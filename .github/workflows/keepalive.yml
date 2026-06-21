@@ -1,0 +1,25 @@
+name: keep-alive
+
+# Pings the deployed health endpoint daily so the free-tier Supabase project
+# doesn't pause during low-traffic periods. Set the repo variable HEALTHCHECK_URL
+# to https://<your-domain>/api/health.
+
+on:
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          URL="${{ vars.HEALTHCHECK_URL }}"
+          if [ -z "$URL" ]; then
+            echo "HEALTHCHECK_URL is not set; skipping."
+            exit 0
+          fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          echo "Health check returned HTTP $code"
+          test "$code" -ge 200 && test "$code" -lt 400
