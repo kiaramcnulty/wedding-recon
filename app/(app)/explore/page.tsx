@@ -69,7 +69,7 @@ export default function ExplorePage() {
   function selectSuggestion(s: GeocodeSuggestion) {
     suppressFetchRef.current = true; // prevent cityQuery change from re-opening the dropdown
     setCityQuery(s.name.split(",")[0]);
-    setFlyTo({ lng: s.lng, lat: s.lat, zoom: 10 });
+    setFlyTo({ lng: s.lng, lat: s.lat, zoom: 9 });
     setSuggestions([]);
     setShowSuggestions(false);
   }
