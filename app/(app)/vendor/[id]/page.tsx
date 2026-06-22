@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { MapPin } from "lucide-react";
+import Link from "next/link";
+import { MapPin, PlusCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
 import type { ReconEntryWithDetails } from "@/lib/types";
@@ -7,6 +8,7 @@ import { PhotoCarousel } from "@/components/vendor/photo-carousel";
 import { ReconCard } from "@/components/vendor/recon-card";
 import { SaveButton } from "@/components/vendor/save-button";
 import { ShareButton } from "@/components/vendor/share-button";
+import { BackButton } from "@/components/vendor/back-button";
 
 interface VendorPageProps {
   params: Promise<{ id: string }>;
@@ -25,6 +27,21 @@ export default async function VendorPage({ params }: VendorPageProps) {
 
   if (vendorError || !vendor) {
     notFound();
+  }
+
+  // Check if the current user already has recon for this vendor
+  const { data: { user } } = await supabase.auth.getUser();
+  let userHasRecon = false;
+  if (user) {
+    const { data: existing } = await supabase
+      .from("recon_entries")
+      .select("id")
+      .eq("vendor_id", id)
+      .eq("author_id", user.id)
+      .neq("status", "removed")
+      .limit(1)
+      .maybeSingle();
+    userHasRecon = !!existing;
   }
 
   // Fetch active recon entries with author + media
@@ -62,6 +79,7 @@ export default async function VendorPage({ params }: VendorPageProps) {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3">
         <div className="flex items-start gap-3">
+          <BackButton />
           {/* Category icon chip */}
           <div
             className="mt-0.5 flex shrink-0 items-center justify-center rounded-lg p-2"
@@ -121,6 +139,19 @@ export default async function VendorPage({ params }: VendorPageProps) {
           <ReconCard key={entry.id} entry={entry} />
         ))}
       </div>
+
+      {/* Add recon CTA — hidden once the user has already contributed */}
+      {!userHasRecon && (
+        <div className="mt-6 px-4">
+          <Link
+            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}`}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/80"
+          >
+            <PlusCircle className="size-4" />
+            Add recon
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

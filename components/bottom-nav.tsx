@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/explore", label: "Explore", icon: Search },
-  { href: "/hub", label: "My recon", icon: Bookmark },
+  { href: "/hub", label: "Planning Hub", icon: Bookmark },
 ] as const;
 
 export function BottomNav() {

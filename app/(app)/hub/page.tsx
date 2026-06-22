@@ -73,7 +73,7 @@ export default async function HubPage() {
     <div className="flex flex-1 flex-col">
       {/* Page header */}
       <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <h1 className="font-heading text-lg font-semibold">My Recon</h1>
+        <h1 className="font-heading text-lg font-semibold">Planning Hub</h1>
         <p className="text-xs text-muted-foreground">
           Vendors you&apos;ve saved or added recon for
         </p>

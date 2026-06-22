@@ -35,8 +35,15 @@ function buildMarkerElement(vendor: Vendor): HTMLElement {
     <Icon size={14} color="#ffffff" strokeWidth={2.5} />,
   );
 
+  // Outer wrapper — MapLibre writes its own translate() transform here for
+  // positioning. Never touch el.style.transform or the marker will scatter.
   const el = document.createElement("div");
-  el.style.cssText = `
+  el.style.cssText = `width: 30px; height: 30px; cursor: pointer;`;
+  el.title = vendor.name;
+
+  // Inner circle — safe to apply visual transforms here.
+  const inner = document.createElement("div");
+  inner.style.cssText = `
     width: 30px;
     height: 30px;
     border-radius: 50%;
@@ -46,18 +53,16 @@ function buildMarkerElement(vendor: Vendor): HTMLElement {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
     transition: transform 0.12s ease;
   `;
-  el.innerHTML = iconSvg;
-  el.title = vendor.name;
+  inner.innerHTML = iconSvg;
+  el.appendChild(inner);
 
-  // Slight scale-up on hover for feedback.
   el.addEventListener("mouseenter", () => {
-    el.style.transform = "scale(1.18)";
+    inner.style.transform = "scale(1.18)";
   });
   el.addEventListener("mouseleave", () => {
-    el.style.transform = "scale(1)";
+    inner.style.transform = "scale(1)";
   });
 
   return el;
@@ -206,7 +211,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0"
+      className="w-full h-full"
       aria-label="Vendor map"
     />
   );
