@@ -23,7 +23,7 @@ export default function ExplorePage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
-  const { position: geoPosition, loading: geoLoading, requestLocation } = useGeolocation();
+  const { position: geoPosition, error: geoError, loading: geoLoading, requestLocation } = useGeolocation();
 
   // When geolocation resolves, fly there (overwrites any city search).
   // setState is deferred via setTimeout to satisfy react-hooks/set-state-in-effect.
@@ -162,7 +162,14 @@ export default function ExplorePage() {
       </div>
 
       {/* Use my location button — bottom-left above bottom nav */}
-      <div className="relative z-10 mt-auto pb-3 pl-3">
+      <div className="relative z-10 mt-auto pb-3 pl-3 flex flex-col items-start gap-1">
+        {geoError && (
+          <p className="rounded-lg bg-background/95 px-2 py-1 text-xs text-destructive shadow-md backdrop-blur-sm max-w-[200px]">
+            {geoError.toLowerCase().includes("denied")
+              ? "Location blocked — enable it in your browser settings"
+              : "Location unavailable"}
+          </p>
+        )}
         <Button
           type="button"
           size="icon"
