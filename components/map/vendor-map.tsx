@@ -16,7 +16,7 @@ const MAP_STYLE_URL =
 
 // Denver, CO
 const DEFAULT_CENTER: [number, number] = [-104.9903, 39.7392];
-const DEFAULT_ZOOM = 11;
+const DEFAULT_ZOOM = 10;
 const DEBOUNCE_MS = 300;
 const MAX_ROWS = 200;
 
