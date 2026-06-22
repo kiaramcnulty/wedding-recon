@@ -69,8 +69,8 @@ function buildMarkerElement(vendor: Vendor): HTMLElement {
 }
 
 interface VendorMapProps {
-  /** External position to fly to (e.g. from "use my location"). */
-  flyToPosition?: { lng: number; lat: number } | null;
+  /** External position to fly to. Pass zoom to override the default (14). */
+  flyToPosition?: { lng: number; lat: number; zoom?: number } | null;
 }
 
 export function VendorMap({ flyToPosition }: VendorMapProps) {
@@ -203,7 +203,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     if (!flyToPosition || !mapRef.current) return;
     mapRef.current.flyTo({
       center: [flyToPosition.lng, flyToPosition.lat],
-      zoom: 14,
+      zoom: flyToPosition.zoom ?? 14,
       duration: 1200,
     });
   }, [flyToPosition]);

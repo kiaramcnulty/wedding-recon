@@ -18,7 +18,7 @@ export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [flyTo, setFlyTo] = useState<{ lng: number; lat: number } | null>(null);
+  const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom?: number } | null>(null);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
@@ -69,7 +69,7 @@ export default function ExplorePage() {
   function selectSuggestion(s: GeocodeSuggestion) {
     suppressFetchRef.current = true; // prevent cityQuery change from re-opening the dropdown
     setCityQuery(s.name.split(",")[0]);
-    setFlyTo({ lng: s.lng, lat: s.lat });
+    setFlyTo({ lng: s.lng, lat: s.lat, zoom: 10 });
     setSuggestions([]);
     setShowSuggestions(false);
   }
