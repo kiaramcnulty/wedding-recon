@@ -68,6 +68,16 @@ function AddReconForm() {
       ? (rawVendorType as VendorType)
       : undefined;
 
+  // Show a back button only when the user arrived from another page (Planning
+  // Hub or a vendor page reached via Explore/Hub), which passes a `from` return
+  // path. Arriving via the "+" tab has no `from`, so no back button is shown.
+  // Restrict to internal paths to avoid an open-redirect through the link.
+  const rawFrom = searchParams.get("from");
+  const backHref =
+    rawFrom && rawFrom.startsWith("/") && !rawFrom.startsWith("//")
+      ? rawFrom
+      : null;
+
   const [vendorState, setVendorState] = React.useState<VendorState>({
     mode: preVendorId ? "google" : "none",
   });
@@ -181,9 +191,11 @@ function AddReconForm() {
     <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
       {/* Header */}
       <header className="flex items-center gap-2 border-b px-4 py-3">
-        <Link href="/hub" aria-label="Back to hub">
-          <ChevronLeft className="size-5 text-muted-foreground" />
-        </Link>
+        {backHref && (
+          <Link href={backHref} aria-label="Go back">
+            <ChevronLeft className="size-5 text-muted-foreground" />
+          </Link>
+        )}
         <h1 className="text-base font-semibold">Add recon</h1>
       </header>
 

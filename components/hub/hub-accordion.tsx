@@ -87,9 +87,12 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
                 {sectionVendors.map((vendor) => (
                   <li
                     key={vendor.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 shadow-sm"
+                    className="flex items-center justify-between gap-3 rounded-xl border bg-card shadow-sm transition-colors hover:bg-muted/40"
                   >
-                    <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/vendor/${vendor.id}?from=${encodeURIComponent("/hub")}`}
+                      className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-l-xl p-3"
+                    >
                       <p className="truncate text-sm font-medium text-foreground">
                         {vendor.name}
                       </p>
@@ -99,32 +102,34 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
                           {vendor.region ? `, ${vendor.region}` : ""}
                         </p>
                       )}
-                    </div>
+                    </Link>
 
-                    {vendor.hasRecon ? (
-                      <Badge
-                        className="shrink-0 gap-1 border-transparent"
-                        style={{
-                          backgroundColor: "#E1F5EE",
-                          color: "#085041",
-                        }}
-                      >
-                        <CheckCircle2 className="size-3" />
-                        Recon added
-                      </Badge>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0 gap-1"
-                        render={
-                          <Link href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}`}>
-                            <PlusCircle className="size-3.5" />
-                            Add Recon
-                          </Link>
-                        }
-                      />
-                    )}
+                    <div className="shrink-0 pr-3">
+                      {vendor.hasRecon ? (
+                        <Badge
+                          className="gap-1 border-transparent"
+                          style={{
+                            backgroundColor: "#E1F5EE",
+                            color: "#085041",
+                          }}
+                        >
+                          <CheckCircle2 className="size-3" />
+                          Recon added
+                        </Badge>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          render={
+                            <Link href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${encodeURIComponent("/hub")}`}>
+                              <PlusCircle className="size-3.5" />
+                              Add Recon
+                            </Link>
+                          }
+                        />
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

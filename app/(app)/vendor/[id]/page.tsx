@@ -13,10 +13,24 @@ import { BrandFooter } from "@/components/brand-lockup";
 
 interface VendorPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function VendorPage({ params }: VendorPageProps) {
+export default async function VendorPage({
+  params,
+  searchParams,
+}: VendorPageProps) {
   const { id } = await params;
+
+  // Where to send the back button: when navigated from another page (e.g. the
+  // Planning Hub) a `from` return path is passed. Restrict to internal paths.
+  // If absent, BackButton falls back to browser history (router.back()).
+  const { from } = await searchParams;
+  const backHref =
+    typeof from === "string" && from.startsWith("/") && !from.startsWith("//")
+      ? from
+      : null;
+
   const supabase = await createClient();
 
   // Fetch vendor
@@ -80,7 +94,7 @@ export default async function VendorPage({ params }: VendorPageProps) {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3">
         <div className="flex items-start gap-3">
-          <BackButton />
+          <BackButton from={backHref} />
           {/* Category icon chip */}
           <div
             className="mt-0.5 flex shrink-0 items-center justify-center rounded-lg p-2"
@@ -145,7 +159,7 @@ export default async function VendorPage({ params }: VendorPageProps) {
       {!userHasRecon && (
         <div className="mt-6 px-4">
           <Link
-            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}`}
+            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${encodeURIComponent(`/vendor/${vendor.id}`)}`}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/80"
           >
             <PlusCircle className="size-4" />
