@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, LocateFixed, Loader2, MapPin } from "lucide-react";
+import { Search, Loader2, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { VendorMap } from "@/components/map/vendor-map";
-import { useGeolocation } from "@/components/map/use-geolocation";
 import { cn } from "@/lib/utils";
 
 interface GeocodeSuggestion {
@@ -22,16 +21,6 @@ export default function ExplorePage() {
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
-
-  const { position: geoPosition, error: geoError, loading: geoLoading, requestLocation } = useGeolocation();
-
-  // When geolocation resolves, fly there (overwrites any city search).
-  // setState is deferred via setTimeout to satisfy react-hooks/set-state-in-effect.
-  useEffect(() => {
-    if (!geoPosition) return;
-    const t = setTimeout(() => setFlyTo(geoPosition), 0);
-    return () => clearTimeout(t);
-  }, [geoPosition]);
 
   // Debounced autocomplete — always goes through setTimeout to avoid
   // calling setState synchronously in the effect body.
@@ -161,31 +150,6 @@ export default function ExplorePage() {
         </div>
       </div>
 
-      {/* Use my location button — bottom-left above bottom nav */}
-      <div className="relative z-10 mt-auto pb-3 pl-3 flex flex-col items-start gap-1">
-        {geoError && (
-          <p className="rounded-lg bg-background/95 px-2 py-1 text-xs text-destructive shadow-md backdrop-blur-sm max-w-[200px]">
-            {geoError.toLowerCase().includes("denied")
-              ? "Location blocked — enable it in your browser settings"
-              : "Location unavailable"}
-          </p>
-        )}
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          aria-label="Use my location"
-          onClick={requestLocation}
-          disabled={geoLoading}
-          className="size-10 rounded-full bg-background/95 shadow-md backdrop-blur-sm"
-        >
-          {geoLoading ? (
-            <Loader2 size={18} className="animate-spin text-primary" />
-          ) : (
-            <LocateFixed size={18} className="text-primary" />
-          )}
-        </Button>
-      </div>
     </div>
   );
 }

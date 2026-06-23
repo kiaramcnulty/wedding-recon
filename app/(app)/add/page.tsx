@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Loader2, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
-import { CATEGORY_LIST, RECON_TYPES, RECON_TYPE_LABELS } from "@/lib/constants/categories";
+import { CATEGORY_LIST, RECON_TYPES, RECON_TYPE_LABELS, VENDOR_TYPES } from "@/lib/constants/categories";
 import type { VendorType, ReconType } from "@/lib/constants/categories";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,11 @@ function AddReconForm() {
   const searchParams = useSearchParams();
   const preVendorId = searchParams.get("vendorId") ?? undefined;
   const preVendorName = searchParams.get("vendorName") ?? undefined;
+  const rawVendorType = searchParams.get("vendorType");
+  const preVendorType: VendorType | undefined =
+    rawVendorType && (VENDOR_TYPES as readonly string[]).includes(rawVendorType)
+      ? (rawVendorType as VendorType)
+      : undefined;
 
   const [vendorState, setVendorState] = React.useState<VendorState>({
     mode: preVendorId ? "google" : "none",
@@ -75,6 +80,7 @@ function AddReconForm() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    defaultValues: preVendorType ? { vendorType: preVendorType } : undefined,
   });
 
   function handlePlaceSelect(place: PlaceSelection) {

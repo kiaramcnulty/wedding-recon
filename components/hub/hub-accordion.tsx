@@ -83,11 +83,11 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
             </AccordionTrigger>
 
             <AccordionContent className="px-0 pb-0">
-              <ul className="divide-y divide-border">
+              <ul className="flex flex-col gap-2 px-4 pb-3 pt-1">
                 {sectionVendors.map((vendor) => (
                   <li
                     key={vendor.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3"
+                    className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 shadow-sm"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground">
@@ -118,7 +118,7 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
                         size="sm"
                         className="shrink-0 gap-1"
                         render={
-                          <Link href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}`}>
+                          <Link href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}`}>
                             <PlusCircle className="size-3.5" />
                             Add Recon
                           </Link>

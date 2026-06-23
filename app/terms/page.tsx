@@ -1,6 +1,6 @@
 export default function TermsPage() {
   return (
-    <div className="mx-auto max-w-[480px] px-5 py-10 space-y-6">
+    <div className="mx-auto max-w-[480px] px-5 py-10 space-y-6 md:max-w-[640px] lg:max-w-[768px]">
       <h1 className="text-2xl font-medium">Terms & disclaimer</h1>
 
       <section className="space-y-3">

@@ -144,7 +144,7 @@ export default async function VendorPage({ params }: VendorPageProps) {
       {!userHasRecon && (
         <div className="mt-6 px-4">
           <Link
-            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}`}
+            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}`}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/80"
           >
             <PlusCircle className="size-4" />

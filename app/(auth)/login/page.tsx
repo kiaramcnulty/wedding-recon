@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Mail, Loader2 } from "lucide-react";
+import { Mail, Loader2, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
+import { BrandMark } from "@/components/brand-mark";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,14 +85,39 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-xl">Welcome to Wedding Recon</CardTitle>
-        <CardDescription>
-          Enter your email and we&apos;ll send you a magic link — no password
-          needed.
-        </CardDescription>
-      </CardHeader>
+    <div className="flex w-full flex-col items-center gap-5">
+      {/* Back to exploring */}
+      <div className="w-full">
+        <Link
+          href="/explore"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronLeft className="size-4" />
+          Back to explore
+        </Link>
+      </div>
+
+      {/* Brand */}
+      <div className="flex flex-col items-center gap-2 text-center">
+        <BrandMark className="size-14" />
+        <div className="space-y-0.5">
+          <p className="font-heading text-lg font-semibold leading-none">
+            weddingrecon.com
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Find local wedding intel. Manage your vendor search.
+          </p>
+        </div>
+      </div>
+
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="text-xl">Log in or create an account</CardTitle>
+          <CardDescription>
+            Enter your email and we&apos;ll send you a magic link — no password
+            needed. New here? The same link creates your account.
+          </CardDescription>
+        </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -139,6 +165,7 @@ export default function LoginPage() {
           </Button>
         </form>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
