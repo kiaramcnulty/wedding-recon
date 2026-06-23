@@ -96,7 +96,7 @@ export default function ExplorePage() {
       </div>
 
       {/* Search bar + autocomplete dropdown */}
-      <div className="relative z-10 px-3 pt-3">
+      <div className="relative z-10 mx-auto w-full max-w-[480px] px-3 pt-3">
         <div className="rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
           <form
             onSubmit={handleSearch}

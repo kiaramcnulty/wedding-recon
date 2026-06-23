@@ -16,7 +16,7 @@ export function BottomNav() {
 
   return (
     <nav className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="relative grid grid-cols-3 items-center px-2 py-2">
+      <div className="relative mx-auto grid w-full max-w-[520px] grid-cols-3 items-center px-2 py-2">
         <NavItem {...TABS[0]} active={isActive(TABS[0].href)} />
 
         <div className="flex justify-center">

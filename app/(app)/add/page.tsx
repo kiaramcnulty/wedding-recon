@@ -177,7 +177,7 @@ function AddReconForm() {
   }
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
       {/* Header */}
       <header className="flex items-center gap-2 border-b px-4 py-3">
         <Link href="/hub" aria-label="Back to hub">
