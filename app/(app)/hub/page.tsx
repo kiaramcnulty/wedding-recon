@@ -5,6 +5,7 @@ import { MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { type Vendor } from "@/lib/types";
 import { HubAccordion } from "@/components/hub/hub-accordion";
+import { BrandFooter } from "@/components/brand-lockup";
 
 export default async function HubPage() {
   const supabase = await createClient();
@@ -101,6 +102,8 @@ export default async function HubPage() {
       ) : (
         <HubAccordion vendors={vendorsWithRecon} />
       )}
+
+      <BrandFooter />
     </div>
   );
 }

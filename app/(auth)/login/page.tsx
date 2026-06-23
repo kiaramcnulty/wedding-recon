@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Mail, Loader2, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLockup } from "@/components/brand-lockup";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,17 +98,7 @@ export default function LoginPage() {
       </div>
 
       {/* Brand */}
-      <div className="flex flex-col items-center gap-2 text-center">
-        <BrandMark className="size-14" />
-        <div className="space-y-0.5">
-          <p className="font-heading text-lg font-semibold leading-none">
-            weddingrecon.com
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Find local wedding intel. Manage your vendor search.
-          </p>
-        </div>
-      </div>
+      <BrandLockup orientation="vertical" size="lg" showDomain showTagline />
 
       <Card className="w-full">
         <CardHeader>

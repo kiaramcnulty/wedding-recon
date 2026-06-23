@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { PlacesCombobox } from "@/components/add/places-combobox";
 import type { PlaceSelection, ManualSelection } from "@/components/add/places-combobox";
 import { ImageUpload } from "@/components/add/image-upload";
+import { BrandFooter } from "@/components/brand-lockup";
 import { createRecon } from "./actions";
 
 // ── Zod schema ────────────────────────────────────────────────────────────────
@@ -370,6 +371,8 @@ function AddReconForm() {
             )}
           </Button>
         </div>
+
+        <BrandFooter className="mt-2" />
       </form>
     </div>
   );

@@ -15,11 +15,6 @@ export function BrandMark({ className }: { className?: string }) {
       aria-label="Wedding Recon"
       className={cn("size-12", className)}
     >
-      <defs>
-        <clipPath id="brandLensClip">
-          <circle cx="27" cy="27" r="18.5" />
-        </clipPath>
-      </defs>
       {/* Handle */}
       <line
         x1="40"
@@ -32,8 +27,8 @@ export function BrandMark({ className }: { className?: string }) {
       />
       {/* Lens fill */}
       <circle cx="27" cy="27" r="18.5" fill="#E1F5EE" />
-      {/* Wedding cake (clipped to the lens) */}
-      <g clipPath="url(#brandLensClip)" fill="#1D9E75">
+      {/* Wedding cake (sits within the lens; the ring is drawn over its edges) */}
+      <g fill="#1D9E75">
         <path d="M27 23.2C23.2 20.4 22.2 18.6 24 17.4c1.2-0.8 2.4-0.3 3 0.6 0.6-0.9 1.8-1.4 3-0.6 1.8 1.2 0.8 3-3 5.8Z" />
         <rect x="21" y="24.5" width="12" height="6" rx="1.6" />
         <rect x="16.5" y="31.5" width="21" height="7.5" rx="1.6" />

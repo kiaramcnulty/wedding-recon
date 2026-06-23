@@ -1,3 +1,5 @@
+import { BrandFooter } from "@/components/brand-lockup";
+
 export default function TermsPage() {
   return (
     <div className="mx-auto max-w-[480px] px-5 py-10 space-y-6 md:max-w-[640px] lg:max-w-[768px]">
@@ -55,6 +57,8 @@ export default function TermsPage() {
       <p className="text-xs text-muted-foreground leading-relaxed pt-4 border-t">
         By creating an account, you agree to these terms.
       </p>
+
+      <BrandFooter />
     </div>
   );
 }

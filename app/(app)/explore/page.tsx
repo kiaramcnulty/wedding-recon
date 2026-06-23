@@ -5,6 +5,7 @@ import { Search, Loader2, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { VendorMap } from "@/components/map/vendor-map";
+import { BrandLockup } from "@/components/brand-lockup";
 import { cn } from "@/lib/utils";
 
 interface GeocodeSuggestion {
@@ -150,6 +151,13 @@ export default function ExplorePage() {
         </div>
       </div>
 
+      {/* Quiet brand mark — bottom-left over the map, lifted clear of the
+          map attribution that sits along the bottom edge. */}
+      <div className="relative z-10 mt-auto px-3 pb-9 pt-3">
+        <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
+          <BrandLockup size="sm" />
+        </div>
+      </div>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { ReconCard } from "@/components/vendor/recon-card";
 import { SaveButton } from "@/components/vendor/save-button";
 import { ShareButton } from "@/components/vendor/share-button";
 import { BackButton } from "@/components/vendor/back-button";
+import { BrandFooter } from "@/components/brand-lockup";
 
 interface VendorPageProps {
   params: Promise<{ id: string }>;
@@ -152,6 +153,8 @@ export default async function VendorPage({ params }: VendorPageProps) {
           </Link>
         </div>
       )}
+
+      <BrandFooter />
     </div>
   );
 }
