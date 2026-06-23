@@ -48,7 +48,7 @@ export default function TermsPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Contact</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Questions about these terms or the service? Please get in touch at hello@weddingrecon.example.
+          Questions about these terms or the service? Please get in touch at kiaramcnulty@gmail.com.
         </p>
       </section>
 
