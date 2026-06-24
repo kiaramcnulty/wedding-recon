@@ -67,7 +67,18 @@ export default async function VendorPage({
     .eq("status", "active")
     .order("created_at", { ascending: false });
 
-  const entries = (rawEntries ?? []) as ReconEntryWithDetails[];
+  const rawList = (rawEntries ?? []) as ReconEntryWithDetails[];
+
+  // Surface the current user's own entry first. sort() is stable, so entries
+  // keep their created_at (newest-first) order within the "mine" / "others"
+  // groups.
+  const entries = user
+    ? [...rawList].sort((a, b) => {
+        const aMine = a.author_id === user.id ? 0 : 1;
+        const bMine = b.author_id === user.id ? 0 : 1;
+        return aMine - bMine;
+      })
+    : rawList;
 
   // Collect all media public URLs for the carousel
   const allImageUrls = entries.flatMap((entry) =>
@@ -151,7 +162,11 @@ export default async function VendorPage({
         </p>
 
         {entries.map((entry) => (
-          <ReconCard key={entry.id} entry={entry} />
+          <ReconCard
+            key={entry.id}
+            entry={entry}
+            isMine={!!user && entry.author_id === user.id}
+          />
         ))}
       </div>
 

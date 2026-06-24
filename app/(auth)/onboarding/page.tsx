@@ -39,7 +39,7 @@ export default function OnboardingPage() {
         <CardTitle className="text-xl">Pick your username</CardTitle>
         <CardDescription>
           Choose an anonymous username that other users will see on your recon
-          entries. You can change it later in your profile.
+          entries.
         </CardDescription>
       </CardHeader>
       <CardContent>

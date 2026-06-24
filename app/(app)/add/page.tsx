@@ -20,6 +20,7 @@ import { PlacesCombobox } from "@/components/add/places-combobox";
 import type { PlaceSelection, ManualSelection } from "@/components/add/places-combobox";
 import { ImageUpload } from "@/components/add/image-upload";
 import { BrandFooter } from "@/components/brand-lockup";
+import { ProfileMenu } from "@/components/profile-menu";
 import { createRecon } from "./actions";
 
 // ── Zod schema ────────────────────────────────────────────────────────────────
@@ -197,6 +198,7 @@ function AddReconForm() {
           </Link>
         )}
         <h1 className="text-base font-semibold">Add recon</h1>
+        <ProfileMenu className="ml-auto shrink-0" />
       </header>
 
       {/* Form */}

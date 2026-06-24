@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { VendorMap } from "@/components/map/vendor-map";
 import { BrandLockup } from "@/components/brand-lockup";
+import { ProfileMenu } from "@/components/profile-menu";
 import { cn } from "@/lib/utils";
 
 interface GeocodeSuggestion {
@@ -96,9 +97,9 @@ export default function ExplorePage() {
         <VendorMap flyToPosition={flyTo} />
       </div>
 
-      {/* Search bar + autocomplete dropdown */}
-      <div className="relative z-10 mx-auto w-full max-w-[480px] px-3 pt-3">
-        <div className="rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
+      {/* Search bar + autocomplete dropdown, with the account control beside it */}
+      <div className="relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">
+        <div className="flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
           <form
             onSubmit={handleSearch}
             className="flex items-center gap-2 px-3 py-2"
@@ -149,6 +150,8 @@ export default function ExplorePage() {
             </ul>
           )}
         </div>
+
+        <ProfileMenu className="shrink-0" />
       </div>
 
       {/* Quiet brand mark — bottom-left over the map, lifted clear of the

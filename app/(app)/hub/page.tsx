@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { type Vendor } from "@/lib/types";
 import { HubAccordion } from "@/components/hub/hub-accordion";
 import { BrandFooter } from "@/components/brand-lockup";
+import { ProfileMenu } from "@/components/profile-menu";
 
 export default async function HubPage() {
   const supabase = await createClient();
@@ -73,11 +74,14 @@ export default async function HubPage() {
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
       {/* Page header */}
-      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <h1 className="font-heading text-lg font-semibold">Planning Hub</h1>
-        <p className="text-xs text-muted-foreground">
-          Vendors you&apos;ve saved or added recon for
-        </p>
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur">
+        <div>
+          <h1 className="font-heading text-lg font-semibold">Planning Hub</h1>
+          <p className="text-xs text-muted-foreground">
+            Vendors you&apos;ve saved or added recon for
+          </p>
+        </div>
+        <ProfileMenu className="shrink-0" />
       </header>
 
       {isEmpty ? (

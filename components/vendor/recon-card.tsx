@@ -10,9 +10,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ReportButton } from "@/components/vendor/report-button";
+import { cn } from "@/lib/utils";
 
 interface ReconCardProps {
   entry: ReconEntryWithDetails;
+  /** True when the entry was authored by the current viewer. */
+  isMine?: boolean;
 }
 
 function getInitials(username: string): string {
@@ -24,7 +27,7 @@ function getInitials(username: string): string {
     .join("") || username.slice(0, 2).toUpperCase();
 }
 
-export async function ReconCard({ entry }: ReconCardProps) {
+export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
   const supabase = await createClient();
 
   const mediaThumbs = entry.media.map(
@@ -36,7 +39,7 @@ export async function ReconCard({ entry }: ReconCardProps) {
   const typeLabel = RECON_TYPE_LABELS[entry.recon_type] ?? entry.recon_type;
 
   return (
-    <Card>
+    <Card className={cn(isMine && "border-primary/40 bg-primary/[0.05]")}>
       <CardHeader>
         <div className="flex items-center gap-2 min-w-0">
           <Avatar size="sm">
@@ -45,6 +48,14 @@ export async function ReconCard({ entry }: ReconCardProps) {
           <span className="text-sm font-medium truncate">
             {entry.author.username}
           </span>
+          {isMine && (
+            <Badge
+              className="shrink-0 border-transparent"
+              style={{ backgroundColor: "#E1F5EE", color: "#085041" }}
+            >
+              My recon
+            </Badge>
+          )}
           <Badge variant="secondary" className="shrink-0">
             {typeLabel}
           </Badge>
