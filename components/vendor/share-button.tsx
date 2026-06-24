@@ -1,6 +1,6 @@
 "use client";
 
-import { Share2 } from "lucide-react";
+import { Share } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { VendorType } from "@/lib/constants/categories";
@@ -42,7 +42,7 @@ export function ShareButton({ vendorId, vendorType, name }: ShareButtonProps) {
       onClick={handleShare}
       aria-label="Share vendor"
     >
-      <Share2 className="size-4" />
+      <Share className="size-4" />
     </Button>
   );
 }

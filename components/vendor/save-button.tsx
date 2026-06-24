@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookmarkPlus, BookmarkCheck } from "lucide-react";
+import { Heart } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -70,14 +70,10 @@ export function SaveButton({ vendorId }: SaveButtonProps) {
       size="icon"
       onClick={handleSave}
       disabled={loading}
-      aria-label={saved ? "Unsave vendor" : "Save vendor"}
+      aria-label={saved ? "Remove from favorites" : "Add to favorites"}
       className={cn(saved && "text-primary border-primary/40 bg-primary/5")}
     >
-      {saved ? (
-        <BookmarkCheck className="size-4" />
-      ) : (
-        <BookmarkPlus className="size-4" />
-      )}
+      <Heart className={cn("size-4", saved && "fill-current")} />
     </Button>
   );
 }
