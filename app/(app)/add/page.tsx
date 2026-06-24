@@ -69,6 +69,12 @@ function AddReconForm() {
       ? (rawVendorType as VendorType)
       : undefined;
 
+  // For an already-resolved vendor the business type is canonical vendor data
+  // and is ignored by the server action, so it's locked (display-only) rather
+  // than presented as an editable — but no-op — control. New vendors (Places /
+  // manual) keep it editable, since there the submitter sets the vendor's type.
+  const lockVendorType = !!preVendorId && !!preVendorType;
+
   // Show a back button only when the user arrived from another page (Planning
   // Hub or a vendor page reached via Explore/Hub), which passes a `from` return
   // path. Arriving via the "+" tab has no `from`, so no back button is shown.
@@ -226,46 +232,68 @@ function AddReconForm() {
           <Controller
             control={control}
             name="vendorType"
-            render={({ field }) => (
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Type of business">
-                {CATEGORY_LIST.map((cat) => {
-                  const Icon = cat.icon;
-                  const isActive = field.value === cat.type;
-                  return (
-                    <button
-                      key={cat.type}
-                      type="button"
-                      role="radio"
-                      aria-checked={isActive}
-                      onClick={() => field.onChange(cat.type)}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
-                        isActive
-                          ? "border-transparent shadow-sm"
-                          : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/40 hover:text-foreground"
-                      )}
-                      style={
-                        isActive
-                          ? {
-                              backgroundColor: cat.lightHex,
-                              color: cat.textHex,
-                              borderColor: cat.colorHex + "44",
-                            }
-                          : undefined
-                      }
-                    >
-                      <Icon
-                        className="size-3.5"
-                        style={isActive ? { color: cat.colorHex } : undefined}
-                      />
-                      {cat.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            render={({ field }) => {
+              // Locked, read-only display for an existing vendor.
+              if (lockVendorType) {
+                const cat = CATEGORY_LIST.find((c) => c.type === field.value);
+                if (!cat) return <></>;
+                const Icon = cat.icon;
+                return (
+                  <div
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium"
+                    style={{
+                      backgroundColor: cat.lightHex,
+                      color: cat.textHex,
+                      borderColor: cat.colorHex + "44",
+                    }}
+                  >
+                    <Icon className="size-3.5" style={{ color: cat.colorHex }} />
+                    {cat.label}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Type of business">
+                  {CATEGORY_LIST.map((cat) => {
+                    const Icon = cat.icon;
+                    const isActive = field.value === cat.type;
+                    return (
+                      <button
+                        key={cat.type}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        onClick={() => field.onChange(cat.type)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
+                          isActive
+                            ? "border-transparent shadow-sm"
+                            : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/40 hover:text-foreground"
+                        )}
+                        style={
+                          isActive
+                            ? {
+                                backgroundColor: cat.lightHex,
+                                color: cat.textHex,
+                                borderColor: cat.colorHex + "44",
+                              }
+                            : undefined
+                        }
+                      >
+                        <Icon
+                          className="size-3.5"
+                          style={isActive ? { color: cat.colorHex } : undefined}
+                        />
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            }}
           />
-          {errors.vendorType && (
+          {!lockVendorType && errors.vendorType && (
             <p className="text-xs text-destructive">{errors.vendorType.message}</p>
           )}
         </section>
