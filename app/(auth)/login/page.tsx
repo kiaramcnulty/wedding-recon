@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Mail, Loader2, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,11 +19,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export default function LoginPage() {
+function LoginContent() {
   const [email, setEmail] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+
+  // Where the back button returns to: the page that sent the guest here passes
+  // a validated internal `from` path (e.g. a vendor page from the favorite
+  // button). Falls back to Explore when there's no origin.
+  const searchParams = useSearchParams();
+  const rawFrom = searchParams.get("from");
+  const backHref =
+    rawFrom && rawFrom.startsWith("/") && !rawFrom.startsWith("//")
+      ? rawFrom
+      : "/explore";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,14 +97,14 @@ export default function LoginPage() {
 
   return (
     <div className="flex w-full flex-col items-center gap-5">
-      {/* Back to exploring */}
+      {/* Back to wherever the guest came from (Explore by default) */}
       <div className="w-full">
         <Link
-          href="/explore"
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ChevronLeft className="size-4" />
-          Back to explore
+          {backHref === "/explore" ? "Back to explore" : "Back"}
         </Link>
       </div>
 
@@ -157,5 +168,13 @@ export default function LoginPage() {
       </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }

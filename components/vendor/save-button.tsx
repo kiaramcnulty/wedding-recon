@@ -28,7 +28,10 @@ export function SaveButton({ vendorId }: SaveButtonProps) {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        router.push("/login");
+        // Send guests to login, remembering this page so the login back button
+        // returns here instead of defaulting to Explore.
+        const returnTo = window.location.pathname + window.location.search;
+        router.push(`/login?from=${encodeURIComponent(returnTo)}`);
         return;
       }
 
