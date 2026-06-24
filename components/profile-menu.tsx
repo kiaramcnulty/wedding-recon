@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { UserRound, LogIn, LogOut, X } from "lucide-react";
 
@@ -34,6 +35,14 @@ function getInitials(name: string): string {
 export function ProfileMenu({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
+  const [mounted, setMounted] = useState(false);
+
+  // Portals require the DOM, so only render the drawer after mount. setState is
+  // deferred via setTimeout to satisfy react-hooks/set-state-in-effect.
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -97,14 +106,18 @@ export function ProfileMenu({ className }: { className?: string }) {
         )}
       </button>
 
-      {/* Drawer (always mounted so it can animate; inert when closed) */}
-      <div
-        className={cn(
-          "fixed inset-0 z-50",
-          open ? "pointer-events-auto" : "pointer-events-none",
-        )}
-        aria-hidden={!open}
-      >
+      {/* Drawer — portaled to <body> so a transformed/filtered ancestor (e.g.
+          a header with backdrop-blur) can't trap its fixed positioning.
+          Always mounted so it can animate; inert when closed. */}
+      {mounted &&
+        createPortal(
+          <div
+            className={cn(
+              "fixed inset-0 z-50",
+              open ? "pointer-events-auto" : "pointer-events-none",
+            )}
+            aria-hidden={!open}
+          >
         <div
           onClick={() => setOpen(false)}
           className={cn(
@@ -192,7 +205,9 @@ export function ProfileMenu({ className }: { className?: string }) {
             )}
           </div>
         </div>
-      </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
