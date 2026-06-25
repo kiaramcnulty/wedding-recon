@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { MapPin, PlusCircle } from "lucide-react";
+import { MapPin, PlusCircle, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
 import type { ReconEntryWithDetails } from "@/lib/types";
@@ -137,10 +137,22 @@ export default async function VendorPage({
 
         {/* Address */}
         {addressParts && (
-          <p className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
+          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="size-3.5 shrink-0" />
-            {addressParts}
-          </p>
+            {vendor.google_place_id ? (
+              <a
+                href={`https://maps.google.com/?cid=${vendor.google_place_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-foreground transition-colors"
+              >
+                {addressParts}
+                <ExternalLink className="size-3.5 shrink-0" />
+              </a>
+            ) : (
+              addressParts
+            )}
+          </div>
         )}
       </div>
 
