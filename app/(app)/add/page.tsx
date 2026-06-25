@@ -29,7 +29,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { PlacesCombobox } from "@/components/add/places-combobox";
-import type { PlaceSelection, ManualSelection } from "@/components/add/places-combobox";
+import type {
+  PlaceSelection,
+  ManualSelection,
+  ExistingVendorSelection,
+} from "@/components/add/places-combobox";
 import { ImageUpload } from "@/components/add/image-upload";
 import { BrandFooter } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
@@ -55,7 +59,11 @@ type FormValues = z.infer<typeof schema>;
 //    PlacesCombobox component, not a plain input ─────────────────────────────
 
 interface VendorState {
-  mode: "none" | "google" | "manual";
+  mode: "none" | "google" | "manual" | "existing";
+  // Existing Wedding Recon vendor (picked from search) — resolves to its id.
+  existingVendorId?: string;
+  existingName?: string;
+  existingVendorType?: VendorType;
   // Google Places
   placeId?: string;
   placeName?: string;
@@ -89,7 +97,8 @@ function AddReconForm() {
   // and is ignored by the server action, so it's locked (display-only) rather
   // than presented as an editable — but no-op — control. New vendors (Places /
   // manual) keep it editable, since there the submitter sets the vendor's type.
-  const lockVendorType = !!preVendorId && !!preVendorType;
+  // (Picking an existing vendor from search also locks it — see below.)
+  const lockedFromParams = !!preVendorId && !!preVendorType;
 
   // Show a back button only when the user arrived from another page (Planning
   // Hub or a vendor page reached via Explore/Hub), which passes a `from` return
@@ -108,6 +117,8 @@ function AddReconForm() {
   const [vendorState, setVendorState] = React.useState<VendorState>({
     mode: preVendorId ? "google" : "none",
   });
+  // An existing vendor's type is canonical, so picking one locks the type chip.
+  const lockVendorType = lockedFromParams || vendorState.mode === "existing";
   const [images, setImages] = React.useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [vendorError, setVendorError] = React.useState<string | null>(null);
@@ -129,6 +140,7 @@ function AddReconForm() {
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -140,7 +152,13 @@ function AddReconForm() {
   // republishes byte-for-byte identical data.
   const buildInputPayload = React.useCallback(
     (values: FormValues) => ({
-      ...(preVendorId ? { vendorId: preVendorId } : {}),
+      // A pre-resolved vendor (URL param) or an existing vendor picked from
+      // search both resolve straight to a vendor id — no new row is created.
+      ...(preVendorId
+        ? { vendorId: preVendorId }
+        : vendorState.mode === "existing"
+          ? { vendorId: vendorState.existingVendorId }
+          : {}),
       ...(vendorState.mode === "google"
         ? {
             placeId: vendorState.placeId,
@@ -277,6 +295,18 @@ function AddReconForm() {
       manualLat: entry.lat,
       manualLng: entry.lng,
     });
+    setVendorError(null);
+  }
+
+  function handleSelectExisting(vendor: ExistingVendorSelection) {
+    setVendorState({
+      mode: "existing",
+      existingVendorId: vendor.vendorId,
+      existingName: vendor.name,
+      existingVendorType: vendor.vendorType,
+    });
+    // The existing vendor's type is canonical; reflect it in the (now locked) chip.
+    setValue("vendorType", vendor.vendorType);
     setVendorError(null);
   }
 
@@ -436,6 +466,7 @@ function AddReconForm() {
           <PlacesCombobox
             lockedName={preVendorName}
             onSelectPlace={handlePlaceSelect}
+            onSelectExisting={handleSelectExisting}
             onSelectManual={handleManualSelect}
             onClear={handleVendorClear}
           />

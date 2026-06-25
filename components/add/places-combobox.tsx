@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Search, X, MapPin, Loader2, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { VendorType } from "@/lib/constants/categories";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -12,6 +13,13 @@ export interface PlaceSelection {
   lat: number | null;
   lng: number | null;
   placeId: string;
+}
+
+/** An existing Wedding Recon vendor picked from the search dropdown. */
+export interface ExistingVendorSelection {
+  vendorId: string;
+  name: string;
+  vendorType: VendorType;
 }
 
 export interface ManualSelection {
@@ -24,10 +32,28 @@ export interface ManualSelection {
   lng: number | null;
 }
 
-interface AutocompleteResult {
-  placeId: string;
-  primaryText: string;
-  secondaryText: string;
+/** A blended search suggestion from /api/places?q= — an existing vendor or a Google place. */
+type SearchSuggestion =
+  | {
+      kind: "existing";
+      vendorId: string;
+      vendorType: string;
+      source: "google" | "user" | "seed";
+      primaryText: string;
+      secondaryText: string;
+    }
+  | {
+      kind: "google";
+      placeId: string;
+      primaryText: string;
+      secondaryText: string;
+    };
+
+/** Origin badge text for a suggestion row. */
+function sourceTag(s: SearchSuggestion): string {
+  if (s.kind === "google" || s.source === "google") return "Google";
+  if (s.source === "seed") return "Featured";
+  return "User created";
 }
 
 /** A geocoded location suggestion from /api/geocode (Nominatim). */
@@ -44,6 +70,8 @@ type ComboboxMode = "search" | "manual";
 interface PlacesComboboxProps {
   /** Called when user selects a Google Place */
   onSelectPlace: (place: PlaceSelection) => void;
+  /** Called when user picks an existing Wedding Recon vendor */
+  onSelectExisting: (vendor: ExistingVendorSelection) => void;
   /** Called when user commits a manual entry */
   onSelectManual: (entry: ManualSelection) => void;
   /** Called when user clears the selection */
@@ -55,6 +83,7 @@ interface PlacesComboboxProps {
 
 export function PlacesCombobox({
   onSelectPlace,
+  onSelectExisting,
   onSelectManual,
   onClear,
   lockedName,
@@ -62,9 +91,11 @@ export function PlacesCombobox({
 }: PlacesComboboxProps) {
   const [mode, setMode] = React.useState<ComboboxMode>("search");
   const [query, setQuery] = React.useState("");
-  const [suggestions, setSuggestions] = React.useState<AutocompleteResult[]>([]);
+  const [suggestions, setSuggestions] = React.useState<SearchSuggestion[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [selected, setSelected] = React.useState<PlaceSelection | null>(null);
+  const [selectedExisting, setSelectedExisting] =
+    React.useState<ExistingVendorSelection | null>(null);
   const [isFetchingDetails, setIsFetchingDetails] = React.useState(false);
   const [open, setOpen] = React.useState(false);
 
@@ -142,7 +173,7 @@ export function PlacesCombobox({
     if (mode !== "search") return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    const empty = !query.trim() || !!selected;
+    const empty = !query.trim() || !!selected || !!selectedExisting;
 
     debounceRef.current = setTimeout(async () => {
       if (empty) {
@@ -153,7 +184,7 @@ export function PlacesCombobox({
       setIsLoading(true);
       try {
         const res = await fetch(`/api/places?q=${encodeURIComponent(query)}`);
-        const data: AutocompleteResult[] = await res.json();
+        const data: SearchSuggestion[] = await res.json();
         setSuggestions(data);
         // Open even with zero results so the manual-entry escape hatch stays
         // reachable when a search returns no matches.
@@ -169,11 +200,25 @@ export function PlacesCombobox({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, mode, selected]);
+  }, [query, mode, selected, selectedExisting]);
 
-  async function handleSelectSuggestion(suggestion: AutocompleteResult) {
+  async function handleSelectSuggestion(suggestion: SearchSuggestion) {
     setOpen(false);
     setQuery(suggestion.primaryText);
+
+    // Existing vendor → resolve directly to its id; no Google lookup needed.
+    if (suggestion.kind === "existing") {
+      const vendor: ExistingVendorSelection = {
+        vendorId: suggestion.vendorId,
+        name: suggestion.primaryText,
+        vendorType: suggestion.vendorType as VendorType,
+      };
+      setSelectedExisting(vendor);
+      onSelectExisting(vendor);
+      return;
+    }
+
+    // Google place → fetch details for coordinates.
     setIsFetchingDetails(true);
     try {
       const res = await fetch(`/api/places?placeId=${encodeURIComponent(suggestion.placeId)}`);
@@ -213,6 +258,7 @@ export function PlacesCombobox({
   function handleClear() {
     setQuery("");
     setSelected(null);
+    setSelectedExisting(null);
     setSuggestions([]);
     setOpen(false);
     setManualName("");
@@ -247,7 +293,7 @@ export function PlacesCombobox({
 
   function handleOptionKeyDown(
     e: React.KeyboardEvent<HTMLLIElement>,
-    suggestion: AutocompleteResult,
+    suggestion: SearchSuggestion,
     idx: number
   ) {
     if (e.key === "Enter" || e.key === " ") {
@@ -427,22 +473,22 @@ export function PlacesCombobox({
             aria-autocomplete="list"
             aria-controls="places-listbox"
             placeholder="Search for a business…"
-            value={selected ? selected.name : query}
-            readOnly={!!selected}
+            value={selected ? selected.name : selectedExisting ? selectedExisting.name : query}
+            readOnly={!!selected || !!selectedExisting}
             onChange={(e) => {
-              if (!selected) setQuery(e.target.value);
+              if (!selected && !selectedExisting) setQuery(e.target.value);
             }}
             onKeyDown={handleSearchKeyDown}
             className={cn(
               "h-10 w-full rounded-lg border border-input bg-transparent py-2 pr-10 pl-9 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm",
-              selected && "bg-muted/30 font-medium"
+              (selected || selectedExisting) && "bg-muted/30 font-medium"
             )}
           />
           {/* Right adornment: loading spinner, clear, or empty */}
           <div className="absolute right-2.5 flex items-center">
             {isFetchingDetails || isLoading ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            ) : (query || selected) ? (
+            ) : (query || selected || selectedExisting) ? (
               <button
                 type="button"
                 onClick={handleClear}
@@ -471,7 +517,7 @@ export function PlacesCombobox({
               ) : (
                 suggestions.map((s, idx) => (
                   <li
-                    key={s.placeId}
+                    key={s.kind === "existing" ? `v:${s.vendorId}` : `g:${s.placeId}`}
                     role="option"
                     aria-selected={false}
                     tabIndex={0}
@@ -479,9 +525,16 @@ export function PlacesCombobox({
                     onClick={() => handleSelectSuggestion(s)}
                     onKeyDown={(e) => handleOptionKeyDown(e, s, idx)}
                   >
-                    <span className="text-sm font-medium leading-snug">{s.primaryText}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium leading-snug">
+                        {s.primaryText}
+                      </span>
+                      <span className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {sourceTag(s)}
+                      </span>
+                    </div>
                     {s.secondaryText && (
-                      <span className="text-xs text-muted-foreground leading-snug">
+                      <span className="truncate text-xs text-muted-foreground leading-snug">
                         {s.secondaryText}
                       </span>
                     )}
@@ -520,6 +573,14 @@ export function PlacesCombobox({
           <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin className="size-3 shrink-0" />
             <span className="truncate">{selected.address ?? "No address"}</span>
+          </p>
+        )}
+        {selectedExisting && (
+          <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="size-3 shrink-0" />
+            <span className="truncate">
+              Already on Wedding Recon — your recon will be added to it.
+            </span>
           </p>
         )}
       </div>
