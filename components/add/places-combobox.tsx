@@ -80,10 +80,12 @@ export function PlacesCombobox({
         const res = await fetch(`/api/places?q=${encodeURIComponent(query)}`);
         const data: AutocompleteResult[] = await res.json();
         setSuggestions(data);
-        setOpen(data.length > 0);
+        // Open even with zero results so the manual-entry escape hatch stays
+        // reachable when a search returns no matches.
+        setOpen(true);
       } catch {
         setSuggestions([]);
-        setOpen(false);
+        setOpen(true);
       } finally {
         setIsLoading(false);
       }
@@ -305,24 +307,30 @@ export function PlacesCombobox({
               role="listbox"
               className="max-h-60 overflow-y-auto py-1"
             >
-              {suggestions.map((s, idx) => (
-                <li
-                  key={s.placeId}
-                  role="option"
-                  aria-selected={false}
-                  tabIndex={0}
-                  className="flex cursor-pointer flex-col gap-0.5 px-3 py-2 outline-none hover:bg-accent focus:bg-accent"
-                  onClick={() => handleSelectSuggestion(s)}
-                  onKeyDown={(e) => handleOptionKeyDown(e, s, idx)}
-                >
-                  <span className="text-sm font-medium leading-snug">{s.primaryText}</span>
-                  {s.secondaryText && (
-                    <span className="text-xs text-muted-foreground leading-snug">
-                      {s.secondaryText}
-                    </span>
-                  )}
+              {suggestions.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-muted-foreground">
+                  No matches for &ldquo;{query.trim()}&rdquo;.
                 </li>
-              ))}
+              ) : (
+                suggestions.map((s, idx) => (
+                  <li
+                    key={s.placeId}
+                    role="option"
+                    aria-selected={false}
+                    tabIndex={0}
+                    className="flex cursor-pointer flex-col gap-0.5 px-3 py-2 outline-none hover:bg-accent focus:bg-accent"
+                    onClick={() => handleSelectSuggestion(s)}
+                    onKeyDown={(e) => handleOptionKeyDown(e, s, idx)}
+                  >
+                    <span className="text-sm font-medium leading-snug">{s.primaryText}</span>
+                    {s.secondaryText && (
+                      <span className="text-xs text-muted-foreground leading-snug">
+                        {s.secondaryText}
+                      </span>
+                    )}
+                  </li>
+                ))
+              )}
               {/* Manual entry escape hatch */}
               <li className="border-t border-border">
                 <button
