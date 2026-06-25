@@ -39,5 +39,51 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - `npm run build` — production build (must pass before commit).
 - `npm run lint` — eslint.
 
+## Key patterns & learnings
+
+### Navigation with return context
+- Use a `from` query param to track origin page (e.g., `?from=/explore` or `?from=/vendor/123`).
+- Always validate: `from && from.startsWith("/") && !from.startsWith("//")` to prevent open redirects.
+- Encode return paths: `encodeURIComponent(returnTo)` when serializing, `decodeURIComponent()` when reading (though next/navigation handles this).
+- Example: guest clicks "Save" on vendor → redirects to `/login?from=/vendor/123` → after login, back button returns to that vendor (not Explore).
+
+### React + SSR patterns
+- **Portal rendering requires mounted state guard:** use `useEffect` with `setTimeout(..., 0)` to defer `setMounted(true)` (satisfies `react-hooks/set-state-in-effect` lint rule and ensures DOM exists).
+  ```tsx
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(t);
+  }, []);
+  ```
+- **Portals escape containing block constraints:** `createPortal(el, document.body)` escapes `position: fixed` being relative to an ancestor with `backdrop-filter` or `transform`. Use for modals, drawers, popovers that need viewport-level positioning.
+- **Server Actions with file uploads:** pass `FormData` (images survive serialization boundary); send structured data as JSON string in a reserved key (`__input`), then `JSON.parse()` on the server.
+
+### UI layout & constraints
+- Mobile frame: `max-w-[480px]` centered, tight padding, bottom nav always visible.
+- Wider content (hub, vendor page): `max-w-[760px]` for better use of desktop space while staying readable.
+- Bottom nav items: grid layout centered via `mx-auto` with the `max-w-[520px]` constraint (matches mobile frame + padding).
+- Headers with profile menu: use `ProfileMenu className="ml-auto shrink-0"` to right-align; it auto-portals internally.
+
+### Supabase patterns
+- **Idempotent upserts:** `upsert(..., { onConflict: "col1,col2" })` for operations that might repeat (e.g., save vendor to hub).
+- **Case-insensitive uniqueness:** use a functional unique index `CREATE UNIQUE INDEX idx_name ON table (LOWER(col))` instead of relying on app-level normalization.
+- **Vendor dedup:** 
+  - Google Places path: upsert by `google_place_id` (guaranteed unique from Google).
+  - Manual/user path: soft-dedup by `ilike("name", name)` + `ilike("city", city)` to catch duplicates, then insert if not found.
+  - Pre-resolved vendor: lock the vendor type since it's canonical data; don't allow user to override.
+- **RLS for public pages:** enable public read on `vendors`, `profiles.username`, `recon_entries` (filtered by status), `recon_media`; restrict write to authenticated users, update/delete to row owners.
+
+### Form & field handling
+- **Vendor type locking:** when adding recon for an existing vendor (via Hub "Add Recon" button), pass `vendorId` + `vendorType` as query params. Lock the type chip (read-only display) if both are present — the user cannot override.
+- **Google Places integration:** server-side only; call `/api/places` route handler with an API key in `.env.local` (never exposed to client). Return place data (id, name, address, lat/lng) to client.
+- **Image uploads:** accept as `File[]` via a combobox UI, serialize via `FormData`, upload server-side to Supabase Storage, then insert `recon_media` rows with storage paths.
+
+### Errors & gotchas
+- **Base UI + Radix confusion:** shadcn/ui wraps Base UI, not Radix — APIs differ. Check existing component files for patterns.
+- **Console warning with render prop:** `<Button render={<Link>} />` triggers a warning; instead use `<Link className={buttonVariants()} />` directly.
+- **Unique violation handling:** Google Places upsert can hit duplicate key; handle gracefully with `error?.code === "23505"` check.
+- **Supabase free tier pausing:** after 7 days with zero requests, the project pauses (not deleted). Keep-alive via a daily `/api/health` ping (GitHub Actions or Vercel Cron) during cold-start.
+
 ## Milestone status
-M0 foundation (scaffold, design system, DB schema/RLS/RPC/seed, shell) is done. Feature slices M1–M6 build on it. Placeholders exist for `explore`/`add`/`hub` — replace them.
+M0 foundation is done. M1 (Auth) → M2 (Explore map) → M3 (Vendor page) → M4 (Add Recon) → M5 (Hub) → M6 (T&S) are built out. All core features are functional; ongoing work is polish, deeplinks, and edge cases.
