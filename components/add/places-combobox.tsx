@@ -17,12 +17,26 @@ export interface PlaceSelection {
 export interface ManualSelection {
   name: string;
   city: string;
+  /** Resolved full address/label from geocoding (null until a location is picked). */
+  address: string | null;
+  region: string | null;
+  lat: number | null;
+  lng: number | null;
 }
 
 interface AutocompleteResult {
   placeId: string;
   primaryText: string;
   secondaryText: string;
+}
+
+/** A geocoded location suggestion from /api/geocode (Nominatim). */
+interface GeocodeResult {
+  name: string;
+  lat: number;
+  lng: number;
+  city: string | null;
+  region: string | null;
 }
 
 type ComboboxMode = "search" | "manual";
@@ -56,11 +70,72 @@ export function PlacesCombobox({
 
   // Manual mode fields
   const [manualName, setManualName] = React.useState("");
-  const [manualCity, setManualCity] = React.useState("");
+  // Location autocomplete (geocoded) — required for a manual entry.
+  const [locQuery, setLocQuery] = React.useState("");
+  const [locSuggestions, setLocSuggestions] = React.useState<GeocodeResult[]>([]);
+  const [locLoading, setLocLoading] = React.useState(false);
+  const [locOpen, setLocOpen] = React.useState(false);
+  const [selectedLocation, setSelectedLocation] =
+    React.useState<GeocodeResult | null>(null);
 
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLUListElement>(null);
+
+  // Notify the parent of the manual entry. Mode stays "manual" once a name is
+  // typed; the parent enforces that a location was resolved before submit.
+  const emitManual = React.useCallback(
+    (name: string, location: GeocodeResult | null) => {
+      if (!name.trim()) {
+        onClear();
+        return;
+      }
+      onSelectManual({
+        name: name.trim(),
+        city: location?.city ?? "",
+        address: location?.name ?? null,
+        region: location?.region ?? null,
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
+      });
+    },
+    [onClear, onSelectManual],
+  );
+
+  // Debounced geocode for the location field. Nominatim asks for ≤1 req/sec and
+  // discourages as-you-type, so we debounce generously and only fire on pause.
+  React.useEffect(() => {
+    if (mode !== "manual") return;
+    if (locDebounceRef.current) clearTimeout(locDebounceRef.current);
+
+    // Don't re-query once a suggestion is locked in (or the field is empty).
+    const skip = !!selectedLocation || !locQuery.trim();
+
+    locDebounceRef.current = setTimeout(async () => {
+      if (skip) {
+        setLocSuggestions([]);
+        setLocOpen(false);
+        return;
+      }
+      setLocLoading(true);
+      try {
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(locQuery)}`);
+        const data: GeocodeResult[] = await res.json();
+        setLocSuggestions(data);
+        setLocOpen(true);
+      } catch {
+        setLocSuggestions([]);
+        setLocOpen(true);
+      } finally {
+        setLocLoading(false);
+      }
+    }, skip ? 0 : 500);
+
+    return () => {
+      if (locDebounceRef.current) clearTimeout(locDebounceRef.current);
+    };
+  }, [locQuery, mode, selectedLocation]);
 
   // Debounced autocomplete
   React.useEffect(() => {
@@ -128,13 +203,20 @@ export function PlacesCombobox({
     }
   }
 
+  function resetManualLocation() {
+    setSelectedLocation(null);
+    setLocQuery("");
+    setLocSuggestions([]);
+    setLocOpen(false);
+  }
+
   function handleClear() {
     setQuery("");
     setSelected(null);
     setSuggestions([]);
     setOpen(false);
     setManualName("");
-    setManualCity("");
+    resetManualLocation();
     setMode("search");
     onClear();
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -144,8 +226,11 @@ export function PlacesCombobox({
     setOpen(false);
     // Pre-fill manual name from whatever they typed
     setManualName(query);
+    resetManualLocation();
     setMode("manual");
-    onClear();
+    // Mode becomes "manual" with a name but no location yet; the parent blocks
+    // submit until a location is resolved.
+    emitManual(query, null);
   }
 
   // Keyboard navigation in the dropdown
@@ -208,9 +293,9 @@ export function PlacesCombobox({
           <button
             type="button"
             onClick={() => {
-              setMode("search");
               setManualName("");
-              setManualCity("");
+              resetManualLocation();
+              setMode("search");
               onClear();
             }}
             className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
@@ -218,37 +303,114 @@ export function PlacesCombobox({
             Search instead
           </button>
         </div>
-        <div className="space-y-2">
-          <Input
-            placeholder="Business name *"
-            value={manualName}
-            onChange={(e) => {
-              setManualName(e.target.value);
-              // Live-call so parent stays in sync
-              if (e.target.value.trim()) {
-                onSelectManual({ name: e.target.value.trim(), city: manualCity.trim() });
-              } else {
-                onClear();
-              }
-            }}
-            aria-label="Business name"
-          />
-          <Input
-            placeholder="City (optional)"
-            value={manualCity}
-            onChange={(e) => {
-              setManualCity(e.target.value);
-              if (manualName.trim()) {
-                onSelectManual({ name: manualName.trim(), city: e.target.value.trim() });
-              }
-            }}
-            aria-label="City"
-          />
+
+        <Input
+          placeholder="Business name *"
+          value={manualName}
+          onChange={(e) => {
+            setManualName(e.target.value);
+            emitManual(e.target.value, selectedLocation);
+          }}
+          aria-label="Business name"
+        />
+
+        {/* Required, geocoded location */}
+        <div className="space-y-1.5">
+          <Label htmlFor="manual-location">Address, city, or state *</Label>
+          <div className="relative">
+            <div className="relative flex items-center">
+              <MapPin className="pointer-events-none absolute left-2.5 size-4 text-muted-foreground" />
+              <input
+                id="manual-location"
+                type="text"
+                role="combobox"
+                aria-expanded={locOpen}
+                aria-autocomplete="list"
+                aria-controls="manual-location-listbox"
+                placeholder="e.g. 123 Main St, Denver, CO"
+                value={selectedLocation ? selectedLocation.name : locQuery}
+                readOnly={!!selectedLocation}
+                onChange={(e) => {
+                  if (!selectedLocation) setLocQuery(e.target.value);
+                }}
+                className={cn(
+                  "h-10 w-full rounded-lg border border-input bg-transparent py-2 pr-10 pl-9 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm",
+                  selectedLocation && "bg-muted/30 font-medium",
+                )}
+              />
+              <div className="absolute right-2.5 flex items-center">
+                {locLoading ? (
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                ) : locQuery || selectedLocation ? (
+                  <button
+                    type="button"
+                    aria-label="Clear location"
+                    onClick={() => {
+                      resetManualLocation();
+                      emitManual(manualName, null);
+                    }}
+                    className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {locOpen && (
+              <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-border bg-popover shadow-md">
+                <ul
+                  id="manual-location-listbox"
+                  role="listbox"
+                  className="max-h-60 overflow-y-auto py-1"
+                >
+                  {locSuggestions.length === 0 ? (
+                    <li className="px-3 py-2 text-sm text-muted-foreground">
+                      No matches for &ldquo;{locQuery.trim()}&rdquo;.
+                    </li>
+                  ) : (
+                    locSuggestions.map((s, idx) => (
+                      <li
+                        key={`${s.lat},${s.lng},${idx}`}
+                        role="option"
+                        aria-selected={false}
+                        tabIndex={0}
+                        className="cursor-pointer px-3 py-2 text-sm leading-snug outline-none hover:bg-accent focus:bg-accent"
+                        onClick={() => {
+                          setSelectedLocation(s);
+                          setLocOpen(false);
+                          emitManual(manualName, s);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedLocation(s);
+                            setLocOpen(false);
+                            emitManual(manualName, s);
+                          }
+                        }}
+                      >
+                        {s.name}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {selectedLocation ? (
+            <p className="flex items-center gap-1 text-xs text-emerald-700">
+              <MapPin className="size-3 shrink-0" />
+              Location set — this vendor will show on the map.
+            </p>
+          ) : (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+              <PenLine className="size-3 shrink-0" />
+              Start typing, then pick a match so it can appear on the map.
+            </p>
+          )}
         </div>
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <PenLine className="size-3" />
-          Manually entered — won&apos;t have map location data.
-        </p>
       </div>
     );
   }

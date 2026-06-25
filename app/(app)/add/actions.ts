@@ -16,9 +16,13 @@ export interface CreateReconInput {
   placeRegion?: string;
   placeLat?: number | null;
   placeLng?: number | null;
-  /** Manual entry */
+  /** Manual entry (location geocoded client-side and required) */
   manualName?: string;
   manualCity?: string;
+  manualAddress?: string | null;
+  manualRegion?: string | null;
+  manualLat?: number | null;
+  manualLng?: number | null;
 
   // Common vendor metadata
   vendorType: VendorType;
@@ -113,16 +117,23 @@ export async function createRecon(formData: FormData) {
       if (existing) {
         vendorId = existing.id as string;
       } else {
+        // Manual entries now carry a geocoded location so they appear on the map.
+        const locationEwkt =
+          input.manualLng != null && input.manualLat != null
+            ? `SRID=4326;POINT(${input.manualLng} ${input.manualLat})`
+            : null;
+
         const { data: inserted, error } = await supabase
           .from("vendors")
           .insert({
             name,
             vendor_type: input.vendorType,
             city: city || null,
-            address_text: city || null,
+            address_text: input.manualAddress ?? (city || null),
+            region: input.manualRegion ?? null,
             source: "user",
             created_by: user.id,
-            location: null,
+            location: locationEwkt,
           })
           .select("id")
           .single();

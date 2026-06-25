@@ -64,9 +64,13 @@ interface VendorState {
   placeRegion?: string;
   placeLat?: number | null;
   placeLng?: number | null;
-  // Manual
+  // Manual (location is geocoded and required)
   manualName?: string;
   manualCity?: string;
+  manualAddress?: string | null;
+  manualRegion?: string | null;
+  manualLat?: number | null;
+  manualLng?: number | null;
 }
 
 // ── Inner form (needs useSearchParams — must be in a Suspense boundary) ───────
@@ -152,6 +156,10 @@ function AddReconForm() {
         ? {
             manualName: vendorState.manualName,
             manualCity: vendorState.manualCity,
+            manualAddress: vendorState.manualAddress,
+            manualRegion: vendorState.manualRegion,
+            manualLat: vendorState.manualLat,
+            manualLng: vendorState.manualLng,
           }
         : {}),
       vendorType: values.vendorType as VendorType,
@@ -264,6 +272,10 @@ function AddReconForm() {
       mode: "manual",
       manualName: entry.name,
       manualCity: entry.city,
+      manualAddress: entry.address,
+      manualRegion: entry.region,
+      manualLat: entry.lat,
+      manualLng: entry.lng,
     });
     setVendorError(null);
   }
@@ -278,6 +290,17 @@ function AddReconForm() {
     // Validate vendor selection
     if (!preVendorId && vendorState.mode === "none") {
       setVendorError("Please search for or enter a business name");
+      return;
+    }
+    // Manual entries must resolve a real location so they can appear on the map.
+    if (
+      !preVendorId &&
+      vendorState.mode === "manual" &&
+      vendorState.manualLat == null
+    ) {
+      setVendorError(
+        "Please choose an address, city, or state from the suggestions.",
+      );
       return;
     }
     setVendorError(null);
