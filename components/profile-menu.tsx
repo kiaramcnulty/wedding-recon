@@ -169,7 +169,7 @@ export function ProfileMenu({ className }: { className?: string }) {
                   className={cn(buttonVariants({ size: "lg" }), "w-full gap-2")}
                 >
                   <LogIn className="size-4" />
-                  Log in
+                  Sign up/log in
                 </Link>
               </>
             )}
