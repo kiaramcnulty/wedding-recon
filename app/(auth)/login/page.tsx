@@ -21,7 +21,6 @@ import {
 
 function LoginContent() {
   const [email, setEmail] = useState("");
-  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -37,11 +36,6 @@ function LoginContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!agreed) {
-      toast.error("Please agree to the Terms before continuing.");
-      return;
-    }
 
     setLoading(true);
     try {
@@ -134,25 +128,6 @@ function LoginContent() {
               autoFocus
             />
           </div>
-
-          <label className="flex cursor-pointer items-start gap-2.5">
-            <input
-              type="checkbox"
-              className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
-              checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-              required
-            />
-            <span className="text-sm text-muted-foreground leading-snug">
-              I agree to the{" "}
-              <Link
-                href="/terms"
-                className="text-primary underline underline-offset-4 hover:text-primary/80"
-              >
-                Terms
-              </Link>
-            </span>
-          </label>
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? (

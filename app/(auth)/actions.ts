@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Set (or update) the current user's anonymous display username.
+ * Set (or update) the current user's anonymous display username and record TOS acceptance.
  * Validates length, trims whitespace, and maps the Postgres unique-violation
  * error (23505) to a user-friendly message returned as a string rather than
  * thrown, so the client can surface it inline.
@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function setUsername(
   formData: FormData | string,
+  tosAgreed?: boolean,
 ): Promise<string | null> {
   const raw =
     typeof formData === "string"
@@ -37,9 +38,14 @@ export async function setUsername(
     redirect("/login");
   }
 
+  const updates: Record<string, unknown> = { username };
+  if (tosAgreed) {
+    updates.tos_accepted_at = new Date().toISOString();
+  }
+
   const { error } = await supabase
     .from("profiles")
-    .update({ username })
+    .update(updates)
     .eq("id", user.id);
 
   if (error) {

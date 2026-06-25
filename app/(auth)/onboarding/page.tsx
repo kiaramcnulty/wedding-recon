@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { setUsername } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,7 @@ import {
 
 export default function OnboardingPage() {
   const [username, setUsernameValue] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -24,8 +27,13 @@ export default function OnboardingPage() {
     e.preventDefault();
     setFieldError(null);
 
+    if (!agreed) {
+      toast.error("Please agree to the Terms before continuing.");
+      return;
+    }
+
     startTransition(async () => {
-      const error = await setUsername(username);
+      const error = await setUsername(username, agreed);
       if (error) {
         setFieldError(error);
       }
@@ -77,6 +85,25 @@ export default function OnboardingPage() {
               if you&apos;d like.
             </p>
           </div>
+
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              required
+            />
+            <span className="text-sm text-muted-foreground leading-snug">
+              I agree to the{" "}
+              <Link
+                href="/terms"
+                className="text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                Terms
+              </Link>
+            </span>
+          </label>
 
           <Button type="submit" className="w-full" disabled={isPending}>
             {isPending ? (
