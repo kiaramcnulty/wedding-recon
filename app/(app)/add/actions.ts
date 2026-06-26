@@ -29,6 +29,8 @@ export interface CreateReconInput {
 
   // Recon entry fields
   reconType: ReconType;
+  collectedMonth: number;
+  collectedYear: number;
   priceText?: string;
   priceDetails?: string;
   notes?: string;
@@ -153,6 +155,8 @@ export async function createRecon(formData: FormData) {
       vendor_id: vendorId,
       author_id: user.id,
       recon_type: input.reconType,
+      recon_collected_month: input.collectedMonth,
+      recon_collected_year: input.collectedYear,
       price_text: input.priceText?.trim() || null,
       price_details: input.priceDetails?.trim() || null,
       notes: input.notes?.trim() || null,

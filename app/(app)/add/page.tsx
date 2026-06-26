@@ -48,6 +48,8 @@ const schema = z.object({
   reconType: z.enum(["online", "virtual", "in_person"], {
     error: "Please choose a type of recon",
   }),
+  collectedMonth: z.number().int().min(1).max(12),
+  collectedYear: z.number().int().min(2000),
   priceText: z.string().optional(),
   priceDetails: z.string().optional(),
   notes: z.string().optional(),
@@ -136,6 +138,10 @@ function AddReconForm() {
     "idle" | "publishing" | "missing"
   >(isResume ? "publishing" : "idle");
 
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1; // getMonth() is 0-indexed
+  const currentYear = now.getFullYear();
+
   const {
     control,
     handleSubmit,
@@ -144,7 +150,11 @@ function AddReconForm() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: preVendorType ? { vendorType: preVendorType } : undefined,
+    defaultValues: {
+      ...(preVendorType ? { vendorType: preVendorType } : {}),
+      collectedMonth: currentMonth,
+      collectedYear: currentYear,
+    },
   });
 
   // Build the structured `__input` payload from the current form + vendor state.
@@ -182,6 +192,8 @@ function AddReconForm() {
         : {}),
       vendorType: values.vendorType as VendorType,
       reconType: values.reconType as ReconType,
+      collectedMonth: values.collectedMonth,
+      collectedYear: values.collectedYear,
       priceText: values.priceText,
       priceDetails: values.priceDetails,
       notes: values.notes,
@@ -193,22 +205,35 @@ function AddReconForm() {
   // automatic publish fails, so the now-signed-in user can review and retry).
   const rehydrateForm = React.useCallback(
     (draft: ReconDraft) => {
-      const p = draft.payload as Record<string, string | undefined>;
+      const p = draft.payload as Record<string, string | number | undefined>;
       reset({
         vendorType: p.vendorType as VendorType,
         reconType: p.reconType as ReconType,
-        priceText: p.priceText ?? "",
-        priceDetails: p.priceDetails ?? "",
-        notes: p.notes ?? "",
+        collectedMonth: p.collectedMonth ? Number(p.collectedMonth) : currentMonth,
+        collectedYear: p.collectedYear ? Number(p.collectedYear) : currentYear,
+        priceText: String(p.priceText ?? ""),
+        priceDetails: String(p.priceDetails ?? ""),
+        notes: String(p.notes ?? ""),
       });
       setVendorState(draft.vendorState as unknown as VendorState);
       setImages(draft.images);
     },
-    [reset],
+    [reset, currentMonth, currentYear],
   );
 
   // Detect auth on mount, and — when returning from the magic link — auto-publish
   // the saved draft. Runs once.
+  // Set correct defaults after client hydration (avoid SSR time-zone mismatches)
+  React.useEffect(() => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    if (month !== currentMonth || year !== currentYear) {
+      setValue("collectedMonth", month);
+      setValue("collectedYear", year);
+    }
+  }, []);
+
   const resumeStarted = React.useRef(false);
   React.useEffect(() => {
     let active = true;
@@ -586,6 +611,55 @@ function AddReconForm() {
           {errors.reconType && (
             <p className="text-xs text-destructive">{errors.reconType.message}</p>
           )}
+        </section>
+
+        {/* ── Recon collected at (month & year) ──────────────────────────── */}
+        <section className="space-y-2">
+          <Label>Recon collected at</Label>
+          <div className="flex gap-2">
+            {/* Month dropdown */}
+            <Controller
+              control={control}
+              name="collectedMonth"
+              render={({ field }) => (
+                <select
+                  value={field.value}
+                  onChange={(e) => field.onChange(Number(e.target.value))}
+                  onBlur={field.onBlur}
+                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => (
+                    <option key={month} value={month}>
+                      {new Date(2000, month - 1).toLocaleString("default", {
+                        month: "long",
+                      })}
+                    </option>
+                  ))}
+                </select>
+              )}
+            />
+            {/* Year dropdown */}
+            <Controller
+              control={control}
+              name="collectedYear"
+              render={({ field }) => (
+                <select
+                  value={field.value}
+                  onChange={(e) => field.onChange(Number(e.target.value))}
+                  onBlur={field.onBlur}
+                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {Array.from({ length: currentYear - 2000 + 1 }, (_, i) => 2000 + i)
+                    .reverse()
+                    .map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                </select>
+              )}
+            />
+          </div>
         </section>
 
         {/* ── Price quote ───────────────────────────────────────────────── */}
