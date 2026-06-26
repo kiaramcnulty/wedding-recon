@@ -47,3 +47,7 @@ supabase/.branches/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local product-spec artifacts (canonical text spec lives in docs/wedding-recon-spec.txt)
+/Wedding Recon Spec.pdf
+/Wedding Recon Spec.md

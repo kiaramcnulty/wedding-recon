@@ -1,0 +1,105 @@
+﻿Goal: to outline the MVP for Wedding Recon, and relevant context, such that an AI agent can build the product, provide feedback/disagree, and make excellent design decision tradeoffs.
+
+
+Overview: After hearing 7 engaged friends complain about not getting wedding venue quotes until they visit in person, and 4 friends told me they found their wedding band entirely off the recommendation of a friend, I decided it was time to build a solution: Wedding Recon, a central hub for engaged couples to benefit from local wedding vendor intel.
+
+
+What is it: At a super high level, Wedding recon is a mobile-first website that delivers two key workflows:
+1. Allows users to explore first-hand intel about wedding vendors in a region, across venues/food/music/flowers/dresses/photography and other categories.
+2. Allows users to save vendors of interest and log their own intel about vendors they visit, all in one central “planning hub”
+Note that (2) is largely in service of (1). There is a fundamental marketplace challenge - and risk - of motivating users to share intel on the platform. The hope is that by providing value to an individual user when they log their own intel - in the form of a central, organized “planning hub” - this will provide enough value to the user to get them to add their own intel, which will then become accessible to other users.
+
+
+Similar products: Mtn Project for rock climbing routes, iOverlander for camping spots.
+
+
+Requirements:
+I’ll include proposals/ideas/mockups for how to accomplish the user requirements below, but I’d consider those soft suggestions, not hard requirements. We should feel encouraged to propose better/alternative ideas that align with the high level product goals and the user requirements. We should also recognize that this is a non-revenue generating product, at least for the foreseeable future, and we should index heavily on low-cost/free options when thinking about the tech stack.
+
+
+Account Creation
+As a fiancee, I can quickly create an account on Wedding Recon, which will allow me to see and store relevant Recon.
+* Suggestion: we create authentication/account constructs with bare minimum information: phone number, email, and anonymous username.
+
+
+Vendor Exploration
+As a fiancee, I can search an area and explore nearby vendors.
+* Suggestion: we create an “Explore” tab in a bottom panel navigation, which has the following:
+   * A search bar that auto-populates at the city level
+   * A colloquial triangle/arrow icon, which allows a user to set their current location
+   * A google maps-esque UI across the page, which can be zoomed in/out based on finger or mouse dragging
+   * An overlay of vendor “pins” in the area being rendered on the map, with different colors and icons for each type of vendor (venue = building, food = food, photos = camera, dresses = dress, planner = woman, flowers = flowers, Other = arrow?)
+See mockup below for a rough idea:
+  
+
+
+
+As a fiancee, I can select vendors of interest and view both basic information and local intel about the vendor.
+* Suggestion: if I click on one of the pins on the map, I get a vendor-specific page with the following:
+   * Name of the vendor
+   * Address of the vendor
+   * Carousel of photos from Google Photos if applicable
+   * A list of Recon entries, which should contain
+      * Anonymous username
+      * Price quotes + price details
+      * Recon notes
+      * Type of recon (online research, call/video meeting, in person visit)
+      * Image/video attachments (photos, videos, flyers, etc)
+
+
+See mockup below for a rough idea:
+  
+
+As a fiancee, I can add a vendor of interest to my Planning Hub.
+* Suggestion: in the vendor-specific page above, add a “plus” icon in the top right that saves the vendor to the Planning Hub
+
+
+As a fiancee, I can share a vendor of interest with someone else, even if they don’t have an account on Planning Hub.
+* Suggestion: in the vendor-specific page above, add a “share” arrow icon in the top right that allows the user to select a platform to share on (e.g. SMS, email etc - the native sharing experience) with the following pre-populated message: “Check out this {{vendor type}} vendor on Wedding Recon! {{deeplink to sign up page/vendor page}}”
+
+
+Recon Creation
+As a fiancee, I can create my own Recon entry very easily.
+* Suggestion: we make the “PLUS” icon the central tab in the bottom navigation bar, which opens a form with the following fields:
+   * Name of Vendor
+      * We should look for existing google businesses and show name + addresses in a dropdown to select a match. If there is no match, we should allow them to enter a name and address (address can be as generic as city), which we will then store as a valid record in the future for others to select.
+   * Type of vendor: Venue, Music, Planner, Flowers, Photos, Other
+   * Type of recon: online, virtual call/meeting, in-person
+   * Price: free text for relevant formatting (e.g. “$100-$150 per hour”)
+   * Price details: free larger text for relevant nuance (e.g. “just the indoor venue is $10k, but if you add the outdoor space then it’s $15k”)
+   * Recon notes: large text box for general notes/review of the vendor (e.g. “The food tasting was awesome. We loved the appetizers but were less impressed with the main course”
+   * CTA to “Save” recon, which publishes it to the rest of the platform and adds it under the user’s Planning Hub
+See mockup below for a rough idea:
+  
+
+As a fiancee, I can create a Recon entry for an existing business on Google Maps or an unknown vendor.
+
+
+As a fiancee, I can add details about the type of vendor, price information and other relevant details.
+
+
+My Recon
+As a fiancee, I can see all my vendors of interest and Recon in one place.
+* Suggestion: we add a “Planning Hub” tab as the righthand tab in the bottom navigation, with:
+   * a list of all vendors that the user has either a) added to their hub via the explorer, or b) added direct Recon for. 
+   * List should be sorted into accordion dropdowns based on vendor type (venues, flowers, etc.)
+   * If the user has already added recon to that vendor, we note a pill saying “Recon added”. If they haven’t we provide a direct CTA that says “Add Recon”
+See mockup below for a rough idea:
+  
+
+
+
+As a fiancee, I can easily add new Recon to a vendor I marked interest in.
+* Suggestion: if the user clicks “Add Recon” above, we re-direct to the “Add Recon" page, with the vendor name pre-populated based on the original record they selected.
+
+
+
+
+Other considerations
+Legal:
+* TOS
+* flag/report mechanism
+Tech Stack:
+* Next.js, Vercel, Supabase, Google Maps/MapLibre
+Cold Start
+* Will need to seed initial data (scraping/online research, friends, cold outreach/visits)
