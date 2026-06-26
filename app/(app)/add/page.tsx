@@ -43,7 +43,7 @@ import { createRecon } from "./actions";
 
 const schema = z.object({
   vendorType: z.enum(["venue", "food", "music", "flowers", "dress", "planner", "photos", "other"], {
-    error: "Please choose a type of business",
+    error: "Please choose a type of vendor",
   }),
   reconType: z.enum(["online", "virtual", "in_person"], {
     error: "Please choose a type of recon",
@@ -319,7 +319,7 @@ function AddReconForm() {
   async function onSubmit(values: FormValues) {
     // Validate vendor selection
     if (!preVendorId && vendorState.mode === "none") {
-      setVendorError("Please search for or enter a business name");
+      setVendorError("Please search for or enter a vendor name");
       return;
     }
     // Manual entries must resolve a real location so they can appear on the map.
@@ -398,9 +398,9 @@ function AddReconForm() {
     return (
       <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center gap-3 px-4 py-16 text-center">
         <Loader2 className="size-7 animate-spin text-primary" />
-        <p className="text-sm font-medium">Publishing your recon…</p>
+        <p className="text-sm font-medium">Saving your recon…</p>
         <p className="text-xs text-muted-foreground">
-          Hang tight — we&apos;re posting the recon you saved.
+          Hang tight — we&apos;re saving the recon you started.
         </p>
       </div>
     );
@@ -417,8 +417,8 @@ function AddReconForm() {
           <h1 className="font-heading text-lg font-semibold">Check your email</h1>
           <p className="mx-auto max-w-sm text-sm text-muted-foreground">
             We sent a magic link to <strong>{sentTo}</strong>.{" "}
-            <strong>Open it on this device</strong> to finish publishing — your
-            recon, including photos, is saved right here in this browser.
+            <strong>Open it on this device</strong> to finish saving — your
+            recon, including photos, is stored right here in this browser.
           </p>
         </div>
         <Button
@@ -461,7 +461,7 @@ function AddReconForm() {
         className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-5"
         noValidate
       >
-        {/* ── Business name ─────────────────────────────────────────────── */}
+        {/* ── Vendor name ───────────────────────────────────────────────── */}
         <section className="space-y-1.5">
           <PlacesCombobox
             lockedName={preVendorName}
@@ -475,9 +475,9 @@ function AddReconForm() {
           )}
         </section>
 
-        {/* ── Type of business chips ────────────────────────────────────── */}
+        {/* ── Type of vendor chips ────────────────────────────────────── */}
         <section className="space-y-2">
-          <Label>Type of business</Label>
+          <Label>Type of vendor</Label>
           <Controller
             control={control}
             name="vendorType"
@@ -503,7 +503,7 @@ function AddReconForm() {
               }
 
               return (
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Type of business">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Type of vendor">
                   {CATEGORY_LIST.map((cat) => {
                     const Icon = cat.icon;
                     const isActive = field.value === cat.type;
@@ -686,9 +686,9 @@ function AddReconForm() {
                 {authState === "guest" ? "Sending link…" : "Saving…"}
               </>
             ) : authState === "guest" ? (
-              "Email me a link to publish"
+              "Email me a link to save"
             ) : (
-              "Publish recon"
+              "Save recon"
             )}
           </Button>
         </div>

@@ -321,7 +321,7 @@ export function PlacesCombobox({
   if (lockedName) {
     return (
       <div className={cn("space-y-1.5", className)}>
-        <Label>Business name</Label>
+        <Label>Vendor name</Label>
         <div className="flex items-center gap-2 rounded-lg border border-input bg-muted/40 px-2.5 py-2 text-sm">
           <MapPin className="size-4 shrink-0 text-muted-foreground" />
           <span className="flex-1 truncate font-medium">{lockedName}</span>
@@ -335,7 +335,7 @@ export function PlacesCombobox({
     return (
       <div className={cn("space-y-3", className)}>
         <div className="flex items-center justify-between">
-          <Label>Business name</Label>
+          <Label>Vendor name</Label>
           <button
             type="button"
             onClick={() => {
@@ -351,13 +351,13 @@ export function PlacesCombobox({
         </div>
 
         <Input
-          placeholder="Business name *"
+          placeholder="Vendor name *"
           value={manualName}
           onChange={(e) => {
             setManualName(e.target.value);
             emitManual(e.target.value, selectedLocation);
           }}
-          aria-label="Business name"
+          aria-label="Vendor name"
         />
 
         {/* Required, geocoded location */}
@@ -459,7 +459,7 @@ export function PlacesCombobox({
   // ── Search mode ───────────────────────────────────────────────────────────
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor="places-search">Business name</Label>
+      <Label htmlFor="places-search">Vendor name</Label>
       <div className="relative">
         {/* Input */}
         <div className="relative flex items-center">
@@ -472,7 +472,7 @@ export function PlacesCombobox({
             aria-expanded={open}
             aria-autocomplete="list"
             aria-controls="places-listbox"
-            placeholder="Search for a business…"
+            placeholder="Search for a vendor…"
             value={selected ? selected.name : selectedExisting ? selectedExisting.name : query}
             readOnly={!!selected || !!selectedExisting}
             onChange={(e) => {
