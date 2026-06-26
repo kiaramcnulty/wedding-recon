@@ -25,8 +25,79 @@ interface MarkerRef {
   vendorId: string;
 }
 
+/**
+ * Heuristic: does this vendor's pin sit on an *approximate* (city/region
+ * centroid) location rather than a precise street address?
+ *
+ * Google-sourced vendors carry rooftop-precise coordinates. For user/seed
+ * vendors we treat the absence of a street/building number in the address as
+ * "approximate" — a city or region geocode (e.g. "Denver, Colorado") has no
+ * house number, whereas a real address does. This is intentionally a front-end
+ * heuristic so it works on existing rows; if we later capture geocode precision
+ * at save time (Nominatim bbox / addresstype), swap this for that field.
+ */
+function isApproximateLocation(vendor: Vendor): boolean {
+  if (vendor.source === "google" || vendor.google_place_id) return false;
+  const addr = (vendor.address_text ?? "").trim();
+  return !/\d/.test(addr);
+}
+
+// Deterministic "fan out" for pins that share an (approximate) coordinate.
+// Identical centroids never separate under plain clustering, so we scatter a
+// colliding group across a compact sunflower/phyllotaxis disc: even density,
+// stable per-index, and tight enough to still read as "somewhere in this area".
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ≈ 2.39996 rad
+const FAN_SPREAD_M = 110; // base spacing between successive fanned pins (meters)
+
+/** Geographic offset (in degrees) for the i-th pin of a colliding group. */
+function fanOutOffset(index: number, lat: number): { dLng: number; dLat: number } {
+  if (index === 0) return { dLng: 0, dLat: 0 }; // one stays on the centroid
+  const radius = FAN_SPREAD_M * Math.sqrt(index); // meters from centroid
+  const theta = index * GOLDEN_ANGLE;
+  const east = radius * Math.cos(theta);
+  const north = radius * Math.sin(theta);
+  return {
+    dLat: north / 111_320,
+    dLng: east / (111_320 * Math.cos((lat * Math.PI) / 180)),
+  };
+}
+
+/**
+ * Resolve each vendor's display position. Vendors are grouped by rounded
+ * coordinate (~11m); any group with more than one member is fanned out so the
+ * pins don't stack. Single pins keep their exact coordinate.
+ */
+function resolveDisplayPositions(
+  vendors: Vendor[],
+): Map<string, { lng: number; lat: number }> {
+  const groups = new Map<string, Vendor[]>();
+  for (const v of vendors) {
+    if (v.lng == null || v.lat == null) continue;
+    const key = `${v.lng.toFixed(4)},${v.lat.toFixed(4)}`;
+    const arr = groups.get(key);
+    if (arr) arr.push(v);
+    else groups.set(key, [v]);
+  }
+
+  const positions = new Map<string, { lng: number; lat: number }>();
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      const v = group[0];
+      positions.set(v.id, { lng: v.lng!, lat: v.lat! });
+      continue;
+    }
+    // Stable order → a vendor keeps the same offset across refreshes/pans.
+    group.sort((a, b) => a.id.localeCompare(b.id));
+    group.forEach((v, i) => {
+      const { dLng, dLat } = fanOutOffset(i, v.lat!);
+      positions.set(v.id, { lng: v.lng! + dLng, lat: v.lat! + dLat });
+    });
+  }
+  return positions;
+}
+
 /** Builds a small colored circle element for a vendor marker. */
-function buildMarkerElement(vendor: Vendor): HTMLElement {
+function buildMarkerElement(vendor: Vendor, approximate: boolean): HTMLElement {
   const meta = CATEGORIES[vendor.vendor_type] ?? CATEGORIES.other;
   const Icon = meta.icon;
 
@@ -39,16 +110,17 @@ function buildMarkerElement(vendor: Vendor): HTMLElement {
   // positioning. Never touch el.style.transform or the marker will scatter.
   const el = document.createElement("div");
   el.style.cssText = `width: 30px; height: 30px; cursor: pointer;`;
-  el.title = vendor.name;
+  el.title = approximate ? `${vendor.name} (approximate area)` : vendor.name;
 
-  // Inner circle — safe to apply visual transforms here.
+  // Inner circle — safe to apply visual transforms here. Approximate-location
+  // pins get a dashed outline to signal the spot is a region, not an address.
   const inner = document.createElement("div");
   inner.style.cssText = `
     width: 30px;
     height: 30px;
     border-radius: 50%;
     background-color: ${meta.colorHex};
-    border: 2px solid #ffffff;
+    border: 2px ${approximate ? "dashed" : "solid"} #ffffff;
     box-shadow: 0 1px 4px rgba(0,0,0,0.35);
     display: flex;
     align-items: center;
@@ -123,12 +195,17 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     // Dynamically import maplibre to avoid SSR issues.
     const maplibregl = (await import("maplibre-gl")).default;
 
+    // Fan out pins that share a coordinate so stacked (approximate) vendors
+    // don't pile onto a single spot.
+    const positions = resolveDisplayPositions(vendors);
+
     const newMarkers: MarkerRef[] = [];
 
     for (const vendor of vendors) {
-      if (vendor.lng == null || vendor.lat == null) continue;
+      const pos = positions.get(vendor.id);
+      if (!pos) continue; // missing coordinates
 
-      const el = buildMarkerElement(vendor);
+      const el = buildMarkerElement(vendor, isApproximateLocation(vendor));
 
       el.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -136,7 +213,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
       });
 
       const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([vendor.lng, vendor.lat])
+        .setLngLat([pos.lng, pos.lat])
         .addTo(map);
 
       newMarkers.push({ marker, vendorId: vendor.id });
