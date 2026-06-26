@@ -107,7 +107,7 @@ export default function ExplorePage() {
             <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden />
             <Input
               type="search"
-              placeholder="Search city or neighborhood for wedding vendors…"
+              placeholder="Search city or area for wedding vendors…"
               value={cityQuery}
               onChange={(e) => setCityQuery(e.target.value)}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
