@@ -33,6 +33,7 @@ export interface CreateReconInput {
   collectedYear: number;
   priceText?: string;
   priceDetails?: string;
+  serviceRegion?: string;
   notes?: string;
 
   // Images are handled as FormData — the caller passes this action a FormData
@@ -159,6 +160,7 @@ export async function createRecon(formData: FormData) {
       recon_collected_year: input.collectedYear,
       price_text: input.priceText?.trim() || null,
       price_details: input.priceDetails?.trim() || null,
+      service_region: input.serviceRegion?.trim() || null,
       notes: input.notes?.trim() || null,
       status: "active",
     })

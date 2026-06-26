@@ -52,6 +52,7 @@ const schema = z.object({
   collectedYear: z.number().int().min(2000),
   priceText: z.string().optional(),
   priceDetails: z.string().optional(),
+  serviceRegion: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -147,6 +148,7 @@ function AddReconForm() {
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -156,6 +158,8 @@ function AddReconForm() {
       collectedYear: currentYear,
     },
   });
+
+  const vendorType = watch("vendorType");
 
   // Build the structured `__input` payload from the current form + vendor state.
   // Shared by the immediate (authed) publish and the saved guest draft so resume
@@ -196,6 +200,7 @@ function AddReconForm() {
       collectedYear: values.collectedYear,
       priceText: values.priceText,
       priceDetails: values.priceDetails,
+      serviceRegion: values.serviceRegion,
       notes: values.notes,
     }),
     [preVendorId, vendorState],
@@ -213,6 +218,7 @@ function AddReconForm() {
         collectedYear: p.collectedYear ? Number(p.collectedYear) : currentYear,
         priceText: String(p.priceText ?? ""),
         priceDetails: String(p.priceDetails ?? ""),
+        serviceRegion: String(p.serviceRegion ?? ""),
         notes: String(p.notes ?? ""),
       });
       setVendorState(draft.vendorState as unknown as VendorState);
@@ -695,6 +701,24 @@ function AddReconForm() {
             )}
           />
         </section>
+
+        {/* ── Service region (non-venue vendors only) ────────────────────── */}
+        {vendorType && vendorType !== "venue" && (
+          <section className="space-y-1.5">
+            <Label htmlFor="service-region">Service region</Label>
+            <Controller
+              control={control}
+              name="serviceRegion"
+              render={({ field }) => (
+                <Input
+                  id="service-region"
+                  placeholder="e.g. NYC metro or Western Colorado"
+                  {...field}
+                />
+              )}
+            />
+          </section>
+        )}
 
         {/* ── Recon notes ───────────────────────────────────────────────── */}
         <section className="space-y-1.5">

@@ -93,6 +93,12 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
           </div>
         )}
 
+        {entry.service_region && (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium">Service region:</span> {entry.service_region}
+          </p>
+        )}
+
         {entry.notes && (
           <p className="text-sm leading-relaxed whitespace-pre-line">
             {entry.notes}

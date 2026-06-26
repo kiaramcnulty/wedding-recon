@@ -35,6 +35,7 @@ export interface ReconEntry {
   recon_collected_year: number;
   price_text: string | null;
   price_details: string | null;
+  service_region: string | null;
   notes: string | null;
   status: ReconStatus;
   created_at: string;
