@@ -38,6 +38,15 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
 
   const typeLabel = RECON_TYPE_LABELS[entry.recon_type] ?? entry.recon_type;
 
+  // Format collected month/year (if available)
+  const collectedDate =
+    entry.recon_collected_month && entry.recon_collected_year
+      ? new Date(entry.recon_collected_year, entry.recon_collected_month - 1).toLocaleDateString(
+          "en-US",
+          { month: "short", year: "numeric" }
+        )
+      : null;
+
   return (
     <Card className={cn(isMine && "border-primary/40 bg-primary/[0.05]")}>
       <CardHeader>
@@ -59,6 +68,11 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
           <Badge variant="secondary" className="shrink-0">
             {typeLabel}
           </Badge>
+          {collectedDate && (
+            <Badge variant="outline" className="shrink-0 text-xs">
+              {collectedDate}
+            </Badge>
+          )}
         </div>
         <CardAction>
           <ReportButton reconEntryId={entry.id} />

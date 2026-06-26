@@ -232,6 +232,7 @@ function AddReconForm() {
       setValue("collectedMonth", month);
       setValue("collectedYear", year);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const resumeStarted = React.useRef(false);
