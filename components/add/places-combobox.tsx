@@ -445,12 +445,6 @@ export function PlacesCombobox({
             )}
           </div>
 
-          {!selectedLocation && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <PenLine className="size-3 shrink-0" />
-              Start typing, then pick a match so it can appear on the map.
-            </p>
-          )}
         </div>
       </div>
     );
