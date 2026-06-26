@@ -22,8 +22,10 @@ Full product/dev plan: see the approved plan referenced in the repo history; thi
   - Server Components / Route Handlers / Server Actions → `await createClient()` from `lib/supabase/server.ts`.
   - Service role (server-only, bypasses RLS) → `createServiceRoleClient()` — use sparingly.
 - **Auth session** is refreshed in `proxy.ts` (Next 16's renamed middleware). Don't gate public vendor pages — shared deeplinks must render without an account.
-- **Map geo query**: call the `vendors_in_bbox` RPC; it returns flattened `lng`/`lat`.
-- **Schema** lives in `supabase/migrations/`. If you change the DB, add a new numbered migration — don't edit applied ones.
+- **Map geo query**: call the `vendors_in_bbox` RPC; it returns flattened `lng`/`lat` (plus `source`, `google_place_id`, `address_text` used for pin styling).
+- **Map markers**: `components/map/vendor-map.tsx` gives approximate-location pins a dashed outline and fans out pins that share a coordinate (deterministic phyllotaxis). See "Approximate-location map pins" below.
+- **Schema** lives in `supabase/migrations/`. If you change the DB, add a new numbered migration — don't edit applied ones. Write them idempotent and **apply new ones by hand in the Supabase SQL editor** (not auto-applied to the hosted DB). See "Migrations" below.
+- **Copy/nomenclature**: the recon CTA is **"Save recon"** (not "Publish"); user-facing labels say **"Vendor"**, not "Business".
 
 ## App structure
 - `app/(app)/` — main screens with the mobile frame + bottom nav: `explore`, `add`, `hub`, and `vendor/[id]`.
@@ -84,6 +86,31 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - **Console warning with render prop:** `<Button render={<Link>} />` triggers a warning; instead use `<Link className={buttonVariants()} />` directly.
 - **Unique violation handling:** Google Places upsert can hit duplicate key; handle gracefully with `error?.code === "23505"` check.
 - **Supabase free tier pausing:** after 7 days with zero requests, the project pauses (not deleted). Keep-alive via a daily `/api/health` ping (GitHub Actions or Vercel Cron) during cold-start.
+- **react-hook-form + React Compiler:** `watch("field")` triggers a benign "Compilation Skipped: incompatible library" lint warning (the compiler skips memoizing that component). Functionally fine; not worth chasing.
+
+### Blended vendor search (dedup) — `/api/places`
+- The business-search box searches **Google Places autocomplete AND existing vendors (Supabase) in parallel**, then merges. A Google prediction whose `place_id` matches an existing vendor is collapsed to the DB row (dedup).
+- Returns a `SearchSuggestion` union: `{ kind: "existing", vendorId, vendorType, source, ... }` or `{ kind: "google", placeId, ... }`, sorted by a lightweight **name-match relevance score** (exact > starts-with > word-boundary > contains), source-agnostic (Google exposes no score).
+- Combobox (`components/add/places-combobox.tsx`) tags each row **"Google" / "User created" / "Featured"** (seed). Picking an existing vendor calls `onSelectExisting` → resolves straight to its `vendorId` (no new row, no Places details call) and **locks the type chip** (vendor type is canonical).
+
+### Recon entry fields: collected date + service region
+- `recon_entries` has `recon_collected_month` / `recon_collected_year` (two dropdowns, default **current** month/year, year range 2000–present) and `service_region` (text, shown **only for non-venue** vendor types). Migrations `0008`, `0009`.
+- Form lives in `app/(app)/add/page.tsx`; display in `components/vendor/recon-card.tsx`. Cards **guard for null** so pre-migration rows render without an "Invalid Date" badge.
+- **SSR/timezone:** compute "current month/year" defaults on the client in a `useEffect` (then `setValue`), not during render, to avoid an SSR/client hydration mismatch.
+
+### Approximate-location map pins
+- `isApproximateLocation(vendor)` heuristic: **non-Google source + no digit in the address** ⇒ approximate (geocoded to a city/region centroid, not a street address). Known blind spot: numbered street names ("E 17th Ave") read as precise. The robust replacement is to **store geocode precision at save time** (Nominatim returns `addresstype` + a `boundingbox`) and key off that field instead.
+- Approximate pins get a **dashed** white outline (vs solid); pins sharing a rounded coordinate are **fanned out** across a compact phyllotaxis disc (`~110m·√n`, deterministic by vendor id so they don't jump on pan). Both live entirely in `vendor-map.tsx` — no migration, since the RPC already returns `source`/`google_place_id`/`address_text`.
+- For very large piles (~50) the fan-out only fully separates at city zoom; if that becomes common, add a click-to-list drawer (discussed, not built).
+
+### Migrations
+- **Write idempotent:** `add column if not exists`; for constraints use `drop constraint if exists` then `add constraint` (Postgres has **no** "add constraint if not exists").
+- **One ALTER per constraint** — you cannot chain multiple `add constraint` clauses in a single `alter table` (syntax error).
+- **Not auto-applied** to the hosted DB — run new migrations by hand in the Supabase SQL editor.
 
 ## Milestone status
-M0 foundation is done. M1 (Auth) → M2 (Explore map) → M3 (Vendor page) → M4 (Add Recon) → M5 (Hub) → M6 (T&S) are built out. All core features are functional; ongoing work is polish, deeplinks, and edge cases.
+M0 foundation done; M1 (Auth) → M2 (Explore map) → M3 (Vendor page) → M4 (Add Recon) → M5 (Hub) → M6 (T&S) all built and functional. Current work is polish/edge-cases.
+
+Recent (2026-06, all on `main`): blended vendor search w/ source tags; guest recon publish via magic link + IndexedDB draft (same-device); required geocoded location for manual vendors; "Recon collected at" (month/year) + "Service region" fields; dashed-outline + fan-out for approximate map pins; "Save recon"/"Vendor" copy.
+
+**Hosted-DB note:** migrations `0008_recon_collected_at.sql` and `0009_service_region.sql` are **applied** (2026-06-26); both are idempotent (safe to re-run). Reminder for future schema changes: migrations are **not** auto-applied to the hosted DB — run new ones by hand in the Supabase SQL editor.
