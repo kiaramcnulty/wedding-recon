@@ -38,6 +38,7 @@ import { ImageUpload } from "@/components/add/image-upload";
 import { BrandFooter } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { createRecon } from "./actions";
+import { uploadReconImages } from "@/lib/recon-upload";
 
 // ── Zod schema ────────────────────────────────────────────────────────────────
 
@@ -276,10 +277,13 @@ function AddReconForm() {
       await clearReconDraft();
 
       try {
-        const fd = new FormData();
-        fd.append("__input", JSON.stringify(draft.payload));
-        draft.images.forEach((file) => fd.append("images[]", file));
-        await createRecon(fd); // success throws NEXT_REDIRECT → navigates away
+        if (!user) throw new Error("Not signed in");
+        const media = await uploadReconImages(supabase, user.id, draft.images);
+        // success throws NEXT_REDIRECT → navigates away
+        await createRecon({
+          ...draft.payload,
+          media,
+        } as Parameters<typeof createRecon>[0]);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "";
         if (msg.includes("NEXT_REDIRECT")) return; // published; navigation underway
@@ -407,15 +411,20 @@ function AddReconForm() {
       return;
     }
 
-    // Authenticated: publish immediately via the server action (redirects on success).
+    // Authenticated: compress + upload photos straight to Storage, then publish.
     setIsSubmitting(true);
     try {
-      const fd = new FormData();
-      fd.append("__input", JSON.stringify(inputPayload));
-      images.forEach((file) => {
-        fd.append("images[]", file);
-      });
-      await createRecon(fd);
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        // Session lapsed between mount and submit.
+        window.location.href = "/login";
+        return;
+      }
+      const media = await uploadReconImages(supabase, user.id, images);
+      await createRecon({ ...inputPayload, media });
     } catch (err) {
       // If it's a NEXT_REDIRECT error, Next will handle it — don't toast
       const msg = err instanceof Error ? err.message : "Something went wrong";
@@ -740,7 +749,7 @@ function AddReconForm() {
         {/* ── Photos ────────────────────────────────────────────────────── */}
         <section className="space-y-2">
           <Label>Photos</Label>
-          <ImageUpload onChange={setImages} maxImages={5} />
+          <ImageUpload onChange={setImages} maxImages={4} />
         </section>
 
         {/* ── Email (guests only) ──────────────────────────────────────────

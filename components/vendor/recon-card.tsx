@@ -32,8 +32,9 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
 
   const mediaThumbs = entry.media.map(
     (m) =>
-      supabase.storage.from("recon-media").getPublicUrl(m.storage_path).data
-        .publicUrl,
+      supabase.storage
+        .from("recon-media")
+        .getPublicUrl(m.thumb_path ?? m.storage_path).data.publicUrl,
   );
 
   const typeLabel = RECON_TYPE_LABELS[entry.recon_type] ?? entry.recon_type;

@@ -59,7 +59,7 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
   }, []);
   ```
 - **Portals escape containing block constraints:** `createPortal(el, document.body)` escapes `position: fixed` being relative to an ancestor with `backdrop-filter` or `transform`. Use for modals, drawers, popovers that need viewport-level positioning.
-- **Server Actions with file uploads:** pass `FormData` (images survive serialization boundary); send structured data as JSON string in a reserved key (`__input`), then `JSON.parse()` on the server.
+- **Server Actions + file uploads:** don't route image bytes through a Server Action — Next caps the action body at 1 MB, Vercel at ~4.5 MB. Compress + upload client-side directly to Supabase Storage and pass only the storage paths to the action (small structured data can ride along as a serialized arg). See **Recon photo uploads** below.
 
 ### UI layout & constraints
 - Mobile frame: `max-w-[480px]` centered, tight padding, bottom nav always visible.
@@ -79,7 +79,7 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 ### Form & field handling
 - **Vendor type locking:** when adding recon for an existing vendor (via Hub "Add Recon" button), pass `vendorId` + `vendorType` as query params. Lock the type chip (read-only display) if both are present — the user cannot override.
 - **Google Places integration:** server-side only; call `/api/places` route handler with an API key in `.env.local` (never exposed to client). Return place data (id, name, address, lat/lng) to client.
-- **Image uploads:** accept as `File[]` via a combobox UI, serialize via `FormData`, upload server-side to Supabase Storage, then insert `recon_media` rows with storage paths.
+- **Image uploads:** compressed in the browser and uploaded **directly to Storage** (not through the action); the action only records `recon_media` paths. See **Recon photo uploads** below.
 
 ### Errors & gotchas
 - **Base UI + Radix confusion:** shadcn/ui wraps Base UI, not Radix — APIs differ. Check existing component files for patterns.
@@ -98,6 +98,14 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - Form lives in `app/(app)/add/page.tsx`; display in `components/vendor/recon-card.tsx`. Cards **guard for null** so pre-migration rows render without an "Invalid Date" badge.
 - **SSR/timezone:** compute "current month/year" defaults on the client in a `useEffect` (then `setValue`), not during render, to avoid an SSR/client hydration mismatch.
 
+### Recon photo uploads (client-side compress + direct-to-Storage)
+- Photos are **compressed in the browser** (`lib/image-compress.ts` — ~1600px full + ~400px thumbnail, JPEG) and **uploaded straight to Supabase Storage** (`lib/recon-upload.ts`); they never pass through the `createRecon` Server Action body. This sidesteps Next's 1 MB action-body cap **and** Vercel's ~4.5 MB serverless limit, and is the main lever on Storage/egress cost (~10× smaller files).
+- `createRecon` (`app/(app)/add/actions.ts`) takes the typed input **directly** (no FormData) and only **records media paths** on `recon_media` (`storage_path` + `thumb_path`). Uploads land under `${userId}/<submissionUuid>/…`.
+- Picker (`components/add/image-upload.tsx`): **max 4 photos, 50 MB each** (per-file, client-side); the bucket also enforces a 50 MB `file_size_limit` (migration `0010`) as a server-side backstop.
+- Display: `recon-card.tsx` previews use `thumb_path ?? storage_path` (egress saver); the vendor-page carousel uses the full image. Reads select `recon_media(*)`, so a missing `thumb_path` is null-safe on pre-migration rows.
+- **Guest flow:** raw photos are stashed in IndexedDB and compressed + uploaded on **resume** (post-auth), since Storage RLS requires an authenticated uploader.
+- Storage RLS (`0005_storage.sql`) already lets any authenticated user upload to `recon-media`; Supabase stamps `owner = auth.uid()` so the owner-only update/delete policies still apply — **no new policy needed** for client uploads.
+
 ### Approximate-location map pins
 - `isApproximateLocation(vendor)` heuristic: **non-Google source + no digit in the address** ⇒ approximate (geocoded to a city/region centroid, not a street address). Known blind spot: numbered street names ("E 17th Ave") read as precise. The robust replacement is to **store geocode precision at save time** (Nominatim returns `addresstype` + a `boundingbox`) and key off that field instead.
 - Approximate pins get a **dashed** white outline (vs solid); pins sharing a rounded coordinate are **fanned out** across a compact phyllotaxis disc (`~110m·√n`, deterministic by vendor id so they don't jump on pan). Both live entirely in `vendor-map.tsx` — no migration, since the RPC already returns `source`/`google_place_id`/`address_text`.
@@ -113,4 +121,4 @@ M0 foundation done; M1 (Auth) → M2 (Explore map) → M3 (Vendor page) → M4 (
 
 Recent (2026-06, all on `main`): blended vendor search w/ source tags; guest recon publish via magic link + IndexedDB draft (same-device); required geocoded location for manual vendors; "Recon collected at" (month/year) + "Service region" fields; dashed-outline + fan-out for approximate map pins; "Save recon"/"Vendor" copy.
 
-**Hosted-DB note:** migrations `0008_recon_collected_at.sql` and `0009_service_region.sql` are **applied** (2026-06-26); both are idempotent (safe to re-run). Reminder for future schema changes: migrations are **not** auto-applied to the hosted DB — run new ones by hand in the Supabase SQL editor.
+**Hosted-DB note:** migrations `0008` and `0009` are **applied** (2026-06-26). `0010_recon_media_thumbs_and_limits.sql` (adds `recon_media.thumb_path` + 50 MB bucket cap) is **PENDING** — apply it by hand in the Supabase SQL editor **before deploying** the client-side photo-upload change, or media inserts fail on the missing column. All migrations are idempotent. Reminder: migrations are **not** auto-applied to the hosted DB — run new ones by hand.

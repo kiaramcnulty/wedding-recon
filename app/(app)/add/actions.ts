@@ -36,32 +36,30 @@ export interface CreateReconInput {
   serviceRegion?: string;
   notes?: string;
 
-  // Images are handled as FormData — the caller passes this action a FormData
-  // object and we fish out `images[]` entries separately.
+  /**
+   * Photos already compressed + uploaded to Storage client-side (see
+   * lib/recon-upload.ts); we only record their paths here. Image bytes never
+   * pass through this action.
+   */
+  media?: { path: string; thumbPath: string | null }[];
 }
 
 /**
- * Server Action: resolve canonical vendor, insert recon entry, upload images,
- * auto-save vendor to hub, then redirect to the vendor page.
+ * Server Action: resolve canonical vendor, insert the recon entry, record its
+ * (already-uploaded) media, auto-save the vendor to the hub, then redirect to
+ * the vendor page.
  *
- * Client should call via FormData so image File objects survive the
- * serialisation boundary. Non-image fields are encoded as JSON in the
- * `__input` key.
+ * Photos are compressed and uploaded to Storage client-side (see
+ * lib/recon-upload.ts); this action receives only their storage paths in
+ * `input.media`, so image bytes never hit the Server Action body limit.
  */
-export async function createRecon(formData: FormData) {
+export async function createRecon(input: CreateReconInput) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-
-  // ── Parse structured input from FormData ─────────────────────────────────
-  const raw = formData.get("__input");
-  if (!raw || typeof raw !== "string") {
-    throw new Error("Missing __input field in FormData");
-  }
-  const input: CreateReconInput = JSON.parse(raw);
 
   // ── 1. Resolve canonical vendor id ───────────────────────────────────────
   let vendorId = input.vendorId;
@@ -170,34 +168,23 @@ export async function createRecon(formData: FormData) {
   if (reconError) throw new Error(`Recon insert error: ${reconError.message}`);
   const reconId = reconEntry.id as string;
 
-  // ── 3. Upload images → recon_media rows ───────────────────────────────────
-  const imageFiles = formData.getAll("images[]");
-
-  for (let i = 0; i < imageFiles.length; i++) {
-    const file = imageFiles[i];
-    if (!(file instanceof File) || file.size === 0) continue;
-
-    // Sanitise filename: strip spaces/special chars, keep extension
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${user.id}/${reconId}/${i}-${safeName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("recon-media")
-      .upload(storagePath, file, { upsert: false });
-
-    if (uploadError) {
-      // Non-fatal: log and continue so the recon still publishes
-      console.error(`[createRecon] image upload failed (${safeName}):`, uploadError.message);
-      continue;
-    }
-
-    const { error: mediaError } = await supabase.from("recon_media").insert({
+  // ── 3. Record uploaded media → recon_media rows ───────────────────────────
+  // Photos were compressed + uploaded client-side; we just persist their paths.
+  const mediaRows = (input.media ?? [])
+    .filter((m) => m.path)
+    .map((m) => ({
       recon_entry_id: reconId,
-      storage_path: storagePath,
+      storage_path: m.path,
+      thumb_path: m.thumbPath,
       media_type: "image",
-    });
+    }));
 
+  if (mediaRows.length > 0) {
+    const { error: mediaError } = await supabase
+      .from("recon_media")
+      .insert(mediaRows);
     if (mediaError) {
+      // Non-fatal: the recon still publishes even if media rows fail.
       console.error(`[createRecon] recon_media insert failed:`, mediaError.message);
     }
   }

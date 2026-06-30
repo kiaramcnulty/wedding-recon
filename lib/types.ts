@@ -45,6 +45,8 @@ export interface ReconMedia {
   id: string;
   recon_entry_id: string;
   storage_path: string;
+  /** Small (~400px) variant for list/card previews; null on pre-thumbnail rows. */
+  thumb_path: string | null;
   media_type: "image";
   created_at: string;
 }

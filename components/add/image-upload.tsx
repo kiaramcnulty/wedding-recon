@@ -2,13 +2,16 @@
 
 import * as React from "react";
 import { ImagePlus, X } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface ImageUploadProps {
   /** Called whenever the file list changes */
   onChange: (files: File[]) => void;
-  /** Max number of images (default: 5) */
+  /** Max number of images (default: 4) */
   maxImages?: number;
+  /** Max size per photo in bytes (default: 50 MB). */
+  maxSizeBytes?: number;
   className?: string;
 }
 
@@ -17,7 +20,14 @@ interface Preview {
   url: string;
 }
 
-export function ImageUpload({ onChange, maxImages = 5, className }: ImageUploadProps) {
+const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50 MB
+
+export function ImageUpload({
+  onChange,
+  maxImages = 4,
+  maxSizeBytes = DEFAULT_MAX_SIZE,
+  className,
+}: ImageUploadProps) {
   const [previews, setPreviews] = React.useState<Preview[]>([]);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -31,17 +41,33 @@ export function ImageUpload({ onChange, maxImages = 5, className }: ImageUploadP
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList) return;
-    const incoming = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
-    if (!incoming.length) return;
+    const all = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
+
+    const tooBig = all.filter((f) => f.size > maxSizeBytes);
+    const valid = all.filter((f) => f.size <= maxSizeBytes);
+
+    if (tooBig.length) {
+      const mb = Math.round(maxSizeBytes / (1024 * 1024));
+      toast.error(
+        tooBig.length === 1
+          ? `"${tooBig[0].name}" is over ${mb} MB — pick a smaller photo.`
+          : `${tooBig.length} photos are over ${mb} MB and were skipped.`,
+      );
+    }
+    if (!valid.length) return;
 
     setPreviews((prev) => {
-      // Revoke URLs that will be replaced / overflow
-      const combined = [...prev, ...incoming.map((f) => ({ file: f, url: URL.createObjectURL(f) }))];
-      const trimmed = combined.slice(0, maxImages);
-      // Revoke excess
-      combined.slice(maxImages).forEach((p) => URL.revokeObjectURL(p.url));
-      onChange(trimmed.map((p) => p.file));
-      return trimmed;
+      const room = Math.max(0, maxImages - prev.length);
+      if (valid.length > room) {
+        toast.error(`You can add up to ${maxImages} photos.`);
+      }
+      const accepted = valid.slice(0, room);
+      const combined = [
+        ...prev,
+        ...accepted.map((f) => ({ file: f, url: URL.createObjectURL(f) })),
+      ];
+      onChange(combined.map((p) => p.file));
+      return combined;
     });
   }
 
@@ -103,7 +129,9 @@ export function ImageUpload({ onChange, maxImages = 5, className }: ImageUploadP
         >
           <ImagePlus className="size-8" />
           <span className="text-sm font-medium">Add photos</span>
-          <span className="text-xs">Up to {maxImages} images</span>
+          <span className="text-xs">
+            Up to {maxImages} photos · {Math.round(maxSizeBytes / (1024 * 1024))} MB each
+          </span>
         </button>
       )}
 
