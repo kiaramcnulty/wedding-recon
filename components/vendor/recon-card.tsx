@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ReportButton } from "@/components/vendor/report-button";
+import { PhotoLightbox } from "@/components/vendor/photo-lightbox";
 import { cn } from "@/lib/utils";
 
 interface ReconCardProps {
@@ -30,12 +31,14 @@ function getInitials(username: string): string {
 export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
   const supabase = await createClient();
 
-  const mediaThumbs = entry.media.map(
-    (m) =>
-      supabase.storage
-        .from("recon-media")
-        .getPublicUrl(m.thumb_path ?? m.storage_path).data.publicUrl,
-  );
+  const photos = entry.media.map((m) => ({
+    thumb: supabase.storage
+      .from("recon-media")
+      .getPublicUrl(m.thumb_path ?? m.storage_path).data.publicUrl,
+    full: supabase.storage
+      .from("recon-media")
+      .getPublicUrl(m.storage_path).data.publicUrl,
+  }));
 
   const typeLabel = RECON_TYPE_LABELS[entry.recon_type] ?? entry.recon_type;
 
@@ -87,7 +90,7 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
               <p className="font-semibold text-base">{entry.price_text}</p>
             )}
             {entry.price_details && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground whitespace-pre-line">
                 {entry.price_details}
               </p>
             )}
@@ -106,31 +109,15 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
           </p>
         )}
 
-        {mediaThumbs.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
-            {mediaThumbs.map((url, i) => (
-              <div
-                key={url + i}
-                className="snap-start shrink-0 rounded-lg overflow-hidden w-[80px] h-[60px] ring-1 ring-foreground/10"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt={`Entry photo ${i + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
+        {photos.length > 0 && (
+          <PhotoLightbox
+            photos={photos}
+            alt="Entry photo"
+            containerClassName="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory"
+            containerStyle={{ scrollbarWidth: "none" }}
+            tileClassName="snap-start w-[80px] h-[60px] rounded-lg ring-1 ring-foreground/10"
+          />
         )}
-
-        <p className="text-xs text-muted-foreground">
-          {new Date(entry.created_at).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </p>
       </CardContent>
     </Card>
   );

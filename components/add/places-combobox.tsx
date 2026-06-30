@@ -12,6 +12,7 @@ export interface PlaceSelection {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  website: string | null;
   placeId: string;
 }
 
@@ -218,31 +219,37 @@ export function PlacesCombobox({
       return;
     }
 
-    // Google place → fetch details for coordinates.
+    // Google place → optimistically commit the selection (with autocomplete
+    // data) *before* the async details fetch. This makes the debounced search
+    // effect see a non-empty `selected` and skip reopening the dropdown, so the
+    // click both selects and closes it. We then enrich with coords + website.
+    const base: PlaceSelection = {
+      name: suggestion.primaryText,
+      address: suggestion.secondaryText || null,
+      lat: null,
+      lng: null,
+      website: null,
+      placeId: suggestion.placeId,
+    };
+    setSelected(base);
     setIsFetchingDetails(true);
     try {
       const res = await fetch(`/api/places?placeId=${encodeURIComponent(suggestion.placeId)}`);
       const details = await res.json();
       const place: PlaceSelection = {
-        name: details?.name ?? suggestion.primaryText,
-        address: details?.address ?? suggestion.secondaryText ?? null,
+        name: details?.name ?? base.name,
+        address: details?.address ?? base.address,
         lat: details?.lat ?? null,
         lng: details?.lng ?? null,
+        website: details?.website ?? null,
         placeId: suggestion.placeId,
       };
       setSelected(place);
       onSelectPlace(place);
     } catch {
-      // Fallback: use autocomplete data
-      const place: PlaceSelection = {
-        name: suggestion.primaryText,
-        address: suggestion.secondaryText || null,
-        lat: null,
-        lng: null,
-        placeId: suggestion.placeId,
-      };
-      setSelected(place);
-      onSelectPlace(place);
+      // Fallback: keep the autocomplete-only selection.
+      setSelected(base);
+      onSelectPlace(base);
     } finally {
       setIsFetchingDetails(false);
     }

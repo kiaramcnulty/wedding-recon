@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { MapPin, PlusCircle, ExternalLink } from "lucide-react";
+import { MapPin, PlusCircle, ExternalLink, Globe } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
 import type { ReconEntryWithDetails } from "@/lib/types";
@@ -80,13 +80,17 @@ export default async function VendorPage({
       })
     : rawList;
 
-  // Collect all media public URLs for the carousel
-  const allImageUrls = entries.flatMap((entry) =>
-    entry.media.map(
-      (m) =>
-        supabase.storage.from("recon-media").getPublicUrl(m.storage_path).data
-          .publicUrl,
-    ),
+  // Media for the carousel: thumbnails inline, full opened in the lightbox so
+  // the carousel itself stays cheap on egress.
+  const photos = entries.flatMap((entry) =>
+    entry.media.map((m) => ({
+      thumb: supabase.storage
+        .from("recon-media")
+        .getPublicUrl(m.thumb_path ?? m.storage_path).data.publicUrl,
+      full: supabase.storage
+        .from("recon-media")
+        .getPublicUrl(m.storage_path).data.publicUrl,
+    })),
   );
 
   const category = CATEGORIES[vendor.vendor_type as VendorType];
@@ -135,31 +139,46 @@ export default async function VendorPage({
           </div>
         </div>
 
-        {/* Address */}
-        {addressParts && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="size-3.5 shrink-0" />
-            {vendor.google_place_id ? (
-              <a
-                href={`https://maps.google.com/?cid=${vendor.google_place_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 hover:text-foreground transition-colors"
-              >
-                {addressParts}
-                <ExternalLink className="size-3.5 shrink-0" />
-              </a>
-            ) : (
-              addressParts
-            )}
-          </div>
-        )}
+        {/* Address + links */}
+        <div className="mt-2 flex flex-col gap-1">
+          {addressParts && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="size-3.5 shrink-0" />
+              {vendor.google_place_id ? (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    `${vendor.name} ${addressParts}`,
+                  )}&query_place_id=${vendor.google_place_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                >
+                  {addressParts}
+                  <ExternalLink className="size-3.5 shrink-0" />
+                </a>
+              ) : (
+                addressParts
+              )}
+            </div>
+          )}
+          {vendor.website && (
+            <a
+              href={vendor.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
+            >
+              <Globe className="size-3.5 shrink-0" />
+              <span className="truncate">Visit website</span>
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Photo carousel */}
-      {allImageUrls.length > 0 && (
+      {photos.length > 0 && (
         <div className="mt-4">
-          <PhotoCarousel imageUrls={allImageUrls} />
+          <PhotoCarousel photos={photos} />
         </div>
       )}
 

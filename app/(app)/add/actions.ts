@@ -16,6 +16,7 @@ export interface CreateReconInput {
   placeRegion?: string;
   placeLat?: number | null;
   placeLng?: number | null;
+  placeWebsite?: string;
   /** Manual entry (location geocoded client-side and required) */
   manualName?: string;
   manualCity?: string;
@@ -92,6 +93,7 @@ export async function createRecon(input: CreateReconInput) {
             city: input.placeCity ?? null,
             region: input.placeRegion ?? null,
             location: locationEwkt,
+            website: input.placeWebsite ?? null,
             source: "google",
             created_by: user.id,
           })

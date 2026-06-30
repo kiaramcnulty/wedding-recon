@@ -24,6 +24,7 @@ interface PlaceDetails {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  website: string | null;
 }
 
 /**
@@ -159,7 +160,8 @@ export async function GET(req: NextRequest) {
         {
           headers: {
             "X-Goog-Api-Key": apiKey,
-            "X-Goog-FieldMask": "id,displayName,formattedAddress,location",
+            "X-Goog-FieldMask":
+              "id,displayName,formattedAddress,location,websiteUri",
           },
         },
       );
@@ -176,6 +178,7 @@ export async function GET(req: NextRequest) {
         address: data?.formattedAddress ?? null,
         lat: data?.location?.latitude ?? null,
         lng: data?.location?.longitude ?? null,
+        website: data?.websiteUri ?? null,
       };
 
       return NextResponse.json(details);

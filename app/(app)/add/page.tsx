@@ -76,6 +76,7 @@ interface VendorState {
   placeRegion?: string;
   placeLat?: number | null;
   placeLng?: number | null;
+  placeWebsite?: string;
   // Manual (location is geocoded and required)
   manualName?: string;
   manualCity?: string;
@@ -183,6 +184,7 @@ function AddReconForm() {
             placeRegion: vendorState.placeRegion,
             placeLat: vendorState.placeLat,
             placeLng: vendorState.placeLng,
+            placeWebsite: vendorState.placeWebsite,
           }
         : {}),
       ...(vendorState.mode === "manual"
@@ -317,6 +319,7 @@ function AddReconForm() {
       placeRegion: region,
       placeLat: place.lat,
       placeLng: place.lng,
+      placeWebsite: place.website ?? undefined,
     });
     setVendorError(null);
   }

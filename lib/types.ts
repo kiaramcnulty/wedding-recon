@@ -18,6 +18,7 @@ export interface Vendor {
   address_text: string | null;
   city: string | null;
   region: string | null;
+  website: string | null;
   /** GeoJSON-style longitude/latitude, surfaced by the vendors_in_bbox RPC. */
   lng: number | null;
   lat: number | null;
