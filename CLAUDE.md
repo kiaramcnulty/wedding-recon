@@ -41,6 +41,9 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - `npm run build` — production build (must pass before commit).
 - `npm run lint` — eslint.
 
+## Skills
+- **`/launchvenues <region>`** — seed a region's vendor-only venues (Places sweep + web/Reddit research → canonical Google-place resolve → local CSV review → deduped bulk Supabase insert). Headless (no browser/Sheets); scripts + playbook in `.claude/skills/launchvenues/`. Recon enrichment is a separate later step.
+
 ## Key patterns & learnings
 
 ### Navigation with return context
@@ -121,4 +124,4 @@ M0 foundation done; M1 (Auth) → M2 (Explore map) → M3 (Vendor page) → M4 (
 
 Recent (2026-06, all on `main`): blended vendor search w/ source tags; guest recon publish via magic link + IndexedDB draft (same-device); required geocoded location for manual vendors; "Recon collected at" (month/year) + "Service region" fields; dashed-outline + fan-out for approximate map pins; "Save recon"/"Vendor" copy.
 
-**Hosted-DB note:** migrations `0008`, `0009`, `0010` are **applied**. `0011_vendor_website.sql` (adds `vendors.website`, shown as a "Visit website" link) is **PENDING** — apply it by hand in the Supabase SQL editor **before deploying**, or Google vendor creation fails on the missing column. All migrations are idempotent. Reminder: migrations are **not** auto-applied to the hosted DB — run new ones by hand.
+**Hosted-DB note:** migrations `0008`–`0011` are **applied** (`0011_vendor_website.sql` adds `vendors.website`, shown as a "Visit website" link). All migrations are idempotent. Reminder: migrations are **not** auto-applied to the hosted DB — run new ones by hand.

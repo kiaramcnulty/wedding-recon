@@ -34,8 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
-# claude code local session dir
-.claude/
+# claude code local session dir (but keep shared skills tracked)
+.claude/*
+!.claude/skills/
 
 # supabase cli local state
 supabase/.temp/
@@ -51,3 +52,6 @@ next-env.d.ts
 # local product-spec artifacts (canonical text spec lives in docs/wedding-recon-spec.txt)
 /Wedding Recon Spec.pdf
 /Wedding Recon Spec.md
+
+# launchvenues skill working artifacts
+/data/launchvenues/
