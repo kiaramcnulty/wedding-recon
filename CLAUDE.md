@@ -43,6 +43,7 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 
 ## Skills
 - **`/launchvenues <region>`** — seed a region's vendor-only venues (Places sweep + web/Reddit research → canonical Google-place resolve → local CSV review → deduped bulk Supabase insert). Headless (no browser/Sheets); scripts + playbook in `.claude/skills/launchvenues/`. Recon enrichment is a separate later step.
+- **`/enrichvenues <region>`** — enrich seeded venues with 1–3 bot-authored recon entries each (Places reviews + site crawl + Reddit/web research → human-voiced `recons.csv` + curated photos → upload under user-approved `is_bot` accounts). Requires migration `0012`; per-state bot rosters in `data/enrichvenues/rosters/`. Three human gates: batch scope, bot roster, upload dry-run. Delegation: Opus for research/synthesis, Sonnet for photo screening. Playbook + reference cards in `.claude/skills/enrichvenues/`.
 
 ## Key patterns & learnings
 

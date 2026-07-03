@@ -55,3 +55,6 @@ next-env.d.ts
 
 # launchvenues skill working artifacts
 /data/launchvenues/
+
+# enrichvenues skill working artifacts
+/data/enrichvenues/
