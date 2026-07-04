@@ -5,9 +5,15 @@ user entries (`recon_entries` where author is not a bot) and any `research/reddi
 for the region — match that energy, not these cards' letter.
 
 **Banned everywhere** (upload.mjs rejects them): stunning, breathtaking, nestled, boasts,
-elevate(s/d), unforgettable, magical, "dream wedding", exquisite, picturesque. Also avoid:
-em-dash-heavy prose, tricolons ("X, Y, and Z" flourishes), identical sentence structure
-across entries, opening every note the same way.
+elevate(s/d), unforgettable, magical, "dream wedding", exquisite, picturesque, "genuine
+value", "can't go wrong", "won't disappoint", "truly special". **Em dashes and en dashes
+are banned outright** (validator rejects them): real users type hyphens, commas, periods.
+
+**Every judgment must be concrete.** "A genuine value" means nothing; "$4k for 9 hours in
+a mansion that seats 180" means something. If you can't tie a verdict to a number, a
+policy, or a sourced quote, cut the verdict and keep the fact. Also avoid: tricolons
+("X, Y, and Z" flourishes), identical sentence structure across entries, opening every
+note the same way, and "the tradeoff/the thing to know" framing more than once per batch.
 
 ## bot1 — lowercase + dash bullets (closest to real early users)
 All lowercase. Notes are `-` bullets of practical fragments. Uses "w/", "~", "&".

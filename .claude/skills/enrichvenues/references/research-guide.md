@@ -1,41 +1,53 @@
-# Per-venue research guide
+# Per-venue research guide (for draft workers)
 
-Work from cheapest source to most expensive. Every fact needs a source you can name.
-NEVER invent a number, a quote, or an event.
+Work cheapest-source-first. Every fact needs a source you can name. NEVER invent a
+number, a quote, or an event. You are drafting CSV rows in the same pass — research
+just enough to write good entries, then stop.
 
-## 1. Archived Reddit threads (read FIRST — richest intel per token)
-- Location: `<workdir>/research/reddit-*.txt` AND `data/launchvenues/<slug>/research/reddit-*.txt`.
-- These contain real prices ("our venue was 11k for a Sunday"), staff/ownership color,
-  complaints, and comparisons between venues — exactly what recon entries need. Index on them.
-- Reddit BLOCKS fetching (crawler and browser). To get new threads, ask the user to search
-  (`site:reddit.com <region> wedding venue`, plus venue-specific queries) and paste each
-  thread into chat. Save every paste VERBATIM to `research/reddit-NN.txt` with a header line
-  `[subreddit — "title" — posted Xmo ago (~Mon YYYY), captured YYYY-MM-DD]` BEFORE doing
-  anything else with the content. Raw threads are hard to re-acquire.
-- Comment ages anchor collected-dates (see entry-rules.md).
+## Read order (per venue)
+1. **`research/<slug>/reddit-slice.txt`** (if present) — per-venue Reddit excerpts.
+   When written by the thread-digest pass these are complete, attributed comments
+   (pronouns and cross-thread references already resolved) — trust them as-is. Richest
+   intel per token: real prices ("our venue was 11k for a Sunday"), staff/ownership
+   color, complaints, dated comments (comment ages anchor collected-dates). Only if a
+   slice is mechanical (raw ±4-line cuts) AND clearly clipped mid-story for YOUR venue
+   may you open that one full `reddit-NN.txt` thread — never read threads for venues
+   outside your batch.
+2. **`research/<slug>/harvest.json`** — vendor_id + up to 5 Google reviews (coordinator
+   names, tour impressions, complaints) + site-page list.
+3. **`research/pricing-web-*.txt`** (workdir-level) — region pricing digests covering many
+   venues at once (wedding-spot/Zola/photographer guides). Check here for pricing BEFORE
+   any web search.
+4. **`research/<slug>/page-*.txt`** — venue-site pages; pricing usually on `page-pricing`,
+   `page-*fees*`, `page-wedding*`. Skip anything that looks like a calendar/API dump.
 
-## 2. Harvest output (already on disk after Phase 1)
-- `research/<slug>/harvest.json` → `google.reviews` (up to 5 real Google reviews: coordinator
-  names, tour impressions, complaints — prime firsthand commentary), rating, vendor_id.
-- `research/<slug>/page-*.txt` → stripped venue-site pages. Pricing tables often live on
-  `page-pricing`, `page-*fees*`, `page-wedding*`. Read selectively; skip `wp-json` calendar dumps.
+## Web search — gap-triggered, max 2 per venue, any tier
+Searches follow MISSING DATA, not tier. Run up to 2 searches for a venue only if:
+(a) its site crawl failed (`site_error` in harvest.json), or (b) no pricing surfaced
+from harvest + the pricing digests. If the cheap sources already answered pricing and
+capacity, run zero searches even for tier 1. Query: `"<venue name>" <city> wedding cost
+pricing`. Photographer guides, wedding-spot.com, Zola, eventective publish real numbers.
+**The Knot `/marketplace/` pages TIME OUT — never WebFetch them**; use WebSearch with
+`allowed_domains: ["theknot.com"]` or its `/content/` articles. One timeout = skip that
+URL, don't retry. If pricing still isn't findable after the gap searches, write the
+honest "quote only" entry per entry-rules.md.
 
-## 3. Web search (only for venues still missing pricing/capacity)
-- Query pattern: `"<venue name>" <city> wedding cost pricing` — photographer planning guides
-  (e.g. "<venue> wedding venue guide"), wedding-spot.com, Zola, eventective, and local blogs
-  publish real numbers.
-- **The Knot**: `/marketplace/` pages reliably TIME OUT — never WebFetch them. Use WebSearch
-  with `allowed_domains: ["theknot.com"]` or fetch its `/content/` articles instead.
-- A WebFetch timeout is page-specific: skip that URL and move on; don't conclude the domain
-  is blocked, and don't retry more than once.
+## Scratch extract (provenance only — nobody re-reads it in-pipeline)
+Write `research/<slug>/extract.md`, **≤400 words, bullets only**, each fact tagged:
+`(site:page-X)`, `(google-review)`, `(reddit:reddit-NN.txt ~date)`, `(web:domain)`.
+Hedge unknowns explicitly ("catering policy not confirmed"). Then write the CSV rows.
 
-## 4. Per-venue extraction record
-For each venue, accumulate findings (a JSON or MD scratch file per venue in `research/<slug>/`)
-with a source tag per fact:
-```
-{ "pricing": [{"fact": "...", "source": "mossdenver.com/pricing"}],
-  "capacity": [...], "included_required": [...], "ownership_staff": [...],
-  "firsthand": [{"fact": "...", "source": "reddit:reddit-02.txt", "when": "2026-03"}],
-  "vibe": [...], "flags": [...] }
-```
-Subagents doing research batches must return these files, not prose summaries.
+## Reddit paste protocol (orchestrator, Phase 0)
+Reddit blocks fetching. The user searches Reddit themselves and pastes threads into
+chat. Save every paste VERBATIM to `research/reddit-NN.txt` with a header line
+`[subreddit — "title" — posted Xmo ago (~Mon YYYY), captured YYYY-MM-DD]` BEFORE doing
+anything else with it, then re-run `roster.mjs --slices`. Raw threads are hard to
+re-acquire.
+
+## Region pricing pass (orchestrator, Phase 1, once per region)
+~5 fetches that cover pricing for dozens of venues at once: the wedding-spot.com city
+page, the Zola city venues page, and 2-3 local photographer "venue guide"/"venue
+prices" posts (find via WebSearch `<region> wedding venue prices guide`). Fetch prompt:
+"List every wedding venue on this page with any pricing, capacity, or package details
+given. One line per venue: name | price info | capacity | notes. No commentary." Save
+each digest to `research/pricing-web-<domain>.txt`.

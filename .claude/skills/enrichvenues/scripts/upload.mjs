@@ -24,7 +24,9 @@ const rosterPath = argValue('roster') || path.join(workdir, 'bots.json');
 const bots = JSON.parse(fs.readFileSync(rosterPath, 'utf8'));
 const botByKey = new Map(bots.map((b) => [b.key || b.username, b]));
 const HEADERS = ['venue', 'vendor_id', 'recon_type', 'month', 'year', 'price_text', 'price_details', 'notes', 'photos', 'sources', 'bot'];
-const rows = parseCSV(fs.readFileSync(path.join(workdir, 'recons.csv'), 'utf8'));
+// --csv <name> lets each batch live in its own file (smaller review artifacts);
+// (author_id, vendor_id) dedup makes multi-file uploads safe.
+const rows = parseCSV(fs.readFileSync(path.join(workdir, argValue('csv') || 'recons.csv'), 'utf8'));
 const hdr = rows[0].map((h) => h.trim());
 const recons = rows.slice(1).filter((r) => r.some((c) => c && c.trim()))
   .map((r) => Object.fromEntries(HEADERS.map((h) => { const i = hdr.indexOf(h); return [h, i === -1 ? '' : (r[i] ?? '').trim()]; })));
@@ -32,7 +34,9 @@ const recons = rows.slice(1).filter((r) => r.some((c) => c && c.trim()))
 // ── Validate ──────────────────────────────────────────────────────────────────
 const RECON_TYPES = new Set(['online', 'virtual', 'in_person']);
 // AI-slop tells; entries containing these must be rephrased before upload.
-const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem)\b/i;
+// Empty-evaluative filler is banned too: judgments must be tied to a number or a sourced fact.
+const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
+const EMDASH = /[—–]/; // no em/en dashes anywhere in entry text — real users type hyphens
 const errors = [];
 const perBot = new Map(), perBotVenue = new Set();
 for (const [i, r] of recons.entries()) {
@@ -40,8 +44,10 @@ for (const [i, r] of recons.entries()) {
   if (!r.vendor_id) errors.push(`${at}: missing vendor_id`);
   if (!RECON_TYPES.has(r.recon_type)) errors.push(`${at}: bad recon_type "${r.recon_type}"`);
   if (!r.price_text || !r.price_details) errors.push(`${at}: price_text and price_details are REQUIRED on every entry`);
-  const banned = `${r.price_details} ${r.notes}`.match(BANNED);
+  const text = `${r.price_text} ${r.price_details} ${r.notes}`;
+  const banned = text.match(BANNED);
   if (banned) errors.push(`${at}: banned marketing/AI phrase "${banned[0]}" — rephrase in the entry's voice`);
+  if (EMDASH.test(text)) errors.push(`${at}: em/en dash in entry text — use a comma, period, or hyphen`);
   const m = parseInt(r.month, 10), y = parseInt(r.year, 10);
   if (!(m >= 1 && m <= 12)) errors.push(`${at}: bad month "${r.month}"`);
   if (!(y >= 2000 && y <= 2100)) errors.push(`${at}: bad year "${r.year}"`);

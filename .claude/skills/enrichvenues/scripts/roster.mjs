@@ -38,13 +38,24 @@ const threads = [];
 for (const dir of redditDirs) {
   if (!fs.existsSync(dir)) continue;
   for (const f of fs.readdirSync(dir).filter((f) => f.startsWith('reddit-') && f.endsWith('.txt'))) {
-    threads.push({ file: `${path.basename(dir) === 'research' ? dir : dir}/${f}`, text: norm(fs.readFileSync(path.join(dir, f), 'utf8')) });
+    threads.push({ path: path.join(dir, f), text: norm(fs.readFileSync(path.join(dir, f), 'utf8')) });
   }
 }
 const redditMentions = (name) => {
   const n = norm(name).replace(/\b(the|at|by|of|a)\b/g, ' ').replace(/\s+/g, ' ').trim();
   if (n.length < 5) return 0;
   return threads.filter((t) => t.text.includes(n)).length;
+};
+
+// Region pricing digests (research/pricing-web-*.txt): flag venues they don't cover,
+// so gap searches can be planned before workers spawn.
+const digests = fs.existsSync(path.join(workdir, 'research'))
+  ? fs.readdirSync(path.join(workdir, 'research')).filter((f) => f.startsWith('pricing-web-') && f.endsWith('.txt'))
+      .map((f) => norm(fs.readFileSync(path.join(workdir, 'research', f), 'utf8'))).join('\n')
+  : '';
+const inDigests = (name) => {
+  const n = norm(name).replace(/\b(the|at|by|of|a)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  return n.length >= 5 && digests.includes(n);
 };
 
 // Places review count, if this venue was already harvested.
@@ -65,9 +76,37 @@ const rows = venues.map((v) => {
   return { v, done, rm, rc, score };
 });
 
+// ── --slices: write per-venue reddit excerpts so draft workers read ~200 tokens,
+// not every thread. Each slice = matching lines ±2 of context, with thread header.
+if (process.argv.includes('--slices')) {
+  let sliced = 0;
+  for (const r of rows) {
+    const n = norm(r.v.name).replace(/\b(the|at|by|of|a)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    if (n.length < 5) continue;
+    const out = [];
+    for (const t of threads) {
+      const raw = fs.readFileSync(t.path, 'utf8');
+      const lines = raw.split('\n');
+      const hits = [];
+      lines.forEach((line, i) => { if (norm(line).includes(n)) hits.push(i); });
+      if (!hits.length) continue;
+      const keep = new Set();
+      for (const i of hits) for (let j = Math.max(0, i - 4); j <= Math.min(lines.length - 1, i + 4); j++) keep.add(j);
+      out.push(`--- ${path.basename(t.path)}: ${lines[0]}`);
+      out.push([...keep].sort((a, b) => a - b).map((i) => lines[i]).join('\n'));
+    }
+    if (!out.length) continue;
+    const dir = path.join(workdir, 'research', norm(r.v.name).replace(/ /g, '-').slice(0, 60));
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'reddit-slice.txt'), out.join('\n') + '\n');
+    sliced++;
+  }
+  console.log(`reddit slices written for ${sliced} venues`);
+}
+
 console.log(`${region} venues: ${venues.length} | already enriched: ${enriched} | reddit threads on file: ${threads.length}`);
 console.log(`bots (${(botProfiles || []).length}): ${(botProfiles || []).map((b) => `${b.username}=${entriesPerBot.get(b.id) || 0}`).join(', ') || '—'}`);
 console.log('\nUNENRICHED, richest first (score = 3×reddit-threads + places-reviews + website):');
 for (const r of rows.filter((r) => !r.done).sort((a, b) => b.score - a.score)) {
-  console.log(`  ${String(r.score).padStart(3)}  ${r.v.name} (${r.v.city || '?'})${r.rm ? ` | reddit×${r.rm}` : ''}${r.rc != null ? ` | ${r.rc} reviews` : ''}${r.v.website ? '' : ' | NO WEBSITE'}`);
+  console.log(`  ${String(r.score).padStart(3)}  ${r.v.name} (${r.v.city || '?'})${r.rm ? ` | reddit×${r.rm}` : ''}${r.rc != null ? ` | ${r.rc} reviews` : ''}${r.v.website ? '' : ' | NO WEBSITE'}${digests && !inDigests(r.v.name) ? ' | NOT-IN-DIGESTS' : ''}`);
 }

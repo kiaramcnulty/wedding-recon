@@ -10,8 +10,12 @@ import { sleep, argValue } from '../../launchvenues/scripts/lib.mjs';
 
 const workdir = process.argv[2];
 if (!workdir || workdir.startsWith('--')) { console.error('usage: photos.mjs <workdir> [--per-venue 4]'); process.exit(1); }
-const PER_VENUE = parseInt(argValue('per-venue') || '4', 10);
+const PER_VENUE = parseInt(argValue('per-venue') || '3', 10);
 const MIN_W = 700, MIN_H = 400;
+// Pre-download junk filter: badges/awards/graphics, and photographer-portrait tells
+// (couple names in the filename). Cheap regex beats paying a vision model to reject.
+const JUNK_URL = /logo|icon|favicon|badge|award|winner|diners|nextdoor|opentable|weddingwire|theknot|\bmenu\b|placeholder|coming-soon/i;
+const PORTRAIT_URL = /%20(&|and)%20|[-_](bride|groom|couple|engagement|portrait|elopement)[-_.]|first[-_]?look/i;
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 
 // CDN URLs often point at downsized renditions; ask for the original/larger one.
@@ -29,14 +33,15 @@ for (const slug of fs.readdirSync(researchDir)) {
   const hf = path.join(researchDir, slug, 'harvest.json');
   if (!fs.existsSync(hf)) continue;
   const h = JSON.parse(fs.readFileSync(hf, 'utf8'));
-  const urls = [...new Set((h.images || []).map(upgradeUrl))];
+  const urls = [...new Set((h.images || []).map(upgradeUrl))]
+    .filter((u) => !JUNK_URL.test(u) && !PORTRAIT_URL.test(decodeURIComponent(u)));
   if (!urls.length) { console.log(`${slug}: no image urls`); continue; }
 
   const outDir = path.join(workdir, 'photos', slug);
   fs.mkdirSync(outDir, { recursive: true });
   const candidates = [];
   for (const u of urls) {
-    if (candidates.length >= PER_VENUE * 3) break; // fetch a few extra, keep the best
+    if (candidates.length >= PER_VENUE * 2) break; // fetch a few extra, keep the best
     try {
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), 15000);

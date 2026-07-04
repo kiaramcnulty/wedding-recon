@@ -85,7 +85,8 @@ async function placeDetails(pid) {
     websiteUri: d.websiteUri,
     reviews: (d.reviews || []).map((r) => ({
       rating: r.rating,
-      when: r.publishTime?.slice(0, 7),
+      // publishTime is sometimes absent; the relative description ("8 months ago") still anchors dates
+      when: r.publishTime?.slice(0, 7) || r.relativePublishTimeDescription,
       text: (r.text?.text || r.originalText?.text || '').trim(),
     })).filter((r) => r.text),
   };
@@ -110,7 +111,8 @@ for (const v of targets) {
       const host = new URL(base).host.replace(/^www\./, '');
       const subs = extractLinks(home.text, base)
         .filter((u) => { try { return new URL(u).host.replace(/^www\./, '') === host && SUBPAGE.test(new URL(u).pathname); } catch { return false; } })
-        .filter((u) => !/\.(jpe?g|png|webp|css|js)(\?|$)/i.test(u))
+        .filter((u) => !/\.(jpe?g|png|webp|css|js|ics)(\?|$)/i.test(u))
+        .filter((u) => !/wp-json|tribe-events|\/feed\b|calendar|\bevent\b.*\d{4}/i.test(u)) // calendar/API dumps waste tokens
         .slice(0, 5);
       out.pdfs = extractLinks(home.text, base).filter((u) => /\.pdf(\?|$)/i.test(u)).slice(0, 5);
       out.images = extractImages(home.text, base);

@@ -31,9 +31,9 @@ Rows arrive pre-matched with `place_id`. Relay the one-line summaries. **Do not 
 ### Web listicles (do inline)
 Run 3–5 WebSearch queries: `{region} wedding venues list`, `{region} unique unconventional wedding venues`, `{region} affordable budget wedding venues`, `best hidden gem wedding venues {region}`. WebFetch the top listicle/aggregator hits (Here Comes The Guide, local blogs, photographer guides, **Zola**). Use this exact fetch prompt, substituting region/state/domain:
 
-> List every wedding venue or event space on this page located in or near {REGION}, {ST}. Output ONLY JSON lines, one per venue: {"name":"...","hint":"City, ST","provenance":"web:{domain}"}. No commentary, no markdown.
+> List every wedding venue or event space on this page located in or near {REGION}, {ST}. Output ONLY JSON lines, one per venue: {"name":"...","hint":"City, ST","provenance":"web:{domain}","intel":"<any pricing, capacity, or package detail the page gives, else omit>"}. No commentary, no markdown.
 
-Save each fetch's raw output to `research/web-<domain>.txt` (Write tool), then append only the `{...}` lines to `candidates.jsonl` (Bash heredoc `cat >>`).
+Save each fetch's raw output to `research/web-<domain>.txt` (Write tool), then append only the `{...}` lines to `candidates.jsonl` (Bash heredoc `cat >>`). The `intel` field costs nothing here and doubles as a region pricing digest for the later `/enrichvenues` pass.
 
 **Source quirks (measured, not assumed):** Zola and most blogs/guides fetch fine. **The Knot** — its `/marketplace/…` listing pages reliably time out (~60s, heavy JS + bot-throttle), but its `/content/<region>-wedding-venues` **articles** fetch fine, and `WebSearch` with `allowed_domains: ["theknot.com"]` returns venue names + summaries without touching the slow page — prefer those two over the marketplace URL. A WebFetch timeout is transient/page-specific: skip that URL and move on, don't conclude the domain is blocked.
 

@@ -1,14 +1,19 @@
 # Entry synthesis rules (all mandatory)
 
-## How many entries
-- 1-3 per venue, **mostly 2**. Never 4+.
-- Split by SOURCE CLUSTER, never by padding: e.g. entry 1 = website pricing page,
-  entry 2 = review/Reddit commentary. A venue with only one thin source gets exactly 1 entry.
-- Conflicting prices from different sources go in SEPARATE entries — that's a feature
-  (more data points for users), not a bug to reconcile.
-- Tiering (from roster.mjs scores): reddit-mentioned venues get the full treatment and
-  should lean on the thread content; long-tail venues get 1 website-sourced entry;
-  venues with no website, no reviews, and no mentions get skipped, not padded.
+## How many entries (tier is assigned by the orchestrator)
+- **Tier 1** (reddit-mentioned / rich sources): 2 entries, rarely 3. Lean on the reddit
+  slice — that content is the whole reason the venue is tier 1.
+- **Tier 2** (any signal at all — a website OR Google reviews): 1 entry by default.
+  Every venue with any recon gets at least one entry; only zero-signal venues are skipped.
+- **Promote/demote on evidence**: if a tier-2 venue's sources turn out rich (a real
+  pricing table AND strong firsthand commentary), write 2 entries; if a tier-1 venue is
+  thinner than its score suggested, write 1. Note promotions in your reply line.
+- Split multi-entry venues by SOURCE CLUSTER, never by padding: entry 1 = website
+  pricing, entry 2 = review/Reddit commentary. Conflicting prices from different sources
+  go in SEPARATE entries — that's a feature (more data points), not a bug to reconcile.
+- No-pricing venues still get their entry: price_text like "no public pricing anywhere,
+  you have to call for a quote" with price_details explaining what you checked.
+  Honest thinness beats invented numbers.
 
 ## price_text + price_details — REQUIRED on every entry
 - `price_text`: compact headline, e.g. "$3.5k-$8k depending on season/day",
