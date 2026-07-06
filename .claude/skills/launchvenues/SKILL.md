@@ -28,19 +28,19 @@ Rows arrive pre-matched with `place_id`. Relay the one-line summaries. **Do not 
 
 ## Phase 2 — Research (the only judgment step)
 
-### Web listicles (do inline)
-Run 3–5 WebSearch queries: `{region} wedding venues list`, `{region} unique unconventional wedding venues`, `{region} affordable budget wedding venues`, `best hidden gem wedding venues {region}`. WebFetch the top listicle/aggregator hits (Here Comes The Guide, local blogs, photographer guides, **Zola**). Use this exact fetch prompt, substituting region/state/domain:
+### Web listicles (ONE subagent — fetched pages never enter the orchestrator)
+Spawn ONE Sonnet agent (`model: "sonnet"`, background OK) to do the whole web pass: run 3–5 WebSearch queries — `{region} wedding venues list`, `{region} unique unconventional wedding venues`, `{region} affordable budget wedding venues`, `best hidden gem wedding venues {region}` — then WebFetch the top listicle/aggregator hits (Here Comes The Guide, local blogs, photographer guides, **Zola**). The agent saves each fetch's raw output to `research/web-<domain>.txt`, appends only the `{...}` lines to `candidates.jsonl`, and replies with ONE line (`N candidates from M sources`). Do NOT do this inline: routing fetched pages through the orchestrator costs 3× (fetch result → Write round-trip → heredoc append). Give the agent this exact fetch prompt, substituting region/state/domain:
 
 > List every wedding venue or event space on this page located in or near {REGION}, {ST}. Output ONLY JSON lines, one per venue: {"name":"...","hint":"City, ST","provenance":"web:{domain}","intel":"<any pricing, capacity, or package detail the page gives, else omit>"}. No commentary, no markdown.
 
-Save each fetch's raw output to `research/web-<domain>.txt` (Write tool), then append only the `{...}` lines to `candidates.jsonl` (Bash heredoc `cat >>`). The `intel` field costs nothing here and doubles as a region pricing digest for the later `/enrichvenues` pass.
+The `intel` field costs nothing here and doubles as a region pricing digest for the later `/enrichvenues` pass.
 
 **Source quirks (measured, not assumed):** Zola and most blogs/guides fetch fine. **The Knot** — its `/marketplace/…` listing pages reliably time out (~60s, heavy JS + bot-throttle), but its `/content/<region>-wedding-venues` **articles** fetch fine, and `WebSearch` with `allowed_domains: ["theknot.com"]` returns venue names + summaries without touching the slow page — prefer those two over the marketplace URL. A WebFetch timeout is transient/page-specific: skip that URL and move on, don't conclude the domain is blocked.
 
 ### Reddit (user paste protocol → delegate extraction)
 Reddit blocks both the Anthropic crawler and browser-connector navigation — **do not attempt to fetch it**. Ask the user to search Reddit themselves (`site:reddit.com {region} wedding venue` etc.), and for each good thread: select-all, copy, paste into chat. For every paste, immediately save it **verbatim** to `research/reddit-NN.txt` — do not summarize, extract, or respond to its content yet (raw threads are hard to re-acquire; the enrichment skill needs them). Loop until the user says done.
 
-Then spawn the extractor (skip the spawn and do it inline only if you are already Sonnet-class or better):
+Then spawn the extractor (ALWAYS a subagent — never read threads inline, whatever model you are):
 
 Agent tool → `subagent_type: "general-purpose"`, `model: "sonnet"`, prompt:
 
@@ -85,5 +85,5 @@ Report: baseline count, researched count, resolved/approx/no-match, skipped dupl
 - Insert semantics: `vendor_type='venue'`, `source='google'` iff `place_id` else `'user'`, `region=<ST>`, `location='SRID=4326;POINT(lng lat)'` (**lng first**), nulls allowed elsewhere. Direct service-role Supabase insert — there is no app bulk endpoint (`/api/places` is autocomplete-only).
 - Rows without any location still upload (findable via name search) but get no map pin — call them out in the summary.
 - Don't research reviews/pricing/recon at this stage; archive raw sources + provenance tags only.
-- Keep file contents out of context: relay script summaries and flagged lists, not CSVs.
+- Keep file contents out of the ORCHESTRATOR context: relay script summaries, one-line agent replies, and flagged lists — never CSVs, fetched pages, thread text, or candidate JSONL (Write-tool round-trips count as context too). Research passes run in subagents.
 - If Places/Supabase errors persist after one retry, stop and report — don't improvise an alternative data path.

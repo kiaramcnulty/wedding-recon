@@ -71,12 +71,16 @@ function extractImages(html, base) {
 }
 
 async function placeDetails(pid) {
-  const res = await fetch(`https://places.googleapis.com/v1/places/${pid}`, {
-    headers: {
-      'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY,
-      'X-Goog-FieldMask': 'id,displayName,rating,userRatingCount,editorialSummary,websiteUri,reviews',
-    },
-  });
+  // try/catch: a transient DNS/network blip must fail THIS venue, not kill the run
+  let res;
+  try {
+    res = await fetch(`https://places.googleapis.com/v1/places/${pid}`, {
+      headers: {
+        'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY,
+        'X-Goog-FieldMask': 'id,displayName,rating,userRatingCount,editorialSummary,websiteUri,reviews',
+      },
+    });
+  } catch (e) { return { err: e.cause?.code || e.message || 'fetch failed' }; }
   if (!res.ok) return { err: `Places ${res.status}` };
   const d = await res.json();
   return {

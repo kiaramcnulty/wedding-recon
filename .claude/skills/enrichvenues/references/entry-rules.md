@@ -1,19 +1,32 @@
 # Entry synthesis rules (all mandatory)
 
-## How many entries (tier is assigned by the orchestrator)
-- **Tier 1** (reddit-mentioned / rich sources): 2 entries, rarely 3. Lean on the reddit
-  slice — that content is the whole reason the venue is tier 1.
-- **Tier 2** (any signal at all — a website OR Google reviews): 1 entry by default.
-  Every venue with any recon gets at least one entry; only zero-signal venues are skipped.
-- **Promote/demote on evidence**: if a tier-2 venue's sources turn out rich (a real
-  pricing table AND strong firsthand commentary), write 2 entries; if a tier-1 venue is
-  thinner than its score suggested, write 1. Note promotions in your reply line.
-- Split multi-entry venues by SOURCE CLUSTER, never by padding: entry 1 = website
-  pricing, entry 2 = review/Reddit commentary. Conflicting prices from different sources
-  go in SEPARATE entries — that's a feature (more data points), not a bug to reconcile.
-- No-pricing venues still get their entry: price_text like "no public pricing anywhere,
-  you have to call for a quote" with price_details explaining what you checked.
-  Honest thinness beats invented numbers.
+## Not a venue? Flag it (do NOT draft a row)
+- If a venue's dossier makes clear it is a SERVICE vendor, not a place that hosts weddings
+  — a caterer, photographer, DJ/entertainment, florist, planner, officiant, stationery/
+  invitations shop — with no event space of its own, do NOT write a row for it. Instead
+  add ` NOTAVENUE:<slug>` to your reply line. (Signals: site sells "our services"/"our
+  packages" with no room/capacity/rental, name like "X Catering"/"X Photography", reviews
+  about food/photos/music rather than a space.) A caterer that ALSO rents its own hall is
+  a venue — keep it. When unsure, draft the row and flag it; the orchestrator decides.
+
+## How many entries
+- **Exactly ONE row per venue listed in your call file**, by that venue's assigned bot.
+  If a dossier is unusually rich (real pricing table AND strong firsthand commentary),
+  still write one row and flag ` RICH:<slug>` in your reply — a second entry may be
+  commissioned separately with a different bot.
+- When a second entry IS commissioned, split by SOURCE CLUSTER, never by padding:
+  entry 1 = website pricing, entry 2 = review/Reddit commentary. Conflicting prices from
+  different sources go in SEPARATE entries — that's a feature (more data points).
+- No-pricing venues still get their entry: price_text `Quote only` with price_details
+  explaining what you checked. Honest thinness beats invented numbers.
+
+## Notes length (cut the fluff)
+- 2-5 sentences, ONE line. Rich dossier → up to ~90 words. Thin or quote-only venue →
+  25-50 words and stop. Never pad a thin venue to look researched.
+- Every sentence earns its place with a concrete fact: pricing shape, capacity,
+  what's included vs required (catering policy especially), staff/ownership feel,
+  a review specific, a logistics quirk. Delete connective filler ("I dug into...",
+  "it's worth noting...", "all in all...").
 
 ## price_text + price_details — REQUIRED on every entry
 - `price_text`: compact headline, e.g. "$3.5k-$8k depending on season/day",
@@ -26,9 +39,9 @@
   (upload.mjs hard-fails).
 
 ## Dates (recon_collected_month/year)
-- A real source date wins: a Reddit comment from "3mo ago" on a thread captured July 2026
-  → collected 4/2026; a 2024 comment → 2024.
-- Otherwise: spread across the LAST 3 MONTHS only. Vary months across entries.
+- Your call file pre-assigns each venue's `date=M/YYYY` — use it.
+- Exception: a real source date wins. A Reddit comment from "3mo ago" on a thread
+  captured July 2026 → collected 4/2026; a 2024 comment → 2024.
 
 ## recon_type
 - `online` is the default and should be ~all entries.
@@ -49,7 +62,7 @@
 
 ## Other fields
 - `service_region`: always null for venues (leave the column out; upload.mjs sets null).
-- `vendor_id`: from `research/<slug>/harvest.json`. Never guess.
+- `vendor_id`: copy VERBATIM from your call file's venue block. Never guess.
 - `bot` column: `bot1..botN` keys from the roster. A bot NEVER gets two entries for the
   same venue (validated). 3-10 entries per bot per run. Bots are PER STATE — they never
   cross states, but the same state roster is reused for future vendor types

@@ -36,6 +36,9 @@ const RECON_TYPES = new Set(['online', 'virtual', 'in_person']);
 // AI-slop tells; entries containing these must be rephrased before upload.
 // Empty-evaluative filler is banned too: judgments must be tied to a number or a sourced fact.
 const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
+// Crawler tells: research-process language no real couple would write. Rephrase as a
+// person would ("their site doesn't list pricing", "couldn't get the page to load").
+const CRAWLER = /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate)\b/i;
 const EMDASH = /[—–]/; // no em/en dashes anywhere in entry text — real users type hyphens
 const errors = [];
 const perBot = new Map(), perBotVenue = new Set();
@@ -47,6 +50,8 @@ for (const [i, r] of recons.entries()) {
   const text = `${r.price_text} ${r.price_details} ${r.notes}`;
   const banned = text.match(BANNED);
   if (banned) errors.push(`${at}: banned marketing/AI phrase "${banned[0]}" — rephrase in the entry's voice`);
+  const tell = text.match(CRAWLER);
+  if (tell) errors.push(`${at}: crawler-tell "${tell[0]}" — rephrase as a person would (no research-tooling language)`);
   if (EMDASH.test(text)) errors.push(`${at}: em/en dash in entry text — use a comma, period, or hyphen`);
   const m = parseInt(r.month, 10), y = parseInt(r.year, 10);
   if (!(m >= 1 && m <= 12)) errors.push(`${at}: bad month "${r.month}"`);
