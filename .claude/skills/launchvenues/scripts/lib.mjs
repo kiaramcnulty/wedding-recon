@@ -94,5 +94,69 @@ export async function placesSearch(query, pageToken) {
   return res.json();
 }
 
+/**
+ * Place Details (New) lookup by place_id. Field mask omits the `places.` prefix (single
+ * place, not a search array). Used to recover fields Text Search leaves empty.
+ */
+export async function placeDetails(placeId, fields = 'id,displayName,formattedAddress,location,websiteUri') {
+  const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+    headers: { 'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY, 'X-Goog-FieldMask': fields },
+  });
+  if (!res.ok) throw new Error(`Place Details ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+/**
+ * Website for a matched place, with a Place Details fallback. Text Search routinely omits
+ * `websiteUri` even for places that have a site (Details returns it reliably), so callers
+ * pass the value from their search hit and we only spend the extra Details call — and its
+ * rate-limit sleep — for the venues that actually came back without one. Returns '' on any
+ * failure so a missing website never aborts a sweep/resolve.
+ */
+export async function websiteWithFallback(placeId, searchWebsite) {
+  if (searchWebsite) return searchWebsite;
+  if (!placeId) return '';
+  try {
+    const d = await placeDetails(placeId, 'websiteUri');
+    await sleep(120);
+    return d.websiteUri || '';
+  } catch { return ''; }
+}
+
+// Domains that are never a venue's OWN website — social, maps/search, and wedding/review
+// DIRECTORIES. A listicle or scrape often lists one of these as a venue's "site"; we only
+// want the venue's own domain, so a directory/social link is dropped rather than stored.
+const NON_WEBSITE_DOMAINS = [
+  // social / video / link aggregators
+  'facebook.com', 'fb.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
+  'pinterest.com', 'youtube.com', 'youtu.be', 'linktr.ee', 'linktree.com',
+  // maps / search
+  'google.com', 'g.page', 'goo.gl',
+  // review + wedding directories (venue-specific pages, but not the venue's own domain)
+  'yelp.com', 'tripadvisor.com', 'theknot.com', 'weddingwire.com', 'zola.com',
+  'weddingspot.com', 'wedding-spot.com', 'herecomestheguide.com', 'partyslate.com',
+  'eventective.com', 'peerspace.com', 'weddingvenuemap.com', 'bridalguide.com',
+];
+/**
+ * Normalize + validate a website URL sourced from RESEARCH or a SCRAPE (not Google's own
+ * websiteUri, which is already canonical). Adds https:// if scheme-less, requires a dotted
+ * host and http(s), and drops any non-venue domain (social/maps/directory) so ONLY a
+ * venue's own domain is stored. Returns '' for anything that doesn't cleanly parse so a
+ * junk listicle cell never lands in the DB. Backend-only.
+ */
+export function cleanWebsite(raw) {
+  let s = (raw || '').trim();
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    if (!/\.[a-z]{2,}$/i.test(u.hostname) || u.hostname.length < 4) return '';
+    const host = u.hostname.replace(/^www\./i, '').toLowerCase();
+    if (NON_WEBSITE_DOMAINS.some((d) => host === d || host.endsWith('.' + d))) return '';
+    return u.toString().replace(/\/$/, '');
+  } catch { return ''; }
+}
+
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function argValue(name) { const i = process.argv.indexOf(`--${name}`); return i === -1 ? null : process.argv[i + 1]; }

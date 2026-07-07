@@ -31,9 +31,9 @@ Rows arrive pre-matched with `place_id`. Relay the one-line summaries. **Do not 
 ### Web listicles (ONE subagent — fetched pages never enter the orchestrator)
 Spawn ONE Sonnet agent (`model: "sonnet"`, background OK) to do the whole web pass: run 3–5 WebSearch queries — `{region} wedding venues list`, `{region} unique unconventional wedding venues`, `{region} affordable budget wedding venues`, `best hidden gem wedding venues {region}` — then WebFetch the top listicle/aggregator hits (Here Comes The Guide, local blogs, photographer guides, **Zola**). The agent saves each fetch's raw output to `research/web-<domain>.txt`, appends only the `{...}` lines to `candidates.jsonl`, and replies with ONE line (`N candidates from M sources`). Do NOT do this inline: routing fetched pages through the orchestrator costs 3× (fetch result → Write round-trip → heredoc append). Give the agent this exact fetch prompt, substituting region/state/domain:
 
-> List every wedding venue or event space on this page located in or near {REGION}, {ST}. Output ONLY JSON lines, one per venue: {"name":"...","hint":"City, ST","provenance":"web:{domain}","intel":"<any pricing, capacity, or package detail the page gives, else omit>"}. No commentary, no markdown.
+> List every wedding venue or event space on this page located in or near {REGION}, {ST}. Output ONLY JSON lines, one per venue: {"name":"...","hint":"City, ST","website":"<the venue's OWN website if the page links it, else omit — never a social, maps, or directory link>","provenance":"web:{domain}","intel":"<any pricing, capacity, or package detail the page gives, else omit>"}. No commentary, no markdown.
 
-The `intel` field costs nothing here and doubles as a region pricing digest for the later `/enrichvenues` pass.
+The `intel` field costs nothing here and doubles as a region pricing digest for the later `/enrichvenues` pass. The `website` field lets a research-sourced URL fill the `website` column for venues Google has none for (see "Research-sourced websites" below).
 
 **Source quirks (measured, not assumed):** Zola and most blogs/guides fetch fine. **The Knot** — its `/marketplace/…` listing pages reliably time out (~60s, heavy JS + bot-throttle), but its `/content/<region>-wedding-venues` **articles** fetch fine, and `WebSearch` with `allowed_domains: ["theknot.com"]` returns venue names + summaries without touching the slow page — prefer those two over the marketplace URL. A WebFetch timeout is transient/page-specific: skip that URL and move on, don't conclude the domain is blocked.
 
@@ -44,7 +44,7 @@ Then spawn the extractor (ALWAYS a subagent — never read threads inline, whate
 
 Agent tool → `subagent_type: "general-purpose"`, `model: "sonnet"`, prompt:
 
-> Read every `reddit-*.txt` file in `<abs workdir>/research/`. They are raw Reddit-thread pastes about wedding venues near {REGION}, {ST}. Extract every distinct venue/event space that could host a wedding (restaurants, parks, rec centers, galleries, breweries, hotels, campuses count). Exclude pure service vendors (florist/DJ/photographer/planner/caterer), venues clearly in another state, and generic non-places ("a park", "an Airbnb"). Append one JSON line per venue to `<abs workdir>/candidates.jsonl`: {"name":"...","hint":"<city/area if stated or inferable, else omit>","provenance":"reddit:<filename>"}. Dedupe within your output; do not modify existing lines. Reply with only the count appended and any names you were unsure about.
+> Read every `reddit-*.txt` file in `<abs workdir>/research/`. They are raw Reddit-thread pastes about wedding venues near {REGION}, {ST}. Extract every distinct venue/event space that could host a wedding (restaurants, parks, rec centers, galleries, breweries, hotels, campuses count). Exclude pure service vendors (florist/DJ/photographer/planner/caterer), venues clearly in another state, and generic non-places ("a park", "an Airbnb"). Append one JSON line per venue to `<abs workdir>/candidates.jsonl`: {"name":"...","hint":"<city/area if stated or inferable, else omit>","website":"<the venue's own website if a commenter linked it, else omit>","provenance":"reddit:<filename>"}. Dedupe within your output; do not modify existing lines. Reply with only the count appended and any names you were unsure about.
 
 ## Phase 3 — Resolve candidates to Google places
 
@@ -70,9 +70,20 @@ node --env-file=.env.local .claude/skills/launchvenues/scripts/upload.mjs data/l
 node --env-file=.env.local .claude/skills/launchvenues/scripts/upload.mjs data/launchvenues/<slug> --apply    # after explicit user yes
 ```
 
-Dry-run first, always. It late-resolves rows where the user added a street address (business match with guard, else coords-only geocode — an address geocode is never stored as a `place_id`), then dedupes: DB `place_id` → DB name+city → within-batch. Show the user the dry-run summary and get an **explicit yes** before `--apply`. This is the only confirmation gate in the pipeline — don't add others, never skip this one. The script verifies after applying (count delta + DB-wide duplicate place_id/name scan) and writes `upload-report.txt`.
+Dry-run first, always. It late-resolves rows where the user added a street address (business match with guard, else coords-only geocode — an address geocode is never stored as a `place_id`), then dedupes: DB `place_id` → DB name+city → within-batch. A dedup hit against an existing DB row whose `website` is blank gets that column **backfilled** from the CSV row (fills blanks only, never overwrites — insert is otherwise insert-only, so a website-less row would never self-heal). Show the user the dry-run summary (including any `BACKFILL` line) and get an **explicit yes** before `--apply`. This is the only confirmation gate in the pipeline — don't add others, never skip this one. The script verifies after applying (count delta + DB-wide duplicate place_id/name scan) and writes `upload-report.txt`.
 
 If the insert fails, nothing was partially written — fix and re-run; dedup makes re-runs safe.
+
+**Website capture:** Google Text Search routinely returns an empty `websiteUri` even for venues that have a site, so `scout`, `resolve`, and `upload`'s late-resolve fall back to a **Place Details** lookup by `place_id` whenever the search hit lacks a website (the extra call fires only for those rows). To repair venues launched before this fallback existed:
+
+```
+node --env-file=.env.local .claude/skills/launchvenues/scripts/backfill-websites.mjs [--region CO] [--limit N]           # dry-run
+node --env-file=.env.local .claude/skills/launchvenues/scripts/backfill-websites.mjs --apply [--region CO] [--limit N]   # write
+```
+
+Scans launched venues with a `place_id` but no website, fetches Place Details for each, and fills the blank (dry-run lists what it would write; only ever fills blanks, never overwrites).
+
+**Research-sourced websites:** when research (a web listicle, a scrape CSV, or a Reddit link) surfaces a venue's own website and Google has none, `resolve`/`ingest` keep that URL in the `website` column so the vendor page can still show a "Visit website" link. This is a backend-only bulk-upload behavior — there is no user-facing website-entry path. Google's own `websiteUri` always wins when present; the research URL is only a fallback. All research/scrape URLs pass through `cleanWebsite()` in `lib.mjs`, which normalizes the scheme, requires a valid dotted host, and stores **only a venue's own domain** — social, maps/search, and wedding/review directory links (facebook, instagram, google/maps, yelp, theknot, weddingwire, zola, etc.) are dropped rather than stored.
 
 ## Phase 6 — Wrap up
 

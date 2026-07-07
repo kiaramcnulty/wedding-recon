@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { readVenues, writeVenues, norm, tokensOverlap, parseCityState, placesSearch, sleep } from './lib.mjs';
+import { readVenues, writeVenues, norm, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep } from './lib.mjs';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -32,7 +32,7 @@ for (const v of venues) {
       Object.assign(v, {
         address: cleanAddress, city: city || v.city, state,
         lat: p.location?.latitude ?? v.lat, lng: p.location?.longitude ?? v.lng,
-        place_id: p.id, website: v.website || p.websiteUri || '',
+        place_id: p.id, website: v.website || await websiteWithFallback(p.id, p.websiteUri),
       });
       lateResolved++;
     } else if (!v.lat || !v.lng) {
@@ -48,18 +48,22 @@ for (const v of venues) {
 
 // ── Dedup: DB place_id > DB name+city > within-batch ─────────────────────────
 const { data: existing, error } = await supabase
-  .from('vendors').select('id, name, city, google_place_id').eq('vendor_type', 'venue');
+  .from('vendors').select('id, name, city, google_place_id, website').eq('vendor_type', 'venue');
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
-const dbPid = new Set(existing.filter((v) => v.google_place_id).map((v) => v.google_place_id));
-const dbName = new Map(existing.map((v) => [norm(v.name) + '|' + norm(v.city || ''), v.name]));
+const dbPid = new Map(existing.filter((v) => v.google_place_id).map((v) => [v.google_place_id, v]));
+const dbName = new Map(existing.map((v) => [norm(v.name) + '|' + norm(v.city || ''), v]));
 
-const toInsert = [], skipDbPid = [], skipDbName = [], skipBatch = [], skipNoName = [];
+// An existing DB row that lacks a website but whose CSV twin now has one gets its website
+// backfilled (fills blanks only — never overwrites an existing website). Insert is otherwise
+// insert-only, so without this a row that first landed website-less stays blank forever.
+const toInsert = [], skipDbPid = [], skipDbName = [], skipBatch = [], skipNoName = [], backfill = [];
 const batchPid = new Set(), batchName = new Set();
+const maybeBackfill = (dbRow, v) => { if (v.website && !(dbRow.website || '').trim()) backfill.push({ id: dbRow.id, name: dbRow.name, website: v.website }); };
 for (const v of venues) {
   if (!v.name) { skipNoName.push(v); continue; }
   const nk = norm(v.name) + '|' + norm(v.city);
-  if (v.place_id && dbPid.has(v.place_id)) { skipDbPid.push(v.name); continue; }
-  if (dbName.has(nk)) { skipDbName.push(`${v.name} ~ ${dbName.get(nk)}`); continue; }
+  if (v.place_id && dbPid.has(v.place_id)) { maybeBackfill(dbPid.get(v.place_id), v); skipDbPid.push(v.name); continue; }
+  if (dbName.has(nk)) { maybeBackfill(dbName.get(nk), v); skipDbName.push(`${v.name} ~ ${dbName.get(nk).name}`); continue; }
   if ((v.place_id && batchPid.has(v.place_id)) || batchName.has(nk)) { skipBatch.push(v.name); continue; }
   if (v.place_id) batchPid.add(v.place_id);
   batchName.add(nk);
@@ -93,6 +97,7 @@ lines.push(`skip — already in DB by place_id (${skipDbPid.length}): ${skipDbPi
 lines.push(`skip — already in DB by name+city (${skipDbName.length}): ${skipDbName.join('; ') || '—'}`);
 lines.push(`skip — duplicate within batch (${skipBatch.length}): ${skipBatch.join(', ') || '—'}`);
 if (skipNoName.length) lines.push(`skip — blank name: ${skipNoName.length}`);
+if (backfill.length) lines.push(`BACKFILL website on existing rows (${backfill.length}): ${backfill.map((b) => b.name).join(', ')}`);
 lines.push(`TO INSERT: ${payload.length}  (google-matched ${payload.filter((p) => p.source === 'google').length}, approximate-pin ${approx.length}, NO LOCATION ${noLoc.length})`);
 if (approx.length) lines.push(`  approximate (city-centroid, dashed pin): ${approx.join(', ')}`);
 if (noLoc.length) lines.push(`  no location — searchable by name but NO map pin: ${noLoc.join(', ')}`);
@@ -105,8 +110,20 @@ if (!APPLY) {
   process.exit(0);
 }
 
-const { data: inserted, error: insErr } = await supabase.from('vendors').insert(payload).select('id');
-if (insErr) { console.error('INSERT FAILED (nothing partially written — safe to fix & re-run):', insErr.message); process.exit(1); }
+let inserted = [];
+if (payload.length) {
+  const { data, error: insErr } = await supabase.from('vendors').insert(payload).select('id');
+  if (insErr) { console.error('INSERT FAILED (nothing partially written — safe to fix & re-run):', insErr.message); process.exit(1); }
+  inserted = data;
+}
+
+// ── Backfill websites on existing rows (fills blanks only) ──────────────────────
+let backfilled = 0;
+for (const b of backfill) {
+  const { error: uErr } = await supabase.from('vendors').update({ website: b.website }).eq('id', b.id);
+  if (uErr) { console.error(`website backfill failed for ${b.name}: ${uErr.message}`); continue; }
+  backfilled++;
+}
 
 // ── Verify ────────────────────────────────────────────────────────────────────
 const { data: after } = await supabase.from('vendors').select('name, city, google_place_id').eq('vendor_type', 'venue');
@@ -119,7 +136,7 @@ for (const v of after ?? []) {
 const dupPids = [...pidCount.entries()].filter(([, n]) => n > 1);
 const dupNames = [...nameCount.entries()].filter(([, n]) => n > 1);
 const verify = [
-  `\nAPPLIED: inserted ${inserted.length} venues | DB venue total now ${after?.length ?? '?'}`,
+  `\nAPPLIED: inserted ${inserted.length} venues${backfill.length ? ` | website backfilled on ${backfilled}/${backfill.length} existing rows` : ''} | DB venue total now ${after?.length ?? '?'}`,
   `verify — duplicate place_ids in DB: ${dupPids.length ? dupPids.map(([p]) => p).join(', ') : 'none'}`,
   `verify — duplicate name+city in DB: ${dupNames.length ? dupNames.map(([n]) => n).join('; ') : 'none'}`,
 ];
