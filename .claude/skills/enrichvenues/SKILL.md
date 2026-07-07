@@ -46,7 +46,7 @@ node --env-file=.env.local .claude/skills/enrichvenues/scripts/pipeline.mjs <wor
 
 `batch` selects the N richest venues with **no recon of any kind**, defers same-named twins (and skips twin research collisions with a warning), assigns bots (≤10/bot/run) and collected-dates, and writes `drafts/<id>-call-NN.md` files with rules + voices + dossiers **inlined**. It fails fast listing any venue missing a dossier.
 
-Spawn one Sonnet agent (`model: "sonnet"`, background OK) per call file. Prompt, verbatim short: *"Read `<workdir>/drafts/<id>-call-NN.md` and follow it exactly. It contains every rule and all research; use no other file, no web access. Write the CSV it specifies in one Write, then reply with the one-line summary it specifies."* Workers get NO gap searches — a venue with no pricing in its dossier gets an honest "Quote only" row (v1 data: live gap-searching had poor ROI; ~36% ended quote-only anyway). If the user wants deeper pricing on specific venues, run ONE targeted search agent for just those, before batching.
+Spawn one agent (`subagent_type: "draft-worker"`, background OK) per call file — that agent type is `model: sonnet` with tools **gated to Read + Write**, so it structurally cannot self-verify, web-search, or list directories past the single-turn contract (this is the main lever on realizing the ~10× budget: extra worker tool calls re-bill the whole ~30k call file). Prompt, verbatim short: *"Read `<workdir>/drafts/<id>-call-NN.md` and follow it exactly. It contains every rule and all research. Write the CSV it specifies in one Write, then reply with the one line it specifies. Do not read anything else back."* Workers get NO gap searches — a venue with no pricing in its dossier gets an honest "Quote only" row (v1 data: live gap-searching had poor ROI; ~36% ended quote-only anyway). If the user wants deeper pricing on specific venues, run ONE targeted search agent for just those, before batching.
 
 Collect two flags from the worker reply lines:
 - **`NOTAVENUE:<slug>`** — the dossier shows a SERVICE vendor mis-seeded as a venue (caterer, photographer, DJ, florist, planner, officiant, stationery shop) with no space of its own. Confirm against the dossier, then **remove the seeded row** unless it was user-added: a seed has `created_by = null`; an app-user-added vendor has `created_by` set and is NEVER auto-removed. Removal = delete its `recon_media` → `recon_entries` → the `vendors` row, and strip it from the batch CSV/manifest. A caterer that rents its OWN hall is a real venue — keep it.
@@ -60,7 +60,7 @@ node --env-file=.env.local .claude/skills/enrichvenues/scripts/pipeline.mjs <wor
 node --env-file=.env.local .claude/skills/enrichvenues/scripts/upload.mjs <workdir> --roster <roster> --csv recons-<id>.csv   # dry-run validation
 ```
 
-Missing venues (a call died): re-spawn just that call file. Validation failures/near-dup warnings: fix only those rows (≤5 inline, else one small call). Never re-draft or re-read the whole batch. The dry-run also blocks **crawler-tell** language ("crawl"/"fetch"/"parse"/"boilerplate"/"garbled text" — research-tooling words no real couple writes); collect the offending rows into one JSON and hand a single Sonnet agent a rephrase-in-place pass.
+Missing venues (a call died): re-spawn just that call file. Validation failures/near-dup warnings: fix only those rows (≤5 inline, else one small call). Never re-draft or re-read the whole batch. The dry-run also blocks **process-tell** language — both research-tooling words ("crawl"/"fetch"/"parse"/"boilerplate"/"garbled text") and pipeline/batch self-references ("batch"/"enrich"/"seeded"/"roster"/"bot"/"pipeline" — copy must never reference scraping, batches, or how the entry was produced); collect the offending rows into one JSON and hand a single Sonnet agent a rephrase-in-place pass.
 
 ### Optional: RICH second entries (only if the user wants depth)
 Venues flagged `RICH` can earn a 2nd entry (review/experience cluster, a different bot than entry 1 — the source-cluster split in the entry rules). It's a SEPARATE run:
@@ -69,7 +69,7 @@ Venues flagged `RICH` can earn a 2nd entry (review/experience cluster, a differe
 node --env-file=.env.local .claude/skills/enrichvenues/scripts/pipeline.mjs <workdir> rich --batch <id> --roster <roster> --venues "<rich slugs>"
 ```
 
-Spawn ONE Sonnet agent on `drafts/<id>-rich-call.md`, validate its `drafts/<id>-rich-worker.csv`, copy to `recons-<id>-rich.csv`, and upload it as its own `--apply` run (the ≤10/bot/run cap is per-file; dedup is safe since the second entry's author differs from the first). `rich` load-balances the second bot and guarantees it differs from entry 1's.
+Spawn ONE `subagent_type: "draft-worker"` agent on `drafts/<id>-rich-call.md` (same gated single-turn contract), validate its `drafts/<id>-rich-worker.csv`, copy to `recons-<id>-rich.csv`, and upload it as its own `--apply` run (the ≤10/bot/run cap is per-file; dedup is safe since the second entry's author differs from the first). `rich` load-balances the second bot and guarantees it differs from entry 1's.
 
 ## Phase 4 — User review (human gate #2)
 
@@ -109,7 +109,7 @@ Run ONLY when the user asks for photos, and only **between Phase 3 and Phase 6**
 - Recon is for VENUES only. Service vendors mis-seeded as venues (catering/photography/DJ/florist/planner/officiant/stationery) get removed, not enriched — unless a real user added them (`created_by` set). Never fabricate a "space" for a service business.
 - `price_text` + `price_details` on every entry (honest "quote only" wording when nothing is findable).
 - Four human gates (batch scope, CSV review, roster, upload dry-run) — never skip, never add.
-- Draft calls are single-turn and tool-less (one Read implicit in the call file, one Write, one-line reply). Orchestrator never reads dossiers/research/images; nothing bulk in the orchestrator context.
+- Draft calls are single-turn, spawned as `subagent_type: "draft-worker"` (tools gated to Read + Write): one Read of the call file, one Write of the CSV, one-line reply — no read-back, no directory listing, no web. The reply is `<file>: done` plus any `RICH:`/`NOTAVENUE:` flags (coverage/pricing counts come from `pipeline.mjs status`, not the worker). Orchestrator never reads dossiers/research/images; nothing bulk in the orchestrator context.
 - Bots: per-state rosters, ≤1 entry per venue per bot, ≤10/bot/run, all flagged `is_bot`, usernames user-approved.
 - Save user-pasted Reddit threads verbatim to `research/` before responding to their content.
 - Use `pipeline.mjs` subcommands for batch mechanics — do not hand-write per-run scripts for selection/coverage/repair/verify.

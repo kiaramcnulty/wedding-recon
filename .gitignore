@@ -34,9 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
-# claude code local session dir (but keep shared skills tracked)
+# claude code local session dir (but keep shared skills + agents tracked)
 .claude/*
 !.claude/skills/
+!.claude/agents/
 
 # supabase cli local state
 supabase/.temp/
