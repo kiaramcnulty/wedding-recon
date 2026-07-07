@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeRegion } from "@/lib/normalize-region";
 import type { VendorType, ReconType } from "@/lib/constants/categories";
 
 export interface CreateReconInput {
@@ -91,7 +92,7 @@ export async function createRecon(input: CreateReconInput) {
             google_place_id: input.placeId,
             address_text: input.placeAddress ?? null,
             city: input.placeCity ?? null,
-            region: input.placeRegion ?? null,
+            region: normalizeRegion(input.placeRegion),
             location: locationEwkt,
             website: input.placeWebsite ?? null,
             source: "google",
@@ -133,7 +134,7 @@ export async function createRecon(input: CreateReconInput) {
             vendor_type: input.vendorType,
             city: city || null,
             address_text: input.manualAddress ?? (city || null),
-            region: input.manualRegion ?? null,
+            region: normalizeRegion(input.manualRegion),
             source: "user",
             created_by: user.id,
             location: locationEwkt,
