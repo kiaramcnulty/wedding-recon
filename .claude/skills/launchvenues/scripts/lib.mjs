@@ -123,5 +123,27 @@ export async function websiteWithFallback(placeId, searchWebsite) {
   } catch { return ''; }
 }
 
+// Hosts that are never a venue's OWN website (social, maps, link aggregators). A listicle
+// or scrape often lists one of these as a venue's "site"; we don't want them in the column.
+const NON_WEBSITE_HOSTS = /(^|\.)(facebook|instagram|twitter|x|tiktok|pinterest|youtube|youtu|linktr|linktree|google|g|goo|yelp)\.(com|be|page|gl|ee)$/i;
+/**
+ * Normalize + validate a website URL sourced from RESEARCH or a SCRAPE (not Google's own
+ * websiteUri, which is already canonical). Adds https:// if scheme-less, requires a dotted
+ * host and http(s), and drops social/maps/aggregator hosts. Returns '' for anything that
+ * doesn't cleanly parse so a junk listicle cell never lands in the DB. Backend-only.
+ */
+export function cleanWebsite(raw) {
+  let s = (raw || '').trim();
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    if (!/\.[a-z]{2,}$/i.test(u.hostname) || u.hostname.length < 4) return '';
+    if (NON_WEBSITE_HOSTS.test(u.hostname)) return '';
+    return u.toString().replace(/\/$/, '');
+  } catch { return ''; }
+}
+
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function argValue(name) { const i = process.argv.indexOf(`--${name}`); return i === -1 ? null : process.argv[i + 1]; }

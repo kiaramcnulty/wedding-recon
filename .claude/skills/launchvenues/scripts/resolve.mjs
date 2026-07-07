@@ -3,7 +3,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvenues/scripts/resolve.mjs <workdir> --state CO
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, norm, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep, argValue } from './lib.mjs';
+import { readVenues, writeVenues, norm, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, cleanWebsite, sleep, argValue } from './lib.mjs';
 
 const workdir = process.argv[2];
 const state = argValue('state');
@@ -19,7 +19,7 @@ const seenPid = new Set(venues.map((v) => v.place_id).filter(Boolean));
 const knownNames = venues.map((v) => norm(v.name));
 
 const cands = fs.readFileSync(candFile, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
-let resolved = 0, approx = 0, nomatch = 0, dups = 0;
+let resolved = 0, approx = 0, nomatch = 0, dups = 0, researchSite = 0;
 const flagged = [];
 
 for (const c of cands) {
@@ -39,8 +39,12 @@ for (const c of cands) {
     const { city, state: st, cleanAddress } = parseCityState(p.formattedAddress, state);
     const exactish = norm(gName) === key || norm(gName).includes(key) || key.includes(norm(gName));
     const flags = exactish ? '' : `CHECK: was "${c.name}"`;
+    // Prefer Google's own website; fall back to a website surfaced by research (backend-only).
+    const gSite = await websiteWithFallback(p.id, p.websiteUri);
+    const website = gSite || cleanWebsite(c.website);
+    if (!gSite && website) researchSite++;
     venues.push({
-      name: gName, address: cleanAddress, city, state: st, website: await websiteWithFallback(p.id, p.websiteUri),
+      name: gName, address: cleanAddress, city, state: st, website,
       lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '', place_id: p.id,
       provenance: c.provenance || 'research', flags,
     });
@@ -50,8 +54,11 @@ for (const c of cands) {
     // No trusted business match — fall back to a city-centroid approximate row.
     // address stays "City, ST" (no street digits) so the app's dashed approximate-pin heuristic fires.
     const cityHint = (c.hint || '').split(',')[0].replace(/\barea\b/gi, '').trim();
+    // No Google place, but keep a website research surfaced (backend-only, non-Google row).
+    const researchWebsite = cleanWebsite(c.website);
+    if (researchWebsite) researchSite++;
     let row = {
-      name: c.name, address: '', city: '', state, website: '', lat: '', lng: '', place_id: '',
+      name: c.name, address: '', city: '', state, website: researchWebsite, lat: '', lng: '', place_id: '',
       provenance: c.provenance || 'research', flags: 'NO_MATCH;NEEDS_ADDRESS',
     };
     if (cityHint) {
@@ -72,5 +79,5 @@ for (const c of cands) {
 }
 
 writeVenues(file, venues);
-console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known | total ${venues.length}`);
+console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known | +${researchSite} using a research website | total ${venues.length}`);
 if (flagged.length) { console.log('\nFLAGGED FOR REVIEW:'); for (const f of flagged) console.log('  ' + f); }

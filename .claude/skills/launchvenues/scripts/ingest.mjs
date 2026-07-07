@@ -2,7 +2,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvenues/scripts/ingest.mjs <workdir> <scrape.csv>
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseCSV, readVenues, writeVenues, norm, parseCityState } from './lib.mjs';
+import { parseCSV, readVenues, writeVenues, norm, parseCityState, cleanWebsite } from './lib.mjs';
 
 const [workdir, scrape] = process.argv.slice(2);
 if (!workdir || !scrape) { console.error('usage: ingest.mjs <workdir> <scrape.csv>'); process.exit(1); }
@@ -34,7 +34,7 @@ for (const r of rows.slice(1)) {
   seenName.add(nk);
   venues.push({
     name, address: cleanAddress, city, state,
-    website: I.website !== -1 ? (r[I.website] || '').trim() : '',
+    website: I.website !== -1 ? cleanWebsite(r[I.website]) : '',
     lat: I.lat !== -1 ? (r[I.lat] || '').trim() : '', lng: I.lng !== -1 ? (r[I.lng] || '').trim() : '',
     place_id: pid, provenance: 'user-scrape', flags: '',
   });
