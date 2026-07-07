@@ -83,7 +83,7 @@ node --env-file=.env.local .claude/skills/launchvenues/scripts/backfill-websites
 
 Scans launched venues with a `place_id` but no website, fetches Place Details for each, and fills the blank (dry-run lists what it would write; only ever fills blanks, never overwrites).
 
-**Research-sourced websites:** when research (a web listicle, a scrape CSV, or a Reddit link) surfaces a venue's own website and Google has none, `resolve`/`ingest` keep that URL in the `website` column so the vendor page can still show a "Visit website" link. This is a backend-only bulk-upload behavior — there is no user-facing website-entry path. Google's own `websiteUri` always wins when present; the research URL is only a fallback. All research/scrape URLs pass through `cleanWebsite()` in `lib.mjs`, which normalizes the scheme, requires a valid dotted host, and drops social/maps/aggregator links (facebook, instagram, google/maps, yelp, linktree, etc.) so junk never lands in the column.
+**Research-sourced websites:** when research (a web listicle, a scrape CSV, or a Reddit link) surfaces a venue's own website and Google has none, `resolve`/`ingest` keep that URL in the `website` column so the vendor page can still show a "Visit website" link. This is a backend-only bulk-upload behavior — there is no user-facing website-entry path. Google's own `websiteUri` always wins when present; the research URL is only a fallback. All research/scrape URLs pass through `cleanWebsite()` in `lib.mjs`, which normalizes the scheme, requires a valid dotted host, and stores **only a venue's own domain** — social, maps/search, and wedding/review directory links (facebook, instagram, google/maps, yelp, theknot, weddingwire, zola, etc.) are dropped rather than stored.
 
 ## Phase 6 — Wrap up
 

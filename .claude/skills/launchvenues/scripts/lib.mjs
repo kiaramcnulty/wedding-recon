@@ -123,14 +123,26 @@ export async function websiteWithFallback(placeId, searchWebsite) {
   } catch { return ''; }
 }
 
-// Hosts that are never a venue's OWN website (social, maps, link aggregators). A listicle
-// or scrape often lists one of these as a venue's "site"; we don't want them in the column.
-const NON_WEBSITE_HOSTS = /(^|\.)(facebook|instagram|twitter|x|tiktok|pinterest|youtube|youtu|linktr|linktree|google|g|goo|yelp)\.(com|be|page|gl|ee)$/i;
+// Domains that are never a venue's OWN website — social, maps/search, and wedding/review
+// DIRECTORIES. A listicle or scrape often lists one of these as a venue's "site"; we only
+// want the venue's own domain, so a directory/social link is dropped rather than stored.
+const NON_WEBSITE_DOMAINS = [
+  // social / video / link aggregators
+  'facebook.com', 'fb.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
+  'pinterest.com', 'youtube.com', 'youtu.be', 'linktr.ee', 'linktree.com',
+  // maps / search
+  'google.com', 'g.page', 'goo.gl',
+  // review + wedding directories (venue-specific pages, but not the venue's own domain)
+  'yelp.com', 'tripadvisor.com', 'theknot.com', 'weddingwire.com', 'zola.com',
+  'weddingspot.com', 'wedding-spot.com', 'herecomestheguide.com', 'partyslate.com',
+  'eventective.com', 'peerspace.com', 'weddingvenuemap.com', 'bridalguide.com',
+];
 /**
  * Normalize + validate a website URL sourced from RESEARCH or a SCRAPE (not Google's own
  * websiteUri, which is already canonical). Adds https:// if scheme-less, requires a dotted
- * host and http(s), and drops social/maps/aggregator hosts. Returns '' for anything that
- * doesn't cleanly parse so a junk listicle cell never lands in the DB. Backend-only.
+ * host and http(s), and drops any non-venue domain (social/maps/directory) so ONLY a
+ * venue's own domain is stored. Returns '' for anything that doesn't cleanly parse so a
+ * junk listicle cell never lands in the DB. Backend-only.
  */
 export function cleanWebsite(raw) {
   let s = (raw || '').trim();
@@ -140,7 +152,8 @@ export function cleanWebsite(raw) {
     const u = new URL(s);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
     if (!/\.[a-z]{2,}$/i.test(u.hostname) || u.hostname.length < 4) return '';
-    if (NON_WEBSITE_HOSTS.test(u.hostname)) return '';
+    const host = u.hostname.replace(/^www\./i, '').toLowerCase();
+    if (NON_WEBSITE_DOMAINS.some((d) => host === d || host.endsWith('.' + d))) return '';
     return u.toString().replace(/\/$/, '');
   } catch { return ''; }
 }
