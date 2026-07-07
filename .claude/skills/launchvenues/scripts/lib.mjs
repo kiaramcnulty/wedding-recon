@@ -94,5 +94,34 @@ export async function placesSearch(query, pageToken) {
   return res.json();
 }
 
+/**
+ * Place Details (New) lookup by place_id. Field mask omits the `places.` prefix (single
+ * place, not a search array). Used to recover fields Text Search leaves empty.
+ */
+export async function placeDetails(placeId, fields = 'id,displayName,formattedAddress,location,websiteUri') {
+  const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+    headers: { 'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY, 'X-Goog-FieldMask': fields },
+  });
+  if (!res.ok) throw new Error(`Place Details ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+/**
+ * Website for a matched place, with a Place Details fallback. Text Search routinely omits
+ * `websiteUri` even for places that have a site (Details returns it reliably), so callers
+ * pass the value from their search hit and we only spend the extra Details call — and its
+ * rate-limit sleep — for the venues that actually came back without one. Returns '' on any
+ * failure so a missing website never aborts a sweep/resolve.
+ */
+export async function websiteWithFallback(placeId, searchWebsite) {
+  if (searchWebsite) return searchWebsite;
+  if (!placeId) return '';
+  try {
+    const d = await placeDetails(placeId, 'websiteUri');
+    await sleep(120);
+    return d.websiteUri || '';
+  } catch { return ''; }
+}
+
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function argValue(name) { const i = process.argv.indexOf(`--${name}`); return i === -1 ? null : process.argv[i + 1]; }

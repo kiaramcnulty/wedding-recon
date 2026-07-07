@@ -2,7 +2,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvenues/scripts/scout.mjs <workdir> --region "Denver, CO" [--anchors "Boulder, CO;Golden, CO"]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, parseCityState, placesSearch, sleep, argValue } from './lib.mjs';
+import { readVenues, writeVenues, parseCityState, placesSearch, websiteWithFallback, sleep, argValue } from './lib.mjs';
 
 const workdir = process.argv[2];
 const region = argValue('region');
@@ -38,7 +38,7 @@ for (const q of queries) {
       seen.add(p.id);
       venues.push({
         name: p.displayName?.text || '', address: cleanAddress, city, state: st,
-        website: p.websiteUri || '', lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '',
+        website: await websiteWithFallback(p.id, p.websiteUri), lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '',
         place_id: p.id, provenance: 'places-sweep', flags: '',
       });
       added++;

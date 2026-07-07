@@ -3,7 +3,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvenues/scripts/resolve.mjs <workdir> --state CO
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, norm, sigTokens, tokensOverlap, parseCityState, placesSearch, sleep, argValue } from './lib.mjs';
+import { readVenues, writeVenues, norm, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep, argValue } from './lib.mjs';
 
 const workdir = process.argv[2];
 const state = argValue('state');
@@ -40,7 +40,7 @@ for (const c of cands) {
     const exactish = norm(gName) === key || norm(gName).includes(key) || key.includes(norm(gName));
     const flags = exactish ? '' : `CHECK: was "${c.name}"`;
     venues.push({
-      name: gName, address: cleanAddress, city, state: st, website: p.websiteUri || '',
+      name: gName, address: cleanAddress, city, state: st, website: await websiteWithFallback(p.id, p.websiteUri),
       lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '', place_id: p.id,
       provenance: c.provenance || 'research', flags,
     });

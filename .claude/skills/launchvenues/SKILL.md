@@ -70,9 +70,18 @@ node --env-file=.env.local .claude/skills/launchvenues/scripts/upload.mjs data/l
 node --env-file=.env.local .claude/skills/launchvenues/scripts/upload.mjs data/launchvenues/<slug> --apply    # after explicit user yes
 ```
 
-Dry-run first, always. It late-resolves rows where the user added a street address (business match with guard, else coords-only geocode — an address geocode is never stored as a `place_id`), then dedupes: DB `place_id` → DB name+city → within-batch. Show the user the dry-run summary and get an **explicit yes** before `--apply`. This is the only confirmation gate in the pipeline — don't add others, never skip this one. The script verifies after applying (count delta + DB-wide duplicate place_id/name scan) and writes `upload-report.txt`.
+Dry-run first, always. It late-resolves rows where the user added a street address (business match with guard, else coords-only geocode — an address geocode is never stored as a `place_id`), then dedupes: DB `place_id` → DB name+city → within-batch. A dedup hit against an existing DB row whose `website` is blank gets that column **backfilled** from the CSV row (fills blanks only, never overwrites — insert is otherwise insert-only, so a website-less row would never self-heal). Show the user the dry-run summary (including any `BACKFILL` line) and get an **explicit yes** before `--apply`. This is the only confirmation gate in the pipeline — don't add others, never skip this one. The script verifies after applying (count delta + DB-wide duplicate place_id/name scan) and writes `upload-report.txt`.
 
 If the insert fails, nothing was partially written — fix and re-run; dedup makes re-runs safe.
+
+**Website capture:** Google Text Search routinely returns an empty `websiteUri` even for venues that have a site, so `scout`, `resolve`, and `upload`'s late-resolve fall back to a **Place Details** lookup by `place_id` whenever the search hit lacks a website (the extra call fires only for those rows). To repair venues launched before this fallback existed:
+
+```
+node --env-file=.env.local .claude/skills/launchvenues/scripts/backfill-websites.mjs [--region CO] [--limit N]           # dry-run
+node --env-file=.env.local .claude/skills/launchvenues/scripts/backfill-websites.mjs --apply [--region CO] [--limit N]   # write
+```
+
+Scans launched venues with a `place_id` but no website, fetches Place Details for each, and fills the blank (dry-run lists what it would write; only ever fills blanks, never overwrites).
 
 ## Phase 6 — Wrap up
 
