@@ -20,7 +20,7 @@
 //   rich:       --batch <id> --roster <path> --venues "slug;slug"   build a SECOND-entry
 //               call file for RICH-flagged venues (commentary cluster, a different bot than
 //               entry 1). Output uploads as a SEPARATE recons-<id>-rich.csv (its own run,
-//               so the ≤10/bot/run cap is per-file); dedup is safe (different author).
+//               so the ≤50/bot/run cap is per-file); dedup is safe (different author).
 // (status/merge/photos-map/health/rich are FS-only; batch/verify need the DB env keys.)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -119,10 +119,10 @@ async function cmdBatch() {
     process.exit(1);
   }
 
-  // bots: round-robin with a hard ≤10-per-run cap
+  // bots: round-robin with a hard ≤50-per-run cap
   const roster = JSON.parse(fs.readFileSync(rosterPath, 'utf8'));
-  if (picked.length > roster.length * 10) {
-    console.error(`batch of ${picked.length} exceeds roster capacity ${roster.length} bots × 10/run — add bots (usernames need user approval) or shrink --size`);
+  if (picked.length > roster.length * 50) {
+    console.error(`batch of ${picked.length} exceeds roster capacity ${roster.length} bots × 50/run — add bots (usernames need user approval) or shrink --size`);
     process.exit(1);
   }
   // collected-date: deterministic hash of vendor_id → 1-18 months back
