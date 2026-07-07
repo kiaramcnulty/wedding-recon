@@ -26,7 +26,7 @@ Budgets (drafting, Sonnet): call file ≈ 3k header + ~600/venue; ~30k/call of 1
 1. Region from the argument; normalize `"City, ST"` — the **state** parameterizes rosters. Verify prereqs: venues seeded; migration `0012` applied (1-row select of `profiles.is_bot`; on error ask the user to run it and stop).
 2. Workdir `data/enrichvenues/<region-slug>/` (one per state — reuse the existing dir if the state already has one, whatever its name; it holds the reddit archive + digests).
 3. Run `roster.mjs` for the status picture (unenriched counts, bot headroom, reddit coverage). Note: roster.mjs counts only bot recon; `pipeline.mjs batch` enforces the real rule — **venues with NO recon of any kind**.
-4. ONE message: proposed batch size (first-ever region → pilot ~10; else up to `bots × 10`), bot roster state (new usernames need approval — see Phase 5), and ask for Reddit thread pastes (protocol in `research-guide.md`: save each paste **verbatim** to `research/reddit-NN.txt`, then re-run the thread-digest pass). Then run through Phase 3 without questions.
+4. ONE message: proposed batch size (first-ever region → pilot ~10; else up to `bots × 50`), bot roster state (new usernames need approval — see Phase 5), and ask for Reddit thread pastes (protocol in `research-guide.md`: save each paste **verbatim** to `research/reddit-NN.txt`, then re-run the thread-digest pass). Then run through Phase 3 without questions.
 
 ## Phase 1 — Harvest → dossiers (scripts, ~free)
 
@@ -44,7 +44,7 @@ node --env-file=.env.local .claude/skills/enrichvenues/scripts/pipeline.mjs <wor
   --region <ST> --roster data/enrichvenues/rosters/<ST>.json --size N --batch <id> [--per-call 15] [--exclude "Name;Name"]
 ```
 
-`batch` selects the N richest venues with **no recon of any kind**, defers same-named twins (and skips twin research collisions with a warning), assigns bots (≤10/bot/run) and collected-dates, and writes `drafts/<id>-call-NN.md` files with rules + voices + dossiers **inlined**. It fails fast listing any venue missing a dossier.
+`batch` selects the N richest venues with **no recon of any kind**, defers same-named twins (and skips twin research collisions with a warning), assigns bots (≤50/bot/run) and collected-dates, and writes `drafts/<id>-call-NN.md` files with rules + voices + dossiers **inlined**. It fails fast listing any venue missing a dossier.
 
 Spawn one agent (`subagent_type: "draft-worker"`, background OK) per call file — that agent type is `model: sonnet` with tools **gated to Read + Write**, so it structurally cannot self-verify, web-search, or list directories past the single-turn contract (this is the main lever on realizing the ~10× budget: extra worker tool calls re-bill the whole ~30k call file). Prompt, verbatim short: *"Read `<workdir>/drafts/<id>-call-NN.md` and follow it exactly. It contains every rule and all research. Write the CSV it specifies in one Write, then reply with the one line it specifies. Do not read anything else back."* Workers get NO gap searches — a venue with no pricing in its dossier gets an honest "Quote only" row (v1 data: live gap-searching had poor ROI; ~36% ended quote-only anyway). If the user wants deeper pricing on specific venues, run ONE targeted search agent for just those, before batching.
 
@@ -69,7 +69,7 @@ Venues flagged `RICH` can earn a 2nd entry (review/experience cluster, a differe
 node --env-file=.env.local .claude/skills/enrichvenues/scripts/pipeline.mjs <workdir> rich --batch <id> --roster <roster> --venues "<rich slugs>"
 ```
 
-Spawn ONE `subagent_type: "draft-worker"` agent on `drafts/<id>-rich-call.md` (same gated single-turn contract), validate its `drafts/<id>-rich-worker.csv`, copy to `recons-<id>-rich.csv`, and upload it as its own `--apply` run (the ≤10/bot/run cap is per-file; dedup is safe since the second entry's author differs from the first). `rich` load-balances the second bot and guarantees it differs from entry 1's.
+Spawn ONE `subagent_type: "draft-worker"` agent on `drafts/<id>-rich-call.md` (same gated single-turn contract), validate its `drafts/<id>-rich-worker.csv`, copy to `recons-<id>-rich.csv`, and upload it as its own `--apply` run (the ≤50/bot/run cap is per-file; dedup is safe since the second entry's author differs from the first). `rich` load-balances the second bot and guarantees it differs from entry 1's.
 
 ## Phase 4 — User review (human gate #2)
 
@@ -110,6 +110,6 @@ Run ONLY when the user asks for photos, and only **between Phase 3 and Phase 6**
 - `price_text` + `price_details` on every entry (honest "quote only" wording when nothing is findable).
 - Four human gates (batch scope, CSV review, roster, upload dry-run) — never skip, never add.
 - Draft calls are single-turn, spawned as `subagent_type: "draft-worker"` (tools gated to Read + Write): one Read of the call file, one Write of the CSV, one-line reply — no read-back, no directory listing, no web. The reply is `<file>: done` plus any `RICH:`/`NOTAVENUE:` flags (coverage/pricing counts come from `pipeline.mjs status`, not the worker). Orchestrator never reads dossiers/research/images; nothing bulk in the orchestrator context.
-- Bots: per-state rosters, ≤1 entry per venue per bot, ≤10/bot/run, all flagged `is_bot`, usernames user-approved.
+- Bots: per-state rosters, ≤1 entry per venue per bot, ≤50/bot/run, all flagged `is_bot`, usernames user-approved.
 - Save user-pasted Reddit threads verbatim to `research/` before responding to their content.
 - Use `pipeline.mjs` subcommands for batch mechanics — do not hand-write per-run scripts for selection/coverage/repair/verify.

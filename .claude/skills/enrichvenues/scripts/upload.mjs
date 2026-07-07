@@ -73,7 +73,7 @@ for (const [i, r] of recons.entries()) {
     if (!fs.existsSync(path.join(workdir, p.replace(/\.jpg$/, '_thumb.jpg')))) errors.push(`${at}: thumb missing for ${p}`);
   }
 }
-for (const [b, n] of perBot) if (n > 10) errors.push(`bot "${b}" has ${n} entries (max 10 per run)`);
+for (const [b, n] of perBot) if (n > 50) errors.push(`bot "${b}" has ${n} entries (max 50 per run)`);
 if (errors.length) { console.error('VALIDATION FAILED:\n' + errors.join('\n')); process.exit(1); }
 
 // Cross-entry redundancy check: two entries sharing a long word-run read as botty.
