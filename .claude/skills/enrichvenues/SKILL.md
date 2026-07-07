@@ -60,7 +60,7 @@ node --env-file=.env.local .claude/skills/enrichvenues/scripts/pipeline.mjs <wor
 node --env-file=.env.local .claude/skills/enrichvenues/scripts/upload.mjs <workdir> --roster <roster> --csv recons-<id>.csv   # dry-run validation
 ```
 
-Missing venues (a call died): re-spawn just that call file. Validation failures/near-dup warnings: fix only those rows (≤5 inline, else one small call). Never re-draft or re-read the whole batch. The dry-run also blocks **crawler-tell** language ("crawl"/"fetch"/"parse"/"boilerplate"/"garbled text" — research-tooling words no real couple writes); collect the offending rows into one JSON and hand a single Sonnet agent a rephrase-in-place pass.
+Missing venues (a call died): re-spawn just that call file. Validation failures/near-dup warnings: fix only those rows (≤5 inline, else one small call). Never re-draft or re-read the whole batch. The dry-run also blocks **process-tell** language — both research-tooling words ("crawl"/"fetch"/"parse"/"boilerplate"/"garbled text") and pipeline/batch self-references ("batch"/"enrich"/"seeded"/"roster"/"bot"/"pipeline" — copy must never reference scraping, batches, or how the entry was produced); collect the offending rows into one JSON and hand a single Sonnet agent a rephrase-in-place pass.
 
 ### Optional: RICH second entries (only if the user wants depth)
 Venues flagged `RICH` can earn a 2nd entry (review/experience cluster, a different bot than entry 1 — the source-cluster split in the entry rules). It's a SEPARATE run:
