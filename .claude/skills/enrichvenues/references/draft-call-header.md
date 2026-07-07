@@ -18,4 +18,6 @@ Header once: `venue,vendor_id,recon_type,month,year,price_text,price_details,not
 Copy `vendor_id` and `bot` VERBATIM from each venue block. Wrap any field containing a comma or quote in double quotes; double internal quotes; never a raw newline inside a field.
 
 ## Finish
-Write the complete CSV (header + all rows) to the OUTPUT FILE named at the bottom of this file, in ONE Write call. Then reply with exactly one line: `<output file>: N rows, M with real pricing` (plus ` RICH: slug1, slug2` if any).
+Write the complete CSV (header + all rows) to the OUTPUT FILE named at the bottom of this file, in ONE Write call. Then STOP and reply with exactly one line: `<output file>: done` (plus ` RICH: slug1, slug2` and/or ` NOTAVENUE: slug1, slug2` if any).
+
+Do NOT read your CSV back to check or count it, do NOT re-read this file, do NOT list directories or reach for any other tool. Downstream scripts validate every row for free (coverage, pricing fields, banned phrases, em-dashes, dedup) — a read-back only re-bills this whole file's tokens for nothing, and a wrong cell is cheaper to fix later than a re-read is now. Write once and stop.
