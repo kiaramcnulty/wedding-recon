@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Bot, Info } from "lucide-react";
 
 const MESSAGE =
-  "Wedding Recon is a newer site. To ensure great coverage of vendor intel, AI helped us aggregate existing intel across existing internet sources.";
+  "Wedding Recon is a newer site. To ensure great coverage of vendor intel, AI helped aggregate existing recon across internet sources.";
 
 /**
  * Subtle indicator that a recon entry was authored by an internal bot account
