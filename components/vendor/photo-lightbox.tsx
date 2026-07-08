@@ -35,6 +35,10 @@ export function PhotoLightbox({
 }: PhotoLightboxProps) {
   const [openIdx, setOpenIdx] = React.useState<number | null>(null);
   const [mounted, setMounted] = React.useState(false);
+  // A tile whose image fails to load (e.g. a proxied Google photo that 404s) is
+  // dropped rather than shown as a broken icon. Indices stay stable so the
+  // lightbox still maps correctly.
+  const [failed, setFailed] = React.useState<ReadonlySet<number>>(new Set());
 
   // Portals need the DOM; defer the mount flag (see CLAUDE.md portal pattern).
   React.useEffect(() => {
@@ -56,22 +60,31 @@ export function PhotoLightbox({
   return (
     <>
       <div className={containerClassName} style={containerStyle}>
-        {photos.map((p, i) => (
-          <button
-            key={p.full + i}
-            type="button"
-            onClick={() => setOpenIdx(i)}
-            aria-label={`Open ${alt.toLowerCase()} ${i + 1}`}
-            className={cn("block shrink-0 cursor-zoom-in overflow-hidden", tileClassName)}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={p.thumb}
-              alt={`${alt} ${i + 1}`}
-              className="h-full w-full object-cover"
-            />
-          </button>
-        ))}
+        {photos.map((p, i) =>
+          failed.has(i) ? null : (
+            <button
+              key={p.full + i}
+              type="button"
+              onClick={() => setOpenIdx(i)}
+              aria-label={`Open ${alt.toLowerCase()} ${i + 1}`}
+              className={cn("block shrink-0 cursor-zoom-in overflow-hidden", tileClassName)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.thumb}
+                alt={`${alt} ${i + 1}`}
+                onError={() =>
+                  setFailed((prev) => {
+                    const next = new Set(prev);
+                    next.add(i);
+                    return next;
+                  })
+                }
+                className="h-full w-full object-cover"
+              />
+            </button>
+          ),
+        )}
       </div>
 
       {mounted &&

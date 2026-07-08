@@ -25,6 +25,23 @@ export interface Vendor {
   source: VendorSource;
   created_by: string | null;
   created_at: string;
+  /** Cached references (not bytes) to the venue's top ≤3 Google Places photos; null until first resolved. See lib/google-photos.ts. */
+  google_photos: GooglePhotoRef[] | null;
+  /** When google_photos was last resolved; rows older than ~30d are re-resolved on next view. */
+  google_photos_fetched_at: string | null;
+}
+
+/**
+ * One Google Places photo reference cached on a vendor. The image bytes are
+ * fetched on demand via /api/vendor-photo and CDN-cached — never stored — to
+ * stay within Google's no-caching terms and off Supabase Storage.
+ */
+export interface GooglePhotoRef {
+  /** Places photo resource name, e.g. "places/<place_id>/photos/<ref>". */
+  name: string;
+  /** First author attribution display name (Google requires showing it). */
+  attrib: string | null;
+  attribUri: string | null;
 }
 
 export interface ReconEntry {

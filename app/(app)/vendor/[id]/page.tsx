@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MapPin, PlusCircle, ExternalLink, Globe } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getVendorGooglePhotos } from "@/lib/google-photos";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { PhotoCarousel } from "@/components/vendor/photo-carousel";
+import { GooglePhotoStrip } from "@/components/vendor/google-photo-strip";
 import { ReconCard } from "@/components/vendor/recon-card";
 import { SaveButton } from "@/components/vendor/save-button";
 import { ShareButton } from "@/components/vendor/share-button";
@@ -59,13 +61,24 @@ export default async function VendorPage({
     userHasRecon = !!existing;
   }
 
-  // Fetch active recon entries with author + media
-  const { data: rawEntries } = await supabase
-    .from("recon_entries")
-    .select("*, author:profiles(username), media:recon_media(*)")
-    .eq("vendor_id", id)
-    .eq("status", "active")
-    .order("created_at", { ascending: false });
+  // Fetch active recon entries (author + media) and resolve the venue's cached
+  // Google photos in parallel. getVendorGooglePhotos only touches the network on
+  // a cache miss, so it's usually free and otherwise hidden behind the recon query.
+  const [{ data: rawEntries }, googlePhotos] = await Promise.all([
+    supabase
+      .from("recon_entries")
+      .select("*, author:profiles(username), media:recon_media(*)")
+      .eq("vendor_id", id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false }),
+    getVendorGooglePhotos(vendor),
+  ]);
+
+  // Distinct author names for the "Photos via Google" caption.
+  const googleCredit =
+    [
+      ...new Set(googlePhotos.map((p) => p.attrib).filter((a): a is string => !!a)),
+    ].join(", ") || null;
 
   const rawList = (rawEntries ?? []) as ReconEntryWithDetails[];
 
@@ -175,7 +188,18 @@ export default async function VendorPage({
         </div>
       </div>
 
-      {/* Photo carousel */}
+      {/* Google Places photos (venue-level; references cached, bytes proxied) */}
+      {googlePhotos.length > 0 && (
+        <div className="mt-4">
+          <GooglePhotoStrip
+            vendorId={vendor.id}
+            count={googlePhotos.length}
+            credit={googleCredit}
+          />
+        </div>
+      )}
+
+      {/* Recon photo carousel */}
       {photos.length > 0 && (
         <div className="mt-4">
           <PhotoCarousel photos={photos} />
