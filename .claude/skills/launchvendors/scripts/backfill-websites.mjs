@@ -5,20 +5,21 @@
 //
 // Dry-run by default (lists what it WOULD write); --apply writes. Idempotent — only ever
 // touches rows that are currently missing a website, never overwrites an existing one.
-// usage: node --env-file=.env.local .claude/skills/launchvenues/scripts/backfill-websites.mjs [--apply] [--region CO] [--limit N]
+// usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/backfill-websites.mjs [--apply] [--type photographer] [--region CO] [--limit N]
 import { createClient } from '@supabase/supabase-js';
-import { placeDetails, sleep, argValue } from './lib.mjs';
+import { placeDetails, sleep, argValue, typeProfile } from './lib.mjs';
 
 const APPLY = process.argv.includes('--apply');
 for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'GOOGLE_PLACES_API_KEY']) {
   if (!process.env[k]) { console.error(`${k} missing — run with --env-file=.env.local from the repo root`); process.exit(1); }
 }
+const profile = typeProfile();
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const region = argValue('region');           // optional: limit to one state, e.g. --region CO
 const limit = parseInt(argValue('limit') || '0', 10);   // optional: cap Places calls this run
 
 let query = supabase.from('vendors').select('id, name, region, website, google_place_id')
-  .eq('vendor_type', 'venue').not('google_place_id', 'is', null).order('name');
+  .eq('vendor_type', profile.vendorType).not('google_place_id', 'is', null).order('name');
 if (region) query = query.eq('region', region);
 const { data: rows, error } = await query;
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
