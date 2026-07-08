@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ReportButton } from "@/components/vendor/report-button";
 import { PhotoLightbox } from "@/components/vendor/photo-lightbox";
+import { BotReconBadge } from "@/components/vendor/bot-recon-badge";
 import { cn } from "@/lib/utils";
 
 interface ReconCardProps {
@@ -117,6 +118,12 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
             containerStyle={{ scrollbarWidth: "none" }}
             tileClassName="snap-start w-[80px] h-[60px] rounded-lg ring-1 ring-foreground/10"
           />
+        )}
+
+        {entry.author.is_bot && (
+          <div className="flex justify-end">
+            <BotReconBadge />
+          </div>
         )}
       </CardContent>
     </Card>

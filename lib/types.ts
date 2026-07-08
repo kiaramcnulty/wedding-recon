@@ -8,6 +8,8 @@ export interface Profile {
   id: string;
   username: string;
   created_at: string;
+  /** Internal flag for seeded/curator bot accounts (enrichvenues pipeline). */
+  is_bot: boolean;
 }
 
 export interface Vendor {
@@ -70,6 +72,6 @@ export interface Report {
 
 /** A recon entry joined with its author username and media, as rendered on vendor pages. */
 export interface ReconEntryWithDetails extends ReconEntry {
-  author: Pick<Profile, "username">;
+  author: Pick<Profile, "username" | "is_bot">;
   media: ReconMedia[];
 }
