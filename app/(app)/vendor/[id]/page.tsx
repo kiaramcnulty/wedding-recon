@@ -67,7 +67,7 @@ export default async function VendorPage({
   const [{ data: rawEntries }, googlePhotos] = await Promise.all([
     supabase
       .from("recon_entries")
-      .select("*, author:profiles(username), media:recon_media(*)")
+      .select("*, author:profiles(username, is_bot), media:recon_media(*)")
       .eq("vendor_id", id)
       .eq("status", "active")
       .order("created_at", { ascending: false }),
