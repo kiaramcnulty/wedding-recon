@@ -21,6 +21,8 @@ export interface Vendor {
   city: string | null;
   region: string | null;
   website: string | null;
+  /** Bare Instagram handle (no @/URL). Research-sourced by the launch/enrich pipelines; rendered as a link next to the website. */
+  instagram: string | null;
   /** GeoJSON-style longitude/latitude, surfaced by the vendors_in_bbox RPC. */
   lng: number | null;
   lat: number | null;

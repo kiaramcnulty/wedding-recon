@@ -54,8 +54,11 @@ next-env.d.ts
 /Wedding Recon Spec.pdf
 /Wedding Recon Spec.md
 
-# launchvenues skill working artifacts
+# launchvenues skill working artifacts (pre-rename venue workdirs)
 /data/launchvenues/
+
+# launchvendors skill working artifacts
+/data/launchvendors/
 
 # enrichvenues skill working artifacts
 /data/enrichvenues/

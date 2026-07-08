@@ -13,6 +13,27 @@ import { ShareButton } from "@/components/vendor/share-button";
 import { BackButton } from "@/components/vendor/back-button";
 import { BrandFooter } from "@/components/brand-lockup";
 
+/** Instagram glyph — lucide v1 dropped brand icons, so this is drawn inline to lucide's stroke conventions. */
+function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
+  );
+}
+
 interface VendorPageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -174,16 +195,31 @@ export default async function VendorPage({
               )}
             </div>
           )}
-          {vendor.website && (
-            <a
-              href={vendor.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
-            >
-              <Globe className="size-3.5 shrink-0" />
-              <span className="truncate">Visit website</span>
-            </a>
+          {(vendor.website || vendor.instagram) && (
+            <div className="flex items-center gap-4">
+              {vendor.website && (
+                <a
+                  href={vendor.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
+                >
+                  <Globe className="size-3.5 shrink-0" />
+                  <span className="truncate">Visit website</span>
+                </a>
+              )}
+              {vendor.instagram && (
+                <a
+                  href={`https://www.instagram.com/${vendor.instagram}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
+                >
+                  <InstagramIcon className="size-3.5 shrink-0" />
+                  <span className="truncate">Instagram</span>
+                </a>
+              )}
+            </div>
           )}
         </div>
       </div>

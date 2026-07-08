@@ -1,7 +1,7 @@
-// Shared helpers for the /launchvenues pipeline. Node built-ins only.
+// Shared helpers for the /launchvendors pipeline. Node built-ins only.
 import fs from 'node:fs';
 
-export const HEADERS = ['name', 'address', 'city', 'state', 'website', 'lat', 'lng', 'place_id', 'provenance', 'flags'];
+export const HEADERS = ['name', 'address', 'city', 'state', 'website', 'instagram', 'lat', 'lng', 'place_id', 'provenance', 'flags'];
 
 export function parseCSV(text) {
   const rows = []; let row = [], field = '', q = false;
@@ -19,7 +19,8 @@ export function parseCSV(text) {
 
 const esc = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
 
-/** Read venues.csv into objects keyed by HEADERS (column-order independent; extra cols ignored). */
+/** Read the working CSV into objects keyed by HEADERS (column-order independent; extra cols
+ *  ignored; files written before a column existed read fine — missing cols come back ''). */
 export function readVenues(file) {
   if (!fs.existsSync(file)) return [];
   const rows = parseCSV(fs.readFileSync(file, 'utf8'));
@@ -42,20 +43,76 @@ const STOP = new Set(['the', 'a', 'an', 'at', 'of', 'and', 'by', 'in', 'on', 'we
 export const sigTokens = (name) => norm(name).split(' ').filter((t) => t.length > 2 && !STOP.has(t));
 // Generic venue-type words: real tokens, but too common to be sole evidence of a match
 // ("Zzyzx Imaginary Gardens" must not match "Denver Botanic Gardens" on "gardens" alone).
-const WEAK = new Set(['garden', 'gardens', 'farm', 'farms', 'ranch', 'house', 'hall', 'club', 'park', 'hotel', 'inn', 'manor', 'barn', 'estate', 'estates', 'lodge', 'gallery', 'room', 'rooftop', 'studio', 'studios', 'castle', 'chapel', 'pavilion']);
+// Kept as the tokensOverlap default so the original venue behavior is unchanged.
+const VENUE_WEAK = new Set(['garden', 'gardens', 'farm', 'farms', 'ranch', 'house', 'hall', 'club', 'park', 'hotel', 'inn', 'manor', 'barn', 'estate', 'estates', 'lodge', 'gallery', 'room', 'rooftop', 'studio', 'studios', 'castle', 'chapel', 'pavilion']);
 /**
  * Match guard between a query name and a Places result name. Passes when:
  *  - every significant query token appears in the match (exact-name case), OR
  *  - at least half of them do AND at least one shared token is distinctive (non-generic).
- * Guards against wrong-business matches on a single generic word.
+ * `weak` is the per-type set of trade/type words that can't be the sole shared token
+ * (defaults to the venue set; pass profile.weak).
  */
-export function tokensOverlap(a, b) {
+export function tokensOverlap(a, b, weak = VENUE_WEAK) {
   const qa = sigTokens(a);
   if (!qa.length) return false;
   const B = new Set(sigTokens(b));
   const shared = qa.filter((t) => B.has(t));
   if (shared.length === qa.length) return true;
-  return shared.length / qa.length >= 0.5 && shared.some((t) => !WEAK.has(t));
+  return shared.length / qa.length >= 0.5 && shared.some((t) => !weak.has(t));
+}
+
+/**
+ * Per-vendor-type MECHANICAL config (queries, dedup tokens, CSV name, columns).
+ * Judgment-side guidance (research queries, extraction prompts, review bars) lives in
+ * ../types/<card>.md — keep the two in sync. The venue profile encodes the original
+ * /launchvenues behavior exactly; adding a type here must not change venue runs.
+ */
+export const TYPE_PROFILES = {
+  venue: {
+    vendorType: 'venue',
+    csv: 'venues.csv',            // historical name — pre-rename venue workdirs stay re-runnable
+    // "wedding venue" only — "event venue" pulls in meeting rooms / corporate banquet
+    // space that isn't wedding-relevant. Keep the query intent tight.
+    sweepQuery: (anchor) => `wedding venue near ${anchor}`,
+    weak: VENUE_WEAK,
+    dedupStop: new Set(),         // no trade words stripped — venue names dedupe on norm() alone
+    captureInstagram: false,
+  },
+  photos: {
+    vendorType: 'photos',
+    csv: 'vendors.csv',
+    sweepQuery: (anchor) => `wedding photographer near ${anchor}`,
+    // "X Photography" must never match "Y Photography" on the trade word alone.
+    weak: new Set(['photography', 'photograph', 'photographs', 'photo', 'photos', 'photographer', 'photographers', 'studio', 'studios', 'film', 'films', 'media', 'imagery', 'image', 'images', 'creative', 'collective', 'productions', 'elopement', 'elopements']),
+    // Sole-proprietor name variants: "Jane Doe Photography" ≡ "Jane Doe Photo LLC".
+    // Includes company suffixes — nameKey works on norm(), which (unlike sigTokens) keeps them.
+    dedupStop: new Set(['photography', 'photograph', 'photographs', 'photo', 'photos', 'photographer', 'photographers', 'studio', 'studios', 'film', 'films', 'llc', 'inc', 'co', 'the']),
+    captureInstagram: true,       // requires vendors.instagram (migration 0016) at upload time
+  },
+};
+
+/** Resolve --type (accepts user-facing aliases) to a profile; clear message on unknown. */
+export function typeProfile() {
+  const raw = (argValue('type') || 'venue').toLowerCase();
+  const alias = {
+    venue: 'venue', venues: 'venue',
+    photographer: 'photos', photographers: 'photos', photography: 'photos', photos: 'photos', photo: 'photos',
+  };
+  const key = alias[raw];
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer`); process.exit(1); }
+  return { key, ...TYPE_PROFILES[key] };
+}
+
+/**
+ * Name key for dedup. Venue: norm(name) — the original behavior. Types with dedupStop
+ * strip trade words first so sole-proprietor variants collide ("Jane Doe Photography" ≡
+ * "Jane Doe Photo"). Falls back to norm(name) when stripping would leave nothing
+ * ("The Photography Studio").
+ */
+export function nameKey(name, profile) {
+  if (!profile || !profile.dedupStop.size) return norm(name);
+  const kept = norm(name).split(' ').filter((t) => t && !profile.dedupStop.has(t));
+  return kept.length ? kept.join(' ') : norm(name);
 }
 
 /**
@@ -123,16 +180,18 @@ export async function websiteWithFallback(placeId, searchWebsite) {
   } catch { return ''; }
 }
 
-// Domains that are never a venue's OWN website — social, maps/search, and wedding/review
-// DIRECTORIES. A listicle or scrape often lists one of these as a venue's "site"; we only
-// want the venue's own domain, so a directory/social link is dropped rather than stored.
+// Domains that are never a vendor's OWN website — social, maps/search, and wedding/review
+// DIRECTORIES. A listicle or scrape often lists one of these as a vendor's "site"; we only
+// want the vendor's own domain, so a directory/social link is dropped rather than stored.
+// (Instagram links are dropped HERE but captured separately via cleanInstagram for types
+// with captureInstagram — an IG page is never a `website`.)
 const NON_WEBSITE_DOMAINS = [
   // social / video / link aggregators
   'facebook.com', 'fb.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
   'pinterest.com', 'youtube.com', 'youtu.be', 'linktr.ee', 'linktree.com',
   // maps / search
   'google.com', 'g.page', 'goo.gl',
-  // review + wedding directories (venue-specific pages, but not the venue's own domain)
+  // review + wedding directories (vendor-specific pages, but not the vendor's own domain)
   'yelp.com', 'tripadvisor.com', 'theknot.com', 'weddingwire.com', 'zola.com',
   'weddingspot.com', 'wedding-spot.com', 'herecomestheguide.com', 'partyslate.com',
   'eventective.com', 'peerspace.com', 'weddingvenuemap.com', 'bridalguide.com',
@@ -140,8 +199,8 @@ const NON_WEBSITE_DOMAINS = [
 /**
  * Normalize + validate a website URL sourced from RESEARCH or a SCRAPE (not Google's own
  * websiteUri, which is already canonical). Adds https:// if scheme-less, requires a dotted
- * host and http(s), and drops any non-venue domain (social/maps/directory) so ONLY a
- * venue's own domain is stored. Returns '' for anything that doesn't cleanly parse so a
+ * host and http(s), and drops any non-vendor domain (social/maps/directory) so ONLY a
+ * vendor's own domain is stored. Returns '' for anything that doesn't cleanly parse so a
  * junk listicle cell never lands in the DB. Backend-only.
  */
 export function cleanWebsite(raw) {
@@ -156,6 +215,22 @@ export function cleanWebsite(raw) {
     if (NON_WEBSITE_DOMAINS.some((d) => host === d || host.endsWith('.' + d))) return '';
     return u.toString().replace(/\/$/, '');
   } catch { return ''; }
+}
+
+/**
+ * Normalize an Instagram reference ("@handle", "handle", or an instagram.com URL) to a
+ * bare handle for vendors.instagram. Returns '' for anything that doesn't cleanly parse —
+ * including instagram.com paths that aren't profiles (/p/, /reel/, /explore/). Backend-only.
+ */
+export function cleanInstagram(raw) {
+  let s = (raw || '').trim();
+  if (!s) return '';
+  const m = s.match(/instagram\.com\/([^/?#\s]+)/i);
+  if (m) s = m[1];
+  s = s.replace(/^@/, '').replace(/\/+$/, '');
+  const NOT_PROFILES = new Set(['p', 'reel', 'reels', 'explore', 'stories', 'accounts', 'tv', 'share']);
+  if (NOT_PROFILES.has(s.toLowerCase())) return '';
+  return /^[a-z0-9._]{2,30}$/i.test(s) ? s : '';
 }
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

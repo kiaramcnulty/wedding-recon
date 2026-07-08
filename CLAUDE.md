@@ -42,7 +42,7 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - `npm run lint` — eslint.
 
 ## Skills
-- **`/launchvenues <region>`** — seed a region's vendor-only venues (Places sweep + web/Reddit research → canonical Google-place resolve → local CSV review → deduped bulk Supabase insert). Headless (no browser/Sheets); scripts + playbook in `.claude/skills/launchvenues/`. Recon enrichment is a separate later step.
+- **`/launchvendors <type> <region>`** — seed a region's vendors for one vendor type (venue default; photographer supported — more types over time). Places sweep + web research + user-pasted Reddit/IG content → canonical Google-place resolve (city-centroid fallback) → local CSV review → deduped bulk Supabase insert. Headless (no browser/Sheets; never fetches Meta). Shared engine in `.claude/skills/launchvendors/scripts/` (mechanical config: `TYPE_PROFILES` in `lib.mjs`) + per-type judgment cards in `types/*.md`. Photographer runs also capture `vendors.instagram` (needs migration `0016`). Recon enrichment is a separate later step. (Renamed from `/launchvenues`; old venue workdirs stay in `data/launchvenues/`.)
 - **`/enrichvenues <region>`** — enrich seeded venues with 1–3 bot-authored recon entries each (Places reviews + site crawl + Reddit/web research → human-voiced `recons.csv` + curated photos → upload under user-approved `is_bot` accounts). Requires migration `0012`; per-state bot rosters in `data/enrichvenues/rosters/`. Three human gates: batch scope, bot roster, upload dry-run. Delegation: Opus for research/synthesis, Sonnet for photo screening. Playbook + reference cards in `.claude/skills/enrichvenues/`.
 
 ## Key patterns & learnings
@@ -125,4 +125,4 @@ M0 foundation done; M1 (Auth) → M2 (Explore map) → M3 (Vendor page) → M4 (
 
 Recent (2026-06, all on `main`): blended vendor search w/ source tags; guest recon publish via magic link + IndexedDB draft (same-device); required geocoded location for manual vendors; "Recon collected at" (month/year) + "Service region" fields; dashed-outline + fan-out for approximate map pins; "Save recon"/"Vendor" copy.
 
-**Hosted-DB note:** migrations `0008`–`0011` are **applied** (`0011_vendor_website.sql` adds `vendors.website`, shown as a "Visit website" link). All migrations are idempotent. Reminder: migrations are **not** auto-applied to the hosted DB — run new ones by hand.
+**Hosted-DB note:** migrations `0008`–`0011` are **applied** (`0011_vendor_website.sql` adds `vendors.website`, shown as a "Visit website" link). `0016_vendor_instagram.sql` adds `vendors.instagram` (bare handle, rendered as an "Instagram" link next to the website link; populated by pipelines only — no user-facing input) — **hand-apply before the first photographer upload**. All migrations are idempotent. Reminder: migrations are **not** auto-applied to the hosted DB — run new ones by hand.
