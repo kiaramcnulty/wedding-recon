@@ -43,6 +43,27 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
 
   const typeLabel = RECON_TYPE_LABELS[entry.recon_type] ?? entry.recon_type;
 
+  // For bot-authored entries, tuck the transparency badge onto the last line of
+  // text (floated bottom-right) so it doesn't take its own row. Pick the last
+  // rendered text block; fall back to a standalone row if there's no text.
+  const badgeSlot = entry.author.is_bot
+    ? entry.notes
+      ? "notes"
+      : entry.service_region
+        ? "region"
+        : entry.price_details
+          ? "priceDetails"
+          : entry.price_text
+            ? "priceText"
+            : "standalone"
+    : null;
+
+  const botBadge = (
+    <span className="float-right ml-2 translate-y-0.5">
+      <BotReconBadge />
+    </span>
+  );
+
   // Format collected month/year (if available)
   const collectedDate =
     entry.recon_collected_month && entry.recon_collected_year
@@ -88,11 +109,15 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
         {(entry.price_text || entry.price_details) && (
           <div className="flex flex-col gap-0.5">
             {entry.price_text && (
-              <p className="font-semibold text-base">{entry.price_text}</p>
+              <p className="font-semibold text-base">
+                {entry.price_text}
+                {badgeSlot === "priceText" && botBadge}
+              </p>
             )}
             {entry.price_details && (
               <p className="text-sm text-muted-foreground whitespace-pre-line">
                 {entry.price_details}
+                {badgeSlot === "priceDetails" && botBadge}
               </p>
             )}
           </div>
@@ -101,12 +126,14 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
         {entry.service_region && (
           <p className="text-sm text-muted-foreground">
             <span className="font-medium">Service region:</span> {entry.service_region}
+            {badgeSlot === "region" && botBadge}
           </p>
         )}
 
         {entry.notes && (
           <p className="text-sm leading-relaxed whitespace-pre-line">
             {entry.notes}
+            {badgeSlot === "notes" && botBadge}
           </p>
         )}
 
@@ -120,7 +147,7 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
           />
         )}
 
-        {entry.author.is_bot && (
+        {badgeSlot === "standalone" && (
           <div className="flex justify-end">
             <BotReconBadge />
           </div>
