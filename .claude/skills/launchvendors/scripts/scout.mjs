@@ -1,5 +1,5 @@
 // Baseline sweep: Places Text Search -> merge into the workdir's working CSV (rows arrive pre-matched with place_id).
-// usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/scout.mjs <workdir> --region "Denver, CO" [--type photographer] [--anchors "Boulder, CO;Golden, CO"]
+// usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/scout.mjs <workdir> --region "Denver, CO" [--type photographer] [--statewide Colorado] [--anchors "Boulder, CO;Golden, CO"]
 import fs from 'node:fs';
 import path from 'node:path';
 import { readVenues, writeVenues, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile } from './lib.mjs';
@@ -8,7 +8,7 @@ const workdir = process.argv[2];
 const region = argValue('region');
 const anchors = (argValue('anchors') || '').split(';').map((s) => s.trim()).filter(Boolean);
 if (!workdir || workdir.startsWith('--') || !region) {
-  console.error('usage: scout.mjs <workdir> --region "Denver, CO" [--type photographer] [--anchors "Boulder, CO;Golden, CO"]');
+  console.error('usage: scout.mjs <workdir> --region "Denver, CO" [--type photographer] [--statewide Colorado] [--anchors "Boulder, CO;Golden, CO"]');
   process.exit(1);
 }
 const profile = typeProfile();
@@ -22,7 +22,13 @@ const venues = readVenues(file);
 const seen = new Set(venues.map((v) => v.place_id).filter(Boolean));
 
 // Query intent per type lives in TYPE_PROFILES (lib.mjs) — keep it tight there.
-const queries = [region, ...anchors].map((a) => profile.sweepQuery(a));
+// --statewide <StateName> prepends a generic state-level query (e.g. "wedding photographer
+// in Colorado") ahead of the per-anchor queries — the primary net for service-area types.
+const statewide = argValue('statewide');
+const queries = [
+  ...(statewide ? [profile.statewideQuery(statewide)] : []),
+  ...[region, ...anchors].map((a) => profile.sweepQuery(a)),
+];
 let added = 0, dup = 0, offState = 0;
 for (const q of queries) {
   let pageToken;

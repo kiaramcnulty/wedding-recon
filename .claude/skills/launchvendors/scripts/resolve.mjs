@@ -18,17 +18,32 @@ if (!fs.existsSync(candFile)) { console.error(`missing ${candFile}`); process.ex
 const venues = readVenues(file);
 const seenPid = new Set(venues.map((v) => v.place_id).filter(Boolean));
 const knownNames = venues.map((v) => nameKey(v.name, profile));
+// Row lookups so a DEDUP HIT can still donate its research-sourced instagram/website to
+// the existing row (fills blanks only) — otherwise a pasted IG handle that collides with
+// a sweep row would be silently lost.
+const byPid = new Map(venues.filter((v) => v.place_id).map((v) => [v.place_id, v]));
+const byKey = new Map();
+for (let i = 0; i < venues.length; i++) if (!byKey.has(knownNames[i])) byKey.set(knownNames[i], venues[i]);
 
 const cands = fs.readFileSync(candFile, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
-let resolved = 0, approx = 0, nomatch = 0, dups = 0, researchSite = 0;
+let resolved = 0, approx = 0, nomatch = 0, dups = 0, researchSite = 0, donated = 0;
 const flagged = [];
+
+const donate = (row, c, ig) => {
+  if (!row) return;
+  let hit = false;
+  if (ig && !row.instagram) { row.instagram = ig; hit = true; }
+  const w = cleanWebsite(c.website);
+  if (w && !(row.website || '').trim()) { row.website = w; hit = true; }
+  if (hit) donated++;
+};
 
 for (const c of cands) {
   const key = nameKey(c.name, profile);
   const ig = profile.captureInstagram ? cleanInstagram(c.instagram) : '';
   // Name-level dedup vs everything already in the file (exact, or containment when name is distinctive enough).
-  const already = knownNames.some((n) => n === key || (sigTokens(c.name).length >= 2 && (n.includes(key) || key.includes(n))));
-  if (already) { dups++; continue; }
+  const dupKey = knownNames.find((n) => n === key || (sigTokens(c.name).length >= 2 && (n.includes(key) || key.includes(n))));
+  if (dupKey !== undefined) { dups++; donate(byKey.get(dupKey), c, ig); continue; }
 
   let p = null;
   try { const d = await placesSearch(`${c.name} ${c.hint || state}`); p = d.places?.[0] ?? null; } catch { /* fall through to no-match */ }
@@ -36,7 +51,7 @@ for (const c of cands) {
 
   // Match guard: must share a significant name token AND sit in the right state.
   if (p && tokensOverlap(c.name, p.displayName?.text || '', profile.weak) && (p.formattedAddress || '').includes(state)) {
-    if (seenPid.has(p.id)) { dups++; console.log(`  = "${c.name}" resolved to a place_id we already have — dropped as duplicate`); continue; }
+    if (seenPid.has(p.id)) { dups++; donate(byPid.get(p.id), c, ig); console.log(`  = "${c.name}" resolved to a place_id we already have — dropped as duplicate (ig/website donated if blank)`); continue; }
     const gName = p.displayName.text; // canonical Google name
     const gKey = nameKey(gName, profile);
     const { city, state: st, cleanAddress } = parseCityState(p.formattedAddress, state);
@@ -46,12 +61,15 @@ for (const c of cands) {
     const gSite = await websiteWithFallback(p.id, p.websiteUri);
     const website = gSite || cleanWebsite(c.website);
     if (!gSite && website) researchSite++;
-    venues.push({
+    const newRow = {
       name: gName, address: cleanAddress, city, state: st, website, instagram: ig,
       lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '', place_id: p.id,
       provenance: c.provenance || 'research', flags,
-    });
-    seenPid.add(p.id); knownNames.push(gKey); resolved++;
+    };
+    venues.push(newRow);
+    seenPid.add(p.id); byPid.set(p.id, newRow);
+    knownNames.push(gKey); if (!byKey.has(gKey)) byKey.set(gKey, newRow);
+    resolved++;
     if (flags) flagged.push(`${gName} | ${flags}`);
   } else {
     // No trusted business match — fall back to a city-centroid approximate row.
@@ -75,12 +93,12 @@ for (const c of cands) {
       await sleep(120);
     }
     venues.push(row);
-    knownNames.push(key);
+    knownNames.push(key); if (!byKey.has(key)) byKey.set(key, row);
     if (row.flags.startsWith('APPROX')) approx++; else nomatch++;
     flagged.push(`${c.name} | ${row.flags}`);
   }
 }
 
 writeVenues(file, venues);
-console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known | +${researchSite} using a research website | total ${venues.length}`);
+console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known (${donated} donated ig/website to existing rows) | +${researchSite} using a research website | total ${venues.length}`);
 if (flagged.length) { console.log('\nFLAGGED FOR REVIEW:'); for (const f of flagged) console.log('  ' + f); }

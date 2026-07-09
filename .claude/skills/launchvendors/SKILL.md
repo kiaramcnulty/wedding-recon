@@ -18,16 +18,16 @@ Cost note: the whole pipeline is ~15–60 Places API calls (sweep) + 1–2 per r
 ## Phase 0 — Setup (one short exchange, then no questions until Phase 4)
 
 1. Parse the skill argument as `<type?> <region>` (e.g. `/launchvendors photographer Denver` or `/launchvendors Richmond`). If the first token is a known type alias (venue(s), photographer(s)/photos — see `typeProfile()` in `lib.mjs`), use it; otherwise the type is **venue**. Read `types/<type>.md` before anything else; it may add preflight requirements (e.g. photographers require migration `0016`).
-2. Normalize region to `"City, ST"`. If the state isn't obvious from the city name, ask. **The state parameterizes everything downstream** — never assume CO.
-3. Propose 4–8 anchor towns (suburbs/nearby towns that widen the sweep, e.g. Denver → Boulder, Golden, Littleton, Aurora, Morrison, Westminster). One message: confirm type, region, state, anchors, and ask whether they have a Google Maps scrape CSV to ingest. Wait for the reply, then run everything through Phase 3 without further questions.
+2. Normalize region to `"City, ST"`. If the state isn't obvious from the city name, ask. **The state parameterizes everything downstream** — never assume CO. A bare state ("Colorado") means a **statewide** launch: pick the largest city as the region arg and pass `--statewide <StateName>` to scout (prepends a generic state-level query — the primary net for service-area types that brand statewide and miss city-"near" queries).
+3. Propose 4–8 anchor towns (suburbs/nearby towns that widen the sweep, e.g. Denver → Boulder, Golden, Littleton, Aurora, Morrison, Westminster; statewide launches span the state's metros + relevant destination towns and may run longer). One message: confirm type, region, state, anchors. **Never ask about scrape CSVs** — if the user has one they'll volunteer it (Kiara, 2026-07: "default is that it's not coming"); `ingest.mjs` handles a volunteered file. Wait for the reply, then run everything through Phase 3 without further questions.
 4. Workdir: `data/launchvendors/<type>-<region-slug>/` (gitignored). Scripts create it. (Pre-rename venue workdirs live in `data/launchvenues/` — leave them; `/enrichvenues` reads them.)
 5. The working CSV name is per-type (`venues.csv` for venues — historical; `vendors.csv` otherwise). The scripts handle this; use the name the script summaries print.
 
 ## Phase 1 — Baseline (scripts, no judgment)
 
 ```
-node --env-file=.env.local .claude/skills/launchvendors/scripts/scout.mjs data/launchvendors/<slug> --type <type> --region "Denver, CO" --anchors "Boulder, CO;Golden, CO;..."
-node --env-file=.env.local .claude/skills/launchvendors/scripts/ingest.mjs data/launchvendors/<slug> <scrape.csv> --type <type>   # only if user provided one
+node --env-file=.env.local .claude/skills/launchvendors/scripts/scout.mjs data/launchvendors/<slug> --type <type> --region "Denver, CO" [--statewide Colorado] --anchors "Boulder, CO;Golden, CO;..."
+node --env-file=.env.local .claude/skills/launchvendors/scripts/ingest.mjs data/launchvendors/<slug> <scrape.csv> --type <type>   # only if the user volunteered a scrape file
 ```
 
 Rows arrive pre-matched with `place_id`. Relay the one-line summaries. **Do not cat the working CSV into context** — trust the counts. For some types (photographers especially) the sweep is expected to be thin — many are Places-less; Phase 2 carries the weight. A thin sweep is data, not an error.

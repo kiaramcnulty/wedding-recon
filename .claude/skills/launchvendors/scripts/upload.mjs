@@ -47,13 +47,15 @@ for (const v of venues) {
   await sleep(120);
 }
 
-// ── Dedup: DB place_id > DB name+city > within-batch ─────────────────────────
-// Types with captureInstagram require migration 0016 (vendors.instagram) — the select
-// fails fast with guidance if the column is missing, before anything is written.
+// ── Dedup: DB place_id (GLOBAL) > DB name+city (type-scoped) > within-batch ──
+// google_place_id is unique across the WHOLE vendors table, so the pid dedup must span
+// all vendor types — a venue that leaked into a photographer sweep is skipped, never
+// re-inserted as a new type. Name+city dedup stays type-scoped ("The Broadmoor" the venue
+// must not swallow "The Broadmoor Photography"). Types with captureInstagram require
+// migration 0016 — the select fails fast with guidance if the column is missing.
 const { data: existing, error } = await supabase
   .from('vendors')
-  .select(`id, name, city, google_place_id, website${profile.captureInstagram ? ', instagram' : ''}`)
-  .eq('vendor_type', profile.vendorType);
+  .select(`id, name, city, vendor_type, google_place_id, website${profile.captureInstagram ? ', instagram' : ''}`);
 if (error) {
   console.error(error.code === '42703'
     ? 'vendors.instagram column missing — hand-apply supabase/migrations/0016_vendor_instagram.sql in the Supabase SQL editor, then re-run.'
@@ -61,12 +63,13 @@ if (error) {
   process.exit(1);
 }
 const dbPid = new Map(existing.filter((v) => v.google_place_id).map((v) => [v.google_place_id, v]));
-const dbName = new Map(existing.map((v) => [nameKey(v.name, profile) + '|' + nameKey(v.city || '', null), v]));
+const dbName = new Map(existing.filter((v) => v.vendor_type === profile.vendorType)
+  .map((v) => [nameKey(v.name, profile) + '|' + nameKey(v.city || '', null), v]));
 
 // An existing DB row that lacks a website/instagram but whose CSV twin now has one gets the
 // blank backfilled (fills blanks only — never overwrites). Insert is otherwise insert-only,
 // so without this a row that first landed website-less stays blank forever.
-const toInsert = [], skipDbPid = [], skipDbName = [], skipBatch = [], skipNoName = [], backfill = [];
+const toInsert = [], skipDbPid = [], skipDbName = [], skipBatch = [], skipNoName = [], skipOtherType = [], backfill = [];
 const batchPid = new Set(), batchName = new Set();
 const maybeBackfill = (dbRow, v) => {
   const patch = {};
@@ -77,7 +80,12 @@ const maybeBackfill = (dbRow, v) => {
 for (const v of venues) {
   if (!v.name) { skipNoName.push(v); continue; }
   const nk = nameKey(v.name, profile) + '|' + nameKey(v.city, null);
-  if (v.place_id && dbPid.has(v.place_id)) { maybeBackfill(dbPid.get(v.place_id), v); skipDbPid.push(v.name); continue; }
+  if (v.place_id && dbPid.has(v.place_id)) {
+    const hit = dbPid.get(v.place_id);
+    if (hit.vendor_type === profile.vendorType) { maybeBackfill(hit, v); skipDbPid.push(v.name); }
+    else skipOtherType.push(`${v.name} (already in DB as ${hit.vendor_type})`);
+    continue;
+  }
   if (dbName.has(nk)) { maybeBackfill(dbName.get(nk), v); skipDbName.push(`${v.name} ~ ${dbName.get(nk).name}`); continue; }
   if ((v.place_id && batchPid.has(v.place_id)) || batchName.has(nk)) { skipBatch.push(v.name); continue; }
   if (v.place_id) batchPid.add(v.place_id);
@@ -112,6 +120,7 @@ const lines = [];
 lines.push(`upload ${APPLY ? 'APPLY' : 'DRY RUN'} — ${file}`);
 lines.push(`rows in csv: ${venues.length}${lateResolved ? ` | late-resolved to place_id: ${lateResolved}` : ''}${lateGeocoded ? ` | late-geocoded coords: ${lateGeocoded}` : ''}`);
 lines.push(`skip — already in DB by place_id (${skipDbPid.length}): ${skipDbPid.join(', ') || '—'}`);
+if (skipOtherType.length) lines.push(`skip — same place exists as ANOTHER vendor type (${skipOtherType.length}): ${skipOtherType.join('; ')}`);
 lines.push(`skip — already in DB by name+city (${skipDbName.length}): ${skipDbName.join('; ') || '—'}`);
 lines.push(`skip — duplicate within batch (${skipBatch.length}): ${skipBatch.join(', ') || '—'}`);
 if (skipNoName.length) lines.push(`skip — blank name: ${skipNoName.length}`);
