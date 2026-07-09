@@ -65,7 +65,8 @@ node --env-file=.env.local .claude/skills/enrichvendors/scripts/upload.mjs <work
 
 Missing vendors (a call died): re-spawn just that call file (THIN/NOTTYPE-flagged ones are intentionally missing — don't). Validation failures/near-dup warnings: fix only those rows (≤5 inline, else one small call). Photographer rows additionally hard-require `service_region`. The dry-run also blocks **process-tell** language — research-tooling words AND pipeline/batch self-references; collect offenders into one JSON and hand a single Sonnet agent a rephrase-in-place pass.
 
-### Optional: RICH second entries — same as before, with `--type`:
+### RICH second entries — DEFAULT, run without asking (Kiara, 2026-07)
+After merge validates, run the RICH pass for all RICH-flagged slugs as part of the same run (skip only if the user says skip). Same mechanics, with `--type`:
 ```
 node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> rich --type <type> --batch <id> --roster <roster> --venues "<rich slugs>"
 ```

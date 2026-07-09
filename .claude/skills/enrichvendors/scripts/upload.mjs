@@ -43,7 +43,7 @@ const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgetta
 // doesn't list pricing", "couldn't get the page to load"); (2) any hint that this entry
 // is part of a scripted set being processed ("from this batch", "the enrichment run",
 // "seeded venues") — a couple's note references the venue, never how the note was made.
-const PROCESS = /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?)\b/i;
+const PROCESS = /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?|launchintel|digest\w*)\b/i;
 const EMDASH = /[—–]/; // no em/en dashes anywhere in entry text — real users type hyphens
 const errors = [];
 const perBot = new Map(), perBotVenue = new Set();
@@ -122,6 +122,11 @@ function backdate(month, year) {
   return new Date(start + Math.random() * Math.max(end - start, 1)).toISOString();
 }
 
+// CSV notes are one physical line (serialization contract); the app renders notes with
+// whitespace-pre-line, so bullet boundaries become REAL newlines here at insert:
+// glued bullets ('-beau is...') and spaced label bullets (' - Style:').
+const debullet = (t) => (t || '').replace(/\s+(?=-[A-Za-z])/g, '\n').replace(/ - (?=[A-Z0-9])/g, '\n- ');
+
 let inserted = 0, media = 0;
 for (const r of toInsert) {
   const bot = botByKey.get(r.bot);
@@ -133,7 +138,7 @@ for (const r of toInsert) {
     recon_collected_year: parseInt(r.year, 10),
     price_text: r.price_text || null,
     price_details: r.price_details || null,
-    notes: r.notes || null,
+    notes: debullet(r.notes) || null,
     service_region: profile.serviceRegionRequired ? (r.service_region || null) : null,
     status: 'active',
     created_at: backdate(parseInt(r.month, 10), parseInt(r.year, 10)),
