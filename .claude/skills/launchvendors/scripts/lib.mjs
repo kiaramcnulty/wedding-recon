@@ -74,6 +74,7 @@ export const TYPE_PROFILES = {
     // "wedding venue" only — "event venue" pulls in meeting rooms / corporate banquet
     // space that isn't wedding-relevant. Keep the query intent tight.
     sweepQuery: (anchor) => `wedding venue near ${anchor}`,
+    statewideQuery: (stateName) => `wedding venues in ${stateName}`,
     weak: VENUE_WEAK,
     dedupStop: new Set(),         // no trade words stripped — venue names dedupe on norm() alone
     captureInstagram: false,
@@ -82,12 +83,19 @@ export const TYPE_PROFILES = {
     vendorType: 'photos',
     csv: 'vendors.csv',
     sweepQuery: (anchor) => `wedding photographer near ${anchor}`,
+    // Service-area vendors brand statewide ("Colorado Wedding Photographer") and often
+    // miss city-"near" queries — the statewide query is the primary net for this type.
+    statewideQuery: (stateName) => `wedding photographer in ${stateName}`,
     // "X Photography" must never match "Y Photography" on the trade word alone.
     weak: new Set(['photography', 'photograph', 'photographs', 'photo', 'photos', 'photographer', 'photographers', 'studio', 'studios', 'film', 'films', 'media', 'imagery', 'image', 'images', 'creative', 'collective', 'productions', 'elopement', 'elopements']),
     // Sole-proprietor name variants: "Jane Doe Photography" ≡ "Jane Doe Photo LLC".
     // Includes company suffixes — nameKey works on norm(), which (unlike sigTokens) keeps them.
     dedupStop: new Set(['photography', 'photograph', 'photographs', 'photo', 'photos', 'photographer', 'photographers', 'studio', 'studios', 'film', 'films', 'llc', 'inc', 'co', 'the']),
     captureInstagram: true,       // requires vendors.instagram (migration 0016) at upload time
+    // WEDDING photographers only (Kiara, 2026-07) — sweep queries have wedding intent but
+    // Places pads results with general portrait/family studios. wedcheck.mjs keeps a sweep
+    // row only when its name or website homepage matches this; otherwise flags for review.
+    intent: /wedding|elopement|bridal/i,
   },
 };
 

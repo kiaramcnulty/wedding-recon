@@ -9,8 +9,16 @@ Profile key `photos` → `vendor_type='photos'` (the app's existing category: Ca
 - **Loose regional bounds:** a photographer 3 hours out, or servicing only part of the region, is fine to include. The state guard still applies (out-of-state rows come back `NO_MATCH`-flagged — surface them for Kiara to decide rather than silently dropping).
 - All vendors show on the map: base-city centroid when research gives a home base (`hint`), else the region anchor; pin-less rows are acceptable and called out at upload.
 
+- **WEDDING photographers only** (Kiara, 2026-07): being a photographer in-state is not enough. Sweep queries have wedding intent but Places pads results with portrait/family/boudoir/landscape studios, photo booths, gig platforms, and even venues — run `wedcheck.mjs` after the sweep, every time.
+
 ## Phase 1 — sweep
-Query per anchor: `wedding photographer near {anchor}` (encoded in `TYPE_PROFILES.photos`).
+Query per anchor: `wedding photographer near {anchor}`; statewide launches add `--statewide <StateName>` (both encoded in `TYPE_PROFILES.photos`).
+
+Then the **wedding-intent check** (mandatory):
+```
+node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs data/launchvendors/<slug> --type photographer
+```
+Keeps a sweep row only when its name, website URL, or website homepage matches `wedding|elopement|bridal`; flags the rest `NON_WEDDING?` (site readable, zero wedding evidence — default **delete at review** unless Kiara recognizes it) or `WED_UNVERIFIED` (no site / fetch failed — needs a human glance). Flags only, never deletes. Research-sourced rows are exempt (their sources are wedding-scoped).
 
 ## Phase 2 — web research queries (3–5 WebSearches)
 - `{region} wedding photographers`
