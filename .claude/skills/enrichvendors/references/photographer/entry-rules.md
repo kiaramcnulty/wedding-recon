@@ -44,7 +44,8 @@
   landscapes, micro-weddings, adventure elopements); hours/second-shooter shape;
   turnaround time; responsiveness; how booking works (call required vs prices up front);
   any firsthand review/reddit color, attributed.
-- 2-5 sentences, ONE line. Rich → up to ~90 words; thin → 25-50 and stop. Every sentence
+- **NO minimum length** (Kiara, 2026-07): a ~200-character note covering all the real
+  intel is a great entry. Length follows intel; cap ~90 words; never pad. Every sentence
   earns its place with a concrete fact. Include negatives when sourced (slow replies,
   zoomed-out shots, travel fees stacking up).
 

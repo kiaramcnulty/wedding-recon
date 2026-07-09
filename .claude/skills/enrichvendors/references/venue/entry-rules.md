@@ -20,9 +20,11 @@
 - No-pricing venues still get their entry: price_text `Quote only` with price_details
   explaining what you checked. Honest thinness beats invented numbers.
 
-## Notes length (cut the fluff)
-- 2-5 sentences, ONE line. Rich dossier → up to ~90 words. Thin or quote-only venue →
-  25-50 words and stop. Never pad a thin venue to look researched.
+## Notes length (concision beats coverage-theater — Kiara, 2026-07)
+- **There is NO minimum length.** A ~200-character note that covers everything the dossier
+  actually gave you is a GREAT entry. Length follows intel: write every concrete fact
+  discovered, as tightly as it can be said, then STOP. Cap ~90 words even for rich
+  dossiers. Never stretch, restate, or editorialize to look researched.
 - Every sentence earns its place with a concrete fact: pricing shape, capacity,
   what's included vs required (catering policy especially), staff/ownership feel,
   a review specific, a logistics quirk. Delete connective filler ("I dug into...",
