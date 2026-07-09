@@ -1,0 +1,51 @@
+{
+  "vendor_id": "251adf35-8789-49b5-95aa-86dbb48c6643",
+  "name": "Wild Iris Media",
+  "city": "Boulder",
+  "website": "http://wildirismedia.com/",
+  "place_id": "ChIJp__58Z_ta4cRNOg7Wi09UmA",
+  "instagram": "the.irisphotography",
+  "fetched_at": "2026-07-09T07:37:19.551Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 7,
+    "websiteUri": "http://wildirismedia.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2024-08",
+        "text": "Very communicative, super laid back, total fly on the wall and will work around whatever YOU are looking for. My husband and I hired Mike for our wedding and can't say enough good things. He's got such a unique eye given his editorial background and had a very different style from other photographers we checked out. He's got a great knack for capturing emotional moments that happen aside from the bride and groom - too!"
+      },
+      {
+        "rating": 5,
+        "when": "2023-06",
+        "text": "Working with Mike is one of the most treasured memories from my wedding; he has a very calm professionalism, is good at giving direction, has a sense of pragmatism, and just generally seems like a swell guy. Mike made everyone feel very comfortable, and did an amazing job capturing all the details of the wedding. Can’t say enough nice things, 10/10 would recommend."
+      },
+      {
+        "rating": 5,
+        "when": "2025-10",
+        "text": "Our planners had the opportunity to work with Mike at a wedding in Boulder, Colorado and he was so wonderful to work with! He was quick to communicate, he prioritized the shots that the couple wanted, and was so nice. We really appreciate how great and easy he was to work with and our couple loved having him at their wedding! Thank you, Mike, for your hard work! We hope to work with Wild Iris Media again soon!"
+      },
+      {
+        "rating": 5,
+        "when": "2025-07",
+        "text": "Mike was fantastic to work with. Met with us multiple times prior to the wedding to make sure he understood the timeline and key shots we wanted to have. Day of he was great, got amazing shots and even took us to this beautiful area in Boulder canyon after the ceremony for some amazing nature shots. Overall he was incredible to work with and we can’t recommend him enough :)"
+      },
+      {
+        "rating": 5,
+        "when": "2023-07",
+        "text": "I cannot say enough good things about Michael! He knew my timeline better than I did, and was sure to get allll the little detail shots. He captured my day perfectly, and was polite and professional. THANK YOU! I would rate 10 stars if I could"
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://d13ns7kbjmbjip.cloudfront.net/bow_2025/section_4_4.png"
+  ],
+  "pages": [
+    {
+      "url": "https://www.wildirismedia.com/",
+      "kind": "home"
+    }
+  ]
+}

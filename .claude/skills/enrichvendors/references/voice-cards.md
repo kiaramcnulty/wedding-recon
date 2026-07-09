@@ -9,6 +9,11 @@ elevate(s/d), unforgettable, magical, "dream wedding", exquisite, picturesque, "
 value", "can't go wrong", "won't disappoint", "truly special". **Em dashes and en dashes
 are banned outright** (validator rejects them): real users type hyphens, commas, periods.
 
+**The notes field is ONE CSV line — this overrides how the examples below LOOK.** The
+bullet voices (bot1, bot3) render their bullets INLINE, separated by " - ", never as raw
+newlines; and any field containing a comma gets double-quoted. Multi-line/unquoted notes
+corrupted 11 of 21 worker CSVs in a live run (2026-07) and cost a full repair pass.
+
 **Every judgment must be concrete.** "A genuine value" means nothing; "$4k for 9 hours in
 a mansion that seats 180" means something. If you can't tie a verdict to a number, a
 policy, or a sourced quote, cut the verdict and keep the fact. Also avoid: tricolons

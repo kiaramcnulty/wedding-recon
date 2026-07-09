@@ -1,0 +1,63 @@
+About Us - Alive Studios 
+Close 
+Menu 
+About Us 
+Weddings 
+Portraiture 
+Headshots &#038; Branding 
+Architecture 
+Studio 
+Events 
+Investment 
+Blog 
+Client Proofing 
+Contact 
+Call us: 303-440-6008 
+About Us 
+Weddings 
+Portraiture 
+Headshots &#038; Branding 
+Architecture 
+Studio 
+Events 
+Investment 
+Blog 
+Client Proofing 
+Contact 
+Call us at 303.440.6008 
+About Us 
+About Alive Studios
+ Welcome to Alive Studios! I, Benjamin D. Buren, am the professional photographer and magician at Alive Studios. My team and I provide compelling imagery to inspired clients all over the world. Alive Studios started over 20 years ago when my flourishing consulting engineering career proved to only be part of the vision. Since then I’ve never looked back in the pursuit of creative construction! Our team includes over half a dozen brilliant individuals who all draw inspiration from the amazing energy of Boulder, Colorado. We have the depth and versatility to create everything from elegant wedding photography and stunning portraiture to captivating product shots and inspired architectural artistry! As you explore our site, remember one thing; Power Flows Where Your Attention Goes . Our attention focuses on using the magic of light to draw out the essence of our subjects. Enjoy Alive Studios! 
+About Benjamin
+Master Photographer
+Photography has captivated me as far back as I can remember, but it wasn’t till being immersed in the intensity of engineering school that I realized what an outlet it could be. When I wasn’t studying about thermodynamics or differential equations my mind started wandering towards the more creative elements of visual presentation. I can still recall my first “ah-ha” moment; out one brilliantly sunny morning after an ice storm with my first camera, a Canon AE1 (I now shoot Nikon). I spent a magical few hours capturing spring blossoms covered with ice, sunburst blasting through intricate branches, and vivid dichotomous renditions of spring life and cold ice. In those hours I saw a different world through my camera, and days later as I flipped through the prints (yup, that was when we shot film and got it developed) my heart sped up and I felt a calling… Throughout the years I’ve built Alive Studios based on the magic of how I feel when capturing that “frozen” moment in time, the instant when the essence of the subject collides with my artistic ability.
+The Alive Studios Team is made up of professional photographers, second shooters, assistants, editors, stylist, art directors and administration. While I, Benjamin, do most of the actual capturing, certain situations are enhanced by additional photographers or different styles and rates. The entire team is focused on bringing integrity, creativity, and passion together to create magic!
+Weddings 
+Alive Studios has captured the magic of over 500 weddings in the past 25 years. We delight in telling the story of love that culminates in marriage and then blasts forth into life and family. What an honor to be present capturing them moments of your amazing day, and showcasing them as art that will last a lifetime. Our team is versatile in all aspects of modern day wedding photography and we are flexible enough to fit almost any reasonable budget. Explore the Wedding portion of this site and be ready to get blown away by our magical imagery.
+Portraits
+Alive Studios captures and creates compelling images of the people you love. Using natural light, refined photography techniques and awesome people skills we draw out the amazing beauty of everyone we photograph. Combine that with highly professional editing skills, unparalleled professionalism and super friendly personalities and you have the ingredients for an awesome photography experience.
+Headshots & Branding
+Headshots & Branding – “The world we live in is more focused on visual data than ever before. The average American sees well over 10,000 unique images in a single day. How can you stand out in this torrent of vibrant and compelling visual input? Alive Studios is incredibly well versed at utilizing current trends, integrating successful methods, and uniquely capturing the essence of who you are! We will gracefully and confidently push you to the edge, draw out your personality, and create images that truly represent the amazing human being known as YOU!
+Architecture
+Alive Studios combines 25 years of experience as well as cutting edge techniques to bring you images that capture a building, a space, exquisitely designed details; your vision... Working with architects, design firms, builders, hotel owners, residential clients, and venue owners we help you bring your space to life in imagery. Be it advertising, marking, public relations or personal archives, bragging rights, documentation or just a true desire to capture your space – Alive Studios will make it happen in a compelling and vibrant way!
+Studio
+In addition to our amazing Colorado Outdoor Studio, Alive Studios owns a 700 square foot photography studio in North Boulder. 12’ seamless backdrops, daylight balanced strobes, diffused natural light and cutting-edge equipment provide us with all the things necessary to create incredible and compelling studio photography. Add to that an awesome location with ample parking, a full professional makeup room and meeting area, and close proximity to a myriad of outdoor shooting options and you have the makings of awesomeness!
+Events
+An amazing amount of planning has gone into the event you are holding. You have found the best place and people to support you. It’s all coming together; it will be awesome, and people will have a blast. Capturing that magic with compelling photography will bring it all to a new level. Promotional images to use for your next event, incredible memories that will last a lifetime, pictures of friends and family. Alive Studios has extensive experience in all types of events and will delight you with the results.
+Somewhere, something incredible is waiting to be known.
+Carl Sagan Company Co 
+The energy of the mind is the essence of life.
+Aristotle Industrial Company 
+Everything you can imagine is real.
+Pablo Picasso Light and Magic 
+; rel="https://api.w.org/"
+Link: ; rel="alternate"; title="JSON"; type="application/json"
+Link: ; rel=shortlink
+Content Delivery Network via Amazon Web Services: CloudFront: N/A
+Minified using Disk
+Minify debug info:
+Theme: 2ce2a
+Template: page
+Database Caching 52/178 queries in 0.072 seconds using Disk
+Served from: alivestudios.com @ 2026-06-28 23:46:54 by W3 Total Cache
+-->

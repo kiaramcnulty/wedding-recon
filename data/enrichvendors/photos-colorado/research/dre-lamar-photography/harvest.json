@@ -1,0 +1,69 @@
+{
+  "vendor_id": "6599a79b-bcb1-4e5a-93cb-721fc4abd2d2",
+  "name": "Dre Lamar Photography",
+  "city": "Colorado Springs",
+  "website": "https://www.drelamarphoto.com/",
+  "place_id": "ChIJ9TBUY5VFE4cRxuw2ZO-BCX8",
+  "fetched_at": "2026-07-09T07:38:26.993Z",
+  "google": {
+    "websiteUri": "https://www.drelamarphoto.com/",
+    "reviews": []
+  },
+  "pdfs": [],
+  "images": [
+    "https://static.wixstatic.com/media/6e75af_512dcc19f7d54d39aa21113e4178c3d1~mv2.png/v1/fill/w_720,h_720,al_c/6e75af_512dcc19f7d54d39aa21113e4178c3d1~mv2.png",
+    "https://static.wixstatic.com/media/6e75af_05bef187bc104cbbb38f403e84b18b66~mv2.jpg/v1/fill/w_476,h_714,q_90,enc_avif,quality_auto/6e75af_05bef187bc104cbbb38f403e84b18b66~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_3632670fa5774fb1905d85294c2c59ae~mv2.jpg/v1/fill/w_475,h_714,q_90,enc_avif,quality_auto/6e75af_3632670fa5774fb1905d85294c2c59ae~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_1e369b9bb3da48c082fc4dd850bc9270~mv2.jpg/v1/fill/w_476,h_714,q_90,enc_avif,quality_auto/6e75af_1e369b9bb3da48c082fc4dd850bc9270~mv2.jpg",
+    "https://static.wixstatic.com/media/01c3aff52f2a4dffa526d7a9843d46ea.png/v1/fill/w_42,h_42,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/01c3aff52f2a4dffa526d7a9843d46ea.png",
+    "https://static.wixstatic.com/media/0fdef751204647a3bbd7eaa2827ed4f9.png/v1/fill/w_42,h_42,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/0fdef751204647a3bbd7eaa2827ed4f9.png",
+    "https://static.wixstatic.com/media/6e75af_df62fe9a3dcd43a5aa0033c353d47411%7Emv2.png/v1/fit/w_2500,h_1330,al_c/6e75af_df62fe9a3dcd43a5aa0033c353d47411%7Emv2.png",
+    "https://static.wixstatic.com/media/6e75af_e7ee5c7259464168941a719759848ad4~mv2_d_1287_2484_s_2.jpg/v1/fill/w_61,h_118,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/6e75af_e7ee5c7259464168941a719759848ad4~mv2_d_1287_2484_s_2.jpg",
+    "https://static.wixstatic.com/media/6e75af_2e5220efc0e544888cc80f603b34f150~mv2.jpg/v1/fill/w_123,h_166,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/6e75af_2e5220efc0e544888cc80f603b34f150~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_3159d9a22ab24873ac897e5e95b5769a~mv2.jpg/v1/fill/w_321,h_482,q_90,enc_avif,quality_auto/6e75af_3159d9a22ab24873ac897e5e95b5769a~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_ef967ed00b1e415f98939eb4eeeac0b9~mv2.jpg/v1/fill/w_318,h_482,q_90,enc_avif,quality_auto/6e75af_ef967ed00b1e415f98939eb4eeeac0b9~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_4137ebb8765340399ff8b9572fbe8602~mv2.jpg/v1/fill/w_322,h_482,q_90,enc_avif,quality_auto/6e75af_4137ebb8765340399ff8b9572fbe8602~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_f3aefa0a4ca44a82ac10b9164f87dfbf~mv2.jpg/v1/fill/w_484,h_729,q_90,enc_avif,quality_auto/6e75af_f3aefa0a4ca44a82ac10b9164f87dfbf~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_11bdc1a8321043e9b819096a50959e90~mv2.jpg/v1/fill/w_486,h_729,q_90,enc_avif,quality_auto/6e75af_11bdc1a8321043e9b819096a50959e90~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_fb83269dbea34250ac061e157171bab1~mv2.jpg/v1/fill/w_334,h_472,q_90,enc_avif,quality_auto/6e75af_fb83269dbea34250ac061e157171bab1~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_8470cff3d76443998e653fb14d42fa49~mv2.jpg/v1/fill/w_311,h_472,q_90,enc_avif,quality_auto/6e75af_8470cff3d76443998e653fb14d42fa49~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_f09e54e2bbea4daeac6cc011f859e267~mv2.jpg/v1/fill/w_315,h_472,q_90,enc_avif,quality_auto/6e75af_f09e54e2bbea4daeac6cc011f859e267~mv2.jpg",
+    "https://static.wixstatic.com/media/nsplsh_50455571455a5261354741~mv2.jpg/v1/fill/w_150,h_100,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/nsplsh_50455571455a5261354741~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_f07d995b596c44e9b9ed5052de4b66f1~mv2.jpg/v1/fill/w_105,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_f07d995b596c44e9b9ed5052de4b66f1~mv2.jpg",
+    "https://static.wixstatic.com/media/nsplsh_4c644a7241456e59446130~mv2_d_6000_4000_s_4_2.jpg/v1/fill/w_150,h_100,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/nsplsh_4c644a7241456e59446130~mv2_d_6000_4000_s_4_2.jpg",
+    "https://static.wixstatic.com/media/11062b_ad49bface38742a0bde3448c79a4f3ab~mv2.jpg/v1/fill/w_150,h_100,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/11062b_ad49bface38742a0bde3448c79a4f3ab~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_98ee277380384d4cb38b00ec117bd6e5~mv2.jpg/v1/fill/w_100,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_98ee277380384d4cb38b00ec117bd6e5~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_a230d3f590374958b309252d9e017e5c~mv2.jpg/v1/fill/w_120,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_a230d3f590374958b309252d9e017e5c~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_7772342d4442420e97e7a355544e5147~mv2.jpg/v1/fill/w_107,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_7772342d4442420e97e7a355544e5147~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_b32161248c144c119d7d3269499cbd4d~mv2.jpg/v1/fill/w_100,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_b32161248c144c119d7d3269499cbd4d~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_4b98aa6b5461447b82d6eb1e8864019c~mv2.jpg/v1/fill/w_100,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_4b98aa6b5461447b82d6eb1e8864019c~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_59317181b6d34fceb53b47c17c929d55~mv2.jpg/v1/fill/w_100,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_59317181b6d34fceb53b47c17c929d55~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_f1c55b03e49949f6871ad6cadb4e8c23~mv2.jpg/v1/fill/w_121,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_f1c55b03e49949f6871ad6cadb4e8c23~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_a49a922772754f8088c369cf7f536f7f~mv2.jpg/v1/fill/w_150,h_143,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_a49a922772754f8088c369cf7f536f7f~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_94206e4b1b234bf090b8a86c73d297ac~mv2.jpg/v1/fill/w_105,h_150,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_auto/6e75af_94206e4b1b234bf090b8a86c73d297ac~mv2.jpg",
+    "https://static.wixstatic.com/media/6e75af_abd936fa1dcf41e2849bdc23a2bdbabc~mv2_d_1365_1366_s_2.jpg/v1/fill/w_135,h_135,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/6e75af_abd936fa1dcf41e2849bdc23a2bdbabc~mv2_d_1365_1366_s_2.jpg",
+    "https://static.wixstatic.com/media/6e75af_662e0f0cc9134c6b8ee26a1c849ac611~mv2.jpg/v1/fill/w_123,h_188,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/6e75af_662e0f0cc9134c6b8ee26a1c849ac611~mv2.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://www.drelamarphoto.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://www.drelamarphoto.com/about-me",
+      "file": "page-about-me.txt"
+    },
+    {
+      "url": "https://www.drelamarphoto.com/weddings",
+      "file": "page-weddings.txt"
+    },
+    {
+      "url": "https://www.drelamarphoto.com/book-online",
+      "file": "page-book-online.txt"
+    },
+    {
+      "url": "https://www.drelamarphoto.com/book-now",
+      "file": "page-book-now.txt"
+    }
+  ]
+}

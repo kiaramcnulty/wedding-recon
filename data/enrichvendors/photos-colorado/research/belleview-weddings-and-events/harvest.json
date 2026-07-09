@@ -1,0 +1,72 @@
+{
+  "vendor_id": "be37790e-9d72-4ae2-881c-60e3d842d253",
+  "name": "Belleview Weddings & Events",
+  "city": "Crested Butte",
+  "website": "http://www.belleviewevents.com/",
+  "place_id": "ChIJXy54TkFyQIcRE36ENL7Z2dU",
+  "fetched_at": "2026-07-09T07:46:16.347Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 32,
+    "websiteUri": "http://www.belleviewevents.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2018-02",
+        "text": "Jamie is a wedding planning wizard and should be your first choice for a wedding/event planner in the beautiful Crested Butte - Gunnison, Colorado region. From our initial meeting through the day after the wedding, she was SO helpful, organized, and fun to work with. She responded to all of our communication promptly and always had ideas, solutions, or local vendor recommendations to our wedding questions or needs. As an additional bonus, she also worked directly with a flower vendor and did a FANTASTIC job designing our wedding flowers - guests are still talking about my boutique. The day of our wedding was literally perfect thanks to Jamie. She kept everything and everyone running so smoothly and effortlessly. Thank you, Jamie for making the vision for our dream wedding come true! - Olivia & Justin, 9.16.17"
+      },
+      {
+        "rating": 5,
+        "when": "2018-11",
+        "text": "Jamie is AMAZING to work with and incredibly talented. Her friendly personality puts everyone at ease while she manages every detail in a seamless fashion. It’s clear that Jamie and her team are passionate and dedicated to what they do. I highly recommend Belleview Weddings & Events to anyone looking to plan an event in the area – can’t imagine doing it without them!!"
+      },
+      {
+        "rating": 5,
+        "when": "2018-11",
+        "text": "We had an amazing experience working the Belleview Weddings & Events!  Jamie is an absolute pro.  As wedding vendors ourselves (photographers), we know what to look for in professional wedding services... Belleview Events provides a top-notch service with a friendly and personable attitude.  If you want someone who can handle all your details with a go-with-the-flow attitude, then Jamie is your girl!  We can't wait to work with her again :)"
+      },
+      {
+        "rating": 5,
+        "when": "2018-12",
+        "text": "As a caterer, Jamie is a pleasure to work with!  She and her staff are very professional, organized, friendly, and know how to communicate.  We've known many of the brides that Jamie has worked with, and it was obvious that much of the stress was alleviated on and before the wedding day.  On the catering side of the event, she had everything we needed ready and kept us informed of the timeline and any changes that came up."
+      },
+      {
+        "rating": 5,
+        "when": "2019-05",
+        "text": "Jamie is incredible! We started off saying we were going to have a small, simple wedding and we ended up morphing it into a huge event with a million moving parts. Jamie handled it all with so much grace and brought to life everything we imagined. Jamie's calming presence was such a gift to us when we were in planning mode and also as we navigated multiple events on our wedding weekend. On our wedding day, I was telling a vendor about how much I enjoyed working with Jamie and she nodded vigorously and responded that Jamie is, hands-down, the best wedding planner in CB. She listed off many of the reasons she is the best: Efficient, great communicator, detail-oriented, creative and also that she doesn't stress anyone out! We couldn't agree more. She clearly has a gift for planning the nitty-gritty of events, yet projecting a laid-back energy  which is so needed on a wedding day. It speaks a lot to who she is as a person that she treats everyone working on her events with kindness and with her powerful calming vibe, not just the bride and groom. Jamie leaves her ego at the door when she works with you and just says, \"What do you want? Let me make it happen for you\" and then graciously works behind the scenes to create the space so you can feel delight, joy and presence on your wedding day. Thank you so much, Jamie and everyone at Bellview Events."
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://belleviewevents.com/wp-content/uploads/2019/12/Donovan_Tiffany_Edited-357-2000x1333.jpg",
+    "https://socialmediawidgets.files.wordpress.com/2014/03/02_facebook.png",
+    "https://socialmediawidgets.files.wordpress.com/2014/03/10_instagram.png",
+    "https://socialmediawidgets.files.wordpress.com/2014/03/13_pinterest.png",
+    "https://belleviewevents.com/wp-content/uploads/2018/02/Whitney-Danny-546.jpg",
+    "http://www.blue-bird-events.com/wp-content/uploads/2012/11/wedding-big-sky-1.jpg",
+    "https://belleviewevents.com/wp-content/uploads/2016/12/W00216-Christina-Riley-298-e1483056882708.jpg",
+    "https://belleviewevents.com/wp-content/uploads/2018/02/Whitney-Danny-232.jpg",
+    "https://belleviewevents.com/wp-content/uploads/2012/11/21-2-681x1024.jpg",
+    "https://belleviewevents.com/wp-content/uploads/2012/11/19867_2016.09.06_POR_Shea-300x240.jpg",
+    "https://belleviewevents.com/wp-content/uploads/2019/05/Buza-profile-1-224x300.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://belleviewevents.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://belleviewevents.com/services/",
+      "file": "page-services.txt"
+    },
+    {
+      "url": "https://belleviewevents.com/elopement-services-2/",
+      "file": "page-elopement-services-2.txt"
+    },
+    {
+      "url": "https://belleviewevents.com/about/",
+      "file": "page-about.txt"
+    }
+  ]
+}

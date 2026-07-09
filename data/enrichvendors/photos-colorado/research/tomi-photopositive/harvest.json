@@ -1,0 +1,33 @@
+{
+  "vendor_id": "ff269248-b017-43bd-b698-e2589bd04d75",
+  "name": "Tomi Photopositive",
+  "city": "Denver/Broomfield",
+  "website": "https://www.tomiphotopositive.com",
+  "place_id": null,
+  "instagram": "tomi.photopositive",
+  "fetched_at": "2026-07-09T07:54:27.738Z",
+  "pdfs": [],
+  "images": [],
+  "pages": [
+    {
+      "url": "https://www.tomiphotopositive.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://www.tomiphotopositive.com/portfolio/top-2022-weddings",
+      "file": "page-portfolio-top-2022-weddings.txt"
+    },
+    {
+      "url": "https://www.tomiphotopositive.com/portfolio/2020-weddings",
+      "file": "page-portfolio-2020-weddings.txt"
+    },
+    {
+      "url": "https://www.tomiphotopositive.com/about",
+      "file": "page-about.txt"
+    },
+    {
+      "url": "https://www.tomiphotopositive.com/investments",
+      "file": "page-investments.txt"
+    }
+  ]
+}

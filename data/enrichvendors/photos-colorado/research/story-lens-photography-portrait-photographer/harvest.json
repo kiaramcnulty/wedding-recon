@@ -1,0 +1,66 @@
+{
+  "vendor_id": "fcdf5f25-b179-4c92-bd80-2b8499646cf4",
+  "name": "Story Lens Photography : Portrait Photographer",
+  "city": "Avon",
+  "website": "http://www.storylensinc.com/",
+  "place_id": "ChIJuYmRgrRcaocRVK7S6uk6_-s",
+  "fetched_at": "2026-07-09T07:43:30.023Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 24,
+    "websiteUri": "http://www.storylensinc.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2025-08",
+        "text": "Lisa was fabulous! We were on a special family vacation in Avon. She went above & beyond to accomodate us! The pictures turned out GREAT!! We were so super happy with her. I'd 100% recommend her!"
+      },
+      {
+        "rating": 5,
+        "when": "2025-11",
+        "text": "We can't say enough good things about our YEARS of working with Lisa and Story Lens Photography.  Lisa has photographed our family almost every year since our kids were born and even successfully pulled together a session with our extended family of around 20 of us (eight little ones too)! Her talent, professionalism, authenticity, humor and incredible creativity with locations and ideas come through in each of her sessions. She makes the whole experience feel like a fun family outing and has come up with some amazing ideas even when weather was really putting a damper on things - some of the best photos we have! Looking through the years of photographs that Lisa has captured brings us back to each of the moments and reminds us of how much we have grown. I'm so happy we found her when we did; my only regret is that we didn't know her when we got married!\n- Erin & Jeff"
+      },
+      {
+        "rating": 5,
+        "when": "2025-10",
+        "text": "Lisa was fantastic! Not only is she talented, she is incredibly considerate and worked with us to alter our shoot time to accommodate our infant’s unpredictable schedule. Our photos turned out beautifully and we will cherish the sweet moments she captured!"
+      },
+      {
+        "rating": 5,
+        "when": "2024-01",
+        "text": "If you are looking for an excellent family photographer, look no further! Lisa did an incredible job capturing our huge family of 16! She made the whole process super easy. She captured us perfectly! She even managed to get beautiful smiles from the toddlers and the teens, which is not an easy task.  We love our photos and are so glad that we found Lisa!"
+      },
+      {
+        "rating": 5,
+        "when": "2025-04",
+        "text": "Lisa has been amazing! There are not enough adjectives to describe how wonderful she has been. She was easy to work with and I received my pictures super fast! I absolutely love them ALL and look forward to having our memories displayed in our home."
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://storylensinc.com/uploads/2022/12/keystone-family-photographer-3.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/keystone-family-photographer-3.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/branch_SLP.png",
+    "https://storylensinc.com/wp-content/uploads/2022/12/beaver-creek-family-photographer-1.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/copper-mountain-photographer-6.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/summit-county-engagement-photographer-2.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/beaver-creek-family-photographer-5.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/vail-family-photographer-1.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/breckenridge-family-photographer-10-.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/vail-extended-family-photographer-4.jpg",
+    "https://storylensinc.com/uploads/2022/12/lseaman_220326_005_web.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/lseaman_220326_005_web.jpg",
+    "https://storylensinc.com/wp-content/uploads/2022/12/Vail_Outdoor_Photographer.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://storylensinc.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://storylensinc.com/details/about/",
+      "file": "page-details-about.txt"
+    }
+  ]
+}

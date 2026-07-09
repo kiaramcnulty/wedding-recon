@@ -1,0 +1,68 @@
+{
+  "vendor_id": "9b92adbb-d33b-4721-b591-ad06ebc6fd35",
+  "name": "Bob Younger Images",
+  "city": "Fort Collins",
+  "website": "https://www.bobyoungerimages.com/?utm_source=google&utm_medium=organic&utm_campaign=googlemybusiness",
+  "place_id": "ChIJYxv_FItKaYcRbwMIIZR8goY",
+  "fetched_at": "2026-07-09T07:39:41.386Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 58,
+    "websiteUri": "https://www.bobyoungerimages.com/?utm_source=google&utm_medium=organic&utm_campaign=googlemybusiness",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2026-01",
+        "text": "Bob Younger Images was fantastic to work with. He just did our work photo shoot and absolutely nailed it. Super professional, easygoing, and made the whole process smooth and comfortable. He gave great direction, moved efficiently, and delivered quality images that actually feel natural and polished—not stiff or awkward. If you want someone who knows what they’re doing and makes it easy, Bob’s your guy."
+      },
+      {
+        "rating": 5,
+        "when": "2026-03",
+        "text": "Great experience with Bob doing some headshots and brand photography for my business. Very happy with my results. Appreciated how much he was open to my ideas throughout the process. He was also very accommodating with a late request to reschedule."
+      },
+      {
+        "rating": 5,
+        "when": "2026-01",
+        "text": "Experienced a team salon shoot with Bob and we are all so pleased. From the comfy vibes to the laid back but professional photog. Thank you so much for all the input you took making us all so happy"
+      },
+      {
+        "rating": 5,
+        "when": "2025-01",
+        "text": "My family and I had the best experience with Bob! He is a talented photographer and an even kinder person. He took special care to make sure we liked our photos and presented us in a beautiful light. We would enthusiastically recommend him for your next photography project."
+      },
+      {
+        "rating": 5,
+        "when": "2025-01",
+        "text": "My family and I worked with Bob to take a family portrait and he is the best! He made the experience so fun and seamless. I absolutely love how the photos turned out and on top of that Bob is just truly the nicest person ever! Would recommend 10/10. :)"
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://www.bobyoungerimages.com/uploads/1/3/1/6/131655895/published/cropped-bobs-headshot-july-2025.jpg?1753743110",
+    "https://www.bobyoungerimages.com/uploads/1/3/1/6/131655895/editor/bob-younger-blaclk-high-res-njq3nz.png?1587265896",
+    "https://files.widgetic.com/file/widgetic-uploads/weebly/mosaic-gallery/131655895/kab6asu9-4kpv77e.jpg",
+    "https://www.bobyoungerimages.com/uploads/1/3/1/6/131655895/ppa_orig.png",
+    "https://www.bobyoungerimages.com/uploads/1/3/1/6/131655895/published/00-bos-winner-2022-photography-business.png?1669868748",
+    "https://www.bobyoungerimages.com/uploads/1/3/1/6/131655895/img-1987-edit-edit_orig.jpg",
+    "https://www.bobyoungerimages.com/uploads/1/3/1/6/131655895/published/b0a9758-edit-2.jpg?1608743928"
+  ],
+  "pages": [
+    {
+      "url": "https://www.bobyoungerimages.com/?utm_source=google&utm_medium=organic&utm_campaign=googlemybusiness",
+      "kind": "home"
+    },
+    {
+      "url": "https://www.bobyoungerimages.com/wedding-photographer.html",
+      "file": "page-wedding-photographer-html.txt"
+    },
+    {
+      "url": "https://www.bobyoungerimages.com/about.html",
+      "file": "page-about-html.txt"
+    },
+    {
+      "url": "https://www.bobyoungerimages.com/headshot-faq.html",
+      "file": "page-headshot-faq-html.txt"
+    }
+  ]
+}

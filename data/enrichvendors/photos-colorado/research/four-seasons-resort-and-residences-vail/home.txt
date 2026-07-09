@@ -1,0 +1,263 @@
+Four Seasons Resort Vail | Luxury Hotel & Ski Resort in Vail Village 
+SKIP TO MAIN CONTENT 
+All Hotels and Resorts Itinerary {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ":"An email with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ","An SMS with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ":"An SMS with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ","error.E0201":"We’re sorry, but the verification code you entered is not valid. Please try again.","error.E0202":"We’re sorry, but the verification code you entered has expired.","error.E0218":" {0} was not found in our records. Please try signing in with your Phone Number.","error.E0219":" {0} was not found in our records. Please try signing in with your Email Address.","error.E0232":"There was a problem processing your request. Please contact us for assistance."}' data-locale="en" data-css-class="Navigation-topBar-ProfileStatus">
+ English Español (Latino América) 简体中文 English 
+ Español (Latino América) 
+ 简体中文 
+Go to the Four Seasons home page 
+ Four Seasons Resort and Residences Vail Resort Overview 
+Accommodations 
+Villa & Residence Rentals 
+Offers 
+Experiences 
+Dining 
+Spa 
+Weddings 
+Meetings & Events 
+Seasonal 
+Services & Amenities 
+Après Ski 
+The Chalet 
+Photos & Videos 
+golf 
+Sustainability 
+Location 
+Contact Us 
+Extended Stays 
+Private Residences 
+More... 
+Check Rates 
+{1} .":"To add more than {0} rooms, please call {1} .","Toll Free Telephone Numbers By Country":"Toll Free Telephone Numbers By Country","A promo code cannot be applied with a flexible date search.":"A promo code cannot be applied with a flexible date search.","Are your dates flexible?":"Are your dates flexible?","View More Rates":"View More Rates","loading indicator":"loading indicator","Read More":"Read More","Sort by rate":"Sort by rate","Low to High":"Low to High","High to Low":"High to Low","Convert Currency":"Convert Currency","Accessible Rooms":"Accessible Rooms","Apply Filters":"Apply Filters","To Book this Room, Please Call":"To Book this Room, Please Call","Close":"Close","from":"from","Avg. per night":"Avg. per night","Select":"Select","Select Bed Options":"Select Bed Options","Selected Itinerary":"Selected Itinerary","Rate Details":"Rate Details","Free Night(s) Applied":"Free Night(s) Applied","Free Cancellation until":"Free Cancellation until","Non-refundable":"Non-refundable","Avg. price per night":"Avg. price per night","Total ${0} nights (taxes incl.)":"Total ${0} nights (taxes incl.)","Book Now":"Book Now","Please Note":"Please Note","Slide {0} is currently active":"Slide {0} is currently active","Show Slide {0}":"Show Slide {0}","Previous slide":"Previous slide","Next slide":"Next slide","View All":"View All","All-In-Pricing":"All-In-Pricing","All-in per night":"All-in per night","Find your destination":"Find your destination","Choose your dates":"Choose your dates","Add number of guests":"Add number of guests","Plan your stay":"Plan your stay","Update Selection":"Update Selection","Conditions":"Conditions","Included":"Included","Cancellation policy":"Cancellation policy","Terms & conditions":"Terms & conditions","View Terms & Conditions":"View Terms & Conditions","Bed Options":"Bed Options","Restricted.":"Restricted.","Unavailable.":"Unavailable.","Go Back":"Go Back","Next":"Next","Room 1":"Room 1","Room 2":"Room 2","Room 3":"Room 3","Room 4":"Room 4","Room {0}":"Room {0}","1 Adult ({0}+)":"1 Adult ({0}+)","{0} Adults ({1}+)":"{0} Adults ({1}+)","1 Adult":"1 Adult","{0} Adults":"{0} Adults","({0}+)":"({0}+)","1 Child ({0} - {1})":"1 Child ({0} - {1})","{0} Children ({1} - {2})":"{0} Children ({1} - {2})","1 Child":"1 Child","{0} Children":"{0} Children","({0} - {1})":"({0} - {1})"}' data-model-data='{"timezone":"America/Denver","openingDate":null}' data-component-name="CAW" data-disable-hide="" data-pp-mode="">
+Go to the Four Seasons home page 
+Check Rates 
+Menu 
+{0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ":"An email with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ","An SMS with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ":"An SMS with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ","error.E0201":"We’re sorry, but the verification code you entered is not valid. Please try again.","error.E0202":"We’re sorry, but the verification code you entered has expired.","error.E0218":" {0} was not found in our records. Please try signing in with your Phone Number.","error.E0219":" {0} was not found in our records. Please try signing in with your Email Address.","error.E0232":"There was a problem processing your request. Please contact us for assistance."}' data-locale="en" data-css-class="NavigationOverlay-ProfileStatus NavigationOverlay-ProfileStatus--topBar">
+Itinerary 
+ English Español (Latino América) 简体中文 English 
+ Español (Latino América) 
+ 简体中文 
+Close overlay 
+{0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ":"An email with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ","An SMS with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ":"An SMS with a 6-digit code was sent to {0} . Please enter the code in the fields shown. If you did not receive a verification code, you may need to register. ","error.E0201":"We’re sorry, but the verification code you entered is not valid. Please try again.","error.E0202":"We’re sorry, but the verification code you entered has expired.","error.E0218":" {0} was not found in our records. Please try signing in with your Phone Number.","error.E0219":" {0} was not found in our records. Please try signing in with your Email Address.","error.E0232":"There was a problem processing your request. Please contact us for assistance."}' data-locale="en" data-css-class="NavigationOverlay-ProfileStatus NavigationOverlay-ProfileStatus--profileSection">
+Go to the Four Seasons home page 
+Four Seasons Resort and Residences
+ Vail
+ Resort Overview 
+Accommodations 
+Villa & Residence Rentals 
+Offers 
+Experiences 
+Dining 
+Spa 
+Weddings 
+ Weddings 
+Venues 
+Packages 
+Planning 
+Honeymoons 
+Contact Us 
+Meetings & Events 
+ Meetings & Events 
+Meetings 
+Events 
+Incentive Travel 
+Corporate Retreats 
+Food & Beverage 
+Request Proposal 
+Seasonal 
+ seasonal 
+winter activities 
+Fourth of July 
+Summer Activities 
+thanksgiving 
+christmas 
+new year 
+Services & Amenities 
+Après Ski 
+The Chalet 
+Photos & Videos 
+golf 
+Sustainability 
+Location 
+Contact Us 
+Extended Stays 
+Private Residences 
+Global Homepage 
+ All Hotels and Resorts 
+Four Seasons Resort and Residences Vail
+ One Vail Road, Vail 
+ 1 (970) 477-8600 Location Contact Us 
+Previous slide Location 
+ Accommodations 
+ Photos & Videos 
+ Facilities & Amenities 
+ Dining 
+ Spa 
+Next slide 
+Four Seasons Resort and Residences Vail
+ One Vail Road, Vail 
+ 1 (970) 477-8600 Location Contact Us 
+Previous slide Location 
+ Accommodations 
+ Photos & Videos 
+ Facilities & Amenities 
+ Dining 
+ Spa 
+Next slide 
+Play or pause video 
+SCROLL TO DISCOVER MORE 
+ CHECK RATES 
+ Four Seasons Resort and Residences Vail
+ One Vail Road, Vail 
+ 1 (970) 477-8600 Location Contact Us 
+ Location 
+ Accommodations 
+ Photos & Videos 
+ Facilities & Amenities 
+ Dining 
+ Spa 
+Location 
+ Accommodations 
+ Photos & Videos 
+ Facilities & Amenities 
+ Dining 
+ Spa 
+Welcome to Vail Village, Where Understated Luxury Meets Mountain Beauty
+Steeped in rich history and the ski culture of the American West, Vail, Colorado continues to be one of the most iconic mountain destinations in the United States. After a day of skiing or hiking, retreat into an oasis of relaxation at our Vail Village luxury hotel and resort. Boasting 300 days of sunshine every year, Four Seasons Resort and Residences Vail is widely recognized as the mountain resort of choice for travellers and the crown jewel of Colorado’s Rocky Mountains.
+Accommodations
+Blanca Two-Bedroom Presidential Suite
+Unwind in elevated luxury in this stylish two-bedroom suite, nestled on the top floor of our luxury Resort. Enjoy breathtaking mountain views of Vail, along with the warmth of cozy gas-burning stone fireplaces in the separate living areas and bedrooms. Your stay includes complimentary daily in-room breakfast, laundry service, a fully stocked MyBar and elevated bath amenities – enhancing every moment with comfort and indulgence.
+ Check Rates Details 
+Poppyfields | Four-Bedroom Residence
+Experience alpine elegance at its finest. Perfect for multi-generational families or groups of friends, this four-bedroom Private Residence offers a cosy retreat with all the comforts of home. Gather around the open kitchen and fireplace to make lasting memories, or step outside on your private balconies to enjoy the breathtaking views of Vail Mountain. Embrace the extraordinary and discover a curated selection of thoughtful offerings designed to foster connection, adventure and unforgettable memories.
+ Check Rates Details 
+Premier Room
+Experience cosy living with partial scenic mountain views in our Premier Rooms. Equipped with gas-burning stone fireplaces, standalone coffee bars and walk-in closets, most also feature a furnished private balcony or terrace.
+ Check Rates Details 
+Executive Suite
+Our Executive Suites are ideal for couples or small families looking for a little extra room during their Vail getaway. These suites, located on the garden level, feature a separate bedroom with a gas-burning stone fireplace and cosy yet contemporary décor.
+ Check Rates Details 
+Resort Room
+Step into comfort and relax in style when staying in our Resort Rooms. Featuring gas-burning stone fireplaces, standalone coffee bars and walk-in closets, most accommodations open to a furnished private balcony or terrace.
+ Check Rates Details 
+Previous slide 1 / 5 
+ Next slide 
+Blanca Two-Bedroom Presidential Suite
+Poppyfields | Four-Bedroom Residence
+Premier Room
+Executive Suite
+Resort Room
+Previous slide 1 / 5 
+ Next slide 
+Featured Offers
+ All Offers 
+Experience More – Spending Credit
+ Experience something unforgettable with a spending credit designed to elevate your stay.
+ view offer 
+Advance Purchase – Up to 20% Off
+ Enjoy up to 20% off our Room Rate when you book your stay in advance.
+ view offer 
+Stay Longer – Fourth Night Free
+ Receive a complimentary fourth night.
+ view offer 
+Colorado Residents Offer
+ Colorado residents are invited to enjoy 20% to 50% off their stay, a Resort credit and valet parking.
+ view offer 
+Featured Offers
+Experience More – Spending Credit
+ Experience something unforgettable with a spending credit designed to elevate your stay.
+ view offer 
+Advance Purchase – Up to 20% Off
+ Enjoy up to 20% off our Room Rate when you book your stay in advance.
+ view offer 
+Stay Longer – Fourth Night Free
+ Receive a complimentary fourth night.
+ view offer 
+Colorado Residents Offer
+ Colorado residents are invited to enjoy 20% to 50% off their stay, a Resort credit and valet parking.
+ view offer 
+All Offers 
+Discover Vail
+Rafting and ATV Adventure
+ 8 hours 
+ Jun 1 - Aug 15 
+Join us for an epic river trip on the Rancho stretch of the Colorado River. On this trip, you&#x27;ll experience a stunning remote canyon, fun swimming opportunities and a historic homestead walk. Next, ascend to our private 6,000-acre mountain escape, gearing up with goggles, bandanas and helmets before heading to the Four Seasons lookout point. Enjoy a gourmet lunch, lawn games and sweeping views of the New York and Mosquito Ranges. Relax in a private viewing pod before calling your guide for the next adventure. Your afternoon will unfold with a two-hour tour of the pristine, private mountain, where lush meadows, wildflowers, lakes and wildlife create an unforgettable landscape. Wrap up at our check-in cabin before returning to the Resort, where a well-earned cocktail awaits. A private photographer will be on-site to capture both adventures, ensuring a collection of unforgettable moments. Expect 150 to 200 professionally taken and edited photos, delivered via link the next day.
+Ziplining Adventure
+ 4 hours 
+ Jun 1 - Sep 30 2026 
+Immerse yourself in the pristine beauty of the Colorado mountains with a ziplining adventure at Four Seasons Resort and Residences Vail. Soar over Alkali Canyon while enjoying views of lush forests and rivers. This excursion features light hiking through scenic terrain – with the longest trek lasting approximately five minutes – and offers an optional "Canyon Plunge" for those seeking a thrilling finish to their mountain journey.
+Whitewater Rafting
+ 2 hours 
+ May 22 - Aug 1 2026 
+Whitewater rafting the Colorado River&#x27;s Shoshone stretch is perfect for visitors to the Vail area. This trip will take you through the gorgeous Glenwood Canyon, where rock walls tower above the river. This trip offers class III rapids and considered a moderate trip for ages 8+. Not a fan of rapids, or does someone in your group not meet the minimum age requirements? These guests can skip the class III rapid but still join the in on the scenic float section of the trip and remain with their group through to the takeout.
+Discover More 
+Vail by Four Seasons
+Enjoy Laps of Luxury at our Mountain Resort Pool
+ Nothing recharges the body after a day on the mountain like a dip in our year-round heated pool and hot tubs, one of the many exclusive benefits afforded to overnight guests of Four Seasons Resort and Residences Vail. Relax and recover with a wide variety of healing massages at our Spa or reconnect with your family while roasting s’mores at the grand outdoor fireplace.
+Enjoy Laps of Luxury at our Mountain Resort Pool
+ Nothing recharges the body after a day on the mountain like a dip in our year-round heated pool and hot tubs, one of the many exclusive benefits afforded to overnight guests of Four Seasons Resort and Residences Vail. Relax and recover with a wide variety of healing massages at our Spa or reconnect with your family while roasting s’mores at the grand outdoor fireplace.
+Details 
+Previous slide 1 / 5 Next slide 
+All Day Après
+ Experience the ultimate alpine après-ski at our Resort with our famous Haute Chocolate, set against the backdrop of Vail Mountain. Indulge in year-round après in a variety of gorgeous social settings at Four Seasons Resort and Residences Vail: With our world-famous Haute Chocolate and cocktails at The Remedy, Northern Italy inspired dining at Tavernetta Vail, or a glass of champagne from the comfort or your room’s private balcony, your après experience awaits.
+All Day Après
+ Experience the ultimate alpine après-ski at our Resort with our famous Haute Chocolate, set against the backdrop of Vail Mountain. Indulge in year-round après in a variety of gorgeous social settings at Four Seasons Resort and Residences Vail: With our world-famous Haute Chocolate and cocktails at The Remedy, Northern Italy inspired dining at Tavernetta Vail, or a glass of champagne from the comfort or your room’s private balcony, your après experience awaits.
+Details 
+Previous slide 2 / 5 Next slide 
+A High-Altitude Round of Golf
+ Vail Valley is home to a range of golf courses including Red Sky Golf Club, the municipal course at Vail Golf Club, EagleVail Golf Club, Eagle Ranch Golf Club and the Gypsum Creek Golf Course. Our Resort has also partnered with Colorado’s world-renowned The Steadman Clinic and Steadman Philippon Research Institute (SPRI) to offer a series of uniquely tailored, advanced performance Golf Programs for guests.
+A High-Altitude Round of Golf
+ Vail Valley is home to a range of golf courses including Red Sky Golf Club, the municipal course at Vail Golf Club, EagleVail Golf Club, Eagle Ranch Golf Club and the Gypsum Creek Golf Course. Our Resort has also partnered with Colorado’s world-renowned The Steadman Clinic and Steadman Philippon Research Institute (SPRI) to offer a series of uniquely tailored, advanced performance Golf Programs for guests.
+Details 
+Previous slide 3 / 5 Next slide 
+ENDLESS OUTDOOR ADVENTURE WITH THE CHALET
+ The Chalet provides exclusive access to our Four Seasons Chalet Concierge services in the heart of Vail Village, steps from Gondola One and the Vail Mountain ticketing counter.
+ENDLESS OUTDOOR ADVENTURE WITH THE CHALET
+ The Chalet provides exclusive access to our Four Seasons Chalet Concierge services in the heart of Vail Village, steps from Gondola One and the Vail Mountain ticketing counter.
+View Details 
+Previous slide 4 / 5 Next slide 
+Private Jets and Scheduled Service into Vail
+ Streamline your arrival into Vail with a private jet flight or direct scheduled service into Eagle County Regional Airport (EGE), a quick 45-minute drive from Vail Village and the most convenient way to maximize one’s time in the Colorado Rockies.
+Private Jets and Scheduled Service into Vail
+ Streamline your arrival into Vail with a private jet flight or direct scheduled service into Eagle County Regional Airport (EGE), a quick 45-minute drive from Vail Village and the most convenient way to maximize one’s time in the Colorado Rockies.
+Details 
+Previous slide 5 / 5 Next slide 
+Previous slide 1 / 5 Next slide 
+Concierge SOAK UP 300 DAYS OF COLORADO SUNSHINE
+ Allow our concierge team to create extraordinary outdoor activities only available on Vail Mountain, in the heart of the Colorado Rockies.
+Contact Our Concierge to Book 
+Vail’s stunning mountain views, quaint European-inspired alpine village and endless activities have guests and families returning year after year. Whether you are drawn to high adrenaline adventure or more leisurely pursuits like the après-ski scene and world-class shopping, there is something for everyone in Vail.
+ Anna Folaros Resort Manager 
+About
+ About Us 
+ Four Seasons for Good 
+ Health and Safety 
+ Careers 
+ Contact Us 
+Reservations
+ Request an Invoice 
+ Find a Reservation 
+ Email Preferences 
+News
+ Press Room 
+ New Openings 
+ Magazine 
+ Newsletter 
+More
+ Private Jet 
+ Yachts 
+ Residences 
+ Villa & Residence Rentals 
+ Gift Cards 
+facebook 
+ instagram 
+ youtube 
+ English Español (Latino América) 简体中文 English 
+ Español (Latino América) 
+ 简体中文 
+Legal Notice 
+ Privacy Notice 
+ Accessibility Policy 
+ Modern Slavery Statement 
+ ©Four Seasons Hotels Limited 1997-2026. All Rights Reserved.
+请注意，您即将跳转至四季酒店在中国境外运营的网站。
+ 明白

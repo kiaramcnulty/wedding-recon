@@ -1,0 +1,80 @@
+{
+  "vendor_id": "3852f841-19c3-4d00-842f-4f71763bb2e5",
+  "name": "Real Life Photographs",
+  "city": "Ridgway",
+  "website": "https://reallifephotographs.com/",
+  "place_id": "ChIJiRfWm6k7P4cRGHiYunOqoNU",
+  "fetched_at": "2026-07-09T07:48:18.949Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 9,
+    "websiteUri": "https://reallifephotographs.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2025-09",
+        "text": "Kaycee was a breath of fresh air. Not only is she an excellent photographer, she is also a lovely person inside and out. She asked many great questions to maximize my expectations for the day and far exceeded those. I would highly recommend Kaycee for your wedding or any event that is important to you."
+      },
+      {
+        "rating": 5,
+        "when": "2026-03",
+        "text": "My family and I have had the pleasure of working with Kaycee many times -- she has captured countless milestones and memories (both human and fur-baby), and we treasure the photographs she has taken. Kaycee's creativity and ability to nurture an atmosphere of comfort and fun is truly unrivaled in my experience. Her work reflects her unique point of view and voice -- one that she has honed during her 20 years in the business. She exudes warmth, openness and precise professionalism. There's no one I'd rather work with to preserve my precious memories -- thank you, Kaycee. xoxo"
+      },
+      {
+        "rating": 5,
+        "when": "2025-12",
+        "text": "Such an amazing experience!!\nKaycee creates such a wonderful and supportive environment where I felt comfortable and confident! It was such a fun time shooting with her and her experience and talent is amazing!"
+      },
+      {
+        "rating": 5,
+        "when": "2025-12",
+        "text": "Kaycee is incredibly talented and truly takes the time to get it right. Beyond her skill, she’s also genuinely kind, which makes the entire experience easy and enjoyable. It was a pleasure working with her, and I couldn’t be happier with the photos. I recommend Kaycee 100%."
+      },
+      {
+        "rating": 5,
+        "when": "2025-05",
+        "text": "Kaycee is one of the most genuine, kind and talented photographers!!! As a longtime local to the Telluride area, she knows the ins and outs of where to go and when for beautiful views and amazing images! I also really love her studio series, she’s one of the only Photography Studios in the area. Her ability to bring out a person‘s character and personality through an image is incredible! You’ll be in great hands if you hire Kaycee!"
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://image4.photobiz.com/8911/27_20240817203045_8373670_large.jpg",
+    "https://image6.photobiz.com/8933/27_20240612102328_8318616_large.png",
+    "https://image4.photobiz.com/8911/27_20240817203045_8373670_xlarge.jpg",
+    "https://image8.photobiz.com/8585/27_20240817200539_8373667_xlarge.jpg",
+    "https://image12.photobiz.com/7732/27_20240817203440_8373671_xlarge.jpg",
+    "https://image7.photobiz.com/8912/27_20240818171740_8374227_xlarge.jpg",
+    "https://image11.photobiz.com/8586/27_20240818171742_8374228_xlarge.jpg",
+    "https://image7.photobiz.com/8912/27_20240818171743_8374229_xlarge.jpg",
+    "https://image3.photobiz.com/8929/27_20240531115239_8303631_xlarge.jpg",
+    "https://image3.photobiz.com/8929/27_20240531115225_8303628_xlarge.jpg",
+    "https://image9.photobiz.com/8584/27_20240531115131_8303618_xlarge.jpg",
+    "https://image3.photobiz.com/8929/27_20240531115201_8303623_xlarge.jpg",
+    "https://image9.photobiz.com/8584/27_20240531115221_8303627_xlarge.jpg",
+    "https://www.reallifephotographs.com/global/images/placeholder_1px.png",
+    "https://image3.photobiz.com/8929/27_20240819143111_8374908_large.jpg",
+    "https://image3.photobiz.com/8929/27_20240819143111_8374908_xlarge.jpg",
+    "https://image8.photobiz.com/8585/27_20240818173045_8374325_large.jpg",
+    "https://image8.photobiz.com/8585/27_20240818173045_8374325_xlarge.jpg",
+    "https://image3.photobiz.com/175/27_20171212102354_5896618_large.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://www.reallifephotographs.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://www.reallifephotographs.com/about",
+      "file": "page-about.txt"
+    },
+    {
+      "url": "https://www.reallifephotographs.com/weddings",
+      "file": "page-weddings.txt"
+    },
+    {
+      "url": "https://www.reallifephotographs.com/home/booking-your-sessions",
+      "file": "page-home-booking-your-sessions.txt"
+    }
+  ]
+}

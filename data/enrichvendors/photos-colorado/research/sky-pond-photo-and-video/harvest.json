@@ -1,0 +1,70 @@
+{
+  "vendor_id": "e176fe36-52dd-43f3-b3a8-bf167c5154c8",
+  "name": "Sky Pond Photo & Video",
+  "city": "Estes Park",
+  "website": "http://skypondphotovideo.com/",
+  "place_id": "ChIJQRd2h5xlaYcRr0FDbUsTCSI",
+  "fetched_at": "2026-07-09T07:44:48.534Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 117,
+    "websiteUri": "http://skypondphotovideo.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2025-09",
+        "text": "If you are planning a trip to Estes Park, and want to have pictures taken. I have the man for you Sky Pond Photo & Videos. Alex is an amazing photographer. 20 plus yrs of experience. Any occasion, and his prices are reasonable. Me and My Husband used Alex when we done our Wedding Shoot in Estes Park (Marina Park) what a Beautiful Place it is. Alex made our shoot, fun, relaxing, and stress free. We were able just to be our selfs and he caught these beautiful moments for us. In Our Book Alex is a Number 1 Photographer.\n\nOnce again I have to say thank you Alex for everything you have done for Donald and I. We loved our experience with you and can’t wait to come back. You will be my first call to capture our next beautiful moments!!!!!"
+      },
+      {
+        "rating": 5,
+        "when": "2025-10",
+        "text": "Alex did fantastic work for us at all stages of the process. I was scheduling a family reunion that ended up having more moving pieces than anticipated. We were staying at the Wind River Lodge and the location he for his photoshoots was beautiful and convenient. Before our photo session, Alex communicated frequently and clearly. During the session, he was flexible while clearly and efficiently getting us posed and taking a lot of photos. After the session, he again communicated frequently about the status of editing on our photos. Most importantly, the photos were great! I highly recommend Alex and Sky Pond!"
+      },
+      {
+        "rating": 5,
+        "when": "2026-05",
+        "text": "Alex was absolutely AMAZING!! My now fiancé planned “couples photos” which turned out to be our proposal/engagements. Alex was very professional and kind and the pictures turned out amazing! I couldn’t be happier with the results!! Thank you for capturing our special moment ❤️"
+      },
+      {
+        "rating": 5,
+        "when": "2026-05",
+        "text": "We had the pleasure of working with Alex with Sky Pond Photography during our vacation in Estes Park, and the entire experience exceeded our expectations. From the moment we met, Alex made our family feel comfortable and truly able to enjoy the moment.\n\nThe session was fun and beautifully captured the scenery and spirit of our time in RMNP. Alex took us to 2 incredible locations for our photo shoot, a grove of Aspen & Ponderosa pine trees, as well as Moraine Park. The photos turned out absolutely stunning.\n\nIf you are looking for a talented and friendly photographer in Estes Park, we highly recommend Sky Pond. We are so grateful to have these special memories captured so perfectly!"
+      },
+      {
+        "rating": 5,
+        "when": "2026-05",
+        "text": "I shot my proposal photos and my engagement photos with Alex, and where do I start?! As a professional photographer and videographer myself I had high standards. Everything from planning my ideas to surprising my now Fiancé with “couples photos,” turned into getting down on one knee, went flawlessly. Alex took us to some absolutely breathtaking locations, knew how to be super flexible with the weather, and took the time to make sure every shot mattered. Lots of photographers just hold down the button and hope one turns out great but Alex made sure every shot was intentional. I just received the photos and am blown away. If you want someone who cares, is highly skilled in their craft, and will make your dream images come to life, Sky Pond is the business for you. Thank you for everything."
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://skypondphotovideo.com/wp-content/uploads/2015/10/WeddingImageHomePage-V2-1000x666.jpg",
+    "https://skypondphotovideo.com/wp-content/uploads/2015/10/PhotoGallery-Weddings-Video-1000x666.jpg",
+    "https://skypondphotovideo.com/wp-content/uploads/2019/04/PhotoGallery-About-V2-1000x666.jpg",
+    "https://skypondphotovideo.com/wp-content/uploads/2018/09/PhotoGallery-Lodging-and-Businesses-1000x666.jpg",
+    "https://skypondphotovideo.com/wp-content/uploads/2015/10/PhotoGallery-BusinessServices-Lodging-V3-1000x666.jpg"
+  ],
+  "pages": [
+    {
+      "url": "http://skypondphotovideo.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://skypondphotovideo.com/estes-park-colorado-wedding-photos-and-videos/",
+      "file": "page-estes-park-colorado-wedding-photos-and-v.txt"
+    },
+    {
+      "url": "https://skypondphotovideo.com/about/",
+      "file": "page-about.txt"
+    },
+    {
+      "url": "https://skypondphotovideo.com/weddings/",
+      "file": "page-weddings.txt"
+    },
+    {
+      "url": "https://skypondphotovideo.com/business-services/",
+      "file": "page-business-services.txt"
+    }
+  ]
+}

@@ -1,0 +1,3132 @@
+[
+  {
+    "name": "Alex Benavidez",
+    "vendor_id": "ca73a27f-dfa9-4bb0-9dec-e46b8b8bb23b",
+    "slug": "alex-benavidez",
+    "city": null,
+    "bot": "bot1",
+    "month": 9,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "Colorado Photography Squad",
+    "vendor_id": "f71a0118-fb4b-43dc-9aec-afb217d08079",
+    "slug": "colorado-photography-squad",
+    "city": null,
+    "bot": "bot2",
+    "month": 10,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "Jordan Gresham Photography",
+    "vendor_id": "d2a8d9ff-abe9-4558-953a-3d0b2410e28a",
+    "slug": "jordan-gresham-photography",
+    "city": null,
+    "bot": "bot3",
+    "month": 5,
+    "year": 2026,
+    "call": 1
+  },
+  {
+    "name": "Nick Sparks Photography",
+    "vendor_id": "5d2957f4-3e95-4f6e-afa2-dcc1ca78a01d",
+    "slug": "nick-sparks-photography",
+    "city": null,
+    "bot": "bot4",
+    "month": 7,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "Rebecca Milan Photography",
+    "vendor_id": "309fa837-ee3d-4aed-8db5-5132168ce78a",
+    "slug": "rebecca-milan-photography",
+    "city": null,
+    "bot": "bot5",
+    "month": 1,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "Emily May Photo",
+    "vendor_id": "4185b543-01d1-4ea4-bbc6-3c9ea3d68d1a",
+    "slug": "emily-may-photo",
+    "city": null,
+    "bot": "bot6",
+    "month": 3,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "Francis Sylvest",
+    "vendor_id": "5a6e7c92-e814-44af-b728-40e632afc71d",
+    "slug": "francis-sylvest",
+    "city": "Boulder",
+    "bot": "bot7",
+    "month": 4,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "Hennessy Photo Co",
+    "vendor_id": "7fd52247-4f18-4c23-9039-15260a966b71",
+    "slug": "hennessy-photo-co",
+    "city": null,
+    "bot": "bot8",
+    "month": 3,
+    "year": 2026,
+    "call": 1
+  },
+  {
+    "name": "Love & Lens",
+    "vendor_id": "6538f389-333b-410e-a931-a7fefd7a6489",
+    "slug": "love-and-lens",
+    "city": null,
+    "bot": "bot9",
+    "month": 1,
+    "year": 2026,
+    "call": 1
+  },
+  {
+    "name": "Samuel Marz",
+    "vendor_id": "8bbf6166-79d4-44d9-848d-50d869b15e95",
+    "slug": "samuel-marz",
+    "city": "Fort Collins",
+    "bot": "bot10",
+    "month": 5,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "Sasha Amelie / Amelie Photos",
+    "vendor_id": "b7062a61-2bb4-4b53-8053-50d609ad62c4",
+    "slug": "sasha-amelie-amelie-photos",
+    "city": null,
+    "bot": "bot11",
+    "month": 7,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "BlueSpruce Photography",
+    "vendor_id": "d1456738-0c29-4f16-9031-8b159fd5142a",
+    "slug": "bluespruce-photography",
+    "city": null,
+    "bot": "bot12",
+    "month": 2,
+    "year": 2026,
+    "call": 1
+  },
+  {
+    "name": "Cassandra Summer Photography",
+    "vendor_id": "3b5020a1-3b5e-4481-bd82-fbbe0184523d",
+    "slug": "cassandra-summer-photography",
+    "city": null,
+    "bot": "bot13",
+    "month": 2,
+    "year": 2025,
+    "call": 1
+  },
+  {
+    "name": "Emma Rose Photography",
+    "vendor_id": "42d38d4d-d991-47ba-a2f4-a22cd220e7e5",
+    "slug": "emma-rose-photography",
+    "city": null,
+    "bot": "bot14",
+    "month": 1,
+    "year": 2026,
+    "call": 1
+  },
+  {
+    "name": "Lauren Crumpler Photo",
+    "vendor_id": "a426e60d-bce3-4c48-8a8b-1aa9483cab1a",
+    "slug": "lauren-crumpler-photo",
+    "city": null,
+    "bot": "bot15",
+    "month": 2,
+    "year": 2026,
+    "call": 1
+  },
+  {
+    "name": "Samantha Dixon Photography",
+    "vendor_id": "74c3e4a8-94d2-41c3-92fa-2852cd23764e",
+    "slug": "samantha-dixon-photography",
+    "city": null,
+    "bot": "bot16",
+    "month": 6,
+    "year": 2025,
+    "call": 2
+  },
+  {
+    "name": "Spenser C Photography",
+    "vendor_id": "9e5183bd-2ca2-4632-bacf-800e4beb8847",
+    "slug": "spenser-c-photography",
+    "city": null,
+    "bot": "bot17",
+    "month": 3,
+    "year": 2025,
+    "call": 2
+  },
+  {
+    "name": "Taylor Nicole Photography",
+    "vendor_id": "095ff032-ba99-45f0-ae6b-db75a479a85f",
+    "slug": "taylor-nicole-photography",
+    "city": null,
+    "bot": "bot1",
+    "month": 4,
+    "year": 2026,
+    "call": 2
+  },
+  {
+    "name": "11:11 Productions Photography",
+    "vendor_id": "6e8073cc-5d2e-485a-a97d-c9a385bcf6bc",
+    "slug": "11-11-productions-photography",
+    "city": "Boulder",
+    "bot": "bot2",
+    "month": 7,
+    "year": 2025,
+    "call": 2
+  },
+  {
+    "name": "Aamodt Studio",
+    "vendor_id": "b7b2e7e7-65ca-4d57-9c97-2fd36d94e0d2",
+    "slug": "aamodt-studio",
+    "city": "Estes Park",
+    "bot": "bot3",
+    "month": 3,
+    "year": 2026,
+    "call": 2
+  },
+  {
+    "name": "Abbi Pittman Photography",
+    "vendor_id": "965c25f6-0948-4173-a8de-d2ca42cd0251",
+    "slug": "abbi-pittman-photography",
+    "city": "Durango",
+    "bot": "bot4",
+    "month": 1,
+    "year": 2025,
+    "call": 2
+  },
+  {
+    "name": "Abie Livesay Photography",
+    "vendor_id": "edd28499-ae86-47c1-8f77-6d90b967205d",
+    "slug": "abie-livesay-photography",
+    "city": "Telluride",
+    "bot": "bot5",
+    "month": 8,
+    "year": 2025,
+    "call": 2
+  },
+  {
+    "name": "Above Alpine Photography",
+    "vendor_id": "8211a8a9-d232-4d7d-9839-8c1c6f3a9d6d",
+    "slug": "above-alpine-photography",
+    "city": "Grand Junction",
+    "bot": "bot6",
+    "month": 4,
+    "year": 2025,
+    "call": 2
+  },
+  {
+    "name": "Addie Knott Photography",
+    "vendor_id": "2fff4859-e340-4fa1-84c0-4f26d5364a0a",
+    "slug": "addie-knott-photography",
+    "city": "Severance",
+    "bot": "bot7",
+    "month": 3,
+    "year": 2025,
+    "call": 2
+  },
+  {
+    "name": "Adventure Amore",
+    "vendor_id": "5a82085c-509e-4eaf-ad2b-a4dab4b73312",
+    "slug": "adventure-amore",
+    "city": "Denver",
+    "bot": "bot8",
+    "month": 4,
+    "year": 2026,
+    "call": 2
+  },
+  {
+    "name": "Aelpha Collective | Photography and Video",
+    "vendor_id": "99032305-347d-4673-a64c-7f04731738a1",
+    "slug": "aelpha-collective-photography-and-video",
+    "city": "Durango",
+    "bot": "bot9",
+    "month": 1,
+    "year": 2026,
+    "call": 2
+  },
+  {
+    "name": "Aesthetic Collective",
+    "vendor_id": "27e85de8-bdb7-4c48-a464-c98aee9eed15",
+    "slug": "aesthetic-collective",
+    "city": "Grand Junction",
+    "bot": "bot10",
+    "month": 5,
+    "year": 2026,
+    "call": 2
+  },
+  {
+    "name": "Aether Photo & Films",
+    "vendor_id": "dc8073e7-aa4e-41db-889f-dad7019f35ba",
+    "slug": "aether-photo-and-films",
+    "city": "Telluride",
+    "bot": "bot11",
+    "month": 5,
+    "year": 2026,
+    "call": 2
+  },
+  {
+    "name": "Alexi Hubbell Photography",
+    "vendor_id": "17d0fca7-b2b9-4509-93ff-4030c727aa4c",
+    "slug": "alexi-hubbell-photography",
+    "city": "Durango",
+    "bot": "bot12",
+    "month": 3,
+    "year": 2026,
+    "call": 2
+  },
+  {
+    "name": "Alive Studios Photography",
+    "vendor_id": "1ee22de7-d958-4920-b533-d3b67b26123d",
+    "slug": "alive-studios-photography",
+    "city": "Boulder",
+    "bot": "bot13",
+    "month": 3,
+    "year": 2025,
+    "call": 2
+  },
+  {
+    "name": "Allison Ragsdale Photography",
+    "vendor_id": "226a5022-f899-4529-85ce-3680d1bfe72f",
+    "slug": "allison-ragsdale-photography",
+    "city": "Durango",
+    "bot": "bot14",
+    "month": 11,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Alton Richardson Studios | Boulder Wedding Photographer",
+    "vendor_id": "027d6b95-56b5-496e-a766-66a7de46c5a4",
+    "slug": "alton-richardson-studios-boulder-wedding-photographer",
+    "city": "Boulder",
+    "bot": "bot15",
+    "month": 5,
+    "year": 2026,
+    "call": 3
+  },
+  {
+    "name": "Amanda Matilda Photography",
+    "vendor_id": "67ca2f64-301b-47f5-be11-616fff777987",
+    "slug": "amanda-matilda-photography",
+    "city": "Grand Junction",
+    "bot": "bot16",
+    "month": 6,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Andrea Stark Photography",
+    "vendor_id": "86ab9261-aaf9-4067-ba01-77fa78b3b57e",
+    "slug": "andrea-stark-photography",
+    "city": "Breckenridge",
+    "bot": "bot17",
+    "month": 9,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Antler Run Photography",
+    "vendor_id": "8a8b6a26-d46d-461e-a09a-525a00b47c89",
+    "slug": "antler-run-photography",
+    "city": "Littleton",
+    "bot": "bot1",
+    "month": 7,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Ash Marie Photography",
+    "vendor_id": "2a525b93-4e5f-488b-9001-f81ad91830ea",
+    "slug": "ash-marie-photography",
+    "city": "Erie",
+    "bot": "bot2",
+    "month": 2,
+    "year": 2026,
+    "call": 3
+  },
+  {
+    "name": "Austin James Photography",
+    "vendor_id": "3e6fef5f-7343-464d-9349-67830329c21d",
+    "slug": "austin-james-photography",
+    "city": "Denver",
+    "bot": "bot3",
+    "month": 4,
+    "year": 2026,
+    "call": 3
+  },
+  {
+    "name": "Authentic Moments Media",
+    "vendor_id": "6fea9902-2aca-4b71-864f-660925086d52",
+    "slug": "authentic-moments-media",
+    "city": "Fort Collins",
+    "bot": "bot4",
+    "month": 2,
+    "year": 2026,
+    "call": 3
+  },
+  {
+    "name": "Authentic Moments Photography",
+    "vendor_id": "3b631b73-e81d-49b7-b324-410d53bc6c6f",
+    "slug": "authentic-moments-photography",
+    "city": "Centennial",
+    "bot": "bot5",
+    "month": 3,
+    "year": 2026,
+    "call": 3
+  },
+  {
+    "name": "Be Boulder Photography",
+    "vendor_id": "c306dcc8-d80a-454a-be92-a834987b5f67",
+    "slug": "be-boulder-photography",
+    "city": "Boulder",
+    "bot": "bot6",
+    "month": 3,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Beaton Photography",
+    "vendor_id": "071af957-edc2-4a2c-9662-f1082887ffb9",
+    "slug": "beaton-photography",
+    "city": "Boulder",
+    "bot": "bot7",
+    "month": 2,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Belleview Weddings & Events",
+    "vendor_id": "be37790e-9d72-4ae2-881c-60e3d842d253",
+    "slug": "belleview-weddings-and-events",
+    "city": "Crested Butte",
+    "bot": "bot8",
+    "month": 8,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Blue Spruce Photography",
+    "vendor_id": "cf5f5f1a-23e7-4141-9561-f916e6c1116b",
+    "slug": "blue-spruce-photography",
+    "city": "Lakewood",
+    "bot": "bot9",
+    "month": 6,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Bob Younger Images",
+    "vendor_id": "9b92adbb-d33b-4721-b591-ad06ebc6fd35",
+    "slug": "bob-younger-images",
+    "city": "Fort Collins",
+    "bot": "bot10",
+    "month": 7,
+    "year": 2025,
+    "call": 3
+  },
+  {
+    "name": "Boho Chic Boudoir by Kara Cavalca",
+    "vendor_id": "a4c8c9a1-ff51-4ad2-a7c5-848896bccc20",
+    "slug": "boho-chic-boudoir-by-kara-cavalca",
+    "city": "Durango",
+    "bot": "bot11",
+    "month": 1,
+    "year": 2026,
+    "call": 3
+  },
+  {
+    "name": "Bonnie Photo",
+    "vendor_id": "0229fa2d-8623-44e5-9a7d-990793db0299",
+    "slug": "bonnie-photo",
+    "city": "Erie",
+    "bot": "bot12",
+    "month": 9,
+    "year": 2025,
+    "call": 4
+  },
+  {
+    "name": "Bound for the Mountains",
+    "vendor_id": "49ef1958-c1de-4211-912d-914e8b66aff1",
+    "slug": "bound-for-the-mountains",
+    "city": "Breckenridge",
+    "bot": "bot13",
+    "month": 9,
+    "year": 2025,
+    "call": 4
+  },
+  {
+    "name": "Breckenridge Photographers",
+    "vendor_id": "6a3a4591-f474-4f56-885f-80a2a8796762",
+    "slug": "breckenridge-photographers",
+    "city": "Breckenridge",
+    "bot": "bot14",
+    "month": 8,
+    "year": 2025,
+    "call": 4
+  },
+  {
+    "name": "Breckenridge Photographics",
+    "vendor_id": "4968e059-d2d2-4b82-83f5-6f34f9c5ef28",
+    "slug": "breckenridge-photographics",
+    "city": "Breckenridge",
+    "bot": "bot15",
+    "month": 7,
+    "year": 2025,
+    "call": 4
+  },
+  {
+    "name": "Breckenridge Portrait Company",
+    "vendor_id": "456a62d4-8a36-4223-b61d-a04db395ed7f",
+    "slug": "breckenridge-portrait-company",
+    "city": "Breckenridge",
+    "bot": "bot16",
+    "month": 2,
+    "year": 2026,
+    "call": 4
+  },
+  {
+    "name": "Brenna Nicole Photography",
+    "vendor_id": "a73e1b4c-56d9-4720-959d-8d4c288867ed",
+    "slug": "brenna-nicole-photography",
+    "city": "Lone Tree",
+    "bot": "bot17",
+    "month": 5,
+    "year": 2025,
+    "call": 4
+  },
+  {
+    "name": "briadair.jpeg",
+    "vendor_id": "bb7f786c-307e-448a-9fa5-a319b6b92fb7",
+    "slug": "briadair-jpeg",
+    "city": "Littleton",
+    "bot": "bot1",
+    "month": 8,
+    "year": 2025,
+    "call": 4
+  },
+  {
+    "name": "Bright Birch Films",
+    "vendor_id": "d16553f5-2565-4a96-a8f4-3585ea1bfba9",
+    "slug": "bright-birch-films",
+    "city": "Colorado Springs",
+    "bot": "bot2",
+    "month": 2,
+    "year": 2025,
+    "call": 4
+  },
+  {
+    "name": "Camara Photography, LLC",
+    "vendor_id": "86e75ed4-8591-465d-aaae-6b64dcaa692e",
+    "slug": "camara-photography-llc",
+    "city": "Colorado Springs",
+    "bot": "bot3",
+    "month": 1,
+    "year": 2025,
+    "call": 4
+  },
+  {
+    "name": "Candace Cross Photography",
+    "vendor_id": "7bae1ed6-6268-4ebe-8e70-d28a9d09d7c6",
+    "slug": "candace-cross-photography",
+    "city": "Durango",
+    "bot": "bot4",
+    "month": 6,
+    "year": 2026,
+    "call": 4
+  },
+  {
+    "name": "Candid Studios Photography & Videography - Colorado Springs",
+    "vendor_id": "b83db0dc-a268-4fe1-b4fc-2c1a96f65742",
+    "slug": "candid-studios-photography-and-videography-colorado-springs",
+    "city": "Colorado Springs",
+    "bot": "bot5",
+    "month": 4,
+    "year": 2026,
+    "call": 4
+  },
+  {
+    "name": "Candid Studios Photography & Videography - Fort Collins",
+    "vendor_id": "220cea63-f3ec-4e08-a92c-7470939495d7",
+    "slug": "candid-studios-photography-and-videography-fort-collins",
+    "city": "Fort Collins",
+    "bot": "bot6",
+    "month": 1,
+    "year": 2026,
+    "call": 4
+  },
+  {
+    "name": "Carissa Marie Photography",
+    "vendor_id": "2b93d350-472a-4c20-a2d1-830d9935403a",
+    "slug": "carissa-marie-photography",
+    "city": "Ouray",
+    "bot": "bot7",
+    "month": 6,
+    "year": 2026,
+    "call": 4
+  },
+  {
+    "name": "Carl Bower Photographs",
+    "vendor_id": "9d83ca07-64ea-473a-9c4f-561bb2fb2132",
+    "slug": "carl-bower-photographs",
+    "city": "Boulder",
+    "bot": "bot8",
+    "month": 2,
+    "year": 2026,
+    "call": 4
+  },
+  {
+    "name": "Cassidy Cheyenne Photography",
+    "vendor_id": "c7cb411b-5f47-4499-918e-ac1183921bfc",
+    "slug": "cassidy-cheyenne-photography",
+    "city": "Durango",
+    "bot": "bot9",
+    "month": 2,
+    "year": 2026,
+    "call": 4
+  },
+  {
+    "name": "Castlehouse Videography",
+    "vendor_id": "2ee73e50-7618-47c8-ae08-e881d9d25710",
+    "slug": "castlehouse-videography",
+    "city": "Boulder",
+    "bot": "bot10",
+    "month": 8,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Catherine Norwood Denver Wedding Photographer",
+    "vendor_id": "18069a93-e1b0-40b8-ad46-0911ecb1ae1c",
+    "slug": "catherine-norwood-denver-wedding-photographer",
+    "city": "Denver",
+    "bot": "bot11",
+    "month": 6,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Clyde Plasencia Photography",
+    "vendor_id": "beff527e-01d2-40f8-ba52-2ad5aab3e79a",
+    "slug": "clyde-plasencia-photography",
+    "city": "Boulder",
+    "bot": "bot12",
+    "month": 4,
+    "year": 2026,
+    "call": 5
+  },
+  {
+    "name": "Colorado Wedding and Elopement Officiant Julie Adriansen",
+    "vendor_id": "e6647afc-9d56-4fb0-b708-a2989bd78535",
+    "slug": "colorado-wedding-and-elopement-officiant-julie-adriansen",
+    "city": "Vail",
+    "bot": "bot13",
+    "month": 2,
+    "year": 2026,
+    "call": 5
+  },
+  {
+    "name": "Colt & Hannah Photography",
+    "vendor_id": "7a406cb1-0b3f-4645-8ad2-c01d3e1e94f0",
+    "slug": "colt-and-hannah-photography",
+    "city": "Durango",
+    "bot": "bot14",
+    "month": 2,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "CStrong Photography",
+    "vendor_id": "decd23b8-4f3c-474f-9046-2ba422fef44b",
+    "slug": "cstrong-photography",
+    "city": "Durango",
+    "bot": "bot15",
+    "month": 7,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Danielle DeFiore Photography",
+    "vendor_id": "b42a322a-ffe7-45fa-9884-a92ad20c4b48",
+    "slug": "danielle-defiore-photography",
+    "city": "Aspen",
+    "bot": "bot16",
+    "month": 12,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "David Gillette Photography",
+    "vendor_id": "83c79768-b86d-4f18-882c-94e799007d43",
+    "slug": "david-gillette-photography",
+    "city": "Vail",
+    "bot": "bot17",
+    "month": 8,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Distinctive Mountain Events",
+    "vendor_id": "02c65599-da26-4f99-b73e-ae8543751185",
+    "slug": "distinctive-mountain-events",
+    "city": "Breckenridge",
+    "bot": "bot1",
+    "month": 6,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Dog Daze Photo",
+    "vendor_id": "94f6351c-be5d-4872-a335-667d649f6ed3",
+    "slug": "dog-daze-photo",
+    "city": "Boulder",
+    "bot": "bot2",
+    "month": 6,
+    "year": 2026,
+    "call": 5
+  },
+  {
+    "name": "Donovan Pavilion",
+    "vendor_id": "e81845ec-3587-4763-8293-345eb818c9e9",
+    "slug": "donovan-pavilion",
+    "city": "Vail",
+    "bot": "bot3",
+    "month": 2,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Doug Treiber Photography",
+    "vendor_id": "67d86eb1-99c3-49f0-96cc-c3846ed08b69",
+    "slug": "doug-treiber-photography",
+    "city": "Breckenridge",
+    "bot": "bot4",
+    "month": 5,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Dre Lamar Photography",
+    "vendor_id": "6599a79b-bcb1-4e5a-93cb-721fc4abd2d2",
+    "slug": "dre-lamar-photography",
+    "city": "Colorado Springs",
+    "bot": "bot5",
+    "month": 6,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Dreamtime Images Photography",
+    "vendor_id": "08de28aa-8ee8-45b8-a1d4-b1eedf4d9c05",
+    "slug": "dreamtime-images-photography",
+    "city": "Estes Park",
+    "bot": "bot6",
+    "month": 2,
+    "year": 2026,
+    "call": 5
+  },
+  {
+    "name": "EagleVail Pavilion",
+    "vendor_id": "bbb748a6-ca69-46d5-92ef-51c0cba866d1",
+    "slug": "eaglevail-pavilion",
+    "city": "Avon",
+    "bot": "bot7",
+    "month": 4,
+    "year": 2025,
+    "call": 5
+  },
+  {
+    "name": "Elevate Photography",
+    "vendor_id": "e2a067d1-33d1-495a-b186-6c8671361049",
+    "slug": "elevate-photography",
+    "city": "Littleton",
+    "bot": "bot8",
+    "month": 1,
+    "year": 2026,
+    "call": 6
+  },
+  {
+    "name": "Ellie Rich",
+    "vendor_id": "78d00bf3-4467-4ecd-a129-b3ead9b148b8",
+    "slug": "ellie-rich",
+    "city": "Denver",
+    "bot": "bot9",
+    "month": 5,
+    "year": 2026,
+    "call": 6
+  },
+  {
+    "name": "Emberlight Media",
+    "vendor_id": "e4b9c30e-cd64-4112-af0e-05c7f9563d18",
+    "slug": "emberlight-media",
+    "city": "Denver",
+    "bot": "bot10",
+    "month": 1,
+    "year": 2025,
+    "call": 6
+  },
+  {
+    "name": "Embodied Art Boudoir",
+    "vendor_id": "12717c71-19a5-43cd-b8b2-4cb29de86341",
+    "slug": "embodied-art-boudoir",
+    "city": "Golden",
+    "bot": "bot11",
+    "month": 6,
+    "year": 2026,
+    "call": 6
+  },
+  {
+    "name": "Emerald Fox Boudoir",
+    "vendor_id": "fb2e9c70-84ab-4685-8b99-198153145073",
+    "slug": "emerald-fox-boudoir",
+    "city": "Aurora",
+    "bot": "bot12",
+    "month": 5,
+    "year": 2025,
+    "call": 6
+  },
+  {
+    "name": "Emily Elizabeth Images",
+    "vendor_id": "083f1531-2147-434f-a4a3-435e5984cb0d",
+    "slug": "emily-elizabeth-images",
+    "city": "Boulder",
+    "bot": "bot13",
+    "month": 11,
+    "year": 2025,
+    "call": 6
+  },
+  {
+    "name": "Emily O Photography",
+    "vendor_id": "db3a69d6-1148-4cfe-b904-8e0406f605c5",
+    "slug": "emily-o-photography",
+    "city": "Fruita",
+    "bot": "bot14",
+    "month": 10,
+    "year": 2025,
+    "call": 6
+  },
+  {
+    "name": "Fanciful Floral & Weddings",
+    "vendor_id": "50237226-9aa1-4bfe-a772-5456a052ed2b",
+    "slug": "fanciful-floral-and-weddings",
+    "city": "Estes Park",
+    "bot": "bot15",
+    "month": 6,
+    "year": 2025,
+    "call": 6
+  },
+  {
+    "name": "Fawntail Boudoir Photography",
+    "vendor_id": "07d3efc8-3906-495c-8538-cebe7107ea8e",
+    "slug": "fawntail-boudoir-photography",
+    "city": "Boulder",
+    "bot": "bot16",
+    "month": 6,
+    "year": 2026,
+    "call": 6
+  },
+  {
+    "name": "For Wild Love",
+    "vendor_id": "0d37f6a7-a7d1-497d-b216-1055167b46a2",
+    "slug": "for-wild-love",
+    "city": "Breckenridge",
+    "bot": "bot17",
+    "month": 6,
+    "year": 2026,
+    "call": 6
+  },
+  {
+    "name": "Foss Photography",
+    "vendor_id": "2f38dda0-575f-431d-8783-c48dab628f8c",
+    "slug": "foss-photography",
+    "city": "Fort Collins",
+    "bot": "bot1",
+    "month": 12,
+    "year": 2025,
+    "call": 6
+  },
+  {
+    "name": "Four Corners Digital Imagery",
+    "vendor_id": "5fda7af9-d7f3-4146-a6fc-1153b6319c9d",
+    "slug": "four-corners-digital-imagery",
+    "city": "Durango",
+    "bot": "bot2",
+    "month": 11,
+    "year": 2025,
+    "call": 6
+  },
+  {
+    "name": "Four Seasons Resort and Residences Vail",
+    "vendor_id": "0f504c9b-0f3b-438c-8da0-c5bcd588d195",
+    "slug": "four-seasons-resort-and-residences-vail",
+    "city": "Vail",
+    "bot": "bot3",
+    "month": 4,
+    "year": 2026,
+    "call": 6
+  },
+  {
+    "name": "Frances Photography",
+    "vendor_id": "0fdbe508-cfc8-4ef0-85ec-dee7928ac19d",
+    "slug": "frances-photography",
+    "city": "Denver",
+    "bot": "bot4",
+    "month": 4,
+    "year": 2026,
+    "call": 6
+  },
+  {
+    "name": "Friends and Lovers Photography",
+    "vendor_id": "d0b00d01-a468-45d3-bc53-2c2a9615bdda",
+    "slug": "friends-and-lovers-photography",
+    "city": "Wheat Ridge",
+    "bot": "bot5",
+    "month": 7,
+    "year": 2025,
+    "call": 6
+  },
+  {
+    "name": "From the Hip Photo",
+    "vendor_id": "acbe0507-f6cf-4e65-89a7-190d77137ee1",
+    "slug": "from-the-hip-photo",
+    "city": "Denver",
+    "bot": "bot6",
+    "month": 5,
+    "year": 2026,
+    "call": 7
+  },
+  {
+    "name": "Gary Soles Gallery",
+    "vendor_id": "df033225-35c2-4a43-96dc-c202badaf66a",
+    "slug": "gary-soles-gallery",
+    "city": "Breckenridge",
+    "bot": "bot7",
+    "month": 6,
+    "year": 2026,
+    "call": 7
+  },
+  {
+    "name": "GIGI•C Weddings",
+    "vendor_id": "878dad24-7ff2-493b-8b97-9fe4b6511c90",
+    "slug": "gigi-c-weddings",
+    "city": "Telluride",
+    "bot": "bot8",
+    "month": 6,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Gillespie Photography",
+    "vendor_id": "d095542b-99d4-47d4-9294-484786639d65",
+    "slug": "gillespie-photography",
+    "city": "Silverthorne",
+    "bot": "bot9",
+    "month": 4,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Glitter & Bliss Wedding Planning & Events",
+    "vendor_id": "4954f761-b2c3-4c4d-884e-065a70f8d163",
+    "slug": "glitter-and-bliss-wedding-planning-and-events",
+    "city": "Vail",
+    "bot": "bot10",
+    "month": 1,
+    "year": 2026,
+    "call": 7
+  },
+  {
+    "name": "Gretchen Troop Photography",
+    "vendor_id": "5a60252c-683a-449e-8332-4663ec84937c",
+    "slug": "gretchen-troop-photography",
+    "city": "Boulder",
+    "bot": "bot11",
+    "month": 3,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Grumpyhighlander",
+    "vendor_id": "128ae87d-affa-4f71-a9f5-81cb8f7cd5a5",
+    "slug": "grumpyhighlander",
+    "city": "Durango",
+    "bot": "bot12",
+    "month": 4,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Hannah Collier Photography",
+    "vendor_id": "358dbe5c-91ab-4b1f-93b4-c887490a13ee",
+    "slug": "hannah-collier-photography",
+    "city": "Colorado Springs",
+    "bot": "bot13",
+    "month": 7,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Hannah Henke Photography",
+    "vendor_id": "485d7852-95bc-4d04-8884-123c9eae520e",
+    "slug": "hannah-henke-photography",
+    "city": "Denver",
+    "bot": "bot14",
+    "month": 9,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Hannah Morvay Photography",
+    "vendor_id": "b91f09aa-1cc8-455c-9b61-76d99b3d606c",
+    "slug": "hannah-morvay-photography",
+    "city": "Golden",
+    "bot": "bot15",
+    "month": 2,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Heather Jackson Photography",
+    "vendor_id": "909b13b0-da75-4c9c-99a8-62841b149c73",
+    "slug": "heather-jackson-photography",
+    "city": "Salida",
+    "bot": "bot16",
+    "month": 1,
+    "year": 2026,
+    "call": 7
+  },
+  {
+    "name": "HoneyLensPhoto Colorado",
+    "vendor_id": "86f43d07-28ab-43e0-b92c-0beb86af962f",
+    "slug": "honeylensphoto-colorado",
+    "city": "Conifer",
+    "bot": "bot17",
+    "month": 2,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Iva Dostal Photography",
+    "vendor_id": "3ebe6729-6f8a-4e31-8ae5-77da6097f0ae",
+    "slug": "iva-dostal-photography",
+    "city": "Longmont",
+    "bot": "bot1",
+    "month": 7,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Jacey Kate Photography | Crested Butte, Colorado Wedding + Elopement Photographer",
+    "vendor_id": "7a843d9d-ee74-4270-8ee5-8029303b3db0",
+    "slug": "jacey-kate-photography-crested-butte-colorado-wedding-elopem",
+    "city": "Crested Butte",
+    "bot": "bot2",
+    "month": 11,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Jacie Marguerite Fine Art Photographer",
+    "vendor_id": "cc2a042d-2634-4a28-9097-71cca89024f0",
+    "slug": "jacie-marguerite-fine-art-photographer",
+    "city": "Aspen",
+    "bot": "bot3",
+    "month": 10,
+    "year": 2025,
+    "call": 7
+  },
+  {
+    "name": "Janna Lynn Photography",
+    "vendor_id": "874ff1b4-155a-41a7-8f01-a15ceefd41c4",
+    "slug": "janna-lynn-photography",
+    "city": "Durango",
+    "bot": "bot4",
+    "month": 10,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "Jason and Daris",
+    "vendor_id": "e2be146a-ab90-46e2-9841-5adcc586e842",
+    "slug": "jason-and-daris",
+    "city": "Telluride",
+    "bot": "bot5",
+    "month": 7,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "Jenne Anne | Adventure Elopement & Intimate Wedding Photography",
+    "vendor_id": "f3a42dae-c351-4ab4-a7f2-6304af399aba",
+    "slug": "jenne-anne-adventure-elopement-and-intimate-wedding-photogra",
+    "city": "Durango",
+    "bot": "bot6",
+    "month": 10,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "Jennifer Garza Photography",
+    "vendor_id": "067b861d-7a5a-4d76-8d0f-e26358e3d7a6",
+    "slug": "jennifer-garza-photography",
+    "city": "Commerce City",
+    "bot": "bot7",
+    "month": 4,
+    "year": 2026,
+    "call": 8
+  },
+  {
+    "name": "Jennifer Glenn Photography",
+    "vendor_id": "29a30efb-ffd7-43c3-8dd8-f5557dc13835",
+    "slug": "jennifer-glenn-photography",
+    "city": "Golden",
+    "bot": "bot8",
+    "month": 7,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "Jess Bidwell Photography",
+    "vendor_id": "5fb45186-d1d9-44e8-8ee2-995c8956000f",
+    "slug": "jess-bidwell-photography",
+    "city": "Montrose",
+    "bot": "bot9",
+    "month": 4,
+    "year": 2026,
+    "call": 8
+  },
+  {
+    "name": "Jessa Rae Photography Crested Butte, Colorado",
+    "vendor_id": "2b3f3b9d-6350-4221-ba0f-69837e745858",
+    "slug": "jessa-rae-photography-crested-butte-colorado",
+    "city": "Gunnison",
+    "bot": "bot10",
+    "month": 2,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "JMGant Photography",
+    "vendor_id": "0c18172e-14f4-4fa5-91d1-132e9526e976",
+    "slug": "jmgant-photography",
+    "city": "Greeley",
+    "bot": "bot11",
+    "month": 7,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "Joe and Robin Photography",
+    "vendor_id": "9472f3d8-1b90-4bba-89f7-68495579584b",
+    "slug": "joe-and-robin-photography",
+    "city": "Littleton",
+    "bot": "bot12",
+    "month": 6,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "Joe Pyle Photography",
+    "vendor_id": "4b09d03a-973f-475e-bd9e-95c098d18b38",
+    "slug": "joe-pyle-photography",
+    "city": "Estes Park",
+    "bot": "bot13",
+    "month": 1,
+    "year": 2026,
+    "call": 8
+  },
+  {
+    "name": "Jolie Rodriguez Photography",
+    "vendor_id": "c8096a7f-a97a-414a-804d-28e7d87782d8",
+    "slug": "jolie-rodriguez-photography",
+    "city": "Parker",
+    "bot": "bot14",
+    "month": 6,
+    "year": 2026,
+    "call": 8
+  },
+  {
+    "name": "Jules Kennedy Photography",
+    "vendor_id": "e98a1afe-2b08-43b6-a286-26f614b1611e",
+    "slug": "jules-kennedy-photography",
+    "city": "Fort Collins",
+    "bot": "bot15",
+    "month": 5,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "Julien Kibler Studio",
+    "vendor_id": "0f2b726a-2d40-4278-a9e1-f803863c291f",
+    "slug": "julien-kibler-studio",
+    "city": "Montrose",
+    "bot": "bot16",
+    "month": 2,
+    "year": 2026,
+    "call": 8
+  },
+  {
+    "name": "Justin Edmonds Photography",
+    "vendor_id": "7121747e-e069-48d7-8036-35fcd215721f",
+    "slug": "justin-edmonds-photography",
+    "city": "Denver",
+    "bot": "bot17",
+    "month": 7,
+    "year": 2025,
+    "call": 8
+  },
+  {
+    "name": "Justyna E Butler, Colorado Elopement Photographer",
+    "vendor_id": "48158314-9efb-431c-9e32-a025b8175ff1",
+    "slug": "justyna-e-butler-colorado-elopement-photographer",
+    "city": "Highlands Ranch",
+    "bot": "bot1",
+    "month": 2,
+    "year": 2026,
+    "call": 8
+  },
+  {
+    "name": "K2 Event Co.",
+    "vendor_id": "5729690f-7d56-4c17-a6b2-5f40c55e2bd3",
+    "slug": "k2-event-co",
+    "city": "Telluride",
+    "bot": "bot2",
+    "month": 4,
+    "year": 2026,
+    "call": 9
+  },
+  {
+    "name": "Kalen Jesse Photography Co.",
+    "vendor_id": "bf565f33-7076-44f2-94cf-9f9ece5918cf",
+    "slug": "kalen-jesse-photography-co",
+    "city": "Denver",
+    "bot": "bot3",
+    "month": 7,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Kara Cavalca Photo+Video",
+    "vendor_id": "ad7d1748-347d-4110-8d0b-fa7364e70be4",
+    "slug": "kara-cavalca-photo-video",
+    "city": "Durango",
+    "bot": "bot4",
+    "month": 12,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Kari Geha Photography",
+    "vendor_id": "01c76481-ac5a-43e0-b559-d3be88ba896b",
+    "slug": "kari-geha-photography",
+    "city": "Denver",
+    "bot": "bot5",
+    "month": 7,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Karla Wedding Photography",
+    "vendor_id": "62eb80ab-408a-45ac-9974-c8038b5d0ab8",
+    "slug": "karla-wedding-photography",
+    "city": "Durango",
+    "bot": "bot6",
+    "month": 3,
+    "year": 2026,
+    "call": 9
+  },
+  {
+    "name": "Katie Corinne Photography",
+    "vendor_id": "d011ba53-cfe1-416a-9f62-55af4451889f",
+    "slug": "katie-corinne-photography",
+    "city": "Monument",
+    "bot": "bot7",
+    "month": 7,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Kelly Miranda Photography",
+    "vendor_id": "6a7146fb-0180-490d-956d-23970b461b98",
+    "slug": "kelly-miranda-photography",
+    "city": "Durango",
+    "bot": "bot8",
+    "month": 8,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "KiKi Creates",
+    "vendor_id": "c6448110-5ab1-4703-a0ae-a85d2802c0fd",
+    "slug": "kiki-creates",
+    "city": "Crested Butte",
+    "bot": "bot9",
+    "month": 2,
+    "year": 2026,
+    "call": 9
+  },
+  {
+    "name": "Kimi D Photography",
+    "vendor_id": "7d0293cb-ca36-4f31-96a2-b1b132d16f5a",
+    "slug": "kimi-d-photography",
+    "city": "Vail",
+    "bot": "bot10",
+    "month": 1,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Leah Goetzel Photography",
+    "vendor_id": "5c9467c9-1617-495b-a5db-2524d3c5ddfd",
+    "slug": "leah-goetzel-photography",
+    "city": "Denver",
+    "bot": "bot11",
+    "month": 1,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Light in Motion Co",
+    "vendor_id": "659ba76f-88e1-4572-8350-9a22ca5bf3da",
+    "slug": "light-in-motion-co",
+    "city": "Telluride",
+    "bot": "bot12",
+    "month": 11,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Lisa Marie Wright Photography",
+    "vendor_id": "6a28df0b-b5e2-4c4f-b3e5-44e681df709c",
+    "slug": "lisa-marie-wright-photography",
+    "city": "Telluride",
+    "bot": "bot13",
+    "month": 10,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Lone Oak Studio, Inc",
+    "vendor_id": "750392e0-7b46-4fca-89ac-217594b41b49",
+    "slug": "lone-oak-studio-inc",
+    "city": "Steamboat Springs",
+    "bot": "bot14",
+    "month": 9,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Lucky Penny Event Planning",
+    "vendor_id": "a5140245-bf71-488b-8179-64c309f5dfbb",
+    "slug": "lucky-penny-event-planning",
+    "city": "Crested Butte",
+    "bot": "bot15",
+    "month": 5,
+    "year": 2026,
+    "call": 9
+  },
+  {
+    "name": "Lyndsey Leach Photography",
+    "vendor_id": "610c2233-0c42-48f5-b4a5-a4a9d2ce2058",
+    "slug": "lyndsey-leach-photography",
+    "city": "Lakewood",
+    "bot": "bot16",
+    "month": 12,
+    "year": 2025,
+    "call": 9
+  },
+  {
+    "name": "Madeline J Studios",
+    "vendor_id": "c444968d-f8c8-436d-b0de-df8222bd666b",
+    "slug": "madeline-j-studios",
+    "city": "Denver",
+    "bot": "bot17",
+    "month": 3,
+    "year": 2026,
+    "call": 10
+  },
+  {
+    "name": "Magnified Joy Photography",
+    "vendor_id": "6451f7a2-eb8e-4a19-8cb0-07f6e8819c6c",
+    "slug": "magnified-joy-photography",
+    "city": "Crested Butte",
+    "bot": "bot1",
+    "month": 10,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Mallory Munson Photography",
+    "vendor_id": "6ee0beb7-af1a-4993-b70a-d40de1b5580e",
+    "slug": "mallory-munson-photography",
+    "city": "Denver",
+    "bot": "bot2",
+    "month": 7,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Mark Creery Photography",
+    "vendor_id": "d318dc6f-8c2c-46c4-9bb4-87dcc62a8684",
+    "slug": "mark-creery-photography",
+    "city": "Fort Collins",
+    "bot": "bot3",
+    "month": 1,
+    "year": 2026,
+    "call": 10
+  },
+  {
+    "name": "Marry Me In Colorado",
+    "vendor_id": "33ac5f88-3d98-4648-9fcc-e800df9a9f9d",
+    "slug": "marry-me-in-colorado",
+    "city": "Estes Park",
+    "bot": "bot4",
+    "month": 3,
+    "year": 2026,
+    "call": 10
+  },
+  {
+    "name": "Matt Alberts Photography",
+    "vendor_id": "bb9aab05-470d-4673-9090-d86f9a0f6eed",
+    "slug": "matt-alberts-photography",
+    "city": "Vail",
+    "bot": "bot5",
+    "month": 11,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Michael Morse Wedding Photography",
+    "vendor_id": "d1b06bf9-9d2c-4a8c-93f3-c4b3fa28fc87",
+    "slug": "michael-morse-wedding-photography",
+    "city": "Telluride",
+    "bot": "bot6",
+    "month": 12,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Michael Rawlings Photography",
+    "vendor_id": "6008e4b8-2058-44f3-8821-d9b50edac159",
+    "slug": "michael-rawlings-photography",
+    "city": "Eagle",
+    "bot": "bot7",
+    "month": 12,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Michele Schanker Photography {Breckenridge Photographer}",
+    "vendor_id": "982e82bb-7608-4744-80c1-be3e05976b05",
+    "slug": "michele-schanker-photography-breckenridge-photographer",
+    "city": "Breckenridge",
+    "bot": "bot8",
+    "month": 7,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Michelle Betz Photography",
+    "vendor_id": "f42c591c-6657-497a-a081-300a39e4f8b1",
+    "slug": "michelle-betz-photography",
+    "city": "Colorado Springs",
+    "bot": "bot9",
+    "month": 2,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Mikayla Renee Photo",
+    "vendor_id": "b8c21c61-c077-496d-9892-85b5d9bf5f54",
+    "slug": "mikayla-renee-photo",
+    "city": "Colorado Springs",
+    "bot": "bot10",
+    "month": 1,
+    "year": 2026,
+    "call": 10
+  },
+  {
+    "name": "Moon Myerson Photography",
+    "vendor_id": "24c7e487-f010-4de4-9d7e-12be7bda8e56",
+    "slug": "moon-myerson-photography",
+    "city": "Fort Collins",
+    "bot": "bot11",
+    "month": 7,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Mountain Wedding Garden",
+    "vendor_id": "71cfefae-6397-443f-9804-0066a3032959",
+    "slug": "mountain-wedding-garden",
+    "city": "Crested Butte",
+    "bot": "bot12",
+    "month": 5,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Nate & Jenny Weddings",
+    "vendor_id": "37c6b382-0a01-4959-815e-18a98f0b04ab",
+    "slug": "nate-and-jenny-weddings",
+    "city": "Vail",
+    "bot": "bot13",
+    "month": 8,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "ONCE WEST Photography",
+    "vendor_id": "043477ef-9af0-49e8-8382-99810f7b0abd",
+    "slug": "once-west-photography",
+    "city": "De Beque",
+    "bot": "bot14",
+    "month": 8,
+    "year": 2025,
+    "call": 10
+  },
+  {
+    "name": "Original Weddings Photo & Video",
+    "vendor_id": "23fb04c9-a80e-436a-8b48-60e7b4d040b2",
+    "slug": "original-weddings-photo-and-video",
+    "city": "Denver",
+    "bot": "bot15",
+    "month": 11,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "Party Girl Events",
+    "vendor_id": "e7c1a9e6-2aae-4c52-a675-8554eef4bf81",
+    "slug": "party-girl-events",
+    "city": "Vail",
+    "bot": "bot16",
+    "month": 6,
+    "year": 2026,
+    "call": 11
+  },
+  {
+    "name": "PHOCO",
+    "vendor_id": "08fd23ac-d878-4bbc-8c68-34cd44f9a9e5",
+    "slug": "phoco",
+    "city": "Fort Collins",
+    "bot": "bot17",
+    "month": 7,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "Photography by Brenda Colwell",
+    "vendor_id": "33f2432d-1974-43cd-9656-da13e9204795",
+    "slug": "photography-by-brenda-colwell",
+    "city": "Telluride",
+    "bot": "bot1",
+    "month": 4,
+    "year": 2026,
+    "call": 11
+  },
+  {
+    "name": "Picturesque Photography",
+    "vendor_id": "37b14a45-4a02-47e3-a1b8-e9a518bd27fc",
+    "slug": "picturesque-photography",
+    "city": "Telluride",
+    "bot": "bot2",
+    "month": 2,
+    "year": 2026,
+    "call": 11
+  },
+  {
+    "name": "Preston Benson Videography: Durango Video Production",
+    "vendor_id": "0ad3f282-a964-40a0-a054-20afad19a686",
+    "slug": "preston-benson-videography-durango-video-production",
+    "city": "Durango",
+    "bot": "bot3",
+    "month": 2,
+    "year": 2026,
+    "call": 11
+  },
+  {
+    "name": "Princess Productions Weddings & Events",
+    "vendor_id": "bf4be683-3c72-4171-a54e-5915297a9baf",
+    "slug": "princess-productions-weddings-and-events",
+    "city": "Crested Butte",
+    "bot": "bot4",
+    "month": 2,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "Ranjani Groth Studios",
+    "vendor_id": "08829c2f-72d3-4e6b-8b37-5bfb2cf4b30e",
+    "slug": "ranjani-groth-studios",
+    "city": "Golden",
+    "bot": "bot5",
+    "month": 5,
+    "year": 2026,
+    "call": 11
+  },
+  {
+    "name": "Real Life Photographs",
+    "vendor_id": "3852f841-19c3-4d00-842f-4f71763bb2e5",
+    "slug": "real-life-photographs",
+    "city": "Ridgway",
+    "bot": "bot6",
+    "month": 5,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "Real West Old Time Photography",
+    "vendor_id": "78f1a812-c1e0-4aad-a17c-95a1b8920f95",
+    "slug": "real-west-old-time-photography",
+    "city": "Estes Park",
+    "bot": "bot7",
+    "month": 2,
+    "year": 2026,
+    "call": 11
+  },
+  {
+    "name": "Rebeca Velie Photography",
+    "vendor_id": "cfe95206-1c42-463a-9e91-195227286146",
+    "slug": "rebeca-velie-photography",
+    "city": "Golden",
+    "bot": "bot8",
+    "month": 1,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "River Bend Ranch",
+    "vendor_id": "199e14b2-fbf5-4de1-a198-1365eda71e82",
+    "slug": "river-bend-ranch",
+    "city": "Durango",
+    "bot": "bot9",
+    "month": 11,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "ROGUE Photography",
+    "vendor_id": "9a1e4b98-9cb9-4d95-8d71-6f6c71a44573",
+    "slug": "rogue-photography",
+    "city": "Denver",
+    "bot": "bot10",
+    "month": 5,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "Ryan Kost Photo",
+    "vendor_id": "406b7297-163a-4721-a446-d1e7487cac51",
+    "slug": "ryan-kost-photo",
+    "city": "Arvada",
+    "bot": "bot11",
+    "month": 4,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "Sam Murch Photography",
+    "vendor_id": "53789041-b67a-4415-b1f0-92c511395349",
+    "slug": "sam-murch-photography",
+    "city": "Ouray",
+    "bot": "bot12",
+    "month": 10,
+    "year": 2025,
+    "call": 11
+  },
+  {
+    "name": "Sarah Christine Photography",
+    "vendor_id": "9c571b43-daba-4865-aa10-7c747a4dee19",
+    "slug": "sarah-christine-photography",
+    "city": "Fort Collins",
+    "bot": "bot13",
+    "month": 5,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Sarah Goff Photography",
+    "vendor_id": "4f27cf98-6fd4-481f-9ea3-4f19595074fa",
+    "slug": "sarah-goff-photography",
+    "city": "Berthoud",
+    "bot": "bot14",
+    "month": 5,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Sarah Roshan Collective",
+    "vendor_id": "39bc9095-be0b-438a-bda5-105d5da71e35",
+    "slug": "sarah-roshan-collective",
+    "city": "Breckenridge",
+    "bot": "bot15",
+    "month": 8,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Sean Lara Photography",
+    "vendor_id": "97d177ae-51cb-48fd-a7a9-6c4f103b91be",
+    "slug": "sean-lara-photography",
+    "city": "Fort Collins",
+    "bot": "bot16",
+    "month": 6,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Shell Creek Photography",
+    "vendor_id": "691184c3-8d01-4476-b739-9ffe18730a4a",
+    "slug": "shell-creek-photography",
+    "city": "Montrose",
+    "bot": "bot17",
+    "month": 1,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Shelly Anderson Photography",
+    "vendor_id": "fe082916-5673-401b-a119-b6e2d9416f8c",
+    "slug": "shelly-anderson-photography",
+    "city": "Arvada",
+    "bot": "bot1",
+    "month": 11,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Sierra Sturt Photo, Vail Photographer",
+    "vendor_id": "d73b478d-16a0-4815-9c66-22ac27cf6c0d",
+    "slug": "sierra-sturt-photo-vail-photographer",
+    "city": "Minturn",
+    "bot": "bot2",
+    "month": 10,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Signature Destination Photographers",
+    "vendor_id": "afbf1a99-0974-4ada-a2f1-d49b8cf81e41",
+    "slug": "signature-destination-photographers",
+    "city": "Avon",
+    "bot": "bot3",
+    "month": 4,
+    "year": 2026,
+    "call": 12
+  },
+  {
+    "name": "Siroky Photography",
+    "vendor_id": "17e1904c-56a3-40bb-98ca-df3fd8fe233c",
+    "slug": "siroky-photography",
+    "city": "Colorado Springs",
+    "bot": "bot4",
+    "month": 1,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Sky Pond Photo & Video",
+    "vendor_id": "e176fe36-52dd-43f3-b3a8-bf167c5154c8",
+    "slug": "sky-pond-photo-and-video",
+    "city": "Estes Park",
+    "bot": "bot5",
+    "month": 1,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Snappr Photography",
+    "vendor_id": "2011f3cf-2537-4dc7-a27d-aef9014da132",
+    "slug": "snappr-photography",
+    "city": "Boulder",
+    "bot": "bot6",
+    "month": 4,
+    "year": 2026,
+    "call": 12
+  },
+  {
+    "name": "Sonnenalp Vail",
+    "vendor_id": "77719076-ce2b-4228-87c9-f599f2db8c25",
+    "slug": "sonnenalp-vail",
+    "city": "Vail",
+    "bot": "bot7",
+    "month": 2,
+    "year": 2026,
+    "call": 12
+  },
+  {
+    "name": "Sophie Catherine Photo",
+    "vendor_id": "3478ac1c-465d-4b47-bb41-88fc4cf3836e",
+    "slug": "sophie-catherine-photo",
+    "city": "Denver",
+    "bot": "bot8",
+    "month": 6,
+    "year": 2026,
+    "call": 12
+  },
+  {
+    "name": "Southwest Durango Photography LLC",
+    "vendor_id": "d6341b44-4405-40bc-ba0b-fbd20cf62d49",
+    "slug": "southwest-durango-photography-llc",
+    "city": "Durango",
+    "bot": "bot9",
+    "month": 3,
+    "year": 2025,
+    "call": 12
+  },
+  {
+    "name": "Story Lens Photography : Portrait Photographer",
+    "vendor_id": "fcdf5f25-b179-4c92-bd80-2b8499646cf4",
+    "slug": "story-lens-photography-portrait-photographer",
+    "city": "Avon",
+    "bot": "bot10",
+    "month": 1,
+    "year": 2026,
+    "call": 12
+  },
+  {
+    "name": "Studio kiva photography",
+    "vendor_id": "46bcbd77-c1e4-44f9-9a1a-422ac49cf6b5",
+    "slug": "studio-kiva-photography",
+    "city": "Breckenridge",
+    "bot": "bot11",
+    "month": 6,
+    "year": 2025,
+    "call": 13
+  },
+  {
+    "name": "Sunbeam Studio",
+    "vendor_id": "149a7518-72f2-4a1d-938b-4256c1f2409b",
+    "slug": "sunbeam-studio",
+    "city": "Louisville",
+    "bot": "bot12",
+    "month": 1,
+    "year": 2026,
+    "call": 13
+  },
+  {
+    "name": "Tayler Carlisle Photography",
+    "vendor_id": "4ac63ceb-186b-4153-b953-e4b5b508f711",
+    "slug": "tayler-carlisle-photography",
+    "city": "Evergreen",
+    "bot": "bot13",
+    "month": 2,
+    "year": 2026,
+    "call": 13
+  },
+  {
+    "name": "Taylor Mitchell Photography",
+    "vendor_id": "149308b2-7f62-445c-bd73-4fa3b86d1f90",
+    "slug": "taylor-mitchell-photography",
+    "city": "Telluride",
+    "bot": "bot14",
+    "month": 2,
+    "year": 2025,
+    "call": 13
+  },
+  {
+    "name": "Telluride Presents",
+    "vendor_id": "cdb31dcf-5dd3-4604-ad65-9d37260a91e7",
+    "slug": "telluride-presents",
+    "city": "Telluride",
+    "bot": "bot15",
+    "month": 2,
+    "year": 2026,
+    "call": 13
+  },
+  {
+    "name": "Telluride Ski Resort Weddings & Events",
+    "vendor_id": "df7f5a6f-5cf3-42c9-b219-6ce5dbf8fb3c",
+    "slug": "telluride-ski-resort-weddings-and-events",
+    "city": "Mountain Village",
+    "bot": "bot16",
+    "month": 5,
+    "year": 2026,
+    "call": 13
+  },
+  {
+    "name": "The Cheers Company",
+    "vendor_id": "b735c747-aec5-4054-8f9d-5ef0b5fb42ae",
+    "slug": "the-cheers-company",
+    "city": "Telluride",
+    "bot": "bot17",
+    "month": 5,
+    "year": 2026,
+    "call": 13
+  },
+  {
+    "name": "The Landing at Estes Park",
+    "vendor_id": "5aad46f7-0909-43d7-891b-a5177921a84d",
+    "slug": "the-landing-at-estes-park",
+    "city": "Estes Park",
+    "bot": "bot1",
+    "month": 6,
+    "year": 2025,
+    "call": 13
+  },
+  {
+    "name": "The Pavilion at The Stanley",
+    "vendor_id": "3f86327f-9280-4caa-a985-bcc74752d666",
+    "slug": "the-pavilion-at-the-stanley",
+    "city": "Estes Park",
+    "bot": "bot2",
+    "month": 1,
+    "year": 2025,
+    "call": 13
+  },
+  {
+    "name": "The Photography Concierge",
+    "vendor_id": "2cb8ba91-b326-4d71-867b-a00c011efeb7",
+    "slug": "the-photography-concierge",
+    "city": "Edwards",
+    "bot": "bot3",
+    "month": 1,
+    "year": 2025,
+    "call": 13
+  },
+  {
+    "name": "The Scobeys - Colorado Wedding Photography",
+    "vendor_id": "ea5601c5-4a4d-4db7-bc9a-647d66a13262",
+    "slug": "the-scobeys-colorado-wedding-photography",
+    "city": "Golden",
+    "bot": "bot4",
+    "month": 3,
+    "year": 2026,
+    "call": 13
+  },
+  {
+    "name": "Third Eye Photography",
+    "vendor_id": "2fbd6c82-d202-45ef-a3ef-92f3cb8d48f9",
+    "slug": "third-eye-photography",
+    "city": "Crested Butte",
+    "bot": "bot5",
+    "month": 12,
+    "year": 2025,
+    "call": 13
+  },
+  {
+    "name": "Thistle and Pine Photography",
+    "vendor_id": "242d7e7d-0971-41e4-a8e6-dc54edb20aee",
+    "slug": "thistle-and-pine-photography",
+    "city": "Colorado Springs",
+    "bot": "bot6",
+    "month": 10,
+    "year": 2025,
+    "call": 13
+  },
+  {
+    "name": "Tina Joiner Photography",
+    "vendor_id": "5cd6ad2a-1f63-422d-9d8d-202413bd4ebc",
+    "slug": "tina-joiner-photography",
+    "city": "Colorado Springs",
+    "bot": "bot7",
+    "month": 3,
+    "year": 2026,
+    "call": 13
+  },
+  {
+    "name": "tomKphoto",
+    "vendor_id": "75e53808-82be-4352-a49b-d2fbad0644f7",
+    "slug": "tomkphoto",
+    "city": "Fort Collins",
+    "bot": "bot8",
+    "month": 8,
+    "year": 2025,
+    "call": 13
+  },
+  {
+    "name": "Toni Axelrod Studios",
+    "vendor_id": "19a1358e-7c7a-4096-bbf9-995bf2092824",
+    "slug": "toni-axelrod-studios",
+    "city": "Vail",
+    "bot": "bot9",
+    "month": 1,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "Trystan Photography",
+    "vendor_id": "8713ed00-1aa4-4854-988d-9386790917c0",
+    "slug": "trystan-photography",
+    "city": "Colorado Springs",
+    "bot": "bot10",
+    "month": 7,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "Two Elk Studios",
+    "vendor_id": "fe441f96-1683-4945-b734-a5f59c57a173",
+    "slug": "two-elk-studios",
+    "city": "Edwards",
+    "bot": "bot11",
+    "month": 6,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "Type Deux Weddings",
+    "vendor_id": "d9583e7e-425a-43f6-859b-600829c953f2",
+    "slug": "type-deux-weddings",
+    "city": "Colorado Springs",
+    "bot": "bot12",
+    "month": 10,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "V’s Photography",
+    "vendor_id": "fb3310bd-e2ec-49cc-b0cb-c04c8eddaba9",
+    "slug": "v-s-photography",
+    "city": "Grand Junction",
+    "bot": "bot13",
+    "month": 8,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "Valley to Summit Photography",
+    "vendor_id": "f244834e-2ddf-4fd4-8700-ff81e6ae7c88",
+    "slug": "valley-to-summit-photography",
+    "city": "Avon",
+    "bot": "bot14",
+    "month": 5,
+    "year": 2026,
+    "call": 14
+  },
+  {
+    "name": "Veils of Vail Wedding Planning & Design",
+    "vendor_id": "a2752144-7715-4794-a7d4-a417e41fa3cd",
+    "slug": "veils-of-vail-wedding-planning-and-design",
+    "city": "Eagle",
+    "bot": "bot15",
+    "month": 6,
+    "year": 2026,
+    "call": 14
+  },
+  {
+    "name": "Venue on the Rocks",
+    "vendor_id": "07813e85-a1bf-49a9-b70f-8b8768e9dbcc",
+    "slug": "venue-on-the-rocks",
+    "city": "Estes Park",
+    "bot": "bot16",
+    "month": 6,
+    "year": 2026,
+    "call": 14
+  },
+  {
+    "name": "Vows and Peaks",
+    "vendor_id": "ddad483e-44cc-46c1-a7ab-0d8e024ead5b",
+    "slug": "vows-and-peaks",
+    "city": "Denver",
+    "bot": "bot17",
+    "month": 2,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "Walnut Street Photography",
+    "vendor_id": "821f8d11-3eff-4f3c-9c6a-8af5ab33a461",
+    "slug": "walnut-street-photography",
+    "city": "Boulder",
+    "bot": "bot1",
+    "month": 11,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "Wanderlust Elopements",
+    "vendor_id": "deff84c7-5bd9-4689-880f-148afe62cf98",
+    "slug": "wanderlust-elopements",
+    "city": "Durango",
+    "bot": "bot2",
+    "month": 1,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "White Starfish Photography",
+    "vendor_id": "a2cd4054-89fa-4299-859a-32f681221555",
+    "slug": "white-starfish-photography",
+    "city": "Vail",
+    "bot": "bot3",
+    "month": 4,
+    "year": 2026,
+    "call": 14
+  },
+  {
+    "name": "Wild Bliss Photography",
+    "vendor_id": "d68c40a5-b368-4738-8419-2ff67d3b25af",
+    "slug": "wild-bliss-photography",
+    "city": "Fort Collins",
+    "bot": "bot4",
+    "month": 2,
+    "year": 2026,
+    "call": 14
+  },
+  {
+    "name": "Wild Fern Photo Co",
+    "vendor_id": "4b832df4-ff5e-4960-b793-13a6773e1643",
+    "slug": "wild-fern-photo-co",
+    "city": "Fort Collins",
+    "bot": "bot5",
+    "month": 10,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "Wild Iris Media",
+    "vendor_id": "251adf35-8789-49b5-95aa-86dbb48c6643",
+    "slug": "wild-iris-media",
+    "city": "Boulder",
+    "bot": "bot6",
+    "month": 9,
+    "year": 2025,
+    "call": 14
+  },
+  {
+    "name": "Wildroot Collective - Colorado Elopement Planning",
+    "vendor_id": "c5a905dc-653f-4f93-8bb3-676891947100",
+    "slug": "wildroot-collective-colorado-elopement-planning",
+    "city": "Golden",
+    "bot": "bot7",
+    "month": 11,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "wmt.co",
+    "vendor_id": "19a6b3c4-c72b-4315-bcaf-0cc3e3feee9e",
+    "slug": "wmt-co",
+    "city": null,
+    "bot": "bot8",
+    "month": 10,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "Abby Shepard Photography",
+    "vendor_id": "35d14415-cc66-467e-9756-35e5fa5e2b16",
+    "slug": "abby-shepard-photography",
+    "city": "Boulder",
+    "bot": "bot9",
+    "month": 4,
+    "year": 2026,
+    "call": 15
+  },
+  {
+    "name": "Alex Mabrey Photography",
+    "vendor_id": "3b4d4a1d-c805-4a98-b998-817f095e8d28",
+    "slug": "alex-mabrey-photography",
+    "city": "Colorado Springs",
+    "bot": "bot10",
+    "month": 6,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "Aly Cav Photography",
+    "vendor_id": "85bcdf8d-517c-47c0-83f3-29eb2830549f",
+    "slug": "aly-cav-photography",
+    "city": null,
+    "bot": "bot11",
+    "month": 9,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "Alyssa Carpenter Photography",
+    "vendor_id": "0a66209b-7105-48d8-8a43-04eb4d2a8dfb",
+    "slug": "alyssa-carpenter-photography",
+    "city": null,
+    "bot": "bot12",
+    "month": 5,
+    "year": 2026,
+    "call": 15
+  },
+  {
+    "name": "Amanda Podesta Photography",
+    "vendor_id": "c24532ca-059b-415f-add9-f346bf918519",
+    "slug": "amanda-podesta-photography",
+    "city": "Aspen/Vail",
+    "bot": "bot13",
+    "month": 3,
+    "year": 2026,
+    "call": 15
+  },
+  {
+    "name": "Amy Ronk Photography",
+    "vendor_id": "8d58e1de-68e0-467f-97c3-45448ac1fb81",
+    "slug": "amy-ronk-photography",
+    "city": "Denver",
+    "bot": "bot14",
+    "month": 3,
+    "year": 2026,
+    "call": 15
+  },
+  {
+    "name": "Angela Amen Photography",
+    "vendor_id": "1a80a56f-6c14-45f1-88aa-ff2c5b03ae75",
+    "slug": "angela-amen-photography",
+    "city": "Denver/Westminster",
+    "bot": "bot15",
+    "month": 5,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "Ashley Kristine Photo",
+    "vendor_id": "a874165e-49b1-4a9a-b15c-8df26fbecb0e",
+    "slug": "ashley-kristine-photo",
+    "city": "Windsor",
+    "bot": "bot16",
+    "month": 8,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "Aspen Sage Photo",
+    "vendor_id": "e2766aff-50a4-4ef0-b0a0-d2635717411d",
+    "slug": "aspen-sage-photo",
+    "city": "Aspen",
+    "bot": "bot17",
+    "month": 8,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "Autumn Parry Photography",
+    "vendor_id": "21ea9652-bbe5-4ae9-8b78-f913e4b08cc8",
+    "slug": "autumn-parry-photography",
+    "city": null,
+    "bot": "bot1",
+    "month": 7,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "Ayla Rae Weddings",
+    "vendor_id": "dc2c6e93-fdf6-4bf0-a30a-0433cca63b87",
+    "slug": "ayla-rae-weddings",
+    "city": null,
+    "bot": "bot2",
+    "month": 5,
+    "year": 2026,
+    "call": 15
+  },
+  {
+    "name": "Berg Berg Photography",
+    "vendor_id": "02f90c4f-8880-4e0a-9516-ef3db9a3d7ea",
+    "slug": "berg-berg-photography",
+    "city": "Golden",
+    "bot": "bot3",
+    "month": 9,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "By The West",
+    "vendor_id": "bbaa8742-43ab-49cc-9889-8e09b385cd6d",
+    "slug": "by-the-west",
+    "city": "Denver",
+    "bot": "bot4",
+    "month": 3,
+    "year": 2025,
+    "call": 15
+  },
+  {
+    "name": "Creative by Antonella",
+    "vendor_id": "9e31c848-8237-4047-81f4-3df54ecce262",
+    "slug": "creative-by-antonella",
+    "city": null,
+    "bot": "bot5",
+    "month": 7,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Eliza Wildflowers Photography",
+    "vendor_id": "3a36c849-b9ef-4830-be74-e24fccc07dad",
+    "slug": "eliza-wildflowers-photography",
+    "city": null,
+    "bot": "bot6",
+    "month": 8,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Evie Joy Photography (Evie Felts)",
+    "vendor_id": "46b51d39-6b8e-45fa-b3f7-f80aff12a495",
+    "slug": "evie-joy-photography-evie-felts",
+    "city": "Mancos/Durango",
+    "bot": "bot7",
+    "month": 6,
+    "year": 2026,
+    "call": 16
+  },
+  {
+    "name": "Hughes Photo Co.",
+    "vendor_id": "ac89a901-ec7a-474f-9e91-5b7e03a7dde7",
+    "slug": "hughes-photo-co",
+    "city": "Colorado Springs",
+    "bot": "bot8",
+    "month": 9,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "In Love and Adventure",
+    "vendor_id": "9fcbf989-ea15-4503-a599-f568850ff1e8",
+    "slug": "in-love-and-adventure",
+    "city": "Colorado Springs",
+    "bot": "bot9",
+    "month": 8,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "John Bosley Photography",
+    "vendor_id": "06f51586-a3ab-4c16-9427-1f3a48e7509e",
+    "slug": "john-bosley-photography",
+    "city": null,
+    "bot": "bot10",
+    "month": 12,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Kate Ivy Photography",
+    "vendor_id": "2aa9db5b-a96c-4970-bbe7-2d33ed3556fe",
+    "slug": "kate-ivy-photography",
+    "city": "Denver",
+    "bot": "bot11",
+    "month": 4,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Kate Merrill Photography",
+    "vendor_id": "52cd4a91-40b0-400d-b2fd-9a42d143803a",
+    "slug": "kate-merrill-photography",
+    "city": null,
+    "bot": "bot12",
+    "month": 3,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Kelly Miller Studios",
+    "vendor_id": "9df3e9ce-ce95-4063-8db5-689f057b594f",
+    "slug": "kelly-miller-studios",
+    "city": null,
+    "bot": "bot13",
+    "month": 5,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Kins Photography",
+    "vendor_id": "c939a2ee-6fa5-422b-b1e9-84cc391d7e7a",
+    "slug": "kins-photography",
+    "city": null,
+    "bot": "bot14",
+    "month": 3,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Kokoro Photography",
+    "vendor_id": "ad6f9205-79e3-4737-99ac-c5b4274efa7d",
+    "slug": "kokoro-photography",
+    "city": null,
+    "bot": "bot15",
+    "month": 10,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Liam Gordon Photography",
+    "vendor_id": "02f90bc5-30cf-464d-b1b4-4fe804624d11",
+    "slug": "liam-gordon-photography",
+    "city": "Colorado Springs",
+    "bot": "bot16",
+    "month": 5,
+    "year": 2026,
+    "call": 16
+  },
+  {
+    "name": "Love Stories with Jen",
+    "vendor_id": "a8f204c4-d7f2-465b-ab3e-f15ad03cdaf3",
+    "slug": "love-stories-with-jen",
+    "city": null,
+    "bot": "bot17",
+    "month": 2,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "McKenzie Bigliazzi Photography",
+    "vendor_id": "5cd51876-c690-4d09-8f20-f83e2782ab27",
+    "slug": "mckenzie-bigliazzi-photography",
+    "city": "Denver",
+    "bot": "bot1",
+    "month": 11,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Molly Margaret Photography",
+    "vendor_id": "bc9a65b4-fd19-415f-8bad-6afcafa82465",
+    "slug": "molly-margaret-photography",
+    "city": null,
+    "bot": "bot2",
+    "month": 10,
+    "year": 2025,
+    "call": 16
+  },
+  {
+    "name": "Mountain Marta Photography",
+    "vendor_id": "45950ed9-be51-47eb-97f0-2acbb13efe3c",
+    "slug": "mountain-marta-photography",
+    "city": "Colorado Springs",
+    "bot": "bot3",
+    "month": 12,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "MSW Photos (Matt Wilson)",
+    "vendor_id": "a78dc21e-4e68-482c-8b0f-87e3e7dfe875",
+    "slug": "msw-photos-matt-wilson",
+    "city": "Denver",
+    "bot": "bot4",
+    "month": 1,
+    "year": 2026,
+    "call": 17
+  },
+  {
+    "name": "Nina Reed / Larsen Photo Co.",
+    "vendor_id": "5ed84b04-5da0-41ad-a82b-f4a25e9741df",
+    "slug": "nina-reed-larsen-photo-co",
+    "city": "Boulder",
+    "bot": "bot5",
+    "month": 1,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Photography: Family, Engagement, Wedding, Portrait etc.",
+    "vendor_id": "0c2ff9e0-ae51-4f0e-9a96-5b8299958264",
+    "slug": "photography-family-engagement-wedding-portrait-etc",
+    "city": "New Castle",
+    "bot": "bot6",
+    "month": 2,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Photos by Elliot",
+    "vendor_id": "278823e4-6083-4dfb-939b-7d33a48e841a",
+    "slug": "photos-by-elliot",
+    "city": null,
+    "bot": "bot7",
+    "month": 6,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Prism Create",
+    "vendor_id": "03a06266-d89e-4997-b55e-e2ce7905fe99",
+    "slug": "prism-create",
+    "city": null,
+    "bot": "bot8",
+    "month": 5,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Roman Photography",
+    "vendor_id": "cc7257a2-b78f-4069-ae95-c5136e6d0017",
+    "slug": "roman-photography",
+    "city": null,
+    "bot": "bot9",
+    "month": 5,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Sarah Godfrey Photography",
+    "vendor_id": "f9d0dc1c-642e-4822-843b-f6366ea4c9a6",
+    "slug": "sarah-godfrey-photography",
+    "city": null,
+    "bot": "bot10",
+    "month": 6,
+    "year": 2026,
+    "call": 17
+  },
+  {
+    "name": "Savannah Chandler Photography",
+    "vendor_id": "1a8c86d4-b4b4-4833-91c7-5d6f78ee7dff",
+    "slug": "savannah-chandler-photography",
+    "city": null,
+    "bot": "bot11",
+    "month": 6,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Shelly M Photography",
+    "vendor_id": "5d50b080-2ad5-430f-9e8a-ba166a76dc2d",
+    "slug": "shelly-m-photography",
+    "city": null,
+    "bot": "bot12",
+    "month": 11,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Stephanie Tod Photography",
+    "vendor_id": "d9bfa45e-cb0e-4f5a-bac2-884da8ac2982",
+    "slug": "stephanie-tod-photography",
+    "city": null,
+    "bot": "bot13",
+    "month": 6,
+    "year": 2026,
+    "call": 17
+  },
+  {
+    "name": "Taylored Wedding and Portraits",
+    "vendor_id": "8b8bae22-e4ba-4a41-ba89-f292b8541c00",
+    "slug": "taylored-wedding-and-portraits",
+    "city": "Denver",
+    "bot": "bot14",
+    "month": 8,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Tom K Photo",
+    "vendor_id": "aba1df06-2e10-4198-965e-415b6ae445ba",
+    "slug": "tom-k-photo",
+    "city": "Boulder",
+    "bot": "bot15",
+    "month": 6,
+    "year": 2026,
+    "call": 17
+  },
+  {
+    "name": "Tomi Photopositive",
+    "vendor_id": "ff269248-b017-43bd-b698-e2589bd04d75",
+    "slug": "tomi-photopositive",
+    "city": "Denver/Broomfield",
+    "bot": "bot16",
+    "month": 12,
+    "year": 2025,
+    "call": 17
+  },
+  {
+    "name": "Vail Mountain Wedding Deck",
+    "vendor_id": "1a3b19dc-e80d-4285-ac9e-e9ddf90cae47",
+    "slug": "vail-mountain-wedding-deck",
+    "city": "Vail",
+    "bot": "bot17",
+    "month": 1,
+    "year": 2026,
+    "call": 17
+  },
+  {
+    "name": "Yellow Paddle Photography",
+    "vendor_id": "563ad562-6880-49ed-b844-f0566a686080",
+    "slug": "yellow-paddle-photography",
+    "city": "Arvada",
+    "bot": "bot1",
+    "month": 12,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Zoe Fortuna Photography",
+    "vendor_id": "23870952-f4ba-44c8-bbc2-c8255d888489",
+    "slug": "zoe-fortuna-photography",
+    "city": null,
+    "bot": "bot2",
+    "month": 5,
+    "year": 2026,
+    "call": 18
+  },
+  {
+    "name": "Alex Medvick Photography",
+    "vendor_id": "58961b06-d6b5-4450-a266-174a16acc977",
+    "slug": "alex-medvick-photography",
+    "city": "Boulder",
+    "bot": "bot3",
+    "month": 2,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Alicia Rinka Photography",
+    "vendor_id": "687e336a-1ddc-45e5-aef9-f4df7ab42868",
+    "slug": "alicia-rinka-photography",
+    "city": "Aspen",
+    "bot": "bot4",
+    "month": 5,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Amanda Berube Photography",
+    "vendor_id": "e5da190a-7af8-410d-b0e7-ac894c919171",
+    "slug": "amanda-berube-photography",
+    "city": null,
+    "bot": "bot5",
+    "month": 3,
+    "year": 2026,
+    "call": 18
+  },
+  {
+    "name": "Annaleisa Veasey Photography",
+    "vendor_id": "720b28be-e9c0-462c-ac46-a24691105f47",
+    "slug": "annaleisa-veasey-photography",
+    "city": null,
+    "bot": "bot6",
+    "month": 6,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Ashley Joyce Photography",
+    "vendor_id": "a6bf3428-7937-4b0e-92e4-bb6c7a680165",
+    "slug": "ashley-joyce-photography",
+    "city": null,
+    "bot": "bot7",
+    "month": 6,
+    "year": 2026,
+    "call": 18
+  },
+  {
+    "name": "Ashley Taylor Photography",
+    "vendor_id": "72727652-a4d9-49b2-91bf-a951cc3d7f7f",
+    "slug": "ashley-taylor-photography",
+    "city": null,
+    "bot": "bot8",
+    "month": 4,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Brenna Skattebo Photography",
+    "vendor_id": "dd1dc577-e2c0-4233-aefe-e6a5e2cc591f",
+    "slug": "brenna-skattebo-photography",
+    "city": null,
+    "bot": "bot9",
+    "month": 1,
+    "year": 2026,
+    "call": 18
+  },
+  {
+    "name": "Bridget Dorr Photography",
+    "vendor_id": "ecdf1846-4e81-483f-8365-e6ad3c541ad8",
+    "slug": "bridget-dorr-photography",
+    "city": "Boulder",
+    "bot": "bot10",
+    "month": 5,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Caitlyn Harris Photography",
+    "vendor_id": "03a9ecd1-e3ff-4970-ac52-34682476e74e",
+    "slug": "caitlyn-harris-photography",
+    "city": null,
+    "bot": "bot11",
+    "month": 8,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Cinematic Studios",
+    "vendor_id": "3017a5ac-9057-44fb-8d16-3f54c0717d12",
+    "slug": "cinematic-studios",
+    "city": "Denver",
+    "bot": "bot12",
+    "month": 2,
+    "year": 2026,
+    "call": 18
+  },
+  {
+    "name": "Cory Antiel Studios",
+    "vendor_id": "a5a35c51-42e7-4f15-8f35-eaf3700e8e85",
+    "slug": "cory-antiel-studios",
+    "city": "Denver",
+    "bot": "bot13",
+    "month": 9,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Deminis Photography",
+    "vendor_id": "be351506-20fe-4b09-acb3-c279d80313c2",
+    "slug": "deminis-photography",
+    "city": null,
+    "bot": "bot14",
+    "month": 3,
+    "year": 2026,
+    "call": 18
+  },
+  {
+    "name": "Elle & Co Photography",
+    "vendor_id": "ef083aa3-adc0-437c-bf62-33771bdbcb1d",
+    "slug": "elle-and-co-photography",
+    "city": "Vail",
+    "bot": "bot15",
+    "month": 1,
+    "year": 2025,
+    "call": 18
+  },
+  {
+    "name": "Emily Beltran Photography",
+    "vendor_id": "4d526a66-f241-4c7d-81a7-cffa6387eae2",
+    "slug": "emily-beltran-photography",
+    "city": null,
+    "bot": "bot16",
+    "month": 3,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "Epic | Photos + Films",
+    "vendor_id": "305cbadd-c0d9-4592-ae35-7ef301a7251f",
+    "slug": "epic-photos-films",
+    "city": "Denver",
+    "bot": "bot17",
+    "month": 6,
+    "year": 2026,
+    "call": 19
+  },
+  {
+    "name": "Evergreen Photo Co.",
+    "vendor_id": "cb39600a-0da6-4d9d-87e6-afed8081f0ef",
+    "slug": "evergreen-photo-co",
+    "city": "Westminster",
+    "bot": "bot1",
+    "month": 4,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "Flor de Campo",
+    "vendor_id": "7c3b367b-bc05-4038-b902-924ddeb9e7ed",
+    "slug": "flor-de-campo",
+    "city": null,
+    "bot": "bot2",
+    "month": 5,
+    "year": 2026,
+    "call": 19
+  },
+  {
+    "name": "Forest Picture Company",
+    "vendor_id": "1713ba5d-aa38-4b8c-9336-21163b2d1fd5",
+    "slug": "forest-picture-company",
+    "city": "Fort Collins",
+    "bot": "bot3",
+    "month": 6,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "George Street Photo & Video",
+    "vendor_id": "c0a6639a-cf59-4d3f-8be6-e3b7908f8ec9",
+    "slug": "george-street-photo-and-video",
+    "city": "Denver",
+    "bot": "bot4",
+    "month": 3,
+    "year": 2026,
+    "call": 19
+  },
+  {
+    "name": "Gracie Marie Photography",
+    "vendor_id": "b89d9f6e-f109-41cf-a9dc-b5434d3548e0",
+    "slug": "gracie-marie-photography",
+    "city": null,
+    "bot": "bot5",
+    "month": 11,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "Homeland Photography",
+    "vendor_id": "d50ba541-c5c9-4fb5-b4e3-8a01aa9e8509",
+    "slug": "homeland-photography",
+    "city": null,
+    "bot": "bot6",
+    "month": 5,
+    "year": 2026,
+    "call": 19
+  },
+  {
+    "name": "Jenny JaeMin Photos",
+    "vendor_id": "b665146b-5615-4111-9c8d-61c46b22e6fd",
+    "slug": "jenny-jaemin-photos",
+    "city": "Denver",
+    "bot": "bot7",
+    "month": 5,
+    "year": 2026,
+    "call": 19
+  },
+  {
+    "name": "Jess & Co",
+    "vendor_id": "cbfeb404-9ce8-4e72-b5d3-4586a12f50ad",
+    "slug": "jess-and-co",
+    "city": null,
+    "bot": "bot8",
+    "month": 4,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "Jessica Cooke Photography",
+    "vendor_id": "1494242f-4381-439d-bf88-5e0f4b3c85a9",
+    "slug": "jessica-cooke-photography",
+    "city": null,
+    "bot": "bot9",
+    "month": 3,
+    "year": 2026,
+    "call": 19
+  },
+  {
+    "name": "Jo McGowan Weddings",
+    "vendor_id": "e53cd564-b6f5-403c-a43d-b6fc2d424351",
+    "slug": "jo-mcgowan-weddings",
+    "city": "Denver",
+    "bot": "bot10",
+    "month": 12,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "Kaitlyn Marie Photography",
+    "vendor_id": "23838bbf-9457-4055-9892-605d46b357cf",
+    "slug": "kaitlyn-marie-photography",
+    "city": "Colorado",
+    "bot": "bot11",
+    "month": 4,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "Katie Blondin Photography",
+    "vendor_id": "db31c1d7-95c7-4693-a69c-38ab3ea8578d",
+    "slug": "katie-blondin-photography",
+    "city": "Littleton",
+    "bot": "bot12",
+    "month": 5,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "Katie Dawn Photography",
+    "vendor_id": "6b3cb447-3db5-4b48-9546-f9737403f12d",
+    "slug": "katie-dawn-photography",
+    "city": "Crested Butte",
+    "bot": "bot13",
+    "month": 11,
+    "year": 2025,
+    "call": 19
+  },
+  {
+    "name": "Kayla Aug Photography",
+    "vendor_id": "43b73564-3041-4d2d-a97f-d37384639ec3",
+    "slug": "kayla-aug-photography",
+    "city": null,
+    "bot": "bot14",
+    "month": 11,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Kiku Ishi Photography",
+    "vendor_id": "05901e0f-2f74-492c-bdc2-7abeecfa9324",
+    "slug": "kiku-ishi-photography",
+    "city": null,
+    "bot": "bot15",
+    "month": 6,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Lauren Leyba Photography",
+    "vendor_id": "dc2982d5-f125-49e2-adf0-feb57799de4e",
+    "slug": "lauren-leyba-photography",
+    "city": "Denver",
+    "bot": "bot16",
+    "month": 8,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Lauren Vandame Photography",
+    "vendor_id": "d1494c01-500f-4350-84a4-ec432c1a01d7",
+    "slug": "lauren-vandame-photography",
+    "city": null,
+    "bot": "bot17",
+    "month": 4,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Ledia Tashi Photography",
+    "vendor_id": "e1d8d28a-97a0-40ff-8450-200e8fcc4819",
+    "slug": "ledia-tashi-photography",
+    "city": "Denver",
+    "bot": "bot1",
+    "month": 12,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "M Nichole Photo",
+    "vendor_id": "7c8d4335-ae80-4452-a513-7609063371f4",
+    "slug": "m-nichole-photo",
+    "city": null,
+    "bot": "bot2",
+    "month": 8,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Mackro Photography",
+    "vendor_id": "03da80a4-5782-48d1-b2ee-05c01e2cfb2d",
+    "slug": "mackro-photography",
+    "city": null,
+    "bot": "bot3",
+    "month": 1,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Makaila Rosin Photography",
+    "vendor_id": "2cb77d99-c869-4ef9-8c28-2aef1a2bb113",
+    "slug": "makaila-rosin-photography",
+    "city": null,
+    "bot": "bot4",
+    "month": 9,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Melanie Joy Photography",
+    "vendor_id": "ccb89532-641e-4822-929a-26224759e87b",
+    "slug": "melanie-joy-photography",
+    "city": null,
+    "bot": "bot5",
+    "month": 3,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Melo Photo + Video",
+    "vendor_id": "f119fb6d-6ad9-4d91-b0a0-1725d97de37a",
+    "slug": "melo-photo-video",
+    "city": "Denver",
+    "bot": "bot6",
+    "month": 9,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Mike Kory Photography",
+    "vendor_id": "959d60e3-4f8e-408f-a0c0-334a2e16c877",
+    "slug": "mike-kory-photography",
+    "city": "Boulder",
+    "bot": "bot7",
+    "month": 4,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Mrs. Ferree Photography",
+    "vendor_id": "075ad2bf-f2ea-4974-a979-c0a232946aa5",
+    "slug": "mrs-ferree-photography",
+    "city": "Denver",
+    "bot": "bot8",
+    "month": 8,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Natali Photographer",
+    "vendor_id": "3c6ffc30-1614-425d-bf4e-040033ffcbf2",
+    "slug": "natali-photographer",
+    "city": null,
+    "bot": "bot9",
+    "month": 11,
+    "year": 2025,
+    "call": 20
+  },
+  {
+    "name": "Nicole Denae Photography",
+    "vendor_id": "723f405a-f383-4346-a14f-a86e060477da",
+    "slug": "nicole-denae-photography",
+    "city": null,
+    "bot": "bot10",
+    "month": 4,
+    "year": 2026,
+    "call": 20
+  },
+  {
+    "name": "Rachel McNurlen Photography",
+    "vendor_id": "c3354407-7089-46af-b062-dcffc9f46b85",
+    "slug": "rachel-mcnurlen-photography",
+    "city": "Boulder/Denver",
+    "bot": "bot11",
+    "month": 6,
+    "year": 2026,
+    "call": 20
+  },
+  {
+    "name": "Samantha Ruscher Photography",
+    "vendor_id": "66ff7828-0edd-4116-b8c4-aa5362f89d58",
+    "slug": "samantha-ruscher-photography",
+    "city": null,
+    "bot": "bot12",
+    "month": 5,
+    "year": 2026,
+    "call": 21
+  },
+  {
+    "name": "Sarah Arnold Photography",
+    "vendor_id": "3a46c589-020c-41ff-b447-912a6a5fb8d1",
+    "slug": "sarah-arnold-photography",
+    "city": "Colorado Springs",
+    "bot": "bot13",
+    "month": 4,
+    "year": 2026,
+    "call": 21
+  },
+  {
+    "name": "Savannah Lauren Photography",
+    "vendor_id": "75119ca5-f998-48ad-9726-73c2328d0d71",
+    "slug": "savannah-lauren-photography",
+    "city": null,
+    "bot": "bot14",
+    "month": 5,
+    "year": 2025,
+    "call": 21
+  },
+  {
+    "name": "Sharee Davenport Photography",
+    "vendor_id": "c62e5d80-4b8f-4dad-bc95-6ddd53a91eef",
+    "slug": "sharee-davenport-photography",
+    "city": null,
+    "bot": "bot15",
+    "month": 6,
+    "year": 2025,
+    "call": 21
+  },
+  {
+    "name": "Stephanie Mathena Photography",
+    "vendor_id": "af30e3e2-2575-44a7-8952-9323074cca2d",
+    "slug": "stephanie-mathena-photography",
+    "city": "Denver",
+    "bot": "bot16",
+    "month": 9,
+    "year": 2025,
+    "call": 21
+  },
+  {
+    "name": "Taryn Ashlee Photography",
+    "vendor_id": "54e89808-eb21-44e0-b3ff-77192ef17b8f",
+    "slug": "taryn-ashlee-photography",
+    "city": null,
+    "bot": "bot17",
+    "month": 4,
+    "year": 2025,
+    "call": 21
+  },
+  {
+    "name": "The Pic Chick",
+    "vendor_id": "1693ba72-1365-4455-9874-831c1ce12e14",
+    "slug": "the-pic-chick",
+    "city": "Thornton",
+    "bot": "bot1",
+    "month": 3,
+    "year": 2026,
+    "call": 21
+  },
+  {
+    "name": "The Twilight Photo & Film",
+    "vendor_id": "96b9e20b-a7ec-4e63-a70d-359147bbfddf",
+    "slug": "the-twilight-photo-and-film",
+    "city": "Colorado Springs",
+    "bot": "bot2",
+    "month": 6,
+    "year": 2026,
+    "call": 21
+  },
+  {
+    "name": "The Wild Phern",
+    "vendor_id": "c19c0198-4fae-437d-af79-d7643bbd1338",
+    "slug": "the-wild-phern",
+    "city": null,
+    "bot": "bot3",
+    "month": 6,
+    "year": 2025,
+    "call": 21
+  },
+  {
+    "name": "Tilted Frame Photography & Design",
+    "vendor_id": "9061908e-c689-44a1-8ea0-be4c1160c4c9",
+    "slug": "tilted-frame-photography-and-design",
+    "city": "Denver",
+    "bot": "bot4",
+    "month": 1,
+    "year": 2026,
+    "call": 21
+  },
+  {
+    "name": "Valr Studios Photography",
+    "vendor_id": "45973bd7-1876-48b1-aaf2-f7ef44f5a180",
+    "slug": "valr-studios-photography",
+    "city": "Colorado Springs",
+    "bot": "bot5",
+    "month": 7,
+    "year": 2025,
+    "call": 21
+  },
+  {
+    "name": "Whitney Rae Photography",
+    "vendor_id": "e127dd2a-aacf-4b38-b38e-f49fb4898975",
+    "slug": "whitney-rae-photography",
+    "city": "Vail",
+    "bot": "bot6",
+    "month": 1,
+    "year": 2026,
+    "call": 21
+  },
+  {
+    "name": "Yoni Gill Photography",
+    "vendor_id": "17100e9b-dfa7-4758-9d75-e2d533f58969",
+    "slug": "yoni-gill-photography",
+    "city": null,
+    "bot": "bot7",
+    "month": 1,
+    "year": 2026,
+    "call": 21
+  }
+]

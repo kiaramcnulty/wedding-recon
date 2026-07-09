@@ -1,0 +1,25 @@
+{
+  "vendor_id": "659ba76f-88e1-4572-8350-9a22ca5bf3da",
+  "name": "Light in Motion Co",
+  "city": "Telluride",
+  "website": "http://www.jasonanddaris.com/",
+  "place_id": "ChIJpxypXDnZPocRXP7VbnoPL2A",
+  "fetched_at": "2026-07-09T07:48:34.658Z",
+  "google": {
+    "websiteUri": "http://www.jasonanddaris.com/",
+    "reviews": []
+  },
+  "pdfs": [],
+  "images": [
+    "http://www.jasonanddaris.com/uploads/2019/03/0038-Toni.jpg",
+    "https://www.jasonanddaris.com/blog/wp-content/uploads/2019/03/0038-Toni.jpg",
+    "http://www.jasonanddaris.com/blog/wp-content/uploads/2019/03/Jason-and-Daris-Profile-Round-300x290.jpg",
+    "http://www.jasonanddaris.com/blog/wp-content/plugins/revslider/admin/assets/images/dummy.png"
+  ],
+  "pages": [
+    {
+      "url": "http://www.jasonanddaris.com/",
+      "kind": "home"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "vendor_id": "b7b2e7e7-65ca-4d57-9c97-2fd36d94e0d2",
+  "name": "Aamodt Studio",
+  "city": "Estes Park",
+  "website": "http://www.aamodtstudio.com/",
+  "place_id": "ChIJ0R61VLFlaYcRe0YEw-gGmTs",
+  "fetched_at": "2026-07-09T07:45:11.865Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 9,
+    "websiteUri": "http://www.aamodtstudio.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2021-07",
+        "text": "Rannveig is an absolute gem. It was wonderful meeting her and having her as our photographer on our intimate family trip in Estes Park. My fiancé and I were able to get last minute photos done with her and I cannot express how appreciative we were of her candor. Her energy is so warm and calming. When choosing a local photographer, you want someone who will take care of you and all the little details. Rannveig did just that. We love her and hope to come back soon to Colorado for another shoot!"
+      },
+      {
+        "rating": 5,
+        "when": "2019-08",
+        "text": "Rannveig was an absolutely amazing photographer for our wedding! She was extremely professional in her ability to organize our bridal party and family. Also, the pictures she took were stunning! Everyone took our breath away. She even stayed later that anticipated to ensure we got all the night shots we wanted. We would highly recommend Aamodt Studio for any wedding photographer. Rannveig was a major part of making our wedding a success!"
+      },
+      {
+        "rating": 5,
+        "when": "2021-10",
+        "text": "Rannveig did the most stunning job of capturing our wedding in Estes Park! She worked so efficiently and helped organize all of us to be our most photogenic selves! The photos are all beautiful and have a natural feel to them; they don't feel forced/posed which is exactly what we were hoping for! We couldn't have found a better photographer and highly recommend her to anyone for any occasion! We are so excited to have these photos to cherish forever."
+      },
+      {
+        "rating": 5,
+        "when": "2015-07",
+        "text": "We could not have chosen a better photographer to share our special day with and to capture all of the innate details of our wedding experience.  Rannveig is a talented artist and the composition of her photos is well thought out so they burst with color and rich texture.  She was relaxed during the shoot but was also energetic with ideas and a joyful personality.  I don't know how we are going to narrow down the best shots... we love them all!\nJill & Craig Wingrove\nAustin, TX"
+      },
+      {
+        "rating": 5,
+        "when": "2015-07",
+        "text": "Rannveig took photos of our family this summer.  We were beyond impressed.  Rannveig was professional, easy to work with and so great with our wild boys.  I couldn't believe how fast she got our pictures back to us, and there were so many amazing shots!  Her photographs are stunning and so natural.  She captured exactly what we wanted.  Thank you, Rannveig for capturing this special time in our family's life."
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://aamodtstudiocomb01ed.zapwp.com/q:u/e:1/r:0/wp:1/w:1/u:https://aamodtstudio.com/wp-content/uploads/2018/09/aamodt.png",
+    "https://aamodtstudio.com/uploads/2018/09/rannveig-headshot-275x300.jpg",
+    "https://aamodtstudiocomb01ed.zapwp.com/q:u/e:1/r:0/wp:1/w:1/u:https://aamodtstudio.com/wp-content/uploads/2018/09/rannveig-headshot-275x300.jpg",
+    "https://aamodtstudiocomb01ed.zapwp.com/q:u/e:1/r:0/wp:1/w:1/u:https://aamodtstudio.com/wp-content/uploads/2018/09/portfolio-111.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://aamodtstudio.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://aamodtstudio.com/about/",
+      "file": "page-about.txt"
+    },
+    {
+      "url": "https://aamodtstudio.com/pricing/",
+      "file": "page-pricing.txt"
+    },
+    {
+      "url": "https://aamodtstudio.com/faq/",
+      "file": "page-faq.txt"
+    }
+  ]
+}

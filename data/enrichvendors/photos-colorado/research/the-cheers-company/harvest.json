@@ -1,0 +1,56 @@
+{
+  "vendor_id": "b735c747-aec5-4054-8f9d-5ef0b5fb42ae",
+  "name": "The Cheers Company",
+  "city": "Telluride",
+  "website": "http://thecheerscompany.com/",
+  "place_id": "ChIJY1nJ7ZXZPocRNJWx36-k6tM",
+  "fetched_at": "2026-07-09T07:48:29.021Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 26,
+    "websiteUri": "http://thecheerscompany.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2025-06",
+        "text": "Jonathon was great! Very easy to work with and kept our small wedding stress free. The personalization in the ceremony was perfect and told our story wonderfully. We couldn’t have asked for anything better. Thank you!"
+      },
+      {
+        "rating": 5,
+        "when": "2024-08",
+        "text": "HIGHLY recommend Jonathon! He’s super easy to talk to, his process is stress-free and he creates absolutely beautiful ceremony speeches. We are so happy to have had him with us on our special day. :)\n\nNo need to be on the fence, book him! Such a great experience and you’ll be happy you did."
+      },
+      {
+        "rating": 5,
+        "when": "2025-09",
+        "text": "It was a true pleasure to work with Jonathon on my best man speech. He was patient, listened well, and captured the essence of the speech perfectly. I had tons of kudos from family and friends after. You will not be disappointed!"
+      },
+      {
+        "rating": 5,
+        "when": "2024-06",
+        "text": "Jonathan was absolutely amazing at officiating our Elopement. His ceremony speech had us laughing, crying and then crying while laughing. He even dressed the part as a \"True Texan\" since the two of us traveled from Texas to elope in the mountains of Ouray, CO. Having The Cheers Company officiate our elopement felt like having our best friend telling our story. I am so grateful to have had him there and cannot recommend him enough. Thank you so much again!  - The Ornelas"
+      },
+      {
+        "rating": 5,
+        "when": "2025-11",
+        "text": "Jonathan did a beautiful job writing our wedding service. We loved having my new SIL conduct the service. Jonathan's service took the burden off her shoulders so we could all enjoy the day more."
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://static.wixstatic.com/media/7df7d2_430865f68a8b481a8b9cf6a6a98097eb~mv2.jpg/v1/fill/w_147,h_79,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/7df7d2_430865f68a8b481a8b9cf6a6a98097eb~mv2.jpg",
+    "https://static.wixstatic.com/media/7df7d2_300230b34215467393367e3c4eecb6dc~mv2.jpg/v1/fill/w_123,h_82,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/7df7d2_300230b34215467393367e3c4eecb6dc~mv2.jpg",
+    "https://static.wixstatic.com/media/7df7d2_61c14df32f2c472dacae3c222213fa21~mv2.png/v1/fill/w_70,h_88,al_c,q_85,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/7df7d2_61c14df32f2c472dacae3c222213fa21~mv2.png"
+  ],
+  "pages": [
+    {
+      "url": "https://www.thecheerscompany.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://www.thecheerscompany.com/about",
+      "file": "page-about.txt"
+    }
+  ]
+}
