@@ -60,5 +60,8 @@ next-env.d.ts
 # launchvendors skill working artifacts
 /data/launchvendors/
 
-# enrichvenues skill working artifacts
+# enrichvenues skill working artifacts (legacy venue workdirs + shared rosters)
 /data/enrichvenues/
+
+# enrichvendors skill working artifacts
+/data/enrichvendors/
