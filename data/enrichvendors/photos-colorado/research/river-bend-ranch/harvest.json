@@ -1,0 +1,77 @@
+{
+  "vendor_id": "199e14b2-fbf5-4de1-a198-1365eda71e82",
+  "name": "River Bend Ranch",
+  "city": "Durango",
+  "website": "http://riverbendranchdurango.com/",
+  "place_id": "ChIJzzm-bBmmPocRfw8uY2H1NpA",
+  "fetched_at": "2026-07-09T07:49:40.494Z",
+  "google": {
+    "rating": 4.9,
+    "ratingCount": 133,
+    "websiteUri": "http://riverbendranchdurango.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2025-10",
+        "text": "River Bend Ranch was the perfect venue for my partner, Sterling, and mine's wedding this past weekend (Oct.11, 2025)!\nThe owners Dan and Jenny are such a delight and Brittney our planner is an absolute rock star!!\nFrom the months planning leading up , to the day of the wedding the whole team was truly amazing!\nBrittney is so knowledgeable about the area and all our vendors and she made our wedding planning experience so stress free!\nThe property is absolutely beautiful and was the perfect backdrop for our special day. All our guests were just in awe of the beautiful surroundings!\nThere was some rain predicted on the day and Brittney had a backup plan in place and kept my mind at ease. The sun came out just in time, thankfully, but I just know that even if it hadn't it still would have been just as beautiful!\nI can not sing the praises enough of Brittney and the whole River Bend Ranch team. Our wedding day was everything we envisioned and more, thanks to them!\nIf you are planning to get married in Durango, this is the venue to do it!!\nAll our gratitude,\nEmily+Sterling"
+      },
+      {
+        "rating": 5,
+        "when": "2026-06",
+        "text": "This venue is breathtaking! The ponds and mountain cliff backgrounds are unmatched. I had the pleasure of attending a wedding at Riverbend ranch and I could not recommend it more. The scenery is perfect for wedding photos and date photos. 10/10"
+      },
+      {
+        "rating": 5,
+        "when": "2023-10",
+        "text": "Beautiful venue for a wedding or party. Great location-just minutes north of Durango. The property is immaculate and there's a house on the property for the family to stay at. Lots of lovely spots for pictures too."
+      },
+      {
+        "rating": 5,
+        "when": "2021-10",
+        "text": "As a photographer, I can say the River Bend Ranch is truly a wedding dream! It's the perfect venue for a wedding! Not only is the venue absolutely stunning, but the staff excel in customer experience and taking care of their clients. They put so much care and time into the venue and every wedding or event that happens there. If you are searching for a venue with a rustic aesthetics, whimsical nature, and amazing staff, the River Bend Ranch is for you!"
+      },
+      {
+        "rating": 5,
+        "when": "2022-10",
+        "text": "River Bend Ranch is Awesome!!!! Dan and his team are super easy to work with, and our wedding was absolutely magical.  The venue is gorgeous, and requires very little of our own decorations thanks to prejnstalled lighting and the beautiful setting.  There was a small mix up on access time for the venue, but Dan was great and worked with us to get it all figured out.  His team was there the whole time and helped make sure the vendors got all set up in the right place and that everything ran smoothly.  We couldnt have picked a better place to get married. My brothers even got to fish in the pond while they waited for me to get ready, and several of our guests enjoyed toodling around in the peddle boats.  We would absolutely recommend this venue to anyone looking to have a large event!"
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://riverbendranchdurango.com/uploads/2023/01/BannerImage.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/BannerImage.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/11/Event-Planning.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/12/DJI_0078_Moment.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/DJI_0022_SQ-e1674065264227.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/Weddings.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/Planning.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/Lodging.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/12/Megan_Alex_Wedding-1122-scaled.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/12/annie_jay601.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/12/Ryan-Heathers-Wedding-Sneak-Peek-14.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/LakeReflection-1.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/12/RBR_WillowReflection2-scaled.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/12/DSC3315-scaled.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/10/Stars.png",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/IMG1_TheViews.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/IMG2_Lodging-e1673972302814.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/IMG5_EventBarn.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/IMG4_CeremonySites-e1673634211638.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2023/01/IMG3_BridalSuite.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/10/Quotes.png",
+    "https://insideoutcreative.io/wp-content/uploads/2022/04/created-by-inside-out-creative.png",
+    "https://riverbendranchdurango.com/uploads/2022/12/IMG_9642-scaled.jpg",
+    "https://riverbendranchdurango.com/wp-content/uploads/2022/12/IMG_9642-scaled.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://riverbendranchdurango.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://riverbendranchdurango.com/about/",
+      "file": "page-about.txt"
+    }
+  ]
+}

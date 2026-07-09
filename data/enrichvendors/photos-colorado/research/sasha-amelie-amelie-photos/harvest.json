@@ -1,0 +1,34 @@
+{
+  "vendor_id": "b7062a61-2bb4-4b53-8053-50d609ad62c4",
+  "name": "Sasha Amelie / Amelie Photos",
+  "city": null,
+  "website": "https://amelie-photos.com",
+  "place_id": null,
+  "fetched_at": "2026-07-09T07:51:48.596Z",
+  "pdfs": [],
+  "images": [
+    "https://i.wfolio.com/x/2liGxMhJRjilwq8i78-UqZczLd56D3TA/sTnJtdZp03LsDDiOBzLXI-I2h26Bzrzc/Bot0vFCnP1dTasSPrlXnq8NcZaqaNckX/W9Uhpy3prK9cuaWxCbhGKV-squgTQrJk/qKdmE4wsbHZzoWXYenLJLg.png"
+  ],
+  "pages": [
+    {
+      "url": "https://amelie-photos.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://amelie-photos.com/prices",
+      "file": "page-prices.txt"
+    },
+    {
+      "url": "https://amelie-photos.com/weddings",
+      "file": "page-weddings.txt"
+    },
+    {
+      "url": "https://amelie-photos.com/proposal-engagement",
+      "file": "page-proposal-engagement.txt"
+    },
+    {
+      "url": "https://amelie-photos.com/faq",
+      "file": "page-faq.txt"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "vendor_id": "e2766aff-50a4-4ef0-b0a0-d2635717411d",
+  "name": "Aspen Sage Photo",
+  "city": "Aspen",
+  "website": "https://www.aspensagephoto.com",
+  "place_id": null,
+  "fetched_at": "2026-07-09T07:54:25.563Z",
+  "pdfs": [],
+  "images": [
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/2e0dcebc-d5cc-4c91-bcad-b178861dcd75/Untitled-2.jpg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/4048ce8c-7034-4340-a4f5-5c1a04b46c32/title4.jpg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1732987056236-EL4PCZLP1Y0HZ495GIY0/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1732911801208-FJS1UO6N3XBZWSCK2FZ1/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1732243337699-FOOTVG4V0SJBEHH5LC5S/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1729949100551-GUPC15K3M5K39K424GZ6/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1729565648124-R2MYLIL133E506JYPO9P/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1729565648880-JUZ3O1KK6GUP1JOH10XY/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1729565650723-TQFODPPVS3HSSLXC2THA/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1729565652188-O7XOEVAK9I9OK2H6G9DQ/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1729565652771-JPV9TC7XIP4F304ZHFL7/image-asset.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/1e7daf3c-fc4f-43bc-9f47-cf9035dd42a9/DSC_3078.jpg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/4e5220c9-7060-4ccf-9ecd-36422e171214/WKP_3369.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/95bf454a-8346-4114-9785-63ff38f3a8a1/1-325.jpg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/c19a51d9-c63a-4d72-be4c-c2131f2bb79c/DSC_1093.jpg.webp",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/77bacd72-aa8c-4830-9b72-11e4764f26e7/Boulder%2BLifestyle%2BMagazine.png",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/4b713180-f140-4377-b3c9-c68b5acb3b38/Screenshot+2026-01-22+at+3.50.51%E2%80%AFPM.png",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/8a68e48b-dcbe-400b-ad0a-1a59ec968b3c/IMG_2557.JPG",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/e6eb22fe-7ec4-4b41-8ab1-9aa7389daf60/Screenshot+2024-09-16+at+5.09.20%E2%80%AFPM.png",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/f5974dba-68e0-4f27-99b8-6eb7b63eac9e/SaylreAspenSagePhoto-719.jpg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/74ff54ff-25b7-409b-8f2a-7e34d335c705/DSC_3144-topaz-face-sharpen-upscale-2x.jpg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/3993b5d9-81f8-4862-89e2-62d7529a90f0/WKP_3104-topaz-face-sharpen-upscale-2.8x.jpg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/e702bad8-55f1-4d22-8fb5-6452cda712fd/finals-284.jpg",
+    "https://images.squarespace-cdn.com/content/v1/66e9afb283489d68eb3e9a29/de1cb752-1019-4755-8b73-b04192e0bc50/DSC_6051.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://www.aspensagephoto.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://www.aspensagephoto.com/packagesgeneral",
+      "file": "page-packagesgeneral.txt"
+    },
+    {
+      "url": "https://www.aspensagephoto.com/faqs",
+      "file": "page-faqs.txt"
+    }
+  ]
+}

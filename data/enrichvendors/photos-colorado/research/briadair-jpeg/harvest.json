@@ -1,0 +1,58 @@
+{
+  "vendor_id": "bb7f786c-307e-448a-9fa5-a319b6b92fb7",
+  "name": "briadair.jpeg",
+  "city": "Littleton",
+  "website": "https://briadair.com/",
+  "place_id": "ChIJ_4iFywaMhygRhWaga_no7Dc",
+  "fetched_at": "2026-07-09T07:54:45.575Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 24,
+    "websiteUri": "https://briadair.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2026-05",
+        "text": "Incredibly talented and  a pleasure to work with. I’ve had the pleasure of getting my photo taken by Bri and I can’t recommend her enough. Such a sweet person who’s truly passionate about her craft."
+      },
+      {
+        "rating": 5,
+        "when": "2026-06",
+        "text": "Bri was wonderful to work with, especially as a couple that is not comfortable being photographed and in the center of attention. Bri was incredibly easy-going and understanding of our go with the flow wedding vibes. We appreciated not feeling rushed or pressured, and were impressed with how many quality photos she took without the focus of the day being on capturing the perfect shots. She offered her services to us at such a great rate and we were happy to be her guinea pigs in an incredibly dimly lit cave wedding. To be able to capture quality photos in the dark cave setting really highlights Bri’s attention to detail and creative skills. Her style leans towards candid and real moments, which was important to us. We couldn’t have been more happy with the results. And talk about turnaround time – this girl got us our shots within a week of the wedding date, despite it being in the middle of the busy season. Bri has incredible communication, wanted to make sure we were 100% satisfied with the photos we got back, and was phenomenal to work with. We wouldn’t hesitate booking her again the next time we need a special moment captured."
+      },
+      {
+        "rating": 5,
+        "when": "2026-05",
+        "text": "By far one of my favorite photographers!!  She’s so talented and really knows how to get the best angles. On top of being very great at taking the best photos of you she is super kind and will absolutely be my go to photographer for any special event."
+      },
+      {
+        "rating": 5,
+        "when": "2026-05",
+        "text": "Bri has done multiple shoots for me and my family whether it's for martial arts or portraits. She's always creative in her shots and always delivers a top quality album! Cannot recommend anyone more!!"
+      },
+      {
+        "rating": 5,
+        "when": "2026-05",
+        "text": "Bri photographed our family’s baby shower and her work is incredible. She was present, engaged, friendly, and had final photos delivered in record time! We will definitely be using Bri again to capture special days!"
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://cdn.bloom.io/18507c8266e95649d1f282783c5b093a-xl.jpg",
+    "https://cdn.bloom.io/ded0d80bc11efdfce92ed69f88ea2348-sm.png",
+    "https://cdn.bloom.io/ded0d80bc11efdfce92ed69f88ea2348-xs-sm.png",
+    "https://cdn.bloom.io/b749d782f0c7ac4c7e113d1cd8620672.jpg",
+    "https://cdn.bloom.io/ac20220803f396f62ebdbc31772511aa-xs.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://briadair.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://briadair.com/about",
+      "file": "page-about.txt"
+    }
+  ]
+}

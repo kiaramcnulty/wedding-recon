@@ -1,0 +1,77 @@
+{
+  "vendor_id": "5a6e7c92-e814-44af-b728-40e632afc71d",
+  "name": "Francis Sylvest",
+  "city": "Boulder",
+  "website": "https://francissylvest.com",
+  "place_id": null,
+  "fetched_at": "2026-07-09T07:50:17.613Z",
+  "pdfs": [],
+  "images": [
+    "https://francissylvest.com/uploads/2024/09/FILM-11-1-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2024/09/FILM-11-1-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/02/Helen-Max-Film-7-9-687x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2025/08/KC-35mm-3-13-686x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-201-687x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2025/10/Helen-Max-Previews-52-683x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-35-750x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2023/06/AS-Film-70-768x669.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-148-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Helen-Max-BW-108-683x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-175-1024x686.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Digital-Edits-148-1024x683.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-41-1024x679.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Helen-Max-BW-7-1024x683.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Digital-Edits-169-1024x768.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-135-1024x686.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-161-1024x686.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-132-1024x686.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Digital-Edits-25-768x576.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-134-687x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2025/11/Jessica-Howie-Previews-II-3-1024x683.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Digital-Edits-18-683x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-13-1024x679.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-50-686x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-168-1024x686.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Film-Edits-40-1024x679.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/04/Portfolio-2026-Digital-Edits-113-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2024/07/Zareen-Noah-Previews-10-768x1024.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/01/Kristie-Brandon-35mm-Film-46-1024x686.jpg",
+    "https://francissylvest.com/wp-content/uploads/2025/12/Helen-Max-Film-7-10-1024x686.jpg",
+    "https://francissylvest.com/wp-content/uploads/2024/09/Allison-Reed-Film-Photos-35mm-2-15-1024x679.jpg",
+    "https://francissylvest.com/wp-content/uploads/2024/12/Avery-Chris-35mm-Film-1-22-1024x679.jpg",
+    "https://francissylvest.com/uploads/2023/06/AS-Film-103-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2023/06/AS-Film-103-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2024/02/Francis-Sylvest-Film-Strip-2-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2024/02/Francis-Sylvest-Film-Strip-1-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2024/02/Francis-Sylvest-Film-Strip-3-scaled.jpg",
+    "https://francissylvest.com/uploads/2024/09/Allison-Reed-Film-Photos-35mm-1-2-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2024/09/Allison-Reed-Film-Photos-35mm-1-2-scaled.jpg",
+    "https://francissylvest.com/wp-content/uploads/2026/05/Screenshot-2026-03-31-at-10.35.28-AM-scaled.png"
+  ],
+  "pages": [
+    {
+      "url": "https://francissylvest.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://francissylvest.com/about/",
+      "file": "page-about.txt"
+    },
+    {
+      "url": "https://francissylvest.com/wedding-cinematographer/",
+      "file": "page-wedding-cinematographer.txt"
+    },
+    {
+      "url": "https://francissylvest.com/crested-butte-wedding-photographer-and-videographer/",
+      "file": "page-crested-butte-wedding-photographer-and-v.txt"
+    },
+    {
+      "url": "https://francissylvest.com/colorado-wedding-photographer/",
+      "file": "page-colorado-wedding-photographer.txt"
+    },
+    {
+      "url": "https://francissylvest.com/aspen-wedding-photographer-and-videographer/",
+      "file": "page-aspen-wedding-photographer-and-videograp.txt"
+    }
+  ]
+}

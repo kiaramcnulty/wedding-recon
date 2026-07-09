@@ -1,0 +1,130 @@
+Denver Wedding Photographer | Kate Merrill [Queer Approved] 
+document.documentElement.classList.remove( 'no-js' );
+var _iub = _iub || [];
+_iub.csConfiguration = {"ccpaAcknowledgeOnDisplay":false,"whitelabel":false,"lang":"en","floatingPreferencesButtonDisplay":"bottom-right","siteId":2428710,"enableCcpa":true,"countryDetection":true,"perPurposeConsent":true,"cookiePolicyId":52104022, "banner":{ "acceptButtonDisplay":true,"customizeButtonDisplay":true,"position":"float-top-center","rejectButtonDisplay":true,"listPurposes":true,"acceptButtonColor":"#69b3bb","acceptButtonCaptionColor":"white","customizeButtonColor":"#535353","customizeButtonCaptionColor":"white","rejectButtonColor":"#ed6a29","rejectButtonCaptionColor":"white","textColor":"#515151","backgroundColor":"#ffffff" }};
+//# sourceURL=iubenda-head-inline-scripts-0
+https://www.katemerrillphoto.com/wp-includes/js/jquery/jquery.min.js
+https://www.katemerrillphoto.com/wp-includes/js/jquery/jquery-migrate.min.js
+Skip to content 
+Portfolio 
+Pricing 
+About 
+Resources 
+Contact 
+Toggle Menu 
+Contact 
+Contact me 
+Denver wedding photographer
+for folks who rock their weird
+My Process
+You deserve wedding photos
+that embrace your whole self
+They can scream YOU from the rooftops, celebrate how awesome your love is, and not be a copy of whatever’s trending. You dance to your own beat, and your wedding doesn’t play by the rules. So why should your photos look like everyone else’s?
+Give me Unique Wedding Photos! 
+your wedding
+isn’t an 8 hour photoshoot
+You're going to enjoy every moment, relish every hug, be present for every conversation, AND have great photos at the end of it. You decide how much of your day is structured photo time. If you want to *gasp* attend your cocktail hour, we'll make it happen. 
+You’re Speaking my Language 
+I’m a wedding photographer
+not an adventure elopement photographer
+Mountain views are stunning. We all know that. We're in Colorado!! But you? You’re planning a wedding where you put your people first, and that's where I find the real magic. I’m just as pumped to photograph the RiNo alleys and LoDo architecture as I would be surrounded by mountains, as long as you're there having a blast with the people you love most. 
+I'll be in the thick of it on your dance floor, dodging wayward elbows and catching every wild, beautiful moment of your day from start to finish.
+Photograph my people 
+As Seen In
+Reviews
+“Booking Kate will be the best decision that you make for your wedding in Denver”
+You will never regret it. She was amazing from the first day we met her to our wedding day. Everyone we have shown our photos to has commented on how unique, artistic, and beautiful they are.
+– Libby & Drew 
+“Are you getting married? Are you two nerds in love? Are you near Denver?”
+Then I have the photographer for you! Kate was incredible. She was organized, talented, and exceptionally kind. She takes photos of couples all the time, but I felt so cared for and seen by her, and her passion for what she does was evident in everything. 
+– Amber & Kevin 
+“Kate got it, and our photos turned out beautifully as a result”
+I highly highly recommend working with Kate for your wedding, ESPECIALLY if you are LGBTQ+. No stodgy heteronormative posing or uncomfortable “who’s the guy?” awkwardness. 
+– Heather & Claire 
+my work
+Blanc Denver Wedding
+Ironton Distillery Wedding in Denver
+Engagement Photos at RiNo Art Park in Denver
+Denver County Courthouse Wedding
+Planet Bluegrass Wedding in Lyons, Colorado
+Gay Wedding at the Denver Children’s Museum
+Denver Microwedding at Hotel Teatro
+Hotel Colorado Wedding in Glenwood Springs
+Denver Skylight LGBTQ+ Wedding
+if you’re thinking
+what do I do with my hands?
+We all do the second a camera gets pointed at us. Myself included. I’ll take you from deer-in-the-headlights to loving every moment of your wedding day. REALLY. 
+I know you’re thinking you’re the exception. Everyone I’ve photographed has promised me THEY’RE going to be the most awkward. But they weren’t, and you’re not either. Just like all the other awesome humans in all my photos…
+love looks good on you too.
+About Kate
+hey! it’s me Kate, she/they
+but this isn’t about me
+Because I’m not at your wedding to add more photos to my portfolio or a new reel to my Instagram feed. I’m there for YOU. Your experience on your day is what matters to me most. That means what you prioritize comes first. If that’s sitting with your grandparents and listening to your favorite stories again, that’s what I’m photographing.
+I really don’t like talking about myself, but here’s the short of it: I’m an out and proud sci-fi nerd, board game enthusiast, book goblin, fan of all things others think are “geek-y”, and bi wedding photographer who's had a camera in their hands their whole life. If you want more…
+there’s photos of me in nerdy costumes here 
+🏳️&zwj;🌈 We’re inclusive of all love and all people . PERIOD. 🏳️&zwj;🌈
+Every person in this world deserves love, marriage, beautiful photographs, and vendors who celebrate them and their relationships.
+What’s Next?
+pricing 
+Planning Resources for Denver Weddings
+wait! before you head out
+Want Wedding Planning Help?
+Best Denver Wedding Venues
+ Read More 
+Denver Small Wedding Guide
+ Read More 
+Courthouse Wedding Guide
+ Read More 
+Farm Wedding Venue Guide
+ Read More 
+check out some more guides 
+Navigation
+Home 
+About 
+Pricing 
+Resources 
+Portfolio 
+LGBTQ+ 
+Contact 
+Kate Merrill
+for folks who rock their weird
+Kate Merrill is a Denver Wedding Photographer servicing the Denver Metro Area and Front Range. Travel for services is included to Denver, Boulder, Littleton, Morrison, Golden, Evergreen, Conifer, and Lyons. A small fee applies to travel for Breckenridge, Aspen, Vail, Eagle, Colorado Springs, and Fort Collins. We also travel to New Mexico, Utah, Washington, California, Mexico, and the UK for lodging and airfare. Just ask for more details.
+full transparent pricing 
+Instagram 
+Pinterest 
+Facebook 
+Mail 
+Favorites
+Best Denver Wedding Venues 
+Denver Courthouse Wedding Guide
+Dog-Friendly Wedding Venues 
+Boulder Elopement Guide 
+Security & Legal
+Privacy Policy 
+Cookie Policy 
+Terms & Conditions 
+Portfolio 
+Pricing 
+About 
+Resources 
+document.documentElement.style.setProperty('--scrollbar-offset', window.innerWidth - document.documentElement.clientWidth + 'px' );
+var kadenceConfig = {"screenReader":{"expand":"Child menu","expandOf":"Child menu of","collapse":"Child menu","collapseOf":"Child menu of"},"breakPoints":{"desktop":"1024","tablet":768},"scrollOffset":"0"};
+//# sourceURL=kadence-navigation-js-extra
+https://www.katemerrillphoto.com/wp-content/themes/kadence/assets/js/navigation.min.js
+https://www.katemerrillphoto.com/wp-content/plugins/breeze/assets/js/js-front-end/breeze-lazy-load.min.js
+document.addEventListener("DOMContentLoaded", function () {
+ if ( "function" !== typeof window.LazyLoad && "function" !== typeof LazyLoad ) {
+ return;
+ }
+var breezeLazyLoad = window.LazyLoad || LazyLoad;
+window.lazyLoadInstance = new breezeLazyLoad({
+ elements_selector: ".br-lazy",
+ data_src: "breeze",
+ data_srcset: "brsrcset",
+ data_sizes: "brsizes",
+ class_loaded: "br-loaded",
+ threshold: 300,
+ });
+ });
+//# sourceURL=breeze-lazy-js-after
+window.addEventListener("DOMContentLoaded",(e=&gt;{document.querySelectorAll('img[loading="lazy"]').forEach((e=&gt;{e.getBoundingClientRect().top&lt;=window.innerHeight&&(e.loading="eager")}))}));

@@ -1,0 +1,68 @@
+{
+  "vendor_id": "e81845ec-3587-4763-8293-345eb818c9e9",
+  "name": "Donovan Pavilion",
+  "city": "Vail",
+  "website": "http://www.donovanpavilion.com/",
+  "place_id": "ChIJf3Yx-JBwaocRAI9220ievBw",
+  "fetched_at": "2026-07-09T07:43:59.450Z",
+  "google": {
+    "rating": 4.7,
+    "ratingCount": 138,
+    "websiteUri": "http://www.donovanpavilion.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2025-12",
+        "text": "We always enjoy working weddings at Donovan Pavilion because the space gives couples so much creative freedom. The main hall is spacious and elegant, the large patio is ideal for outdoor moments, and the surrounding area offers endless portrait opportunities. The ability to bring in outside catering and vendors is a huge advantage for couples who want a customized experience. Photographing and filming weddings here is always smooth and enjoyable. It is an excellent venue for couples who want an elevated mountain celebration that still feels personal and flexible."
+      },
+      {
+        "rating": 5,
+        "when": "2025-10",
+        "text": "The Donovan Pavilion was the most perfect venue for our wedding reception. It was able to accommodate our large guest list and the location could not be more beautiful. The venue is so beautiful that we were able to save a lot of money on decor and florals. Our cocktail hour outside was a dream! We loved working with Mindy and the team - they were so responsive and helpful through the entire process. One of the most beautiful venues in Vail and totally affordable."
+      },
+      {
+        "rating": 5,
+        "when": "2025-08",
+        "text": "As a florist I love the Donovan Pavillion! The space is beautiful and so peaceful by the river. I especially love the outdoor ceremony area nestled in the trees. The staff are wonderful and so on top of things. Its very clean and everything runs like clockwork.  I always look forward to flowering events there!\nFour Seasons Custom Florals"
+      },
+      {
+        "rating": 5,
+        "when": "2024-07",
+        "text": "Had a wonderful experience with Donovan Pavilion as our wedding reception venue. Mindy was very easy to work with! Loved the outcome and many of our guests were stunned by the venue’s beauty. The aspen grove full of wildflowers next to the creek was an absolute highlight."
+      },
+      {
+        "rating": 4,
+        "when": "2026-05",
+        "text": "Beautiful venue for events. Lots of space and the venue provides round tables and chairs. The kitchen is conveniently located for catering. The river is right behind the venue, with access to a beautiful river walk."
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [],
+  "pages": [
+    {
+      "url": "https://www.vail.gov/government/donovan-pavilion",
+      "kind": "home"
+    },
+    {
+      "url": "https://www.vail.gov/government/donovan-pavilion/services",
+      "file": "page-government-donovan-pavilion-services.txt"
+    },
+    {
+      "url": "https://www.vail.gov/government/donovan-pavilion/rates-policies",
+      "file": "page-government-donovan-pavilion-rates-polici.txt"
+    },
+    {
+      "url": "https://www.vail.gov/community/community-facilities/donovan-pavilion/rates-policies/2025-rental-rates",
+      "file": "page-community-community-facilities-donovan-p.txt"
+    },
+    {
+      "url": "https://www.vail.gov/community/community-facilities/donovan-pavilion/rates-policies/2026-rental-rates",
+      "file": "page-community-community-facilities-donovan-p.txt"
+    },
+    {
+      "url": "https://www.vail.gov/government/donovan-pavilion/rates-policies/event-guidelines",
+      "file": "page-government-donovan-pavilion-rates-polici.txt"
+    }
+  ]
+}

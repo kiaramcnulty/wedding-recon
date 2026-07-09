@@ -1,0 +1,367 @@
+{
+  "retype": [
+    {
+      "name": "Donovan Pavilion",
+      "vendor_id": "e81845ec-3587-4763-8293-345eb818c9e9",
+      "slug": "donovan-pavilion",
+      "city": "Vail",
+      "bot": "bot3",
+      "month": 2,
+      "year": 2025,
+      "call": 5
+    },
+    {
+      "name": "EagleVail Pavilion",
+      "vendor_id": "bbb748a6-ca69-46d5-92ef-51c0cba866d1",
+      "slug": "eaglevail-pavilion",
+      "city": "Avon",
+      "bot": "bot7",
+      "month": 4,
+      "year": 2025,
+      "call": 5
+    },
+    {
+      "name": "Four Seasons Resort and Residences Vail",
+      "vendor_id": "0f504c9b-0f3b-438c-8da0-c5bcd588d195",
+      "slug": "four-seasons-resort-and-residences-vail",
+      "city": "Vail",
+      "bot": "bot3",
+      "month": 4,
+      "year": 2026,
+      "call": 6
+    },
+    {
+      "name": "River Bend Ranch",
+      "vendor_id": "199e14b2-fbf5-4de1-a198-1365eda71e82",
+      "slug": "river-bend-ranch",
+      "city": "Durango",
+      "bot": "bot9",
+      "month": 11,
+      "year": 2025,
+      "call": 11
+    },
+    {
+      "name": "Telluride Ski Resort Weddings & Events",
+      "vendor_id": "df7f5a6f-5cf3-42c9-b219-6ce5dbf8fb3c",
+      "slug": "telluride-ski-resort-weddings-and-events",
+      "city": "Mountain Village",
+      "bot": "bot16",
+      "month": 5,
+      "year": 2026,
+      "call": 13
+    },
+    {
+      "name": "The Landing at Estes Park",
+      "vendor_id": "5aad46f7-0909-43d7-891b-a5177921a84d",
+      "slug": "the-landing-at-estes-park",
+      "city": "Estes Park",
+      "bot": "bot1",
+      "month": 6,
+      "year": 2025,
+      "call": 13
+    },
+    {
+      "name": "The Pavilion at The Stanley",
+      "vendor_id": "3f86327f-9280-4caa-a985-bcc74752d666",
+      "slug": "the-pavilion-at-the-stanley",
+      "city": "Estes Park",
+      "bot": "bot2",
+      "month": 1,
+      "year": 2025,
+      "call": 13
+    },
+    {
+      "name": "Veils of Vail Wedding Planning & Design",
+      "vendor_id": "a2752144-7715-4794-a7d4-a417e41fa3cd",
+      "slug": "veils-of-vail-wedding-planning-and-design",
+      "city": "Eagle",
+      "bot": "bot15",
+      "month": 6,
+      "year": 2026,
+      "call": 14
+    },
+    {
+      "name": "Venue on the Rocks",
+      "vendor_id": "07813e85-a1bf-49a9-b70f-8b8768e9dbcc",
+      "slug": "venue-on-the-rocks",
+      "city": "Estes Park",
+      "bot": "bot16",
+      "month": 6,
+      "year": 2026,
+      "call": 14
+    }
+  ],
+  "del": [
+    {
+      "name": "Aesthetic Collective",
+      "vendor_id": "27e85de8-bdb7-4c48-a464-c98aee9eed15",
+      "slug": "aesthetic-collective",
+      "city": "Grand Junction",
+      "bot": "bot10",
+      "month": 5,
+      "year": 2026,
+      "call": 2
+    },
+    {
+      "name": "Boho Chic Boudoir by Kara Cavalca",
+      "vendor_id": "a4c8c9a1-ff51-4ad2-a7c5-848896bccc20",
+      "slug": "boho-chic-boudoir-by-kara-cavalca",
+      "city": "Durango",
+      "bot": "bot11",
+      "month": 1,
+      "year": 2026,
+      "call": 3
+    },
+    {
+      "name": "Breckenridge Photographics",
+      "vendor_id": "4968e059-d2d2-4b82-83f5-6f34f9c5ef28",
+      "slug": "breckenridge-photographics",
+      "city": "Breckenridge",
+      "bot": "bot15",
+      "month": 7,
+      "year": 2025,
+      "call": 4
+    },
+    {
+      "name": "Colorado Wedding and Elopement Officiant Julie Adriansen",
+      "vendor_id": "e6647afc-9d56-4fb0-b708-a2989bd78535",
+      "slug": "colorado-wedding-and-elopement-officiant-julie-adriansen",
+      "city": "Vail",
+      "bot": "bot13",
+      "month": 2,
+      "year": 2026,
+      "call": 5
+    },
+    {
+      "name": "Distinctive Mountain Events",
+      "vendor_id": "02c65599-da26-4f99-b73e-ae8543751185",
+      "slug": "distinctive-mountain-events",
+      "city": "Breckenridge",
+      "bot": "bot1",
+      "month": 6,
+      "year": 2025,
+      "call": 5
+    },
+    {
+      "name": "Embodied Art Boudoir",
+      "vendor_id": "12717c71-19a5-43cd-b8b2-4cb29de86341",
+      "slug": "embodied-art-boudoir",
+      "city": "Golden",
+      "bot": "bot11",
+      "month": 6,
+      "year": 2026,
+      "call": 6
+    },
+    {
+      "name": "Emerald Fox Boudoir",
+      "vendor_id": "fb2e9c70-84ab-4685-8b99-198153145073",
+      "slug": "emerald-fox-boudoir",
+      "city": "Aurora",
+      "bot": "bot12",
+      "month": 5,
+      "year": 2025,
+      "call": 6
+    },
+    {
+      "name": "Emily O Photography",
+      "vendor_id": "db3a69d6-1148-4cfe-b904-8e0406f605c5",
+      "slug": "emily-o-photography",
+      "city": "Fruita",
+      "bot": "bot14",
+      "month": 10,
+      "year": 2025,
+      "call": 6
+    },
+    {
+      "name": "Fanciful Floral & Weddings",
+      "vendor_id": "50237226-9aa1-4bfe-a772-5456a052ed2b",
+      "slug": "fanciful-floral-and-weddings",
+      "city": "Estes Park",
+      "bot": "bot15",
+      "month": 6,
+      "year": 2025,
+      "call": 6
+    },
+    {
+      "name": "Fawntail Boudoir Photography",
+      "vendor_id": "07d3efc8-3906-495c-8538-cebe7107ea8e",
+      "slug": "fawntail-boudoir-photography",
+      "city": "Boulder",
+      "bot": "bot16",
+      "month": 6,
+      "year": 2026,
+      "call": 6
+    },
+    {
+      "name": "For Wild Love",
+      "vendor_id": "0d37f6a7-a7d1-497d-b216-1055167b46a2",
+      "slug": "for-wild-love",
+      "city": "Breckenridge",
+      "bot": "bot17",
+      "month": 6,
+      "year": 2026,
+      "call": 6
+    },
+    {
+      "name": "Four Corners Digital Imagery",
+      "vendor_id": "5fda7af9-d7f3-4146-a6fc-1153b6319c9d",
+      "slug": "four-corners-digital-imagery",
+      "city": "Durango",
+      "bot": "bot2",
+      "month": 11,
+      "year": 2025,
+      "call": 6
+    },
+    {
+      "name": "Gary Soles Gallery",
+      "vendor_id": "df033225-35c2-4a43-96dc-c202badaf66a",
+      "slug": "gary-soles-gallery",
+      "city": "Breckenridge",
+      "bot": "bot7",
+      "month": 6,
+      "year": 2026,
+      "call": 7
+    },
+    {
+      "name": "GIGI•C Weddings",
+      "vendor_id": "878dad24-7ff2-493b-8b97-9fe4b6511c90",
+      "slug": "gigi-c-weddings",
+      "city": "Telluride",
+      "bot": "bot8",
+      "month": 6,
+      "year": 2025,
+      "call": 7
+    },
+    {
+      "name": "Janna Lynn Photography",
+      "vendor_id": "874ff1b4-155a-41a7-8f01-a15ceefd41c4",
+      "slug": "janna-lynn-photography",
+      "city": "Durango",
+      "bot": "bot4",
+      "month": 10,
+      "year": 2025,
+      "call": 8
+    },
+    {
+      "name": "Lucky Penny Event Planning",
+      "vendor_id": "a5140245-bf71-488b-8179-64c309f5dfbb",
+      "slug": "lucky-penny-event-planning",
+      "city": "Crested Butte",
+      "bot": "bot15",
+      "month": 5,
+      "year": 2026,
+      "call": 9
+    },
+    {
+      "name": "Party Girl Events",
+      "vendor_id": "e7c1a9e6-2aae-4c52-a675-8554eef4bf81",
+      "slug": "party-girl-events",
+      "city": "Vail",
+      "bot": "bot16",
+      "month": 6,
+      "year": 2026,
+      "call": 11
+    },
+    {
+      "name": "Princess Productions Weddings & Events",
+      "vendor_id": "bf4be683-3c72-4171-a54e-5915297a9baf",
+      "slug": "princess-productions-weddings-and-events",
+      "city": "Crested Butte",
+      "bot": "bot4",
+      "month": 2,
+      "year": 2025,
+      "call": 11
+    },
+    {
+      "name": "Ranjani Groth Studios",
+      "vendor_id": "08829c2f-72d3-4e6b-8b37-5bfb2cf4b30e",
+      "slug": "ranjani-groth-studios",
+      "city": "Golden",
+      "bot": "bot5",
+      "month": 5,
+      "year": 2026,
+      "call": 11
+    },
+    {
+      "name": "Real West Old Time Photography",
+      "vendor_id": "78f1a812-c1e0-4aad-a17c-95a1b8920f95",
+      "slug": "real-west-old-time-photography",
+      "city": "Estes Park",
+      "bot": "bot7",
+      "month": 2,
+      "year": 2026,
+      "call": 11
+    },
+    {
+      "name": "Snappr Photography",
+      "vendor_id": "2011f3cf-2537-4dc7-a27d-aef9014da132",
+      "slug": "snappr-photography",
+      "city": "Boulder",
+      "bot": "bot6",
+      "month": 4,
+      "year": 2026,
+      "call": 12
+    },
+    {
+      "name": "Sonnenalp Vail",
+      "vendor_id": "77719076-ce2b-4228-87c9-f599f2db8c25",
+      "slug": "sonnenalp-vail",
+      "city": "Vail",
+      "bot": "bot7",
+      "month": 2,
+      "year": 2026,
+      "call": 12
+    },
+    {
+      "name": "Story Lens Photography : Portrait Photographer",
+      "vendor_id": "fcdf5f25-b179-4c92-bd80-2b8499646cf4",
+      "slug": "story-lens-photography-portrait-photographer",
+      "city": "Avon",
+      "bot": "bot10",
+      "month": 1,
+      "year": 2026,
+      "call": 12
+    },
+    {
+      "name": "Sunbeam Studio",
+      "vendor_id": "149a7518-72f2-4a1d-938b-4256c1f2409b",
+      "slug": "sunbeam-studio",
+      "city": "Louisville",
+      "bot": "bot12",
+      "month": 1,
+      "year": 2026,
+      "call": 13
+    },
+    {
+      "name": "Telluride Presents",
+      "vendor_id": "cdb31dcf-5dd3-4604-ad65-9d37260a91e7",
+      "slug": "telluride-presents",
+      "city": "Telluride",
+      "bot": "bot15",
+      "month": 2,
+      "year": 2026,
+      "call": 13
+    },
+    {
+      "name": "The Cheers Company",
+      "vendor_id": "b735c747-aec5-4054-8f9d-5ef0b5fb42ae",
+      "slug": "the-cheers-company",
+      "city": "Telluride",
+      "bot": "bot17",
+      "month": 5,
+      "year": 2026,
+      "call": 13
+    },
+    {
+      "name": "Vail Mountain Wedding Deck",
+      "vendor_id": "1a3b19dc-e80d-4285-ac9e-e9ddf90cae47",
+      "slug": "vail-mountain-wedding-deck",
+      "city": "Vail",
+      "bot": "bot17",
+      "month": 1,
+      "year": 2026,
+      "call": 17
+    }
+  ],
+  "parked": []
+}

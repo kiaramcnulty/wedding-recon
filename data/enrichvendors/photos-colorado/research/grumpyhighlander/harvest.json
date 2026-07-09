@@ -1,0 +1,67 @@
+{
+  "vendor_id": "128ae87d-affa-4f71-a9f5-81cb8f7cd5a5",
+  "name": "Grumpyhighlander",
+  "city": "Durango",
+  "website": "https://www.grumpyhighlander.com/",
+  "place_id": "ChIJScSf8e2-laARMsJrGeIiqJQ",
+  "fetched_at": "2026-07-09T07:49:44.348Z",
+  "google": {
+    "rating": 5,
+    "ratingCount": 2,
+    "websiteUri": "https://www.grumpyhighlander.com/",
+    "reviews": [
+      {
+        "rating": 5,
+        "when": "2026-02",
+        "text": "Captures big and little moments just perfectly without any intrusion. Excellent work!"
+      },
+      {
+        "rating": 5,
+        "when": "2023-01",
+        "text": "Took a bunch of pictures for us at the Durango Dog Ranch, it was a proposal and he took a ton of great pictures! He definitely knows what he's doing!"
+      }
+    ]
+  },
+  "pdfs": [],
+  "images": [
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/546d80e4-0ed4-4b1d-b227-5bebb5b3892c/tempImage3j1Ise.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1622642086571-OKUOUOZWJNHXUJGVZIBL/DSC01040-2.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1623106471128-12IVBP8XRB2MTIF89PAU/Grumpyhighlander+profile+face+.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1606669896797-7666HGDUB8LXMAA2V56P/Molas%2BCabin%2B2020%2Blate%2Bafternoon%2B.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1615053594568-3U9G169WGLGALOT7KN4Z/Screen+Shot+2021-03-06+at+10.59.12+AM.png",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1612288162226-M60EY8LQARA2734EM7QP/Laurel+Cambell+Headshot+.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1621094912851-SXLH1JW7MX50924YTBLH/DSC08702.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1612287395033-ZPGDNBJAB5H1UBSR2B83/DSC03462.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1621096594021-69FMDG98TTQFL4TM1KME/Mankins+Wedding+3.jpeg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/91534e5e-918d-4ccb-913d-2be539cde135/Indian+Creek+Camp%40Grumpyhighlander-42.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1621097756025-LXE1YK30GEVJBP2WA4A2/Darlene+and+John+Coffer+wedding+.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/ad6916b1-4bef-4e9d-9aa7-7005f5c00fe5/DSC07025.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/d61ea2bd-9e70-49ac-8eeb-776b7c7042c8/Iceberg+Kid+1%40Grumpyhighlander-22.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5e1ba38a3deac25d940f8b9a/1c41ddb2-28a4-4670-a845-a4f42c5ab29e/blue+Lake+pano+.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5923016644024315f6b579cc/1497042784132-FY092E0J3BP9WM2Y08M1/camp_074.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5923016644024315f6b579cc/1497042891895-GKUFLDWK7VB41M4GV70F/camp_221.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5923016644024315f6b579cc/1497042929567-0HF2C8ZEA0Z9IQVJDH8M/grilling.jpg"
+  ],
+  "pages": [
+    {
+      "url": "https://www.grumpyhighlander.com/",
+      "kind": "home"
+    },
+    {
+      "url": "https://www.grumpyhighlander.com/services-and-pricing-2021",
+      "file": "page-services-and-pricing-2021.txt"
+    },
+    {
+      "url": "https://www.grumpyhighlander.com/about-fairfield",
+      "error": "HTTP 404"
+    },
+    {
+      "url": "https://www.grumpyhighlander.com/packages-fairfield",
+      "file": "page-packages-fairfield.txt"
+    },
+    {
+      "url": "https://www.grumpyhighlander.com/faq-fairfield",
+      "file": "page-faq-fairfield.txt"
+    }
+  ]
+}
