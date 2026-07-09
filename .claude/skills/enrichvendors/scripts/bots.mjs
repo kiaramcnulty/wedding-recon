@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { argValue } from '../../launchvenues/scripts/lib.mjs';
+import { argValue } from '../../launchvendors/scripts/lib.mjs';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');

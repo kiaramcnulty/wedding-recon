@@ -3,10 +3,11 @@
 // raw harvest.json / page-*.txt / whole digests — a regex pass extracts the pricing,
 // capacity, review, and reddit content for free, and everything else stays on disk.
 // Pure filesystem: no DB, no network, no env needed.
-// usage: node .claude/skills/enrichvenues/scripts/dossier.mjs <workdir> [--venues "slug;slug"] [--cap 4000]
+// usage: node .claude/skills/enrichvendors/scripts/dossier.mjs <workdir> [--type photographer] [--venues "slug;slug"] [--cap 4000]
 import fs from 'node:fs';
 import path from 'node:path';
-import { norm, argValue } from '../../launchvenues/scripts/lib.mjs';
+import { norm, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
 if (!workdir || workdir.startsWith('--')) { console.error('usage: dossier.mjs <workdir> [--venues "a;b"] [--cap 4000]'); process.exit(1); }
@@ -18,7 +19,8 @@ const digests = fs.readdirSync(researchDir)
   .filter((f) => f.startsWith('pricing-web-') && f.endsWith('.txt'))
   .map((f) => ({ tag: f.replace(/^pricing-web-|\.txt$/g, ''), lines: fs.readFileSync(path.join(researchDir, f), 'utf8').split('\n') }));
 
-const PRICE_LINE = /\$\s?\d|per\s+(person|plate|guest|head)|packag|rental|site fee|venue fee|minimum|deposit|capacit|(\d{2,4}\s+(guests?|seated|standing))|all.inclusive|pric(e|ing)|\brates?\b/i;
+const profile = etype();
+const PRICE_LINE = profile.priceLine;
 const NOISE = /cookie|privacy|subscribe|newsletter|copyright|all rights|follow us|instagram|facebook|menu toggle|skip to (content|main)|sign in|log in|gift card|careers/i;
 const WEDDINGY = /wedding|recept|ceremon|bride|groom|married/i;
 const nameKey = (s) => norm(s).replace(/\b(the|at|by|of|a)\b/g, ' ').replace(/\s+/g, ' ').trim();
@@ -78,9 +80,9 @@ for (const slug of fs.readdirSync(researchDir).sort()) {
 
   const parts = [
     `# ${h.name} (${h.city || '?'}) — vendor_id=${h.vendor_id}`,
-    `site=${h.website || h.google?.websiteUri || 'none'} | google ${h.google?.rating ?? '?'}★ × ${h.google?.ratingCount ?? '?'}${h.site_error ? ` | SITE CRAWL FAILED (${h.site_error})` : ''}`,
+    `site=${h.website || h.google?.websiteUri || 'none'}${h.instagram ? ` | instagram=@${h.instagram}` : ''} | google ${h.google?.rating ?? '?'}★ × ${h.google?.ratingCount ?? '?'}${h.site_error ? ` | SITE CRAWL FAILED (${h.site_error})` : ''}`,
     h.google?.summary ? `google summary: ${h.google.summary}` : '',
-    `\n## site pricing/capacity lines\n${priceLines.length ? priceLines.join('\n') : '(none found on site)'}`,
+    `\n## ${profile.dossierPriceTitle}\n${priceLines.length ? priceLines.join('\n') : '(none found on site)'}`,
     pdfs.length ? `pdf rate cards seen on site (not fetched): ${pdfs.join(' ; ')}` : '',
     revs.length ? `\n## google reviews (top ${revs.length})\n${revs.join('\n')}` : '',
     digestHits.length ? `\n## region pricing digests\n${digestHits.join('\n')}` : '',

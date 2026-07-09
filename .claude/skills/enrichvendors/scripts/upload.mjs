@@ -2,12 +2,13 @@
 // Dry-run by default; nothing is written without --apply.
 // Idempotent: a bot never has two entries for one venue, so (author_id, vendor_id)
 // is the natural dedup key — rows already in the DB are skipped on re-run.
-// usage: node --env-file=.env.local .claude/skills/enrichvenues/scripts/upload.mjs <workdir> [--apply]
+// usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/upload.mjs <workdir> [--type photographer] [--apply]
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { parseCSV, argValue } from '../../launchvenues/scripts/lib.mjs';
+import { parseCSV, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -23,7 +24,8 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 const rosterPath = argValue('roster') || path.join(workdir, 'bots.json');
 const bots = JSON.parse(fs.readFileSync(rosterPath, 'utf8'));
 const botByKey = new Map(bots.map((b) => [b.key || b.username, b]));
-const HEADERS = ['venue', 'vendor_id', 'recon_type', 'month', 'year', 'price_text', 'price_details', 'notes', 'photos', 'sources', 'bot'];
+const profile = etype();
+const HEADERS = profile.headers;   // venue: original 11 cols; photos appends service_region
 // --csv <name> lets each batch live in its own file (smaller review artifacts);
 // (author_id, vendor_id) dedup makes multi-file uploads safe.
 const rows = parseCSV(fs.readFileSync(path.join(workdir, argValue('csv') || 'recons.csv'), 'utf8'));
@@ -50,6 +52,7 @@ for (const [i, r] of recons.entries()) {
   if (!r.vendor_id) errors.push(`${at}: missing vendor_id`);
   if (!RECON_TYPES.has(r.recon_type)) errors.push(`${at}: bad recon_type "${r.recon_type}"`);
   if (!r.price_text || !r.price_details) errors.push(`${at}: price_text and price_details are REQUIRED on every entry`);
+  if (profile.serviceRegionRequired && !(r.service_region || '').trim()) errors.push(`${at}: service_region is REQUIRED on every ${profile.key} entry`);
   const text = `${r.price_text} ${r.price_details} ${r.notes}`;
   const banned = text.match(BANNED);
   if (banned) errors.push(`${at}: banned marketing/AI phrase "${banned[0]}" — rephrase in the entry's voice`);
@@ -131,7 +134,7 @@ for (const r of toInsert) {
     price_text: r.price_text || null,
     price_details: r.price_details || null,
     notes: r.notes || null,
-    service_region: null,
+    service_region: profile.serviceRegionRequired ? (r.service_region || null) : null,
     status: 'active',
     created_at: backdate(parseInt(r.month, 10), parseInt(r.year, 10)),
   }).select('id').single();
