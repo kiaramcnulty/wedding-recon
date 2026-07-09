@@ -2,11 +2,12 @@
 // details (rating + up to 5 reviews) and crawl the venue website (homepage +
 // pricing/wedding subpages) for text, image URLs, and PDF links.
 // Writes research/<slug>/harvest.json under the workdir. Read-only against Supabase.
-// usage: node --env-file=.env.local .claude/skills/enrichvenues/scripts/harvest.mjs <workdir> --region CO [--venues "Name 1;Name 2"] [--limit N]
+// usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/harvest.mjs <workdir> --region CO [--type photographer] [--venues "Name 1;Name 2"] [--limit N]
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { norm, sleep, argValue } from '../../launchvenues/scripts/lib.mjs';
+import { norm, sleep, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
 if (!workdir || workdir.startsWith('--')) { console.error('usage: harvest.mjs <workdir> --region CO [--venues "a;b"] [--limit N]'); process.exit(1); }
@@ -18,11 +19,12 @@ const region = argValue('region') || 'CO';
 const wanted = (argValue('venues') || '').split(';').map((s) => s.trim()).filter(Boolean);
 const limit = parseInt(argValue('limit') || '0', 10);
 
+const profile = etype();
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const { data: all, error } = await supabase
   .from('vendors')
-  .select('id, name, city, region, website, google_place_id')
-  .eq('vendor_type', 'venue').eq('region', region);
+  .select(`id, name, city, region, website, google_place_id${profile.serviceRegionRequired ? ', instagram' : ''}`)
+  .eq('vendor_type', profile.vendorType).eq('region', region);
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
 
 let targets = all;
@@ -96,14 +98,14 @@ async function placeDetails(pid) {
   };
 }
 
-const SUBPAGE = /(pric|package|rate|invest|wedding|event|faq|rental|tour|book|venue|capacit)/i;
+const SUBPAGE = profile.subpage;
 
 fs.mkdirSync(path.join(workdir, 'research'), { recursive: true });
 let ok = 0, failed = 0;
 for (const v of targets) {
   const dir = path.join(workdir, 'research', slug(v.name));
   fs.mkdirSync(dir, { recursive: true });
-  const out = { vendor_id: v.id, name: v.name, city: v.city, website: v.website, place_id: v.google_place_id, fetched_at: new Date().toISOString() };
+  const out = { vendor_id: v.id, name: v.name, city: v.city, website: v.website, place_id: v.google_place_id, instagram: v.instagram || undefined, fetched_at: new Date().toISOString() };
 
   if (v.google_place_id) { out.google = await placeDetails(v.google_place_id); await sleep(150); }
   const site = v.website || out.google?.websiteUri;

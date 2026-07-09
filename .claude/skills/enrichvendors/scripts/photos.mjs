@@ -2,20 +2,25 @@
 // keep the largest real photos (skips tiny/logo-ish files), and compress to the
 // app's convention (~1600px full JPEG + ~400px thumb, mirroring lib/image-compress.ts).
 // Writes photos/<slug>/NN.jpg + NN_thumb.jpg and photos/<slug>/manifest.json (source URLs).
-// usage: node --env-file=.env.local .claude/skills/enrichvenues/scripts/photos.mjs <workdir> [--per-venue 4]
+// usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/photos.mjs <workdir> [--type photographer] [--per-venue 4]
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { sleep, argValue } from '../../launchvenues/scripts/lib.mjs';
+import { sleep, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
 if (!workdir || workdir.startsWith('--')) { console.error('usage: photos.mjs <workdir> [--per-venue 4]'); process.exit(1); }
 const PER_VENUE = parseInt(argValue('per-venue') || '3', 10);
 const MIN_W = 700, MIN_H = 400;
-// Pre-download junk filter: badges/awards/graphics, and photographer-portrait tells
-// (couple names in the filename). Cheap regex beats paying a vision model to reject.
+// Pre-download junk filter: badges/awards/graphics always; couple-portrait tells only for
+// types where people-as-subject is junk (venues). For photographers, portraits ARE the
+// portfolio — profile.portraitFilter turns the second filter off.
+const profile = etype();
 const JUNK_URL = /logo|icon|favicon|badge|award|winner|diners|nextdoor|opentable|weddingwire|theknot|\bmenu\b|placeholder|coming-soon/i;
-const PORTRAIT_URL = /%20(&|and)%20|[-_](bride|groom|couple|engagement|portrait|elopement)[-_.]|first[-_]?look/i;
+const PORTRAIT_URL = profile.portraitFilter
+  ? /%20(&|and)%20|[-_](bride|groom|couple|engagement|portrait|elopement)[-_.]|first[-_]?look/i
+  : /$^/; // matches nothing
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 
 // CDN URLs often point at downsized renditions; ask for the original/larger one.

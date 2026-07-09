@@ -2,11 +2,12 @@
 // recon, how rich each venue's sources look (Places reviews if harvested, Reddit
 // mentions in archived threads), and per-bot entry counts for the state roster.
 // Read-only. Use this to pick the next batch and to check roster headroom.
-// usage: node --env-file=.env.local .claude/skills/enrichvenues/scripts/roster.mjs <workdir> --region <ST>
+// usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/roster.mjs <workdir> --region <ST> [--type photographer]
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { norm, argValue } from '../../launchvenues/scripts/lib.mjs';
+import { norm, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
 const region = argValue('region');
@@ -16,9 +17,10 @@ for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) {
 }
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+const profile = etype();
 const { data: venues, error } = await supabase
   .from('vendors').select('id, name, city, website, google_place_id')
-  .eq('vendor_type', 'venue').eq('region', region).order('name');
+  .eq('vendor_type', profile.vendorType).eq('region', region).order('name');
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
 
 const { data: botProfiles } = await supabase.from('profiles').select('id, username').eq('is_bot', true);
@@ -33,7 +35,7 @@ for (const e of botEntries || []) {
 }
 
 // Reddit mentions: count archived threads (this workdir + the launchvenues one) that name each venue.
-const redditDirs = [path.join(workdir, 'research'), path.join('data/launchvenues', path.basename(workdir), 'research')];
+const redditDirs = [path.join(workdir, 'research'), path.join('data/launchvenues', path.basename(workdir), 'research'), path.join('data/launchvendors', path.basename(workdir), 'research')];
 const threads = [];
 for (const dir of redditDirs) {
   if (!fs.existsSync(dir)) continue;

@@ -1,5 +1,6 @@
-// One CLI for /enrichvenues batch mechanics. Replaces the throwaway orchestrator
+// One CLI for /enrichvendors batch mechanics. Replaces the throwaway orchestrator
 // scripts that previously burned a turn each (assign/coverage/repair/verify/state).
+// All commands accept --type <venue|photographer> (default venue — original behavior).
 //
 //   batch      select venues with NO recon of ANY kind (bot OR human), dedupe same-named
 //              twins, assign bots + collected-dates, and write single-turn call files
@@ -25,19 +26,24 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { norm, parseCSV, argValue } from '../../launchvenues/scripts/lib.mjs';
+import { norm, parseCSV, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
 const cmd = process.argv[3];
 const CMDS = ['batch', 'status', 'merge', 'verify', 'photos-map', 'health', 'rich'];
 if (!workdir || workdir.startsWith('--') || !CMDS.includes(cmd)) {
-  console.error(`usage: pipeline.mjs <workdir> <${CMDS.join('|')}> [flags]`); process.exit(1);
+  console.error(`usage: pipeline.mjs <workdir> <${CMDS.join('|')}> [--type venue|photographer] [flags]`); process.exit(1);
 }
+const profile = etype();
 const req = (k) => { const v = argValue(k); if (!v) { console.error(`--${k} is required for ${cmd}`); process.exit(1); } return v; };
 const needEnv = () => { for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) if (!process.env[k]) { console.error(`${k} missing — run with --env-file=.env.local`); process.exit(1); } };
 const db = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-const HEADERS = ['venue', 'vendor_id', 'recon_type', 'month', 'year', 'price_text', 'price_details', 'notes', 'photos', 'sources', 'bot'];
+// Per-type CSV shape: venue = the original 11 columns; photos appends service_region
+// LAST so every venue column index is untouched. First column is named 'venue' for all
+// types (historical; it holds the vendor name).
+const HEADERS = profile.headers;
 const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
 const EMDASH = /[—–]/;
 const slugOf = (s) => norm(s).replace(/ /g, '-').slice(0, 60);
@@ -71,7 +77,7 @@ async function cmdBatch() {
   const supabase = db();
 
   const { data: venues, error } = await supabase.from('vendors')
-    .select('id, name, city, website, google_place_id').eq('vendor_type', 'venue').eq('region', region).order('name');
+    .select('id, name, city, website, google_place_id').eq('vendor_type', profile.vendorType).eq('region', region).order('name');
   if (error) { console.error('DB read failed:', error.message); process.exit(1); }
   // Exclude venues with ANY recon — bot OR human. (roster.mjs only counts bot recon;
   // the product rule for backfills is "no recon of any kind".)
@@ -81,7 +87,7 @@ async function cmdBatch() {
 
   // reddit mentions (same signal as roster.mjs) for ordering
   const threads = [];
-  for (const dir of [path.join(workdir, 'research'), path.join('data/launchvenues', path.basename(workdir), 'research')]) {
+  for (const dir of [path.join(workdir, 'research'), path.join('data/launchvenues', path.basename(workdir), 'research'), path.join('data/launchvendors', path.basename(workdir), 'research')]) {
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir).filter((f) => f.startsWith('reddit-') && f.endsWith('.txt')))
       threads.push(norm(fs.readFileSync(path.join(dir, f), 'utf8')));
@@ -139,9 +145,9 @@ async function cmdBatch() {
     return { name: v.name, vendor_id: v.id, slug: slugOf(v.name), city: v.city, bot: roster[i % roster.length].key, month, year, call: Math.floor(i / perCall) + 1 };
   });
 
-  // call files: header (contract + entry rules + voice cards, inlined ONCE per call) + venue blocks
-  const refDir = '.claude/skills/enrichvenues/references';
-  const header = ['draft-call-header.md', 'entry-rules.md', 'voice-cards.md']
+  // call files: header (contract + entry rules + voice cards, inlined ONCE per call) + vendor blocks
+  const refDir = '.claude/skills/enrichvendors/references';
+  const header = profile.refs
     .map((f) => fs.readFileSync(path.join(refDir, f), 'utf8')).join('\n\n---\n\n');
   fs.mkdirSync(draftsDir, { recursive: true });
   const nCalls = Math.ceil(manifest.length / perCall);
@@ -150,7 +156,7 @@ async function cmdBatch() {
     const mine = manifest.filter((m) => m.call === c);
     const blocks = mine.map((m) => {
       const dossier = fs.readFileSync(path.join(workdir, 'research', m.slug, 'dossier.md'), 'utf8').trim();
-      return `\n\n=== VENUE: ${m.name} | vendor_id=${m.vendor_id} | bot=${m.bot} | date=${m.month}/${m.year} ===\n${dossier}`;
+      return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | bot=${m.bot} | date=${m.month}/${m.year} ===\n${dossier}`;
     });
     const out = `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-worker-${String(c).padStart(2, '0')}.csv\n`;
     fs.writeFileSync(path.join(draftsDir, `${batch}-call-${String(c).padStart(2, '0')}.md`), out);
@@ -173,7 +179,7 @@ function cmdStatus() {
   const wantIds = new Set(manifest.map((m) => m.vendor_id));
   const botByVid = new Map(manifest.map((m) => [m.vendor_id, m.bot]));
   const files = fs.readdirSync(draftsDir).filter((f) => f.startsWith(`${batch}-worker-`) && f.endsWith('.csv')).sort();
-  const drafted = new Set(); let total = 0, malformed = 0, badVid = 0, badBot = 0, noPrice = 0, banned = 0, dashes = 0;
+  const drafted = new Set(); let total = 0, malformed = 0, badVid = 0, badBot = 0, noPrice = 0, banned = 0, dashes = 0, noRegion = 0;
   for (const f of files) {
     const { hdr, data } = parseDraftCsv(path.join(draftsDir, f));
     const i = (n) => hdr.indexOf(n);
@@ -184,6 +190,7 @@ function cmdStatus() {
       if (!wantIds.has(vid)) badVid++; else drafted.add(vid);
       if (vid && botByVid.get(vid) && (r[i('bot')] ?? '').trim() !== botByVid.get(vid)) badBot++;
       if (!(r[i('price_text')] ?? '').trim() || !(r[i('price_details')] ?? '').trim()) noPrice++;
+      if (profile.serviceRegionRequired && !(r[i('service_region')] ?? '').trim()) noRegion++;
       const text = `${r[i('price_text')]} ${r[i('price_details')]} ${r[i('notes')]}`;
       if (BANNED.test(text)) banned++;
       if (EMDASH.test(text)) dashes++;
@@ -192,7 +199,7 @@ function cmdStatus() {
   }
   const missing = manifest.filter((m) => !drafted.has(m.vendor_id));
   console.log(`\ndrafted ${drafted.size}/${manifest.length} | rows ${total} | malformed ${malformed} | bad vendor_id ${badVid} | bot mismatch ${badBot}`);
-  console.log(`missing price fields ${noPrice} | banned phrases ${banned} | em-dashes ${dashes}`);
+  console.log(`missing price fields ${noPrice} | banned phrases ${banned} | em-dashes ${dashes}${profile.serviceRegionRequired ? ` | missing service_region ${noRegion}` : ''}`);
   if (missing.length) console.log(`MISSING: ${missing.map((m) => m.name).join('; ')}`);
 }
 
@@ -210,11 +217,16 @@ function cmdMerge() {
   for (const f of files) {
     const { hdr, data } = parseDraftCsv(path.join(draftsDir, f));
     const iV = hdr.indexOf('vendor_id');
+    const iSrc = HEADERS.indexOf('sources'), iBot = HEADERS.indexOf('bot');
+    const tailN = HEADERS.length - 1 - iSrc; // columns after sources (bot [, service_region])
     for (let r of data) {
       // field overflow (unquoted comma in sources): rejoin overflow into sources, restore bot from manifest
+      // (venue layout: iSrc=9, tailN=1 — identical to the original fixed-index repair)
       if (r.length > HEADERS.length) {
         const vid0 = (r[1] ?? '').trim();
-        r = [...r.slice(0, 9), r.slice(9, r.length - 1).join(','), botByVid.get(vid0) ?? r[r.length - 1]];
+        const tail = r.slice(r.length - tailN);
+        r = [...r.slice(0, iSrc), r.slice(iSrc, r.length - tailN).join(','), ...tail];
+        r[iBot] = botByVid.get(vid0) ?? r[iBot];
         repaired++;
       }
       if (r.length < HEADERS.length) { problems.push(`${f}: short row "${(r[0] || '').slice(0, 40)}"`); continue; }
@@ -224,9 +236,9 @@ function cmdMerge() {
         if (fix && !seenVid.has(fix)) { r[1] = fix; vid = fix; repaired++; }
         else { problems.push(`${f}: unknown vendor_id for "${r[0]}"`); continue; }
       }
-      if (seenVid.has(vid)) { problems.push(`${f}: duplicate venue "${r[0]}"`); continue; }
+      if (seenVid.has(vid)) { problems.push(`${f}: duplicate vendor "${r[0]}"`); continue; }
       seenVid.add(vid);
-      if (botByVid.get(vid) && (r[10] ?? '').trim() !== botByVid.get(vid)) { r[10] = botByVid.get(vid); repaired++; }
+      if (botByVid.get(vid) && (r[iBot] ?? '').trim() !== botByVid.get(vid)) { r[iBot] = botByVid.get(vid); repaired++; }
       out.push(r.map((c) => (c ?? '').replace(/\r?\n/g, ' ').trim()));
     }
   }
@@ -380,12 +392,12 @@ function cmdRich() {
   }
   if (missing.length) { console.error(`not in ${batch} manifest: ${missing.join('; ')}`); process.exit(1); }
 
-  const refDir = '.claude/skills/enrichvenues/references';
-  const header = ['draft-call-header.md', 'entry-rules.md', 'voice-cards.md'].map((f) => fs.readFileSync(path.join(refDir, f), 'utf8')).join('\n\n---\n\n');
+  const refDir = '.claude/skills/enrichvendors/references';
+  const header = profile.refs.map((f) => fs.readFileSync(path.join(refDir, f), 'utf8')).join('\n\n---\n\n');
   const blocks = rich.map((m) => {
     const dossier = fs.readFileSync(path.join(workdir, 'research', m.slug, 'dossier.md'), 'utf8').trim();
-    return `\n\n=== VENUE: ${m.name} | vendor_id=${m.vendor_id} | bot=${m.secondBot} | date=${m.month}/${m.year} ===\n`
-      + `SECOND ENTRY — this venue is rich enough for two. A DIFFERENT couple (bot=${m.firstBot}) already wrote entry 1 covering PRICING: "${m.firstPrice}". You are a different couple: lead with the REVIEW / EXPERIENCE / LOGISTICS cluster (staff, vibe, what a real wedding there was like, quirks). price_text + price_details are still required: derive a HEDGED version of the venue's real pricing in your own words (e.g. "going off their posted rates it's about $X-$Y", "reviews put saturdays around $X"), or an honest "Quote only" if the dossier has no number. Do NOT copy entry 1's pricing verbatim, and NEVER reference "entry 1" / the other entry / another listing — a reader sees separate cards from different people, so each entry must stand alone. Clearly different voice and opening from a typical first entry.\n${dossier}`;
+    return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | bot=${m.secondBot} | date=${m.month}/${m.year} ===\n`
+      + `SECOND ENTRY — this vendor is rich enough for two. A DIFFERENT couple (bot=${m.firstBot}) already wrote entry 1 covering PRICING: "${m.firstPrice}". You are a different couple: lead with the REVIEW / EXPERIENCE / LOGISTICS cluster (staff, vibe, what working with them was like, quirks). price_text + price_details are still required: derive a HEDGED version of the vendor's real pricing in your own words (e.g. "going off their posted rates it's about $X-$Y", "reviews put saturdays around $X"), or an honest "Quote only" if the dossier has no number. Do NOT copy entry 1's pricing verbatim, and NEVER reference "entry 1" / the other entry / another listing — a reader sees separate cards from different people, so each entry must stand alone. Clearly different voice and opening from a typical first entry.\n${dossier}`;
   });
   fs.mkdirSync(draftsDir, { recursive: true });
   fs.writeFileSync(path.join(draftsDir, `${batch}-rich-call.md`), `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-rich-worker.csv\n`);
