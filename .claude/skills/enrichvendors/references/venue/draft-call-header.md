@@ -3,7 +3,7 @@
 You are drafting bot recon entries for the wedding venues listed below. Everything you need is IN THIS FILE: the rules, the bot voices, and one research dossier per venue. Do NOT read any other file, do NOT search the web, do NOT use any tool except one Write at the end. Never fabricate a price, quote, event, or visit.
 
 ## Output contract
-- EXACTLY ONE CSV row per venue, authored by that venue's assigned `bot`, dated with its assigned `date` (override the date only if the dossier contains a clearly better-sourced real date, e.g. a dated reddit comment).
+- EXACTLY ONE JSON line per venue, authored by that venue's assigned `bot`, dated with its assigned `date` (override the date only if the dossier contains a clearly better-sourced real date, e.g. a dated reddit comment).
 - `recon_type` is always `online`.
 - `price_text` + `price_details` REQUIRED on every row. Dossier has real figures → an honest, hedged range tied to them (season/day/what's-included in `price_details`). No figures → `price_text` = `Quote only` and `price_details` honestly says what you checked and that they price per event. NEVER invent a number.
 - `notes`: ONE line (no embedded newlines), first person, in the assigned bot's voice per the voice cards. **NO minimum length — a ~200-char note covering all the real intel is a great entry. Length follows intel; cap ~90 words; never pad or restate.** Cut filler words; keep concrete facts: capacity, inclusions, catering policy, a review specific, logistics quirks. Attribute borrowed experiences ("a review mentions...", "a bride on reddit said..."); never first person for things the bot didn't do. Include warts when sources have them.
@@ -14,11 +14,12 @@ You are drafting bot recon entries for the wedding venues listed below. Everythi
 - If a dossier is unusually rich (real pricing table AND strong firsthand commentary), still write ONE row, but append ` RICH:<slug>` to that venue's line in your reply so a second entry can be commissioned separately.
 - If a venue is actually a SERVICE vendor with no space of its own (caterer, photographer, DJ, florist, planner, officiant, stationery shop — see the entry rules), do NOT write a row for it; append ` NOTAVENUE:<slug>` to your reply instead.
 
-## CSV format (exact)
-Header once: `venue,vendor_id,recon_type,month,year,price_text,price_details,notes,photos,sources,bot`
-Copy `vendor_id` and `bot` VERBATIM from each venue block. Wrap any field containing a comma or quote in double quotes; double internal quotes; never a raw newline inside a field.
+## Output format (exact) — JSON Lines
+Write ONE JSON object per venue, one object per line — no wrapping array, no markdown fences, no header line. Every object has ALL of these keys:
+`{"venue": "...", "vendor_id": "<VERBATIM from the block>", "recon_type": "online", "month": <number>, "year": <number>, "price_text": "...", "price_details": "...", "notes": "...", "photos": "", "sources": "...", "bot": "<VERBATIM botN from the block>"}`
+JSON handles all escaping — just emit valid JSON per line. Keep `notes` one logical line (inline "-bullets"; no literal newline characters in the string).
 
 ## Finish
-Write the complete CSV (header + all rows) to the OUTPUT FILE named at the bottom of this file, in ONE Write call. Then STOP and reply with exactly one line: `<output file>: done` (plus ` RICH: slug1, slug2` and/or ` NOTAVENUE: slug1, slug2` if any).
+Write all the JSON lines to the OUTPUT FILE named at the bottom of this file, in ONE Write call. Then STOP and reply with exactly one line: `<output file>: done` (plus ` RICH: slug1, slug2` and/or ` NOTAVENUE: slug1, slug2` if any).
 
-Do NOT read your CSV back to check or count it, do NOT re-read this file, do NOT list directories or reach for any other tool. Downstream scripts validate every row for free (coverage, pricing fields, banned phrases, em-dashes, dedup) — a read-back only re-bills this whole file's tokens for nothing, and a wrong cell is cheaper to fix later than a re-read is now. Write once and stop.
+Do NOT read your output file back to check or count it, do NOT re-read this file, do NOT list directories or reach for any other tool. Downstream scripts validate every row for free (coverage, pricing fields, banned phrases, em-dashes, dedup) — a read-back only re-bills this whole file's tokens for nothing, and a wrong cell is cheaper to fix later than a re-read is now. Write once and stop.

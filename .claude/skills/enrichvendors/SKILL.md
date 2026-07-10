@@ -21,7 +21,7 @@ The v1 run burned ~2M tokens on 100 venues. Three sinks, three rules:
 2. **Scripts compress, models write.** `dossier.mjs` regex-cuts each vendor's harvest/pages/digests/reddit to a ~500-token dossier for free. No agent ever reads `harvest.json`, `page-*.txt`, whole digests, or whole threads. No `extract.md` provenance files — the `sources` column is the provenance.
 3. **Never re-touch every row.** No global polish pass: voice rules ride inside the call file; `upload.mjs` dry-run + `pipeline.mjs status` validate mechanically for free. Fix ONLY flagged rows (≤5: orchestrator edits inline; more: one small targeted call).
 
-Budgets (drafting, Sonnet): call file ≈ 3k header + ~600/vendor; ~30k/call of 15 vendors ⇒ **~2-2.5k tokens/vendor, ~210k per 100, 300+ fits one session.** Orchestrator stays thin: `pipeline.mjs` does batch/status/merge/verify — do not hand-write per-run scripts for these. Worker replies are one line; nothing bulk ever enters the orchestrator context.
+Budgets (drafting, Sonnet): call file ≈ 3k header + ~600/vendor; ~14-18k/call of 25 vendors (the default) ⇒ **~2k tokens/vendor, 300+ fits one session.** Orchestrator stays thin: `pipeline.mjs` does batch/status/merge/verify — do not hand-write per-run scripts for these. Worker replies are one line; nothing bulk ever enters the orchestrator context.
 
 ## Phase 0 — Scope (one exchange, human gate #1)
 
@@ -43,12 +43,12 @@ Once per region+type (fixed cost): the **region pricing pass** — one Sonnet su
 
 ```
 node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> batch \
-  --type <type> --region <ST> --roster data/enrichvenues/rosters/<ST>.json --size N --batch <id> [--per-call 15] [--exclude "Name;Name"]
+  --type <type> --region <ST> --roster data/enrichvenues/rosters/<ST>.json --size N --batch <id> [--per-call 25] [--exclude "Name;Name"]
 ```
 
 `batch` selects the N richest vendors of the type with **no recon of any kind**, defers same-named twins (and skips twin research collisions with a warning), assigns bots (≤50/bot/run) and collected-dates, and writes `drafts/<id>-call-NN.md` files with the TYPE'S rules + voices + dossiers **inlined**. It fails fast listing any vendor missing a dossier.
 
-Spawn one agent (`subagent_type: "draft-worker"`, background OK) per call file — that agent type is `model: sonnet` with tools **gated to Read + Write**. Prompt, verbatim short: *"Read `<workdir>/drafts/<id>-call-NN.md` and follow it exactly. It contains every rule and all research. Write the CSV it specifies in one Write, then reply with the one line it specifies. Do not read anything else back."* Workers get NO gap searches — a vendor with no pricing in its dossier gets an honest "Quote only" row.
+Spawn one agent (`subagent_type: "draft-worker"`, background OK) per call file — that agent type is `model: sonnet` with tools **gated to Read + Write**. Prompt, verbatim short: *"Read `<workdir>/drafts/<id>-call-NN.md` and follow it exactly. It contains every rule and all research. Write the output file it specifies in one Write, then reply with the one line it specifies. Do not read anything else back."* Workers get NO gap searches — a vendor with no pricing in its dossier gets an honest "Quote only" row. **Workers write JSON Lines** (`drafts/<id>-worker-NN.jsonl`) — JSON escaping ends the CSV-corruption failure class that forced a full repair pass in the 2026-07 run; `merge` still emits the reviewable `recons-<id>.csv`.
 
 Collect flags from the worker reply lines (defined per type in its draft-call-header):
 - **`NOTAVENUE:`/`NOTPHOTOG:<slug>`** — the dossier shows a vendor of the WRONG type for this run. Confirm against the dossier, then handle: a mis-typed **seed** (`created_by = null`) is removed (its `recon_media` → `recon_entries` → `vendors` row) or re-typed if it clearly belongs to another supported type; an app-user-added vendor (`created_by` set) is NEVER auto-removed. Strip it from the batch CSV/manifest.
@@ -69,6 +69,8 @@ Missing vendors (a call died): re-spawn just that call file (THIN/NOTTYPE-flagge
 After merge validates, run the RICH pass for all RICH-flagged slugs as part of the same run (skip only if the user says skip). Same mechanics, with `--type`:
 ```
 node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> rich --type <type> --batch <id> --roster <roster> --venues "<rich slugs>"
+# spawn ONE draft-worker on drafts/<id>-rich-call.md (writes <id>-rich-worker.jsonl), then:
+node .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> richout --type <type> --batch <id>   # → recons-<id>-rich.csv
 ```
 
 ## Phase 4 — User review (human gate #2)

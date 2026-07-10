@@ -31,7 +31,7 @@ import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
 const cmd = process.argv[3];
-const CMDS = ['batch', 'status', 'merge', 'verify', 'photos-map', 'health', 'rich'];
+const CMDS = ['batch', 'status', 'merge', 'verify', 'photos-map', 'health', 'rich', 'richout'];
 if (!workdir || workdir.startsWith('--') || !CMDS.includes(cmd)) {
   console.error(`usage: pipeline.mjs <workdir> <${CMDS.join('|')}> [--type venue|photographer] [flags]`); process.exit(1);
 }
@@ -62,6 +62,33 @@ function parseDraftCsv(p) {
   const hdr = rows[0].map((h) => h.trim());
   return { hdr, data: rows.slice(1).filter((r) => r.some((c) => c && c.trim())) };
 }
+// v3 workers write JSON Lines — JSON.stringify escaping ends the CSV-corruption failure
+// class (11/21 workers corrupted their CSVs in the 2026-07 photographer run; a full
+// model-repair pass was needed). Rows normalize to HEADERS-ordered string arrays.
+// Legacy CSV worker files can't be re-processed by this version — re-draft the batch,
+// or check out the pre-JSONL pipeline from git history for an old artifact.
+function readWorkerRows(prefix) {
+  const all = fs.existsSync(draftsDir) ? fs.readdirSync(draftsDir) : [];
+  const files = all.filter((f) => f.startsWith(prefix) && f.endsWith('.jsonl')).sort();
+  if (!files.length && all.some((f) => f.startsWith(prefix) && f.endsWith('.csv'))) {
+    console.error(`only legacy CSV worker files found for "${prefix}*" — this pipeline reads JSONL worker output (see readWorkerRows comment)`);
+    process.exit(1);
+  }
+  const perFile = [];
+  for (const f of files) {
+    const rows = [], problems = [];
+    fs.readFileSync(path.join(draftsDir, f), 'utf8').split('\n').forEach((l, idx) => {
+      const t = l.trim();
+      if (!t) return;
+      try {
+        const o = JSON.parse(t);
+        rows.push(HEADERS.map((h) => String(o[h] ?? '').replace(/\r?\n/g, ' ').trim()));
+      } catch { problems.push(`${f}:${idx + 1}: unparseable JSON line`); }
+    });
+    perFile.push({ file: f, rows, problems });
+  }
+  return { perFile };
+}
 function loadCsvRecons(csvName) {
   const rows = parseCSV(fs.readFileSync(path.join(workdir, csvName), 'utf8'));
   const hdr = rows[0].map((h) => h.trim());
@@ -73,7 +100,9 @@ function loadCsvRecons(csvName) {
 async function cmdBatch() {
   needEnv();
   const region = req('region'), rosterPath = req('roster'), size = parseInt(req('size'), 10), batch = req('batch');
-  const perCall = parseInt(argValue('per-call') || '15', 10);
+  // 25/call keeps files ~14-18k tokens at ≤~600-token dossiers (measured: photographer
+  // dossiers avg ~410) — 40% fewer worker spawns than the old 15 default.
+  const perCall = parseInt(argValue('per-call') || '25', 10);
   const supabase = db();
 
   const { data: venues, error } = await supabase.from('vendors')
@@ -158,7 +187,7 @@ async function cmdBatch() {
       const dossier = fs.readFileSync(path.join(workdir, 'research', m.slug, 'dossier.md'), 'utf8').trim();
       return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | bot=${m.bot} | date=${m.month}/${m.year} ===\n${dossier}`;
     });
-    const out = `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-worker-${String(c).padStart(2, '0')}.csv\n`;
+    const out = `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-worker-${String(c).padStart(2, '0')}.jsonl\n`;
     fs.writeFileSync(path.join(draftsDir, `${batch}-call-${String(c).padStart(2, '0')}.md`), out);
     maxTok = Math.max(maxTok, Math.round(out.length / 4));
   }
@@ -178,14 +207,13 @@ function cmdStatus() {
   const manifest = loadManifest(batch);
   const wantIds = new Set(manifest.map((m) => m.vendor_id));
   const botByVid = new Map(manifest.map((m) => [m.vendor_id, m.bot]));
-  const files = fs.readdirSync(draftsDir).filter((f) => f.startsWith(`${batch}-worker-`) && f.endsWith('.csv')).sort();
+  const { perFile } = readWorkerRows(`${batch}-worker-`);
+  const i = (n) => HEADERS.indexOf(n);
   const drafted = new Set(); let total = 0, malformed = 0, badVid = 0, badBot = 0, noPrice = 0, banned = 0, dashes = 0, noRegion = 0;
-  for (const f of files) {
-    const { hdr, data } = parseDraftCsv(path.join(draftsDir, f));
-    const i = (n) => hdr.indexOf(n);
-    for (const r of data) {
+  for (const { file: f, rows, problems } of perFile) {
+    malformed += problems.length;
+    for (const r of rows) {
       total++;
-      if (r.length !== HEADERS.length) malformed++;
       const vid = (r[i('vendor_id')] ?? '').trim();
       if (!wantIds.has(vid)) badVid++; else drafted.add(vid);
       if (vid && botByVid.get(vid) && (r[i('bot')] ?? '').trim() !== botByVid.get(vid)) badBot++;
@@ -195,7 +223,7 @@ function cmdStatus() {
       if (BANNED.test(text)) banned++;
       if (EMDASH.test(text)) dashes++;
     }
-    console.log(`  ${f}: ${data.length} rows`);
+    console.log(`  ${f}: ${rows.length} rows${problems.length ? ` | ${problems.length} unparseable JSON lines` : ''}`);
   }
   const missing = manifest.filter((m) => !drafted.has(m.vendor_id));
   console.log(`\ndrafted ${drafted.size}/${manifest.length} | rows ${total} | malformed ${malformed} | bad vendor_id ${badVid} | bot mismatch ${badBot}`);
@@ -210,26 +238,14 @@ function cmdMerge() {
   const idByName = new Map(manifest.map((m) => [norm(m.name), m.vendor_id]));
   const wantIds = new Set(manifest.map((m) => m.vendor_id));
   const botByVid = new Map(manifest.map((m) => [m.vendor_id, m.bot]));
-  const files = fs.readdirSync(draftsDir).filter((f) => f.startsWith(`${batch}-worker-`) && f.endsWith('.csv')).sort();
-  if (!files.length) { console.error('no worker CSVs found'); process.exit(1); }
+  const { perFile } = readWorkerRows(`${batch}-worker-`);
+  if (!perFile.length) { console.error('no worker JSONL files found'); process.exit(1); }
 
+  const iBot = HEADERS.indexOf('bot');
   const out = [HEADERS]; const seenVid = new Set(); const problems = []; let repaired = 0;
-  for (const f of files) {
-    const { hdr, data } = parseDraftCsv(path.join(draftsDir, f));
-    const iV = hdr.indexOf('vendor_id');
-    const iSrc = HEADERS.indexOf('sources'), iBot = HEADERS.indexOf('bot');
-    const tailN = HEADERS.length - 1 - iSrc; // columns after sources (bot [, service_region])
-    for (let r of data) {
-      // field overflow (unquoted comma in sources): rejoin overflow into sources, restore bot from manifest
-      // (venue layout: iSrc=9, tailN=1 — identical to the original fixed-index repair)
-      if (r.length > HEADERS.length) {
-        const vid0 = (r[1] ?? '').trim();
-        const tail = r.slice(r.length - tailN);
-        r = [...r.slice(0, iSrc), r.slice(iSrc, r.length - tailN).join(','), ...tail];
-        r[iBot] = botByVid.get(vid0) ?? r[iBot];
-        repaired++;
-      }
-      if (r.length < HEADERS.length) { problems.push(`${f}: short row "${(r[0] || '').slice(0, 40)}"`); continue; }
+  for (const { file: f, rows, problems: fileProblems } of perFile) {
+    problems.push(...fileProblems);
+    for (const r of rows) {
       let vid = (r[1] ?? '').trim();
       if (!wantIds.has(vid)) {
         const fix = idByName.get(norm(r[0] ?? ''));
@@ -239,7 +255,7 @@ function cmdMerge() {
       if (seenVid.has(vid)) { problems.push(`${f}: duplicate vendor "${r[0]}"`); continue; }
       seenVid.add(vid);
       if (botByVid.get(vid) && (r[iBot] ?? '').trim() !== botByVid.get(vid)) { r[iBot] = botByVid.get(vid); repaired++; }
-      out.push(r.map((c) => (c ?? '').replace(/\r?\n/g, ' ').trim()));
+      out.push(r);
     }
   }
   if (problems.length) { console.error('UNRECOVERABLE:\n  ' + problems.join('\n  ')); process.exit(1); }
@@ -314,7 +330,7 @@ function cmdPhotosMap() {
   const screenDir = path.join(workdir, 'photos', 'screen');
   const keepers = {};
   for (const f of fs.readdirSync(screenDir).filter((f) => /^keep-batch-.*\.json$/.test(f)).sort()) {
-    for (const [slug, arr] of Object.entries(JSON.parse(fs.readFileSync(path.join(screenDir, f), 'utf8')))) keepers[slug] = (arr || []).slice(0, 2);
+    for (const [slug, arr] of Object.entries(JSON.parse(fs.readFileSync(path.join(screenDir, f), 'utf8')))) keepers[slug] = (arr || []).slice(0, profile.photoCap ?? 2);
   }
   const missing = [];
   for (const [slug, arr] of Object.entries(keepers)) for (const fn of arr) {
@@ -400,16 +416,32 @@ function cmdRich() {
       + `SECOND ENTRY — this vendor is rich enough for two. A DIFFERENT couple (bot=${m.firstBot}) already wrote entry 1 covering PRICING: "${m.firstPrice}". You are a different couple: lead with the REVIEW / EXPERIENCE / LOGISTICS cluster (staff, vibe, what working with them was like, quirks). price_text + price_details are still required: derive a HEDGED version of the vendor's real pricing in your own words (e.g. "going off their posted rates it's about $X-$Y", "reviews put saturdays around $X"), or an honest "Quote only" if the dossier has no number. Do NOT copy entry 1's pricing verbatim, and NEVER reference "entry 1" / the other entry / another listing — a reader sees separate cards from different people, so each entry must stand alone. Clearly different voice and opening from a typical first entry.\n${dossier}`;
   });
   fs.mkdirSync(draftsDir, { recursive: true });
-  fs.writeFileSync(path.join(draftsDir, `${batch}-rich-call.md`), `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-rich-worker.csv\n`);
+  fs.writeFileSync(path.join(draftsDir, `${batch}-rich-call.md`), `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-rich-worker.jsonl\n`);
   fs.writeFileSync(path.join(draftsDir, `${batch}-rich-manifest.json`), JSON.stringify(rich, null, 2));
   console.log(`rich second-entry call for ${rich.length} venues → drafts/${batch}-rich-call.md`);
   console.log(`second bots: ${rich.map((m) => `${m.slug}=${m.secondBot}(vs ${m.firstBot})`).join(', ')}`);
-  console.log(`spawn one Sonnet agent on it; then: validate drafts/${batch}-rich-worker.csv, copy to recons-${batch}-rich.csv, upload as a separate --apply run`);
+  console.log(`spawn one draft-worker on it; then: pipeline richout --batch ${batch} → recons-${batch}-rich.csv, upload as a separate --apply run`);
+}
+
+// ── richout ───────────────────────────────────────────────────────────────────
+// Convert the rich worker's JSONL into recons-<batch>-rich.csv for upload.
+function cmdRichout() {
+  const batch = req('batch');
+  const { perFile } = readWorkerRows(`${batch}-rich-worker`);
+  if (!perFile.length) { console.error(`no ${batch}-rich-worker.jsonl found`); process.exit(1); }
+  const out = [HEADERS];
+  let bad = 0;
+  for (const { rows, problems } of perFile) { out.push(...rows); bad += problems.length; }
+  const csvName = `recons-${batch}-rich.csv`;
+  fs.writeFileSync(path.join(workdir, csvName), out.map((row) => row.map(csvEsc).join(',')).join('\n') + '\n');
+  console.log(`${out.length - 1} rich rows → ${csvName}${bad ? ` | ${bad} unparseable lines DROPPED` : ''}`);
+  if (bad) process.exit(1);
 }
 
 if (cmd === 'batch') await cmdBatch();
 else if (cmd === 'status') cmdStatus();
 else if (cmd === 'rich') cmdRich();
+else if (cmd === 'richout') cmdRichout();
 else if (cmd === 'merge') cmdMerge();
 else if (cmd === 'verify') await cmdVerify();
 else if (cmd === 'photos-map') cmdPhotosMap();

@@ -22,6 +22,8 @@ export const ETYPES = {
     dossierPriceTitle: 'site pricing/capacity lines',
     // photos.mjs: venues drop couple-portrait URLs (people-as-subject is a junk signal there)
     portraitFilter: true,
+    // photos-map: max keeper photos mapped per vendor
+    photoCap: 2,
     // worker reply flag for "this row is a different vendor type, mis-seeded"
     notFlag: 'NOTAVENUE',
   },
@@ -36,6 +38,7 @@ export const ETYPES = {
     priceLine: /\$\s?\d|per\s+hour|hourly|packag|collection|starting (at|price)|invest|hours? of coverage|second (shooter|photographer)|engagement session|album|travel fee|elopement|deposit|retainer|pric(e|ing)|\brates?\b|full day|half day/i,
     dossierPriceTitle: 'site pricing/package lines',
     portraitFilter: false,             // portfolio couple portraits ARE the product for photographers
+    photoCap: 3,                       // photos are critical for this type (Kiara, 2026-07): target ~3/vendor
     notFlag: 'NOTPHOTOG',
   },
 };
