@@ -21,7 +21,7 @@ The v1 run burned ~2M tokens on 100 venues. Three sinks, three rules:
 2. **Scripts compress, models write.** `dossier.mjs` regex-cuts each vendor's harvest/pages/digests/reddit to a ~500-token dossier for free. No agent ever reads `harvest.json`, `page-*.txt`, whole digests, or whole threads. No `extract.md` provenance files — the `sources` column is the provenance.
 3. **Never re-touch every row.** No global polish pass: voice rules ride inside the call file; `upload.mjs` dry-run + `pipeline.mjs status` validate mechanically for free. Fix ONLY flagged rows (≤5: orchestrator edits inline; more: one small targeted call).
 
-Budgets (drafting, Sonnet): call file ≈ 3k header + ~600/vendor; ~14-18k/call of 25 vendors (the default) ⇒ **~2k tokens/vendor, 300+ fits one session.** Orchestrator stays thin: `pipeline.mjs` does batch/status/merge/verify — do not hand-write per-run scripts for these. Worker replies are one line; nothing bulk ever enters the orchestrator context.
+Budgets (drafting, Sonnet): call file ≈ 3k header + ~600/vendor; ~14-18k/call of 25 vendors (the default) ⇒ **~2k tokens/vendor, 300+ fits one session.** (A deferred plan to move drafting onto the metered Anthropic Batch API — off the subscription, ~$1-1.50/run — is written up in `docs/anthropic-batch-drafting.md`; blocked on a Kiara billing decision.) Orchestrator stays thin: `pipeline.mjs` does batch/status/merge/verify — do not hand-write per-run scripts for these. Worker replies are one line; nothing bulk ever enters the orchestrator context.
 
 ## Phase 0 — Scope (one exchange, human gate #1)
 
