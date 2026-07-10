@@ -30,8 +30,10 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Touch the user to trigger token refresh; do not branch on the result here.
-  await supabase.auth.getUser();
+  // Verify the JWT (locally when the project uses asymmetric signing keys) and
+  // refresh the session when it's near expiry. Replaces getUser(), which made
+  // a network round trip to Supabase Auth on every navigation.
+  await supabase.auth.getClaims();
 
   return response;
 }
