@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 import { type Vendor } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
@@ -47,8 +48,10 @@ const CLUSTER_MAX_ZOOM = 14;
 // Co-located type-clusters (e.g. venues + photographers downtown) would stack on
 // top of each other. Give each type a small fixed screen offset arranged on a
 // ring, so overlapping type-clusters splay into a tidy rosette instead of piling
-// up. An isolated cluster just sits a few px off its centroid — imperceptible.
-const ROSETTE_RADIUS_PX = 10;
+// up. Sized so two big co-located discs stay separately readable; an isolated
+// cluster sits within the ~50px area it already represents, so the offset reads
+// as intentional rather than misplaced.
+const ROSETTE_RADIUS_PX = 18;
 const CLUSTER_OFFSET: Record<VendorType, [number, number]> = Object.fromEntries(
   VENDOR_TYPES.map((t, i) => {
     const angle = (i / VENDOR_TYPES.length) * 2 * Math.PI;
@@ -197,6 +200,11 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     maxLng: number;
     maxLat: number;
   } | null>(null);
+  // Overlay shown only during a *truly-new* fetch (first load + search jumps),
+  // never on ordinary pans/zooms. Safety timeout hides it if the map never
+  // settles (e.g. tiles fail) so it can't get stuck.
+  const [loading, setLoading] = useState(true);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = createClient();
 
   /**
@@ -274,6 +282,9 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   const refreshMarkers = useCallback(async () => {
     const vendors = await fetchVendors();
     if (vendors) applyVendors(vendors);
+    // Whatever triggered this fetch has now settled — clear any loading overlay.
+    // (Ordinary pans never set it, so this is usually a no-op.)
+    setLoading(false);
   }, [fetchVendors, applyVendors]);
 
   /** Debounced wrapper for refreshMarkers — called on 'moveend'. */
@@ -289,6 +300,9 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     if (typeof window === "undefined") return;
     if (!containerRef.current) return;
     if (mapRef.current) return; // already initialized
+
+    // Failsafe: never let the loading overlay outlive a stuck map load.
+    loadTimeoutRef.current = setTimeout(() => setLoading(false), 10000);
 
     let map: import("maplibre-gl").Map;
 
@@ -414,12 +428,18 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
 
         const vendors = await firstData;
         if (vendors) applyVendors(vendors);
+        setLoading(false); // first load done — reveal the map
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
         map.on("moveend", scheduleRefresh);
       });
     })();
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -428,9 +448,12 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally run once
 
-  // Fly to an external position when provided (e.g. user's geolocation).
+  // Fly to an external position when provided (e.g. a search or geolocation).
+  // A jump lands in new territory → treat it as a truly-new fetch and show the
+  // overlay until the follow-on moveend fetch settles.
   useEffect(() => {
     if (!flyToPosition || !mapRef.current) return;
+    setLoading(true);
     mapRef.current.flyTo({
       center: [flyToPosition.lng, flyToPosition.lat],
       zoom: flyToPosition.zoom ?? 14,
@@ -439,10 +462,24 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   }, [flyToPosition]);
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full"
-      aria-label="Vendor map"
-    />
+    <div className="relative w-full h-full">
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+        aria-label="Vendor map"
+      />
+      {loading && (
+        <div
+          className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center bg-background/70 backdrop-blur-[1px]"
+          role="status"
+          aria-label="Loading vendors"
+        >
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Loader2 className="size-6 animate-spin text-primary" />
+            <span className="text-sm font-medium">Finding vendors…</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
