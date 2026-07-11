@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, Loader2, MapPin } from "lucide-react";
+import { Search, Loader2, MapPin, Navigation } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { VendorMap } from "@/components/map/vendor-map";
@@ -34,6 +35,8 @@ export default function ExplorePage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom?: number } | null>(null);
   const [searching, setSearching] = useState(false);
+  const [userPosition, setUserPosition] = useState<{ lng: number; lat: number } | null>(null);
+  const [locating, setLocating] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
@@ -103,6 +106,48 @@ export default function ExplorePage() {
     }
   }
 
+  async function handleLocate() {
+    if (locating) return;
+    if (!("geolocation" in navigator)) {
+      toast.error("Location isn't available in this browser.");
+      return;
+    }
+
+    const deniedMessage =
+      "Location access is blocked — allow it for this site in your browser settings.";
+
+    // Known-denied? The browser won't re-prompt, so skip the doomed attempt
+    // and point at settings right away. Unsupported → fall through.
+    try {
+      const status = await navigator.permissions?.query?.({ name: "geolocation" });
+      if (status?.state === "denied") {
+        toast.error(deniedMessage);
+        return;
+      }
+    } catch {
+      // Permissions API unsupported — getCurrentPosition will report instead.
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const { longitude: lng, latitude: lat } = pos.coords;
+        setUserPosition({ lng, lat });
+        setFlyTo({ lng, lat, zoom: 14 });
+      },
+      (err) => {
+        setLocating(false);
+        toast.error(
+          err.code === err.PERMISSION_DENIED
+            ? deniedMessage
+            : "Couldn't get your location. Try again.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
+    );
+  }
+
   return (
     <div className="relative flex flex-1 flex-col min-h-[60vh]">
       {/* Warm the basemap connection early (hoisted to <head> by React). */}
@@ -111,7 +156,7 @@ export default function ExplorePage() {
 
       {/* Full-bleed map behind everything */}
       <div className="absolute inset-0">
-        <VendorMap flyToPosition={flyTo} />
+        <VendorMap flyToPosition={flyTo} userPosition={userPosition} />
       </div>
 
       {/* Search bar + autocomplete dropdown, with the account control beside it */}
@@ -171,12 +216,25 @@ export default function ExplorePage() {
         <ProfileMenu className="shrink-0" />
       </div>
 
-      {/* Quiet brand mark — bottom-left over the map, lifted clear of the
-          map attribution that sits along the bottom edge. */}
-      <div className="relative z-10 mt-auto px-3 pb-9 pt-3">
+      {/* Bottom row over the map, lifted clear of the map attribution along
+          the bottom edge: quiet brand mark on the left, locate button right. */}
+      <div className="relative z-10 mt-auto flex items-end justify-between px-3 pb-9 pt-3">
         <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
           <BrandLockup size="sm" />
         </div>
+        <button
+          type="button"
+          onClick={handleLocate}
+          disabled={locating}
+          aria-label="Center map on my location"
+          className="flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
+        >
+          {locating ? (
+            <Loader2 size={20} className="animate-spin" aria-hidden />
+          ) : (
+            <Navigation size={20} aria-hidden />
+          )}
+        </button>
       </div>
     </div>
   );

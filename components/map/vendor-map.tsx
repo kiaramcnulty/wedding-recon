@@ -184,13 +184,17 @@ function buildFeatureCollectionsByType(
 interface VendorMapProps {
   /** External position to fly to. Pass zoom to override the default (14). */
   flyToPosition?: { lng: number; lat: number; zoom?: number } | null;
+  /** The user's geolocated position — rendered as a "you are here" dot. */
+  userPosition?: { lng: number; lat: number } | null;
 }
 
-export function VendorMap({ flyToPosition }: VendorMapProps) {
+export function VendorMap({ flyToPosition, userPosition }: VendorMapProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userMarkerRef = useRef<any>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Area covered by the last *complete* fetch. When the viewport stays inside
   // it, the pins on the map are already correct — skip the refetch.
@@ -441,8 +445,9 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
       if (mapRef.current) {
-        mapRef.current.remove();
+        mapRef.current.remove(); // also removes any markers on the map
         mapRef.current = null;
+        userMarkerRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -460,6 +465,35 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
       duration: 1200,
     });
   }, [flyToPosition]);
+
+  // "You are here" dot: created on the first geolocation, moved on later ones.
+  // One-shot pulse ring re-added per update so repeat taps re-announce the dot.
+  useEffect(() => {
+    if (!userPosition) return;
+    let cancelled = false;
+    (async () => {
+      const maplibregl = (await import("maplibre-gl")).default;
+      const map = mapRef.current;
+      if (!map || cancelled) return;
+      if (!userMarkerRef.current) {
+        const dot = document.createElement("div");
+        dot.className = "user-location-dot";
+        userMarkerRef.current = new maplibregl.Marker({ element: dot })
+          .setLngLat([userPosition.lng, userPosition.lat])
+          .addTo(map);
+      } else {
+        userMarkerRef.current.setLngLat([userPosition.lng, userPosition.lat]);
+      }
+      const el = userMarkerRef.current.getElement() as HTMLElement;
+      el.querySelector(".user-location-pulse")?.remove();
+      const pulse = document.createElement("div");
+      pulse.className = "user-location-pulse";
+      el.appendChild(pulse);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userPosition]);
 
   return (
     <div className="relative w-full h-full">
