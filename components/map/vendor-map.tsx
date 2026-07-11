@@ -18,7 +18,13 @@ const MAP_STYLE_URL =
 const DEFAULT_CENTER: [number, number] = [-104.9903, 39.7392];
 const DEFAULT_ZOOM = 9;
 const DEBOUNCE_MS = 150;
-const MAX_ROWS = 200;
+// Upper bound on pins per fetch. Must stay ABOVE a launched region's true vendor
+// count: vendors_in_bbox has no ORDER BY, so when a fetch box holds more than
+// this, Postgres returns an arbitrary subset and whole pockets (e.g. Thornton)
+// silently drop out until you zoom in far enough to fall under the cap. The real
+// fix for genuinely dense regions is marker clustering (deferred round-2 GeoJSON
+// rewrite); until then keep comfortable headroom over the region total.
+const MAX_ROWS = 1000;
 
 // Fetch beyond the viewport so small pans land inside already-fetched area.
 const BBOX_PAD_FACTOR = 0.5; // half a viewport-span extra on each side
