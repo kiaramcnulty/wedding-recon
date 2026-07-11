@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { renderToStaticMarkup } from "react-dom/server";
-import { CATEGORIES } from "@/lib/constants/categories";
 import { type Vendor } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import { registerPinImages, pinImageId } from "@/lib/map/pin-images";
 
 // MapLibre is browser-only; import deferred to effects.
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -18,21 +17,27 @@ const MAP_STYLE_URL =
 const DEFAULT_CENTER: [number, number] = [-104.9903, 39.7392];
 const DEFAULT_ZOOM = 9;
 const DEBOUNCE_MS = 150;
-// Upper bound on pins per fetch. Must stay ABOVE a launched region's true vendor
-// count: vendors_in_bbox has no ORDER BY, so when a fetch box holds more than
-// this, Postgres returns an arbitrary subset and whole pockets (e.g. Thornton)
-// silently drop out until you zoom in far enough to fall under the cap. The real
-// fix for genuinely dense regions is marker clustering (deferred round-2 GeoJSON
-// rewrite); until then keep comfortable headroom over the region total.
-const MAX_ROWS = 1000;
+// Upper bound on pins per fetch. vendors_in_bbox has no ORDER BY, so if a fetch
+// box holds more than this, Postgres returns an arbitrary subset and whole
+// pockets silently drop out. Pins now render on the GPU via a clustered symbol
+// layer (not DOM markers), so a high cap is cheap — keep it well above any single
+// launched region's vendor count. Genuinely dense multi-metro views would want
+// server-side clustering (PostGIS), out of scope here.
+const MAX_ROWS = 5000;
 
 // Fetch beyond the viewport so small pans land inside already-fetched area.
 const BBOX_PAD_FACTOR = 0.5; // half a viewport-span extra on each side
 
-interface MarkerRef {
-  marker: import("maplibre-gl").Marker;
-  vendorId: string;
-}
+// GeoJSON source + layer ids for the clustered vendor pins.
+const SRC = "vendors";
+const LAYER_CLUSTERS = "vendor-clusters";
+const LAYER_CLUSTER_COUNT = "vendor-cluster-count";
+const LAYER_PINS = "vendor-unclustered";
+
+const EMPTY_FC: GeoJSON.FeatureCollection = {
+  type: "FeatureCollection",
+  features: [],
+};
 
 /**
  * Heuristic: does this vendor's pin sit on an *approximate* (city/region
@@ -105,48 +110,23 @@ function resolveDisplayPositions(
   return positions;
 }
 
-/** Builds a small colored circle element for a vendor marker. */
-function buildMarkerElement(vendor: Vendor, approximate: boolean): HTMLElement {
-  const meta = CATEGORIES[vendor.vendor_type] ?? CATEGORIES.other;
-  const Icon = meta.icon;
-
-  // Render the Lucide icon as SVG markup (white, 14px).
-  const iconSvg = renderToStaticMarkup(
-    <Icon size={14} color="#ffffff" strokeWidth={2.5} />,
-  );
-
-  // Outer wrapper — MapLibre writes its own translate() transform here for
-  // positioning. Never touch el.style.transform or the marker will scatter.
-  const el = document.createElement("div");
-  el.style.cssText = `width: 30px; height: 30px; cursor: pointer;`;
-  el.title = approximate ? `${vendor.name} (approximate area)` : vendor.name;
-
-  // Inner circle — safe to apply visual transforms here. Approximate-location
-  // pins get a dashed outline to signal the spot is a region, not an address.
-  const inner = document.createElement("div");
-  inner.style.cssText = `
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: ${meta.colorHex};
-    border: 2px ${approximate ? "dashed" : "solid"} #ffffff;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.12s ease;
-  `;
-  inner.innerHTML = iconSvg;
-  el.appendChild(inner);
-
-  el.addEventListener("mouseenter", () => {
-    inner.style.transform = "scale(1.18)";
-  });
-  el.addEventListener("mouseleave", () => {
-    inner.style.transform = "scale(1)";
-  });
-
-  return el;
+/** Build a GeoJSON FeatureCollection of vendor pins for the clustered source. */
+function buildFeatureCollection(vendors: Vendor[]): GeoJSON.FeatureCollection {
+  const positions = resolveDisplayPositions(vendors);
+  const features: GeoJSON.Feature[] = [];
+  for (const vendor of vendors) {
+    const pos = positions.get(vendor.id);
+    if (!pos) continue; // missing coordinates
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
+      properties: {
+        id: vendor.id,
+        icon: pinImageId(vendor.vendor_type, isApproximateLocation(vendor)),
+      },
+    });
+  }
+  return { type: "FeatureCollection", features };
 }
 
 interface VendorMapProps {
@@ -159,10 +139,9 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
-  const markersRef = useRef<MarkerRef[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Area covered by the last *complete* fetch. When the viewport stays inside
-  // it, the markers on the map are already correct — skip the refetch.
+  // it, the pins on the map are already correct — skip the refetch.
   const coverageRef = useRef<{
     minLng: number;
     minLat: number;
@@ -171,18 +150,12 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   } | null>(null);
   const supabase = createClient();
 
-  /** Remove all current markers from the map. */
-  const clearMarkers = useCallback(() => {
-    for (const { marker } of markersRef.current) {
-      marker.remove();
-    }
-    markersRef.current = [];
-  }, []);
-
-  /** Query the RPC and refresh markers based on current bounds. */
+  /** Query the RPC for the current bounds and push the result into the source. */
   const refreshMarkers = useCallback(async () => {
     const map = mapRef.current;
     if (!map) return;
+    const source = map.getSource(SRC);
+    if (!source) return; // layers not initialized yet
 
     const bounds = map.getBounds();
     const west = bounds.getWest();
@@ -191,7 +164,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     const north = bounds.getNorth();
 
     // Cache hit: viewport fully inside the area of the last complete fetch —
-    // every vendor in view is already a marker on the map.
+    // every vendor in view is already in the source.
     const cov = coverageRef.current;
     if (
       cov &&
@@ -220,10 +193,8 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
 
     if (error) {
       console.error("[VendorMap] vendors_in_bbox error:", error.message);
-      return; // keep existing markers and coverage — stale beats blank
+      return; // keep existing pins and coverage — stale beats blank
     }
-
-    clearMarkers();
 
     const vendors = (data ?? []) as Vendor[];
 
@@ -236,37 +207,8 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
         ? { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat }
         : null;
 
-    if (vendors.length === 0) return;
-
-    // Dynamically import maplibre to avoid SSR issues.
-    const maplibregl = (await import("maplibre-gl")).default;
-
-    // Fan out pins that share a coordinate so stacked (approximate) vendors
-    // don't pile onto a single spot.
-    const positions = resolveDisplayPositions(vendors);
-
-    const newMarkers: MarkerRef[] = [];
-
-    for (const vendor of vendors) {
-      const pos = positions.get(vendor.id);
-      if (!pos) continue; // missing coordinates
-
-      const el = buildMarkerElement(vendor, isApproximateLocation(vendor));
-
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        router.push(`/vendor/${vendor.id}`);
-      });
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([pos.lng, pos.lat])
-        .addTo(map);
-
-      newMarkers.push({ marker, vendorId: vendor.id });
-    }
-
-    markersRef.current = newMarkers;
-  }, [supabase, clearMarkers, router]);
+    source.setData(buildFeatureCollection(vendors));
+  }, [supabase]);
 
   /** Debounced wrapper for refreshMarkers — called on 'moveend'. */
   const scheduleRefresh = useCallback(() => {
@@ -303,16 +245,113 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
 
       mapRef.current = map;
 
-      map.on("load", () => {
-        refreshMarkers();
-      });
+      map.on("load", async () => {
+        // Pre-rasterize category pins before the symbol layer references them.
+        await registerPinImages(map);
+        if (!mapRef.current) return; // unmounted mid-load
 
-      map.on("moveend", scheduleRefresh);
+        map.addSource(SRC, {
+          type: "geojson",
+          data: EMPTY_FC,
+          cluster: true,
+          clusterRadius: 50,
+          clusterMaxZoom: 14,
+        });
+
+        // Cluster bubbles — neutral grey, sized/shaded by point count.
+        map.addLayer({
+          id: LAYER_CLUSTERS,
+          type: "circle",
+          source: SRC,
+          filter: ["has", "point_count"],
+          paint: {
+            "circle-color": [
+              "step",
+              ["get", "point_count"],
+              "#8A8F98",
+              10,
+              "#6B7280",
+              25,
+              "#4B5563",
+            ],
+            "circle-radius": [
+              "step",
+              ["get", "point_count"],
+              16,
+              10,
+              20,
+              25,
+              26,
+            ],
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#ffffff",
+          },
+        });
+
+        // Cluster point-count labels.
+        map.addLayer({
+          id: LAYER_CLUSTER_COUNT,
+          type: "symbol",
+          source: SRC,
+          filter: ["has", "point_count"],
+          layout: {
+            "text-field": ["get", "point_count_abbreviated"],
+            "text-font": ["Noto Sans Regular"],
+            "text-size": 13,
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
+          },
+          paint: { "text-color": "#ffffff" },
+        });
+
+        // Individual vendor pins — pre-rendered category icons.
+        map.addLayer({
+          id: LAYER_PINS,
+          type: "symbol",
+          source: SRC,
+          filter: ["!", ["has", "point_count"]],
+          layout: {
+            "icon-image": ["get", "icon"],
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+          },
+        });
+
+        // Click a cluster → zoom to where it breaks apart.
+        map.on("click", LAYER_CLUSTERS, (e) => {
+          const feature = e.features?.[0];
+          if (!feature) return;
+          const clusterId = feature.properties?.cluster_id;
+          const src = map.getSource(SRC) as import("maplibre-gl").GeoJSONSource;
+          src.getClusterExpansionZoom(clusterId).then((zoom) => {
+            const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
+            map.easeTo({ center: [lng, lat], zoom });
+          });
+        });
+
+        // Click a pin → open the vendor page.
+        map.on("click", LAYER_PINS, (e) => {
+          const id = e.features?.[0]?.properties?.id;
+          if (typeof id === "string") router.push(`/vendor/${id}`);
+        });
+
+        // Pointer cursor over interactive layers.
+        for (const layer of [LAYER_CLUSTERS, LAYER_PINS]) {
+          map.on("mouseenter", layer, () => {
+            map.getCanvas().style.cursor = "pointer";
+          });
+          map.on("mouseleave", layer, () => {
+            map.getCanvas().style.cursor = "";
+          });
+        }
+
+        refreshMarkers();
+        map.on("moveend", scheduleRefresh);
+      });
     })();
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      clearMarkers();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
