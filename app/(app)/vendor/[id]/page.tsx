@@ -1,6 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { MapPin, PlusCircle, ExternalLink, Globe } from "lucide-react";
+import {
+  MapPin,
+  PlusCircle,
+  ExternalLink as ExternalLinkIcon,
+  Globe,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getVendorGooglePhotos } from "@/lib/google-photos";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
@@ -11,6 +16,7 @@ import { ReconCard } from "@/components/vendor/recon-card";
 import { SaveButton } from "@/components/vendor/save-button";
 import { ShareButton } from "@/components/vendor/share-button";
 import { BackButton } from "@/components/vendor/back-button";
+import { ExternalLink } from "@/components/external-link";
 import { BrandFooter } from "@/components/brand-lockup";
 
 /** Instagram glyph — lucide v1 dropped brand icons, so this is drawn inline to lucide's stroke conventions. */
@@ -182,17 +188,23 @@ export default async function VendorPage({
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="size-3.5 shrink-0" />
               {vendor.google_place_id ? (
-                <a
+                // Overlay shows Google's iframe-embeddable map view (keyless
+                // output=embed, matched by name+address); href keeps the
+                // precise query_place_id URL for the open-in-new-tab hatch.
+                <ExternalLink
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
                     `${vendor.name} ${addressParts}`,
                   )}&query_place_id=${vendor.google_place_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  embed
+                  embedSrc={`https://maps.google.com/maps?q=${encodeURIComponent(
+                    `${vendor.name} ${addressParts}`,
+                  )}&output=embed`}
+                  overlayTitle="Google Maps"
                   className="flex items-center gap-1 hover:text-foreground transition-colors"
                 >
                   {addressParts}
-                  <ExternalLink className="size-3.5 shrink-0" />
-                </a>
+                  <ExternalLinkIcon className="size-3.5 shrink-0" />
+                </ExternalLink>
               ) : (
                 addressParts
               )}
@@ -201,26 +213,27 @@ export default async function VendorPage({
           {(vendor.website || vendor.instagram) && (
             <div className="flex items-center gap-4">
               {vendor.website && (
-                <a
+                // Embeddability varies per site; checked in the background via
+                // /api/embed-check — blocked sites stay plain new-tab links.
+                <ExternalLink
                   href={vendor.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  embed={{ vendorId: vendor.id, kind: "website" }}
                   className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
                 >
                   <Globe className="size-3.5 shrink-0" />
                   <span className="truncate">Visit website</span>
-                </a>
+                </ExternalLink>
               )}
               {vendor.instagram && (
-                <a
+                // Instagram blocks framing on all profile pages — always a
+                // plain new-tab link (embed defaults to false).
+                <ExternalLink
                   href={`https://www.instagram.com/${vendor.instagram}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
                 >
                   <InstagramIcon className="size-3.5 shrink-0" />
                   <span className="truncate">Instagram</span>
-                </a>
+                </ExternalLink>
               )}
             </div>
           )}

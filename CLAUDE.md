@@ -26,6 +26,7 @@ Full product/dev plan: see the approved plan referenced in the repo history; thi
 - **Map markers**: `components/map/vendor-map.tsx` gives approximate-location pins a dashed outline and fans out pins that share a coordinate (deterministic phyllotaxis). See "Approximate-location map pins" below.
 - **Schema** lives in `supabase/migrations/`. If you change the DB, add a new numbered migration — don't edit applied ones. Write them idempotent and **apply new ones by hand in the Supabase SQL editor** (not auto-applied to the hosted DB). See "Migrations" below.
 - **Copy/nomenclature**: the recon CTA is **"Save recon"** (not "Publish"); user-facing labels say **"Vendor"**, not "Business".
+- **External links**: use `<ExternalLink>` from `components/external-link.tsx`, never a bare `<a target="_blank">`. It shows the destination in an in-app overlay sheet when the site allows framing, and degrades to a plain new-tab link when it doesn't. See "External-link overlay" below.
 
 ## App structure
 - `app/(app)/` — main screens with the mobile frame + bottom nav: `explore`, `add`, `hub`, and `vendor/[id]`.
@@ -109,6 +110,11 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - Display: `recon-card.tsx` previews use `thumb_path ?? storage_path` (egress saver); the vendor-page carousel uses the full image. Reads select `recon_media(*)`, so a missing `thumb_path` is null-safe on pre-migration rows.
 - **Guest flow:** raw photos are stashed in IndexedDB and compressed + uploaded on **resume** (post-auth), since Storage RLS requires an authenticated uploader.
 - Storage RLS (`0005_storage.sql`) already lets any authenticated user upload to `recon-media`; Supabase stamps `owner = auth.uid()` so the owner-only update/delete policies still apply — **no new policy needed** for client uploads.
+
+### External-link overlay (`<ExternalLink>`)
+- All external links go through `components/external-link.tsx` — a real anchor (cmd/ctrl/middle-click keep native behavior) that intercepts a plain left-click to show the destination in a full-height overlay sheet (`components/external-overlay.tsx`, photo-lightbox portal pattern) with domain + open-in-new-tab + ✕ header and a sandboxed iframe (**no** `allow-top-navigation`, so framebusting scripts can't hijack the app tab).
+- **Framing is the target site's choice** (X-Frame-Options / CSP `frame-ancestors`) and invisible to cross-origin JS, so embeddability is checked server-side: `embed={{ vendorId, kind }}` hits `/api/embed-check` in the background on mount (URL resolved from the vendors row — no raw-URL param, so no SSRF; failures → `false`; cached 1h browser / 24h CDN). Blocked or unchecked links behave exactly like `<a target="_blank">` — no dead-end taps.
+- Static cases skip the check: **Instagram** profiles always block framing (`embed` omitted → plain new-tab link); **Google Maps** overlays the keyless iframe-embeddable view (`maps.google.com/maps?q=<name+address>&output=embed`) via `embedSrc` + `embed`. That endpoint is undocumented-but-ancient Google; if it ever dies, swap to the official (also free) Maps Embed API with a referrer-restricted key.
 
 ### Approximate-location map pins
 - `isApproximateLocation(vendor)` heuristic: **non-Google source + no digit in the address** ⇒ approximate (geocoded to a city/region centroid, not a street address). Known blind spot: numbered street names ("E 17th Ave") read as precise. The robust replacement is to **store geocode precision at save time** (Nominatim returns `addresstype` + a `boundingbox`) and key off that field instead.
