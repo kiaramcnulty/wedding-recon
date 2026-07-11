@@ -56,44 +56,47 @@ export default async function VendorPage({
 
   const supabase = await createClient();
 
-  // Fetch vendor
-  const { data: vendor, error: vendorError } = await supabase
-    .from("vendors")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (vendorError || !vendor) {
-    notFound();
-  }
-
-  // Check if the current user already has recon for this vendor
-  const { data: { user } } = await supabase.auth.getUser();
-  let userHasRecon = false;
-  if (user) {
-    const { data: existing } = await supabase
-      .from("recon_entries")
-      .select("id")
-      .eq("vendor_id", id)
-      .eq("author_id", user.id)
-      .neq("status", "removed")
-      .limit(1)
-      .maybeSingle();
-    userHasRecon = !!existing;
-  }
-
-  // Fetch active recon entries (author + media) and resolve the venue's cached
-  // Google photos in parallel. getVendorGooglePhotos only touches the network on
-  // a cache miss, so it's usually free and otherwise hidden behind the recon query.
-  const [{ data: rawEntries }, googlePhotos] = await Promise.all([
+  // Stage 1 — independent fetches in parallel: the vendor row, the viewer's
+  // identity, and the vendor's active recon entries. getClaims() verifies the
+  // JWT locally (no Auth-server round trip when the project uses asymmetric
+  // signing keys; falls back to a network check otherwise — never slower than
+  // the getUser() it replaces, and it runs in parallel here regardless).
+  const [vendorRes, claimsRes, entriesRes] = await Promise.all([
+    supabase.from("vendors").select("*").eq("id", id).single(),
+    supabase.auth.getClaims(),
     supabase
       .from("recon_entries")
       .select("*, author:profiles(username, is_bot), media:recon_media(*)")
       .eq("vendor_id", id)
       .eq("status", "active")
       .order("created_at", { ascending: false }),
+  ]);
+
+  const vendor = vendorRes.data;
+  if (vendorRes.error || !vendor) {
+    notFound();
+  }
+
+  const userId = claimsRes.data?.claims.sub ?? null;
+
+  // Stage 2 — both need stage-1 results. The "does the viewer already have
+  // recon here" check must stay a separate query (it counts `flagged` entries,
+  // which the active-only list above does not include). getVendorGooglePhotos
+  // only touches the network on a cache miss, so it's usually free.
+  const [existingRes, googlePhotos] = await Promise.all([
+    userId
+      ? supabase
+          .from("recon_entries")
+          .select("id")
+          .eq("vendor_id", id)
+          .eq("author_id", userId)
+          .neq("status", "removed")
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     getVendorGooglePhotos(vendor),
   ]);
+  const userHasRecon = !!existingRes.data;
 
   // Distinct author names for the "Photos via Google" caption.
   const googleCredit =
@@ -101,15 +104,15 @@ export default async function VendorPage({
       ...new Set(googlePhotos.map((p) => p.attrib).filter((a): a is string => !!a)),
     ].join(", ") || null;
 
-  const rawList = (rawEntries ?? []) as ReconEntryWithDetails[];
+  const rawList = (entriesRes.data ?? []) as ReconEntryWithDetails[];
 
   // Surface the current user's own entry first. sort() is stable, so entries
   // keep their created_at (newest-first) order within the "mine" / "others"
   // groups.
-  const entries = user
+  const entries = userId
     ? [...rawList].sort((a, b) => {
-        const aMine = a.author_id === user.id ? 0 : 1;
-        const bMine = b.author_id === user.id ? 0 : 1;
+        const aMine = a.author_id === userId ? 0 : 1;
+        const bMine = b.author_id === userId ? 0 : 1;
         return aMine - bMine;
       })
     : rawList;
@@ -256,7 +259,7 @@ export default async function VendorPage({
           <ReconCard
             key={entry.id}
             entry={entry}
-            isMine={!!user && entry.author_id === user.id}
+            isMine={!!userId && entry.author_id === userId}
           />
         ))}
       </div>

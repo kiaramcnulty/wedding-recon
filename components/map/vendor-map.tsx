@@ -17,8 +17,17 @@ const MAP_STYLE_URL =
 // Denver, CO
 const DEFAULT_CENTER: [number, number] = [-104.9903, 39.7392];
 const DEFAULT_ZOOM = 9;
-const DEBOUNCE_MS = 300;
-const MAX_ROWS = 200;
+const DEBOUNCE_MS = 150;
+// Upper bound on pins per fetch. Must stay ABOVE a launched region's true vendor
+// count: vendors_in_bbox has no ORDER BY, so when a fetch box holds more than
+// this, Postgres returns an arbitrary subset and whole pockets (e.g. Thornton)
+// silently drop out until you zoom in far enough to fall under the cap. The real
+// fix for genuinely dense regions is marker clustering (deferred round-2 GeoJSON
+// rewrite); until then keep comfortable headroom over the region total.
+const MAX_ROWS = 1000;
+
+// Fetch beyond the viewport so small pans land inside already-fetched area.
+const BBOX_PAD_FACTOR = 0.5; // half a viewport-span extra on each side
 
 interface MarkerRef {
   marker: import("maplibre-gl").Marker;
@@ -152,6 +161,14 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   const mapRef = useRef<any>(null);
   const markersRef = useRef<MarkerRef[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Area covered by the last *complete* fetch. When the viewport stays inside
+  // it, the markers on the map are already correct — skip the refetch.
+  const coverageRef = useRef<{
+    minLng: number;
+    minLat: number;
+    maxLng: number;
+    maxLat: number;
+  } | null>(null);
   const supabase = createClient();
 
   /** Remove all current markers from the map. */
@@ -168,10 +185,30 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     if (!map) return;
 
     const bounds = map.getBounds();
-    const min_lng = bounds.getWest();
-    const min_lat = bounds.getSouth();
-    const max_lng = bounds.getEast();
-    const max_lat = bounds.getNorth();
+    const west = bounds.getWest();
+    const south = bounds.getSouth();
+    const east = bounds.getEast();
+    const north = bounds.getNorth();
+
+    // Cache hit: viewport fully inside the area of the last complete fetch —
+    // every vendor in view is already a marker on the map.
+    const cov = coverageRef.current;
+    if (
+      cov &&
+      west >= cov.minLng &&
+      east <= cov.maxLng &&
+      south >= cov.minLat &&
+      north <= cov.maxLat
+    ) {
+      return;
+    }
+
+    const lngPad = (east - west) * BBOX_PAD_FACTOR;
+    const latPad = (north - south) * BBOX_PAD_FACTOR;
+    const min_lng = west - lngPad;
+    const max_lng = east + lngPad;
+    const min_lat = Math.max(south - latPad, -85);
+    const max_lat = Math.min(north + latPad, 85);
 
     const { data, error } = await supabase.rpc("vendors_in_bbox", {
       min_lng,
@@ -183,12 +220,21 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
 
     if (error) {
       console.error("[VendorMap] vendors_in_bbox error:", error.message);
-      return;
+      return; // keep existing markers and coverage — stale beats blank
     }
 
     clearMarkers();
 
     const vendors = (data ?? []) as Vendor[];
+
+    // A truncated result (hit MAX_ROWS) means the padded area is only partially
+    // known — zooming into it could reveal vendors we never received, so only a
+    // complete result is safe to treat as covered. An empty area is complete,
+    // so cover it too (otherwise panning an empty region refetches forever).
+    coverageRef.current =
+      vendors.length < MAX_ROWS
+        ? { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat }
+        : null;
 
     if (vendors.length === 0) return;
 
