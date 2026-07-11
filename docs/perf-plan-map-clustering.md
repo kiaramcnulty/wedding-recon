@@ -1,5 +1,13 @@
 # Spec: map marker clustering (perf round 2)
 
+> **Built (2026-07-11), decisions resolved:** clusters are **segmented by vendor
+> type** — each type gets its own clustered source and a category-colored bubble
+> (icon above the count), not one neutral grey cluster. Co-located type-clusters
+> splay via a small per-type "rosette" screen offset. Other resolved calls: row
+> cap raised to 5000 (no RPC migration); no hover-grow; `clusterRadius: 50`,
+> `clusterMaxZoom: 14`. The "one source, neutral grey clusters" description below
+> is the original proposal — kept for context; the per-type design supersedes it.
+
 **Status:** DRAFT for Kiara's review. Do not build until approved. This is the
 deferred "round 2" from `docs/perf-plan-map-vendor-page.md` — the proper fix
 for the two things the round-1 stopgaps only patched:

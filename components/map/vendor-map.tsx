@@ -2,9 +2,14 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 import { type Vendor } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
-import { registerPinImages, pinImageId } from "@/lib/map/pin-images";
+import {
+  registerPinImages,
+  pinImageId,
+  clusterImageId,
+} from "@/lib/map/pin-images";
 
 // MapLibre is browser-only; import deferred to effects.
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -19,25 +24,55 @@ const DEFAULT_ZOOM = 9;
 const DEBOUNCE_MS = 150;
 // Upper bound on pins per fetch. vendors_in_bbox has no ORDER BY, so if a fetch
 // box holds more than this, Postgres returns an arbitrary subset and whole
-// pockets silently drop out. Pins now render on the GPU via a clustered symbol
-// layer (not DOM markers), so a high cap is cheap — keep it well above any single
-// launched region's vendor count. Genuinely dense multi-metro views would want
-// server-side clustering (PostGIS), out of scope here.
+// pockets silently drop out. Pins now render on the GPU via clustered symbol
+// layers (not DOM markers), so a high cap is cheap — keep it well above any
+// single launched region's vendor count. Genuinely dense multi-metro views would
+// want server-side clustering (PostGIS), out of scope here.
 const MAX_ROWS = 5000;
 
 // Fetch beyond the viewport so small pans land inside already-fetched area.
 const BBOX_PAD_FACTOR = 0.5; // half a viewport-span extra on each side
 
-// GeoJSON source + layer ids for the clustered vendor pins.
-const SRC = "vendors";
-const LAYER_CLUSTERS = "vendor-clusters";
-const LAYER_CLUSTER_COUNT = "vendor-cluster-count";
-const LAYER_PINS = "vendor-unclustered";
+// Clustering is per GeoJSON source and can't segment by a property, so each
+// vendor type gets its OWN clustered source + layers. That yields per-type
+// clusters (a green "5 venues" bubble next to a blue "10 photographers" bubble)
+// instead of one mixed grey blob.
+const srcId = (t: VendorType) => `vendors-${t}`;
+const clusterLayerId = (t: VendorType) => `clusters-${t}`;
+const pinLayerId = (t: VendorType) => `pins-${t}`;
+
+const CLUSTER_RADIUS = 50;
+const CLUSTER_MAX_ZOOM = 14;
+
+// Co-located type-clusters (e.g. venues + photographers downtown) would stack on
+// top of each other. Give each type a small fixed screen offset arranged on a
+// ring, so overlapping type-clusters splay into a tidy rosette instead of piling
+// up. An isolated cluster just sits a few px off its centroid — imperceptible.
+const ROSETTE_RADIUS_PX = 10;
+const CLUSTER_OFFSET: Record<VendorType, [number, number]> = Object.fromEntries(
+  VENDOR_TYPES.map((t, i) => {
+    const angle = (i / VENDOR_TYPES.length) * 2 * Math.PI;
+    return [
+      t,
+      [
+        Math.round(Math.cos(angle) * ROSETTE_RADIUS_PX),
+        Math.round(Math.sin(angle) * ROSETTE_RADIUS_PX),
+      ],
+    ];
+  }),
+) as Record<VendorType, [number, number]>;
 
 const EMPTY_FC: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
   features: [],
 };
+
+/** Normalize any vendor_type to one of our known category buckets. */
+function bucketType(vendorType: string): VendorType {
+  return (VENDOR_TYPES as readonly string[]).includes(vendorType)
+    ? (vendorType as VendorType)
+    : "other";
+}
 
 /**
  * Heuristic: does this vendor's pin sit on an *approximate* (city/region
@@ -78,8 +113,9 @@ function fanOutOffset(index: number, lat: number): { dLng: number; dLat: number 
 
 /**
  * Resolve each vendor's display position. Vendors are grouped by rounded
- * coordinate (~11m); any group with more than one member is fanned out so the
- * pins don't stack. Single pins keep their exact coordinate.
+ * coordinate (~11m) ACROSS types; any group with more than one member is fanned
+ * out so pins (even of different types) don't stack. Single pins keep their exact
+ * coordinate.
  */
 function resolveDisplayPositions(
   vendors: Vendor[],
@@ -110,23 +146,36 @@ function resolveDisplayPositions(
   return positions;
 }
 
-/** Build a GeoJSON FeatureCollection of vendor pins for the clustered source. */
-function buildFeatureCollection(vendors: Vendor[]): GeoJSON.FeatureCollection {
+/**
+ * Bucket vendors into one GeoJSON FeatureCollection per type. Positions are
+ * resolved globally (so cross-type co-located pins still separate) then split by
+ * type for the per-type clustered sources.
+ */
+function buildFeatureCollectionsByType(
+  vendors: Vendor[],
+): Record<VendorType, GeoJSON.FeatureCollection> {
   const positions = resolveDisplayPositions(vendors);
-  const features: GeoJSON.Feature[] = [];
+  const byType = Object.fromEntries(
+    VENDOR_TYPES.map((t) => [
+      t,
+      { type: "FeatureCollection", features: [] as GeoJSON.Feature[] },
+    ]),
+  ) as Record<VendorType, GeoJSON.FeatureCollection>;
+
   for (const vendor of vendors) {
     const pos = positions.get(vendor.id);
     if (!pos) continue; // missing coordinates
-    features.push({
+    const t = bucketType(vendor.vendor_type);
+    (byType[t].features as GeoJSON.Feature[]).push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
       properties: {
         id: vendor.id,
-        icon: pinImageId(vendor.vendor_type, isApproximateLocation(vendor)),
+        icon: pinImageId(t, isApproximateLocation(vendor)),
       },
     });
   }
-  return { type: "FeatureCollection", features };
+  return byType;
 }
 
 interface VendorMapProps {
@@ -150,12 +199,11 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   } | null>(null);
   const supabase = createClient();
 
-  /** Query the RPC for the current bounds and push the result into the source. */
+  /** Query the RPC for the current bounds and push results into the sources. */
   const refreshMarkers = useCallback(async () => {
     const map = mapRef.current;
     if (!map) return;
-    const source = map.getSource(SRC);
-    if (!source) return; // layers not initialized yet
+    if (!map.getSource(srcId(VENDOR_TYPES[0]))) return; // layers not ready yet
 
     const bounds = map.getBounds();
     const west = bounds.getWest();
@@ -164,7 +212,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     const north = bounds.getNorth();
 
     // Cache hit: viewport fully inside the area of the last complete fetch —
-    // every vendor in view is already in the source.
+    // every vendor in view is already in a source.
     const cov = coverageRef.current;
     if (
       cov &&
@@ -207,7 +255,10 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
         ? { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat }
         : null;
 
-    source.setData(buildFeatureCollection(vendors));
+    const byType = buildFeatureCollectionsByType(vendors);
+    for (const t of VENDOR_TYPES) {
+      map.getSource(srcId(t))?.setData(byType[t]);
+    }
   }, [supabase]);
 
   /** Debounced wrapper for refreshMarkers — called on 'moveend'. */
@@ -237,7 +288,6 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
         attributionControl: false,
       });
 
-      // Compact attribution in the bottom-right.
       map.addControl(
         new maplibregl.AttributionControl({ compact: true }),
         "bottom-right",
@@ -246,103 +296,97 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
       mapRef.current = map;
 
       map.on("load", async () => {
-        // Pre-rasterize category pins before the symbol layer references them.
+        // Pre-rasterize category pins + cluster discs before layers use them.
         await registerPinImages(map);
         if (!mapRef.current) return; // unmounted mid-load
 
-        map.addSource(SRC, {
-          type: "geojson",
-          data: EMPTY_FC,
-          cluster: true,
-          clusterRadius: 50,
-          clusterMaxZoom: 14,
-        });
-
-        // Cluster bubbles — neutral grey, sized/shaded by point count.
-        map.addLayer({
-          id: LAYER_CLUSTERS,
-          type: "circle",
-          source: SRC,
-          filter: ["has", "point_count"],
-          paint: {
-            "circle-color": [
-              "step",
-              ["get", "point_count"],
-              "#8A8F98",
-              10,
-              "#6B7280",
-              25,
-              "#4B5563",
-            ],
-            "circle-radius": [
-              "step",
-              ["get", "point_count"],
-              16,
-              10,
-              20,
-              25,
-              26,
-            ],
-            "circle-stroke-width": 2,
-            "circle-stroke-color": "#ffffff",
-          },
-        });
-
-        // Cluster point-count labels.
-        map.addLayer({
-          id: LAYER_CLUSTER_COUNT,
-          type: "symbol",
-          source: SRC,
-          filter: ["has", "point_count"],
-          layout: {
-            "text-field": ["get", "point_count_abbreviated"],
-            "text-font": ["Noto Sans Regular"],
-            "text-size": 13,
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          },
-          paint: { "text-color": "#ffffff" },
-        });
-
-        // Individual vendor pins — pre-rendered category icons.
-        map.addLayer({
-          id: LAYER_PINS,
-          type: "symbol",
-          source: SRC,
-          filter: ["!", ["has", "point_count"]],
-          layout: {
-            "icon-image": ["get", "icon"],
-            "icon-allow-overlap": true,
-            "icon-ignore-placement": true,
-          },
-        });
-
-        // Click a cluster → zoom to where it breaks apart.
-        map.on("click", LAYER_CLUSTERS, (e) => {
-          const feature = e.features?.[0];
-          if (!feature) return;
-          const clusterId = feature.properties?.cluster_id;
-          const src = map.getSource(SRC) as import("maplibre-gl").GeoJSONSource;
-          src.getClusterExpansionZoom(clusterId).then((zoom) => {
-            const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
-            map.easeTo({ center: [lng, lat], zoom });
+        // One clustered source per type.
+        for (const t of VENDOR_TYPES) {
+          map.addSource(srcId(t), {
+            type: "geojson",
+            data: EMPTY_FC,
+            cluster: true,
+            clusterRadius: CLUSTER_RADIUS,
+            clusterMaxZoom: CLUSTER_MAX_ZOOM,
           });
-        });
+        }
 
-        // Click a pin → open the vendor page.
-        map.on("click", LAYER_PINS, (e) => {
-          const id = e.features?.[0]?.properties?.id;
-          if (typeof id === "string") router.push(`/vendor/${id}`);
-        });
+        // Individual vendor pins (added first so cluster bubbles sit on top).
+        for (const t of VENDOR_TYPES) {
+          map.addLayer({
+            id: pinLayerId(t),
+            type: "symbol",
+            source: srcId(t),
+            filter: ["!", ["has", "point_count"]],
+            layout: {
+              "icon-image": ["get", "icon"],
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+            },
+          });
+        }
 
-        // Pointer cursor over interactive layers.
-        for (const layer of [LAYER_CLUSTERS, LAYER_PINS]) {
-          map.on("mouseenter", layer, () => {
-            map.getCanvas().style.cursor = "pointer";
+        // Per-type cluster bubbles: category disc + icon, with the count below
+        // it (icon-above-count). icon-size/text-size step up together with the
+        // count so the number stays proportionally placed. Both icon and text
+        // carry the same rosette offset so they move as one.
+        for (const t of VENDOR_TYPES) {
+          const off = CLUSTER_OFFSET[t];
+          map.addLayer({
+            id: clusterLayerId(t),
+            type: "symbol",
+            source: srcId(t),
+            filter: ["has", "point_count"],
+            layout: {
+              "icon-image": clusterImageId(t),
+              "icon-size": ["step", ["get", "point_count"], 1, 10, 1.15, 25, 1.3],
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+              "text-field": ["get", "point_count_abbreviated"],
+              "text-font": ["Noto Sans Regular"],
+              "text-size": ["step", ["get", "point_count"], 13, 10, 15, 25, 17],
+              "text-offset": [0, 0.85],
+              "text-allow-overlap": true,
+              "text-ignore-placement": true,
+            },
+            paint: {
+              "text-color": "#ffffff",
+              "icon-translate": off,
+              "text-translate": off,
+            },
           });
-          map.on("mouseleave", layer, () => {
-            map.getCanvas().style.cursor = "";
+        }
+
+        // Interaction: cluster → zoom to expansion; pin → open vendor page.
+        for (const t of VENDOR_TYPES) {
+          const clusters = clusterLayerId(t);
+          const pins = pinLayerId(t);
+          const source = srcId(t);
+
+          map.on("click", clusters, (e) => {
+            const feature = e.features?.[0];
+            if (!feature) return;
+            const clusterId = feature.properties?.cluster_id;
+            const src = map.getSource(source) as import("maplibre-gl").GeoJSONSource;
+            src.getClusterExpansionZoom(clusterId).then((zoom) => {
+              const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
+              map.easeTo({ center: [lng, lat], zoom });
+            });
           });
+
+          map.on("click", pins, (e) => {
+            const id = e.features?.[0]?.properties?.id;
+            if (typeof id === "string") router.push(`/vendor/${id}`);
+          });
+
+          for (const layer of [clusters, pins]) {
+            map.on("mouseenter", layer, () => {
+              map.getCanvas().style.cursor = "pointer";
+            });
+            map.on("mouseleave", layer, () => {
+              map.getCanvas().style.cursor = "";
+            });
+          }
         }
 
         refreshMarkers();
