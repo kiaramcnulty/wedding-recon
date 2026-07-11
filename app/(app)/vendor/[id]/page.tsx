@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
@@ -43,6 +44,46 @@ function InstagramIcon({ className }: { className?: string }) {
 interface VendorPageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+// Per-vendor social metadata: a shared /vendor/[id] link (SMS, X, etc.) should
+// preview with the vendor's name + a real description, not the static root
+// title. The brand og:image (app/opengraph-image.png) is inherited from the
+// root layout since we don't override openGraph.images here.
+export async function generateMetadata({
+  params,
+}: VendorPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: vendor } = await supabase
+    .from("vendors")
+    .select("name, city, vendor_type")
+    .eq("id", id)
+    .single();
+
+  if (!vendor) {
+    return { title: "Vendor not found" };
+  }
+
+  const label = CATEGORIES[vendor.vendor_type as VendorType]?.label ?? "vendor";
+  const where = vendor.city ? ` in ${vendor.city}` : "";
+  const description = `Recon on ${vendor.name}, a ${label.toLowerCase()}${where} — real price quotes, notes, and photos from couples on Wedding Recon.`;
+
+  return {
+    title: vendor.name,
+    description,
+    openGraph: {
+      title: `${vendor.name} · Wedding Recon`,
+      description,
+      type: "article",
+      url: `/vendor/${id}`,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${vendor.name} · Wedding Recon`,
+      description,
+    },
+  };
 }
 
 export default async function VendorPage({
