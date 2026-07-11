@@ -86,6 +86,17 @@ async function svgToImageData(svg: string, box: number): Promise<ImageData> {
 export async function registerPinImages(
   map: import("maplibre-gl").Map,
 ): Promise<void> {
+  /** Rasterize one SVG and register it, unless it already exists. */
+  const add = async (id: string, svg: string, box: number) => {
+    if (map.hasImage(id)) return;
+    const data = await svgToImageData(svg, box);
+    if (map.hasImage(id)) return; // lost a race — someone else added it
+    map.addImage(id, data, { pixelRatio: DPR });
+  };
+
+  // Kick every rasterization off at once; image decodes then run concurrently
+  // instead of blocking the first pin render on ~24 sequential awaits.
+  const jobs: Promise<void>[] = [];
   for (const [type, meta] of Object.entries(CATEGORIES)) {
     const iconSvg = renderToStaticMarkup(
       createElement(meta.icon, {
@@ -94,19 +105,9 @@ export async function registerPinImages(
         strokeWidth: 2.5,
       }),
     );
-
-    for (const dashed of [false, true]) {
-      const id = pinImageId(type, dashed);
-      if (!map.hasImage(id)) {
-        const data = await svgToImageData(pinSvg(meta.colorHex, iconSvg, dashed), PIN_BOX);
-        map.addImage(id, data, { pixelRatio: DPR });
-      }
-    }
-
-    const clusterId = clusterImageId(type);
-    if (!map.hasImage(clusterId)) {
-      const data = await svgToImageData(clusterSvg(meta.colorHex, iconSvg), CLUSTER_BOX);
-      map.addImage(clusterId, data, { pixelRatio: DPR });
-    }
+    jobs.push(add(pinImageId(type, false), pinSvg(meta.colorHex, iconSvg, false), PIN_BOX));
+    jobs.push(add(pinImageId(type, true), pinSvg(meta.colorHex, iconSvg, true), PIN_BOX));
+    jobs.push(add(clusterImageId(type), clusterSvg(meta.colorHex, iconSvg), CLUSTER_BOX));
   }
+  await Promise.all(jobs);
 }

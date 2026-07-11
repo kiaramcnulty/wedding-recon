@@ -199,11 +199,14 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   } | null>(null);
   const supabase = createClient();
 
-  /** Query the RPC for the current bounds and push results into the sources. */
-  const refreshMarkers = useCallback(async () => {
+  /**
+   * Query the RPC for the current bounds. Returns the vendor rows, or null when
+   * nothing needs applying (cache hit or error). Kept separate from applying so
+   * the first fetch can run concurrently with map image baking on load.
+   */
+  const fetchVendors = useCallback(async (): Promise<Vendor[] | null> => {
     const map = mapRef.current;
-    if (!map) return;
-    if (!map.getSource(srcId(VENDOR_TYPES[0]))) return; // layers not ready yet
+    if (!map) return null;
 
     const bounds = map.getBounds();
     const west = bounds.getWest();
@@ -221,7 +224,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
       south >= cov.minLat &&
       north <= cov.maxLat
     ) {
-      return;
+      return null;
     }
 
     const lngPad = (east - west) * BBOX_PAD_FACTOR;
@@ -241,7 +244,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
 
     if (error) {
       console.error("[VendorMap] vendors_in_bbox error:", error.message);
-      return; // keep existing pins and coverage — stale beats blank
+      return null; // keep existing pins and coverage — stale beats blank
     }
 
     const vendors = (data ?? []) as Vendor[];
@@ -255,11 +258,23 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
         ? { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat }
         : null;
 
+    return vendors;
+  }, [supabase]);
+
+  /** Push vendor rows into the per-type clustered sources. */
+  const applyVendors = useCallback((vendors: Vendor[]) => {
+    const map = mapRef.current;
+    if (!map) return;
     const byType = buildFeatureCollectionsByType(vendors);
     for (const t of VENDOR_TYPES) {
       map.getSource(srcId(t))?.setData(byType[t]);
     }
-  }, [supabase]);
+  }, []);
+
+  const refreshMarkers = useCallback(async () => {
+    const vendors = await fetchVendors();
+    if (vendors) applyVendors(vendors);
+  }, [fetchVendors, applyVendors]);
 
   /** Debounced wrapper for refreshMarkers — called on 'moveend'. */
   const scheduleRefresh = useCallback(() => {
@@ -296,11 +311,9 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
       mapRef.current = map;
 
       map.on("load", async () => {
-        // Pre-rasterize category pins + cluster discs before layers use them.
-        await registerPinImages(map);
-        if (!mapRef.current) return; // unmounted mid-load
-
-        // One clustered source per type.
+        // Sources need no images, so add them first and kick off the first
+        // fetch immediately — the network round trip then overlaps the (now
+        // parallel) icon rasterization instead of running after it.
         for (const t of VENDOR_TYPES) {
           map.addSource(srcId(t), {
             type: "geojson",
@@ -310,6 +323,12 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
             clusterMaxZoom: CLUSTER_MAX_ZOOM,
           });
         }
+
+        const firstData = fetchVendors();
+
+        // Pre-rasterize category pins + cluster discs before layers use them.
+        await registerPinImages(map);
+        if (!mapRef.current) return; // unmounted mid-load
 
         // Individual vendor pins (added first so cluster bubbles sit on top).
         for (const t of VENDOR_TYPES) {
@@ -345,12 +364,16 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
               "text-field": ["get", "point_count_abbreviated"],
               "text-font": ["Noto Sans Regular"],
               "text-size": ["step", ["get", "point_count"], 13, 10, 15, 25, 17],
-              "text-offset": [0, 0.85],
+              // Sit the count in the lower half of the disc (icon is up top);
+              // em-based so it tracks text-size as the disc scales with count.
+              "text-offset": [0, 0.6],
               "text-allow-overlap": true,
               "text-ignore-placement": true,
             },
             paint: {
               "text-color": "#ffffff",
+              "text-halo-color": "rgba(0,0,0,0.25)",
+              "text-halo-width": 1,
               "icon-translate": off,
               "text-translate": off,
             },
@@ -389,7 +412,8 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
           }
         }
 
-        refreshMarkers();
+        const vendors = await firstData;
+        if (vendors) applyVendors(vendors);
         map.on("moveend", scheduleRefresh);
       });
     })();
