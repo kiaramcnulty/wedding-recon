@@ -15,6 +15,19 @@ interface GeocodeSuggestion {
   lng: number;
 }
 
+// Origin of the basemap tiles — preconnected below so the TLS handshake happens
+// during JS parse instead of after MapLibre first asks for the style.
+const MAP_TILE_ORIGIN = (() => {
+  try {
+    return new URL(
+      process.env.NEXT_PUBLIC_MAP_STYLE_URL ??
+        "https://tiles.openfreemap.org/styles/liberty",
+    ).origin;
+  } catch {
+    return "https://tiles.openfreemap.org";
+  }
+})();
+
 export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
@@ -92,6 +105,10 @@ export default function ExplorePage() {
 
   return (
     <div className="relative flex flex-1 flex-col min-h-[60vh]">
+      {/* Warm the basemap connection early (hoisted to <head> by React). */}
+      <link rel="preconnect" href={MAP_TILE_ORIGIN} crossOrigin="anonymous" />
+      <link rel="dns-prefetch" href={MAP_TILE_ORIGIN} />
+
       {/* Full-bleed map behind everything */}
       <div className="absolute inset-0">
         <VendorMap flyToPosition={flyTo} />

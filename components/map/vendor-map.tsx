@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { renderToStaticMarkup } from "react-dom/server";
-import { CATEGORIES } from "@/lib/constants/categories";
+import { Loader2 } from "lucide-react";
+import { VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 import { type Vendor } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import {
+  registerPinImages,
+  pinImageId,
+  clusterImageId,
+} from "@/lib/map/pin-images";
 
 // MapLibre is browser-only; import deferred to effects.
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -18,20 +23,58 @@ const MAP_STYLE_URL =
 const DEFAULT_CENTER: [number, number] = [-104.9903, 39.7392];
 const DEFAULT_ZOOM = 9;
 const DEBOUNCE_MS = 150;
-// Upper bound on pins per fetch. Must stay ABOVE a launched region's true vendor
-// count: vendors_in_bbox has no ORDER BY, so when a fetch box holds more than
-// this, Postgres returns an arbitrary subset and whole pockets (e.g. Thornton)
-// silently drop out until you zoom in far enough to fall under the cap. The real
-// fix for genuinely dense regions is marker clustering (deferred round-2 GeoJSON
-// rewrite); until then keep comfortable headroom over the region total.
-const MAX_ROWS = 1000;
+// Upper bound on pins per fetch. vendors_in_bbox has no ORDER BY, so if a fetch
+// box holds more than this, Postgres returns an arbitrary subset and whole
+// pockets silently drop out. Pins now render on the GPU via clustered symbol
+// layers (not DOM markers), so a high cap is cheap — keep it well above any
+// single launched region's vendor count. Genuinely dense multi-metro views would
+// want server-side clustering (PostGIS), out of scope here.
+const MAX_ROWS = 5000;
 
 // Fetch beyond the viewport so small pans land inside already-fetched area.
 const BBOX_PAD_FACTOR = 0.5; // half a viewport-span extra on each side
 
-interface MarkerRef {
-  marker: import("maplibre-gl").Marker;
-  vendorId: string;
+// Clustering is per GeoJSON source and can't segment by a property, so each
+// vendor type gets its OWN clustered source + layers. That yields per-type
+// clusters (a green "5 venues" bubble next to a blue "10 photographers" bubble)
+// instead of one mixed grey blob.
+const srcId = (t: VendorType) => `vendors-${t}`;
+const clusterLayerId = (t: VendorType) => `clusters-${t}`;
+const pinLayerId = (t: VendorType) => `pins-${t}`;
+
+const CLUSTER_RADIUS = 50;
+const CLUSTER_MAX_ZOOM = 14;
+
+// Co-located type-clusters (e.g. venues + photographers downtown) would stack on
+// top of each other. Give each type a small fixed screen offset arranged on a
+// ring, so overlapping type-clusters splay into a tidy rosette instead of piling
+// up. Sized so two big co-located discs stay separately readable; an isolated
+// cluster sits within the ~50px area it already represents, so the offset reads
+// as intentional rather than misplaced.
+const ROSETTE_RADIUS_PX = 18;
+const CLUSTER_OFFSET: Record<VendorType, [number, number]> = Object.fromEntries(
+  VENDOR_TYPES.map((t, i) => {
+    const angle = (i / VENDOR_TYPES.length) * 2 * Math.PI;
+    return [
+      t,
+      [
+        Math.round(Math.cos(angle) * ROSETTE_RADIUS_PX),
+        Math.round(Math.sin(angle) * ROSETTE_RADIUS_PX),
+      ],
+    ];
+  }),
+) as Record<VendorType, [number, number]>;
+
+const EMPTY_FC: GeoJSON.FeatureCollection = {
+  type: "FeatureCollection",
+  features: [],
+};
+
+/** Normalize any vendor_type to one of our known category buckets. */
+function bucketType(vendorType: string): VendorType {
+  return (VENDOR_TYPES as readonly string[]).includes(vendorType)
+    ? (vendorType as VendorType)
+    : "other";
 }
 
 /**
@@ -73,8 +116,9 @@ function fanOutOffset(index: number, lat: number): { dLng: number; dLat: number 
 
 /**
  * Resolve each vendor's display position. Vendors are grouped by rounded
- * coordinate (~11m); any group with more than one member is fanned out so the
- * pins don't stack. Single pins keep their exact coordinate.
+ * coordinate (~11m) ACROSS types; any group with more than one member is fanned
+ * out so pins (even of different types) don't stack. Single pins keep their exact
+ * coordinate.
  */
 function resolveDisplayPositions(
   vendors: Vendor[],
@@ -105,48 +149,36 @@ function resolveDisplayPositions(
   return positions;
 }
 
-/** Builds a small colored circle element for a vendor marker. */
-function buildMarkerElement(vendor: Vendor, approximate: boolean): HTMLElement {
-  const meta = CATEGORIES[vendor.vendor_type] ?? CATEGORIES.other;
-  const Icon = meta.icon;
+/**
+ * Bucket vendors into one GeoJSON FeatureCollection per type. Positions are
+ * resolved globally (so cross-type co-located pins still separate) then split by
+ * type for the per-type clustered sources.
+ */
+function buildFeatureCollectionsByType(
+  vendors: Vendor[],
+): Record<VendorType, GeoJSON.FeatureCollection> {
+  const positions = resolveDisplayPositions(vendors);
+  const byType = Object.fromEntries(
+    VENDOR_TYPES.map((t) => [
+      t,
+      { type: "FeatureCollection", features: [] as GeoJSON.Feature[] },
+    ]),
+  ) as Record<VendorType, GeoJSON.FeatureCollection>;
 
-  // Render the Lucide icon as SVG markup (white, 14px).
-  const iconSvg = renderToStaticMarkup(
-    <Icon size={14} color="#ffffff" strokeWidth={2.5} />,
-  );
-
-  // Outer wrapper — MapLibre writes its own translate() transform here for
-  // positioning. Never touch el.style.transform or the marker will scatter.
-  const el = document.createElement("div");
-  el.style.cssText = `width: 30px; height: 30px; cursor: pointer;`;
-  el.title = approximate ? `${vendor.name} (approximate area)` : vendor.name;
-
-  // Inner circle — safe to apply visual transforms here. Approximate-location
-  // pins get a dashed outline to signal the spot is a region, not an address.
-  const inner = document.createElement("div");
-  inner.style.cssText = `
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: ${meta.colorHex};
-    border: 2px ${approximate ? "dashed" : "solid"} #ffffff;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.12s ease;
-  `;
-  inner.innerHTML = iconSvg;
-  el.appendChild(inner);
-
-  el.addEventListener("mouseenter", () => {
-    inner.style.transform = "scale(1.18)";
-  });
-  el.addEventListener("mouseleave", () => {
-    inner.style.transform = "scale(1)";
-  });
-
-  return el;
+  for (const vendor of vendors) {
+    const pos = positions.get(vendor.id);
+    if (!pos) continue; // missing coordinates
+    const t = bucketType(vendor.vendor_type);
+    (byType[t].features as GeoJSON.Feature[]).push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
+      properties: {
+        id: vendor.id,
+        icon: pinImageId(t, isApproximateLocation(vendor)),
+      },
+    });
+  }
+  return byType;
 }
 
 interface VendorMapProps {
@@ -159,30 +191,30 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
-  const markersRef = useRef<MarkerRef[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Area covered by the last *complete* fetch. When the viewport stays inside
-  // it, the markers on the map are already correct — skip the refetch.
+  // it, the pins on the map are already correct — skip the refetch.
   const coverageRef = useRef<{
     minLng: number;
     minLat: number;
     maxLng: number;
     maxLat: number;
   } | null>(null);
+  // Overlay shown only during a *truly-new* fetch (first load + search jumps),
+  // never on ordinary pans/zooms. Safety timeout hides it if the map never
+  // settles (e.g. tiles fail) so it can't get stuck.
+  const [loading, setLoading] = useState(true);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = createClient();
 
-  /** Remove all current markers from the map. */
-  const clearMarkers = useCallback(() => {
-    for (const { marker } of markersRef.current) {
-      marker.remove();
-    }
-    markersRef.current = [];
-  }, []);
-
-  /** Query the RPC and refresh markers based on current bounds. */
-  const refreshMarkers = useCallback(async () => {
+  /**
+   * Query the RPC for the current bounds. Returns the vendor rows, or null when
+   * nothing needs applying (cache hit or error). Kept separate from applying so
+   * the first fetch can run concurrently with map image baking on load.
+   */
+  const fetchVendors = useCallback(async (): Promise<Vendor[] | null> => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map) return null;
 
     const bounds = map.getBounds();
     const west = bounds.getWest();
@@ -191,7 +223,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     const north = bounds.getNorth();
 
     // Cache hit: viewport fully inside the area of the last complete fetch —
-    // every vendor in view is already a marker on the map.
+    // every vendor in view is already in a source.
     const cov = coverageRef.current;
     if (
       cov &&
@@ -200,7 +232,7 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
       south >= cov.minLat &&
       north <= cov.maxLat
     ) {
-      return;
+      return null;
     }
 
     const lngPad = (east - west) * BBOX_PAD_FACTOR;
@@ -220,10 +252,8 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
 
     if (error) {
       console.error("[VendorMap] vendors_in_bbox error:", error.message);
-      return; // keep existing markers and coverage — stale beats blank
+      return null; // keep existing pins and coverage — stale beats blank
     }
-
-    clearMarkers();
 
     const vendors = (data ?? []) as Vendor[];
 
@@ -236,37 +266,26 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
         ? { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat }
         : null;
 
-    if (vendors.length === 0) return;
+    return vendors;
+  }, [supabase]);
 
-    // Dynamically import maplibre to avoid SSR issues.
-    const maplibregl = (await import("maplibre-gl")).default;
-
-    // Fan out pins that share a coordinate so stacked (approximate) vendors
-    // don't pile onto a single spot.
-    const positions = resolveDisplayPositions(vendors);
-
-    const newMarkers: MarkerRef[] = [];
-
-    for (const vendor of vendors) {
-      const pos = positions.get(vendor.id);
-      if (!pos) continue; // missing coordinates
-
-      const el = buildMarkerElement(vendor, isApproximateLocation(vendor));
-
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        router.push(`/vendor/${vendor.id}`);
-      });
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([pos.lng, pos.lat])
-        .addTo(map);
-
-      newMarkers.push({ marker, vendorId: vendor.id });
+  /** Push vendor rows into the per-type clustered sources. */
+  const applyVendors = useCallback((vendors: Vendor[]) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const byType = buildFeatureCollectionsByType(vendors);
+    for (const t of VENDOR_TYPES) {
+      map.getSource(srcId(t))?.setData(byType[t]);
     }
+  }, []);
 
-    markersRef.current = newMarkers;
-  }, [supabase, clearMarkers, router]);
+  const refreshMarkers = useCallback(async () => {
+    const vendors = await fetchVendors();
+    if (vendors) applyVendors(vendors);
+    // Whatever triggered this fetch has now settled — clear any loading overlay.
+    // (Ordinary pans never set it, so this is usually a no-op.)
+    setLoading(false);
+  }, [fetchVendors, applyVendors]);
 
   /** Debounced wrapper for refreshMarkers — called on 'moveend'. */
   const scheduleRefresh = useCallback(() => {
@@ -282,6 +301,9 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     if (!containerRef.current) return;
     if (mapRef.current) return; // already initialized
 
+    // Failsafe: never let the loading overlay outlive a stuck map load.
+    loadTimeoutRef.current = setTimeout(() => setLoading(false), 10000);
+
     let map: import("maplibre-gl").Map;
 
     (async () => {
@@ -295,7 +317,6 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
         attributionControl: false,
       });
 
-      // Compact attribution in the bottom-right.
       map.addControl(
         new maplibregl.AttributionControl({ compact: true }),
         "bottom-right",
@@ -303,16 +324,122 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
 
       mapRef.current = map;
 
-      map.on("load", () => {
-        refreshMarkers();
-      });
+      map.on("load", async () => {
+        // Sources need no images, so add them first and kick off the first
+        // fetch immediately — the network round trip then overlaps the (now
+        // parallel) icon rasterization instead of running after it.
+        for (const t of VENDOR_TYPES) {
+          map.addSource(srcId(t), {
+            type: "geojson",
+            data: EMPTY_FC,
+            cluster: true,
+            clusterRadius: CLUSTER_RADIUS,
+            clusterMaxZoom: CLUSTER_MAX_ZOOM,
+          });
+        }
 
-      map.on("moveend", scheduleRefresh);
+        const firstData = fetchVendors();
+
+        // Pre-rasterize category pins + cluster discs before layers use them.
+        await registerPinImages(map);
+        if (!mapRef.current) return; // unmounted mid-load
+
+        // Individual vendor pins (added first so cluster bubbles sit on top).
+        for (const t of VENDOR_TYPES) {
+          map.addLayer({
+            id: pinLayerId(t),
+            type: "symbol",
+            source: srcId(t),
+            filter: ["!", ["has", "point_count"]],
+            layout: {
+              "icon-image": ["get", "icon"],
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+            },
+          });
+        }
+
+        // Per-type cluster bubbles: category disc + icon, with the count below
+        // it (icon-above-count). icon-size/text-size step up together with the
+        // count so the number stays proportionally placed. Both icon and text
+        // carry the same rosette offset so they move as one.
+        for (const t of VENDOR_TYPES) {
+          const off = CLUSTER_OFFSET[t];
+          map.addLayer({
+            id: clusterLayerId(t),
+            type: "symbol",
+            source: srcId(t),
+            filter: ["has", "point_count"],
+            layout: {
+              "icon-image": clusterImageId(t),
+              "icon-size": ["step", ["get", "point_count"], 1, 10, 1.15, 25, 1.3],
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+              "text-field": ["get", "point_count_abbreviated"],
+              "text-font": ["Noto Sans Regular"],
+              "text-size": ["step", ["get", "point_count"], 13, 10, 15, 25, 17],
+              // Sit the count in the lower half of the disc (icon is up top);
+              // em-based so it tracks text-size as the disc scales with count.
+              "text-offset": [0, 0.6],
+              "text-allow-overlap": true,
+              "text-ignore-placement": true,
+            },
+            paint: {
+              "text-color": "#ffffff",
+              "text-halo-color": "rgba(0,0,0,0.25)",
+              "text-halo-width": 1,
+              "icon-translate": off,
+              "text-translate": off,
+            },
+          });
+        }
+
+        // Interaction: cluster → zoom to expansion; pin → open vendor page.
+        for (const t of VENDOR_TYPES) {
+          const clusters = clusterLayerId(t);
+          const pins = pinLayerId(t);
+          const source = srcId(t);
+
+          map.on("click", clusters, (e) => {
+            const feature = e.features?.[0];
+            if (!feature) return;
+            const clusterId = feature.properties?.cluster_id;
+            const src = map.getSource(source) as import("maplibre-gl").GeoJSONSource;
+            src.getClusterExpansionZoom(clusterId).then((zoom) => {
+              const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
+              map.easeTo({ center: [lng, lat], zoom });
+            });
+          });
+
+          map.on("click", pins, (e) => {
+            const id = e.features?.[0]?.properties?.id;
+            if (typeof id === "string") router.push(`/vendor/${id}`);
+          });
+
+          for (const layer of [clusters, pins]) {
+            map.on("mouseenter", layer, () => {
+              map.getCanvas().style.cursor = "pointer";
+            });
+            map.on("mouseleave", layer, () => {
+              map.getCanvas().style.cursor = "";
+            });
+          }
+        }
+
+        const vendors = await firstData;
+        if (vendors) applyVendors(vendors);
+        setLoading(false); // first load done — reveal the map
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
+        map.on("moveend", scheduleRefresh);
+      });
     })();
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      clearMarkers();
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -321,9 +448,12 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally run once
 
-  // Fly to an external position when provided (e.g. user's geolocation).
+  // Fly to an external position when provided (e.g. a search or geolocation).
+  // A jump lands in new territory → treat it as a truly-new fetch and show the
+  // overlay until the follow-on moveend fetch settles.
   useEffect(() => {
     if (!flyToPosition || !mapRef.current) return;
+    setLoading(true);
     mapRef.current.flyTo({
       center: [flyToPosition.lng, flyToPosition.lat],
       zoom: flyToPosition.zoom ?? 14,
@@ -332,10 +462,24 @@ export function VendorMap({ flyToPosition }: VendorMapProps) {
   }, [flyToPosition]);
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full"
-      aria-label="Vendor map"
-    />
+    <div className="relative w-full h-full">
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+        aria-label="Vendor map"
+      />
+      {loading && (
+        <div
+          className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center bg-background/70 backdrop-blur-[1px]"
+          role="status"
+          aria-label="Loading vendors"
+        >
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Loader2 className="size-6 animate-spin text-primary" />
+            <span className="text-sm font-medium">Finding vendors…</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
