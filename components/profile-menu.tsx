@@ -3,12 +3,19 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { UserRound, LogIn, LogOut, X } from "lucide-react";
+import { UserRound, LogIn, LogOut, X, Mail } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/app/(auth)/actions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 type AuthState =
@@ -36,6 +43,7 @@ export function ProfileMenu({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [mounted, setMounted] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   // Portals require the DOM, so only render the drawer after mount. setState is
   // deferred via setTimeout to satisfy react-hooks/set-state-in-effect.
@@ -73,15 +81,16 @@ export function ProfileMenu({ className }: { className?: string }) {
     };
   }, []);
 
-  // Close on Escape.
+  // Close on Escape. When the feedback dialog is layered on top, let it handle
+  // Escape first so one press dismisses only the dialog, not the whole drawer.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape" && !feedbackOpen) setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, feedbackOpen]);
 
   const isUser = auth.status === "user";
 
@@ -204,10 +213,36 @@ export function ProfileMenu({ className }: { className?: string }) {
               </>
             )}
           </div>
+
+          <div className="mt-auto border-t p-4">
+            <button
+              type="button"
+              onClick={() => setFeedbackOpen(true)}
+              className="flex w-full items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Mail className="size-4 shrink-0" />
+              Questions or feedback?
+            </button>
+          </div>
         </div>
           </div>,
           document.body,
         )}
+
+        <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Questions or feedback?</DialogTitle>
+              <DialogDescription>
+                Please send any questions or feedback to the site creator,{" "}
+                <a href="mailto:kiaramcnulty@gmail.com">
+                  kiaramcnulty@gmail.com
+                </a>
+                . Responses are typically received within 1 business day.
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
     </>
   );
 }
