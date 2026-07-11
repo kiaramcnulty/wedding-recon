@@ -14,11 +14,36 @@ const geistMono = Geist_Mono({
 
 import { Toaster } from "@/components/ui/sonner";
 
+// Absolute base for Open Graph / icon URLs — social crawlers (iMessage, X,
+// Facebook) require absolute image URLs, so relative metadata paths resolve
+// against this. Set NEXT_PUBLIC_SITE_URL per environment; fall back to prod.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://weddingrecon.com";
+const DESCRIPTION = "Explore local wedding vendors and share your own recon.";
+
 export const metadata: Metadata = {
-  title: "Wedding Recon",
-  description: "Explore local wedding vendors and share your own recon.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Wedding Recon",
+    template: "%s · Wedding Recon",
+  },
+  description: DESCRIPTION,
+  applicationName: "Wedding Recon",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Wedding Recon", statusBarStyle: "default" },
+  // og:image is supplied automatically by app/opengraph-image.png (Next's file
+  // convention), rendered absolute via metadataBase above.
+  openGraph: {
+    type: "website",
+    siteName: "Wedding Recon",
+    title: "Wedding Recon",
+    description: DESCRIPTION,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Wedding Recon",
+    description: DESCRIPTION,
+  },
 };
 
 export const viewport = {
