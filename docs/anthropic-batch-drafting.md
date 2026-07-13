@@ -1,8 +1,50 @@
-# Deferred: move enrichment drafting to the Anthropic Batch API
+# Move enrichment drafting to the Anthropic Batch API
 
-**Status: DEFERRED by Kiara (2026-07-10) — re-assess in a later session.**
-This doc is self-contained: a fresh session can pick the work up from here without any
-prior context. Read it fully before building; most prerequisites are already done.
+**Status: BUILT (2026-07-13) — pending Kiara's local toy-batch test before first real run.**
+Kiara approved metered billing and created a Console key (`ANTHROPIC_BATCH_API_KEY` in her
+local `.env.local`). Implemented as specced, plus review hardenings (see "As built" below):
+`draft.mjs` (submit/status/collect, cost-gated, resumable), `pipeline.mjs --mode api`
+call files, and the `_flags` skip in `readWorkerRows`. SKILL.md Phase 2 documents the flow.
+The original proposal below is kept for context.
+
+## As built — deltas from the proposal
+
+- **Delivery override, not just a flags line.** The reference headers' delivery contract
+  (Write tool + reply line) doesn't exist on the API, so `--mode api` appends a full
+  "API MODE — DELIVERY OVERRIDE" footer: JSON lines in the response body, no fences/
+  commentary, final `{"_flags": ...}` line. `draft.mjs submit` refuses harness-mode call
+  files (missing override marker).
+- **Resumable subcommands** instead of one blocking script: batch ids persist in
+  `drafts/<batch>-batchapi.json`; `submit --calls "NN"` does targeted resubmits (later
+  submissions win per custom_id); `custom_id` = `<batch>-call-NN` (not a bare number).
+- **Cost controls:** `submit` prints expected + worst-case cost and aborts above
+  `--max-cost` (default $5); `--dry-run` previews; `collect` prints actual usage + $.
+  Defaults are Sonnet 5 batch sticker rates ($1.50/$7.50 per MTok; intro $1/$5 through
+  2026-08-31) — override with `--in-rate/--out-rate`. Layer on Console-side controls:
+  small prepaid balance (no auto-reload) and a workspace spend limit.
+- **Result hygiene:** `collect` refuses non-`end_turn` results (a `max_tokens`
+  truncation would corrupt the JSONL), strips fences/chatter defensively, warns when a
+  response lacks its `_flags` line, and handles errored/canceled/expired with the exact
+  resubmit command.
+- **Key naming:** `ANTHROPIC_BATCH_API_KEY`, deliberately not `ANTHROPIC_API_KEY` (which
+  would shadow Claude Code's subscription auth if it leaked into a shell env).
+- **Knobs for the quality A/B:** `--model` (try `claude-haiku-4-5`) and `--effort`
+  (Sonnet 5 runs adaptive thinking by default; `--effort low` is the cheap lever) —
+  judge via the validator AND a human voice read, side-by-side with harness output.
+- Offline test hook: `collect --results-file <jsonl>` (used by the repo's offline
+  end-to-end test; also handy for replaying saved results).
+
+## First-run checklist (local, Kiara's machine)
+
+1. `pipeline.mjs <workdir> batch ... --size 2 --batch toy1 --mode api` (2-vendor toy batch)
+2. `draft.mjs <workdir> submit --batch toy1 --dry-run` → sanity-check the estimate
+3. `submit` → `status --wait` → `collect` → `pipeline.mjs status/merge` → `upload.mjs` dry-run
+4. Read the two entries against a harness-drafted sample: voice, hedging, no process-tell
+5. Note actual $ from `collect` vs the estimate; then clear for full-size runs
+
+---
+
+*Original proposal (2026-07-10), kept for context:*
 
 ## TL;DR
 

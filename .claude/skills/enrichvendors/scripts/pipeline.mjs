@@ -16,6 +16,9 @@
 //
 // usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> <cmd> [flags]
 //   batch:      --region ST --roster <path> --size N --batch <id> [--per-call 25]
+//               [--mode api]  build call files for the Batch API (draft.mjs) instead of
+//               harness draft-workers: appends a no-tools delivery override (JSON lines
+//               in the response body + a final {"_flags": ...} line).
 //   status:     --batch <id>
 //   merge:      --batch <id>
 //   verify:     --roster <path> --csv <name> [--fix-gaps]
@@ -52,6 +55,23 @@ const nameKey = (s) => norm(s).replace(/\b(the|at|by|of|a)\b/g, ' ').replace(/\s
 const csvEsc = (s) => (/[",\n]/.test(s ?? '') ? `"${String(s).replace(/"/g, '""')}"` : (s ?? ''));
 const draftsDir = path.join(workdir, 'drafts');
 
+// --mode api: call files go to the Message Batches API via draft.mjs instead of
+// harness draft-worker agents. The reference header's delivery contract (Write tool +
+// reply line) doesn't exist there, so API-mode call files carry this override as the
+// FINAL block. Keep the flag vocabulary in sync with references/<type>/draft-call-header.md.
+const API_FOOTER = `
+=== API MODE — DELIVERY OVERRIDE (no tools) ===
+You are running as a plain API call. There is no Write tool and no separate reply
+channel, so the delivery instructions above (ONE Write call, one-line reply) do NOT
+apply. Instead:
+- Your ENTIRE response must be JSON Lines: one JSON object per row, one object per line.
+- No markdown fences, no preamble, no commentary — nothing before, between, or after rows.
+- After the last row, emit exactly ONE final line carrying the reply-line flags defined
+  above (same vocabulary, space-separated): {"_flags": "NOTAVENUE: slug1 THIN: slug2, slug3 SHORT: slug4"}
+  If there are no flags, end with {"_flags": ""}.
+- The OUTPUT FILE line above is bookkeeping for the collector script — do not mention it.
+`;
+
 function loadManifest(batch) {
   const p = path.join(draftsDir, `${batch}-manifest.json`);
   if (!fs.existsSync(p)) { console.error(`${p} not found — run batch first`); process.exit(1); }
@@ -83,6 +103,7 @@ function readWorkerRows(prefix) {
       if (!t) return;
       try {
         const o = JSON.parse(t);
+        if (o && typeof o === 'object' && '_flags' in o) return; // API-mode flags line (draft.mjs collects these)
         rows.push(HEADERS.map((h) => String(o[h] ?? '').replace(/\r?\n/g, ' ').trim()));
       } catch { problems.push(`${f}:${idx + 1}: unparseable JSON line`); }
     });
@@ -104,6 +125,7 @@ async function cmdBatch() {
   // 25/call keeps files ~14-18k tokens at ≤~600-token dossiers (measured: photographer
   // dossiers avg ~410) — 40% fewer worker spawns than the old 15 default.
   const perCall = parseInt(argValue('per-call') || '25', 10);
+  const apiMode = argValue('mode') === 'api';
   const supabase = db();
 
   const { data: venues, error } = await supabase.from('vendors')
@@ -225,7 +247,7 @@ async function cmdBatch() {
       const assign = ms.map((x) => `entry${x.entry}: bot=${x.bot} date=${x.month}/${x.year}`).join(' | ');
       return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | entries=${ms.length} | ${assign} ===\n${dossier}`;
     });
-    const out = `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-worker-${String(c).padStart(2, '0')}.jsonl\n`;
+    const out = `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-worker-${String(c).padStart(2, '0')}.jsonl\n${apiMode ? API_FOOTER : ''}`;
     fs.writeFileSync(path.join(draftsDir, `${batch}-call-${String(c).padStart(2, '0')}.md`), out);
     maxTok = Math.max(maxTok, Math.round(out.length / 4));
   }
@@ -237,7 +259,8 @@ async function cmdBatch() {
   console.log(`entry distribution: ${[1, 2, 3].map((n) => `${n}-entry×${dist[n] || 0}`).join(', ')} (richness-driven)`);
   console.log(`bot load: ${Object.entries(perBot).map(([b, n]) => `${b}=${n}`).join(', ')}`);
   console.log(`largest call file ≈ ${maxTok} tokens`);
-  console.log(`spawn one draft-worker agent per drafts/${batch}-call-NN.md`);
+  if (apiMode) console.log(`API mode: submit with draft.mjs — node --env-file=.env.local .claude/skills/enrichvendors/scripts/draft.mjs ${workdir} submit --batch ${batch}`);
+  else console.log(`spawn one draft-worker agent per drafts/${batch}-call-NN.md`);
 }
 
 // ── status ────────────────────────────────────────────────────────────────────
