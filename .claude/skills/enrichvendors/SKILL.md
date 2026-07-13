@@ -40,6 +40,29 @@ node .claude/skills/enrichvendors/scripts/dossier.mjs <workdir> --type <type>
 
 Once per region+type (fixed cost): the **region pricing pass** — one Sonnet subagent WebSearches `<region> <vendor type> prices/packages`, fetches ~5 multi-vendor sources, saves per-vendor digests to `research/pricing-web-<domain>.txt`, replies one line. Launch-time research intel (candidates.jsonl `intel` fields) can be script-converted into a `research/pricing-web-launchintel.txt` digest — dossiers pick up any `pricing-web-*.txt` automatically. And whenever the reddit archive changed: `roster.mjs --type <type> --slices` (or the thread-digest subagent for messy threads) so per-vendor `reddit-slice.txt` excerpts exist. Re-run `dossier.mjs` after either.
 
+## Cloud/web runs — the split workflow
+
+Cloud sessions (Claude Code on the web) can run **everything except harvest's vendor-site
+crawl**: sandbox egress is allowlist-only (None/Trusted/Custom), and the open web —
+arbitrary vendor domains — can't be allowlisted. Places data (`*.googleapis.com`) IS
+default-allowlisted, so a cloud harvest technically runs but produces thinner dossiers
+(reviews only, no site pricing pages). Don't accept that silently for a real run.
+
+- **Environment prereqs (one-time, web UI):** secrets `NEXT_PUBLIC_SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_PLACES_API_KEY`, `ANTHROPIC_BATCH_API_KEY`;
+  network access **Custom** + "include default list" + `*.supabase.co`. The committed
+  SessionStart hook (`.claude/hooks/session-start.sh`) materializes `.env.local` from
+  those secrets, so every `--env-file=.env.local` command here runs unchanged.
+- **Local half (per new region+type, at Kiara's machine):** Phase 0 pastes + `harvest.mjs`
+  + pricing digests, then hand off the research dir on the session branch:
+  `git add -f data/enrichvendors/<workdir>/research && git commit && git push`.
+  The dir is gitignored on purpose — force-add it **only on an enrichment work branch**
+  (scraped site text + review excerpts stay out of `main`; these branches don't merge).
+- **Cloud half (everything else, any batch, any later session):** `dossier.mjs` (pure
+  filesystem) → `pipeline.mjs batch --mode api` → `draft.mjs submit/status/collect` →
+  merge → validate → the usual human gates. Harvest re-runs for *new* vendors need the
+  local half again; batches over already-harvested vendors need nothing local.
+
 ## Phase 2 — Batch + single-turn draft calls (Sonnet)
 
 ```
