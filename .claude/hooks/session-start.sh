@@ -11,9 +11,12 @@
 #   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (DB read/write — harvest, batch, upload, verify)
 #   GOOGLE_PLACES_API_KEY                                (harvest: Places reviews/details)
 #   ANTHROPIC_BATCH_API_KEY                              (draft.mjs: Batch drafting)
-# The environment's network policy must also allow broad outbound HTTPS —
-# harvest crawls arbitrary vendor websites plus places.googleapis.com, *.supabase.co,
-# and api.anthropic.com. A trusted-hosts-only policy will break harvest.
+# Network access (set on the environment): api.anthropic.com and *.googleapis.com are
+# in the Trusted default allowlist (draft.mjs + Places harvest work under Trusted).
+# Add *.supabase.co via Custom access with "include defaults" for DB read/write.
+# CAVEAT: harvest also crawls arbitrary vendor websites; the sandbox allowlist model
+# can't cover the open web, so those site fetches fail in the cloud (harvest continues,
+# dossiers are thinner — Places reviews only). Run harvest locally for full site coverage.
 set -euo pipefail
 cd "$CLAUDE_PROJECT_DIR"
 
