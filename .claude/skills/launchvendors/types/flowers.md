@@ -10,11 +10,11 @@ Profile key `flowers` → `vendor_type='flowers'` (app category: Flower2 icon, p
 ## Phase 1 — sweep
 Query per anchor: `wedding florist near {anchor}`; statewide adds `wedding florists in {StateName}`. Encoded in `TYPE_PROFILES.flowers`.
 
-Then the **wedding-intent check** (mandatory):
+Noise is handled mechanically (Kiara, 2026-07: prune proactively — humans skim, they don't audit): the sweep drops nurseries/garden centers/greenhouses/landscapers **by name**, then the **wedding-intent check** (mandatory) prunes rows with no wedding evidence in name, site, or Google reviews:
 ```
 node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs data/launchvendors/<slug> --type flowers
 ```
-Flags sweep rows with zero wedding/bridal evidence on name/site (`NON_WEDDING?` — mostly everyday-delivery flower shops and garden centers; default delete at review) or with no readable site (`WED_UNVERIFIED` — needs a human glance).
+Everyday-delivery flower shops with no wedding evidence anywhere get pruned to `pruned.csv` — relay the names, rescue by moving a row back (a reddit-vouched shop, chains included, re-enters via the research path anyway). Only `WED_UNVERIFIED` rows (unreadable site, no rescuing reviews) still need a human glance.
 
 ## Phase 2 — web research queries (3–5 WebSearches)
 - `{region} wedding florists`
@@ -32,7 +32,7 @@ Fetch-extraction prompt (substitute region/state/domain):
 > Read every `reddit-*.txt` file in `<abs workdir>/research/`. They are raw Reddit-thread pastes about wedding flowers near {REGION}, {ST}. Extract every distinct source of wedding flowers commenters used or recommend — boutique florists, home studios, AND non-boutique options (Costco, Trader Joe's, grocery floral counters, flower markets) when a commenter actually used them for a wedding. Exclude venues, planners, other vendor types, and florists clearly based in and serving another state. Append one JSON line per source to `<abs workdir>/candidates.jsonl`: {"name":"...","hint":"<base city or store location if stated, else omit>","website":"<their own website if linked, else omit>","provenance":"reddit:<filename>","intel":"<pricing, what the commenter ordered (bouquets, centerpieces, DIY buckets), how it turned out, delivery/pickup notes, else omit>"}. Dedupe within your output; do not modify existing lines. Reply with only the count appended and any names you were unsure about.
 
 ## Phase 4 — review watchlist
-Beyond the standard flags: `NON_WEDDING?` everyday-delivery shops and garden centers (delete unless human recon vouches), chain rows (confirm the resolved store location matches what the thread pointed at), and planner/design studios that subcontract florals rather than doing them (delete).
+Beyond the standard flags: chain rows (confirm the resolved store location matches what the thread pointed at) and planner/design studios that subcontract florals rather than doing them (delete). Everyday-delivery shops and garden centers are pruned mechanically — mention the pruned count and move on.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:

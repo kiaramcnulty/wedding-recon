@@ -10,11 +10,11 @@ Profile key `music` → `vendor_type='music'` (app category: Music icon, indigo;
 ## Phase 1 — sweep
 Three queries per anchor (encoded in `TYPE_PROFILES.music`): `wedding band near {anchor}`, `wedding dj near {anchor}`, `wedding music near {anchor}` — bands and DJs brand differently, and "wedding music" catches ceremony ensembles/pianists the other two miss. Statewide adds the same trio for `{StateName}`. `place_id` dedup collapses the overlap; expect a higher raw-query count than other types (still pennies).
 
-Then the **wedding-intent check** (mandatory):
+Noise is handled mechanically, in two layers (Kiara, 2026-07: prune proactively — humans skim, they don't audit): the sweep drops schools/lessons/AV rentals/instrument shops/karaoke **by name** before they enter the CSV, then the **wedding-intent check** (mandatory) prunes what's left with no wedding evidence in name, site, or Google reviews:
 ```
 node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs data/launchvendors/<slug> --type music
 ```
-"wedding music" is the loosest of the three nets: expect flags on music schools, instrument shops, AV/production companies, and general event venues. Default **delete `NON_WEDDING?` at review** unless Kiara recognizes the act.
+"wedding music" is the loosest of the three nets, so expect a real pruned count — everything lands in `pruned.csv` with a reason; relay the names, rescue by moving a row back. Only `WED_UNVERIFIED` rows (unreadable site, no rescuing reviews) still need a human glance.
 
 ## Phase 2 — web research queries (3–5 WebSearches)
 - `{region} wedding bands`
@@ -32,7 +32,7 @@ Fetch-extraction prompt (substitute region/state/domain):
 > Read every `reddit-*.txt` file in `<abs workdir>/research/`. They are raw Reddit-thread pastes about wedding music near {REGION}, {ST}. Extract every distinct wedding music act — DJs, live bands, ceremony musicians (quartets, pianists, guitarists), singers, entertainment agencies. Exclude venues, AV rental companies, music schools, other vendor types, and acts clearly based in and serving another state. Append one JSON line per act to `<abs workdir>/candidates.jsonl`: {"name":"...","hint":"<base city if stated or inferable, else omit>","website":"<their own website if linked, else omit>","provenance":"reddit:<filename>","intel":"<act type, pricing, what parts of the day they covered, genre/instrument, showcase mentions, or experience detail commenters give, else omit>"}. Dedupe within your output; do not modify existing lines. Reply with only the count appended and any names you were unsure about.
 
 ## Phase 4 — review watchlist
-Beyond the standard flags: `NON_WEDDING?` sweep noise (schools, AV rentals, record shops — delete), venues that host live music (delete), duplicate act-vs-agency rows (an agency AND one of its named bands may both appear — keep both only if each has its own booking surface), and name-collision dedup on generic act names ("Soul Fire Band" vs "Soulfire").
+Beyond the standard flags: venues that host live music that slipped past the filters (delete), duplicate act-vs-agency rows (an agency AND one of its named bands may both appear — keep both only if each has its own booking surface), and name-collision dedup on generic act names ("Soul Fire Band" vs "Soulfire"). Schools/AV/instrument-shop noise is pruned mechanically — mention the pruned count and move on.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:

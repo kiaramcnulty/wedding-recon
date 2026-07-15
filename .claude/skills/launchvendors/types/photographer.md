@@ -18,7 +18,7 @@ Then the **wedding-intent check** (mandatory):
 ```
 node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs data/launchvendors/<slug> --type photographer
 ```
-Keeps a sweep row only when its name, website URL, or website homepage matches `wedding|elopement|bridal`; flags the rest `NON_WEDDING?` (site readable, zero wedding evidence — default **delete at review** unless Kiara recognizes it) or `WED_UNVERIFIED` (no site / fetch failed — needs a human glance). Flags only, never deletes. Research-sourced rows are exempt (their sources are wedding-scoped).
+Keeps a sweep row when its name, website URL, website homepage, or **Google reviews** show `wedding|elopement|bridal` evidence; everything else is **pruned automatically** to `pruned.csv` (Kiara, 2026-07: humans skim, they don't audit — relay the pruned names; a row is rescued by moving it back). The only rows that stay flagged (`WED_UNVERIFIED`) are ones with a website we couldn't read and no rescuing reviews — glance at just those. Photo-booth rentals are dropped by name at sweep time. Research-sourced rows are exempt (their sources are wedding-scoped).
 
 ## Phase 2 — web research queries (3–5 WebSearches)
 - `{region} wedding photographers`
@@ -41,7 +41,7 @@ Most Places-less photographers still have a findable site. For each candidate **
 Instagram pages are browsed and pasted **by the user** — never fetched or automated (Meta ToS).
 
 ## Phase 4 — review watchlist
-Beyond the standard flags, ask Kiara to eyeball for: photo-booth rentals that slipped through (names containing "booth"), video-only outfits, and name-variant dedup collisions (the type profile treats "Jane Doe Photography" ≡ "Jane Doe Photo" — the dry-run's name+city skip list shows what collided).
+Beyond the standard flags, ask Kiara to eyeball for: video-only outfits, and name-variant dedup collisions (the type profile treats "Jane Doe Photography" ≡ "Jane Doe Photo" — the dry-run's name+city skip list shows what collided). Photo-booth rentals and non-wedding studios are pruned mechanically now (junk-name filter + wedcheck) — mention the pruned count and move on.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:

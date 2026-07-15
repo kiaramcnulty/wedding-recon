@@ -13,7 +13,7 @@ Goal: vendor-only placeholder rows in the `vendors` table (pins with name/locati
 
 All commands run from the repo root. Scripts live in `.claude/skills/launchvendors/scripts/` and need `.env.local` (`GOOGLE_PLACES_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) — they fail fast with a clear message if a key is missing; relay that to the user and stop.
 
-Cost note: the whole pipeline is ~15–60 Places API calls (sweep; music runs 3 queries per anchor so ~3×, still trivial) + 1–2 per researched candidate — pennies, mostly inside Google's free tier.
+Cost note: the whole pipeline is ~15–60 Places API calls (sweep; music runs 3 queries per anchor so ~3×, still trivial) + 1–2 per researched candidate + ≤1 Place Details (reviews) per evidence-less sweep row in wedcheck — pennies, mostly inside Google's free tier.
 
 ## Phase 0 — Setup (one short exchange, then no questions until Phase 4)
 
@@ -60,6 +60,9 @@ Tell the user: open the working CSV in any spreadsheet app or editor. Only flagg
 - `CHECK: was "X"` — resolver matched a differently-named place; confirm or fix.
 - `APPROX;NEEDS_ADDRESS` — city-centroid only; paste a street address into `address` if known (fine to leave for service-area vendors).
 - `NO_MATCH;NEEDS_ADDRESS` — nothing found; fix the name/city or add an address.
+- `WED_UNVERIFIED` (intent-checked types) — site exists but unreadable and reviews don't rescue it; keep or delete on a glance.
+
+Mechanically **pruned** rows (junk names, no wedding evidence in name/site/Google reviews) never reach this CSV — they're in `pruned.csv` with a reason; report the count and names, and a row is rescued by moving it back. Humans skim large lists rather than audit them (Kiara, 2026-07) — the pipeline prunes proactively so this review stays short.
 
 Also relay any type-card review watchlist (e.g. photographers: photo-booth rentals, video-only outfits). They may freely edit/add/delete rows (keep the header row). Wait for "done", then **re-read the file fresh. Never reference or assume row numbers across a user-edit boundary** — the user may have added, deleted, or reordered rows; every operation keys on `place_id` (else normalized name). This rule is absolute; violating it corrupted data in a live session.
 

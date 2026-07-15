@@ -91,6 +91,10 @@ export const TYPE_PROFILES = {
     // Sole-proprietor name variants: "Jane Doe Photography" ≡ "Jane Doe Photo LLC".
     // Includes company suffixes — nameKey works on norm(), which (unlike sigTokens) keeps them.
     dedupStop: new Set(['photography', 'photograph', 'photographs', 'photo', 'photos', 'photographer', 'photographers', 'studio', 'studios', 'film', 'films', 'llc', 'inc', 'co', 'the']),
+    // Obvious sweep noise dropped by NAME before it ever enters the CSV (Kiara, 2026-07:
+    // prune proactively — humans skim, they don't audit). "booth" alone is a surname; only
+    // the full phrase is safe.
+    junkName: /photo ?booths?\b/i,
     captureInstagram: true,       // requires vendors.instagram (migration 0016) at upload time
     // WEDDING photographers only (Kiara, 2026-07) — sweep queries have wedding intent but
     // Places pads results with general portrait/family studios. wedcheck.mjs keeps a sweep
@@ -105,6 +109,7 @@ export const TYPE_PROFILES = {
     // "X Catering" must never match "Y Catering" on the trade word alone.
     weak: new Set(['catering', 'caterer', 'caterers', 'cuisine', 'kitchen', 'kitchens', 'food', 'foods', 'events', 'bbq', 'cafe', 'grill', 'chef', 'chefs', 'company', 'group', 'hospitality']),
     dedupStop: new Set(['catering', 'caterer', 'caterers', 'events', 'co', 'llc', 'inc', 'the']),
+    junkName: /\b(grocery|supermarket|convenience|gas station|liquor store)\b/i,
     captureInstagram: false,
     // Wedding-specific results only (Kiara, 2026-07): a caterer with zero wedding evidence
     // on name/site is flagged; a reddit thread or Google review describing their wedding
@@ -121,6 +126,9 @@ export const TYPE_PROFILES = {
     statewideQuery: (stateName) => [`wedding band in ${stateName}`, `wedding dj in ${stateName}`, `wedding music in ${stateName}`],
     weak: new Set(['music', 'musicians', 'musician', 'band', 'bands', 'dj', 'djs', 'entertainment', 'events', 'productions', 'sound', 'sounds', 'strings', 'trio', 'quartet', 'ensemble', 'live', 'party', 'group', 'company']),
     dedupStop: new Set(['music', 'band', 'dj', 'djs', 'entertainment', 'events', 'productions', 'llc', 'inc', 'co', 'the']),
+    // "wedding music" is the loosest sweep net — drop schools/lessons/AV/instrument shops
+    // by name before they enter the CSV. Legit act names ("Elite DJ Productions") don't match.
+    junkName: /\b(school|schools|academy|conservatory|lessons?|tuition|karaoke|instrument store|music store|guitar center|equipment rental|av rental|audio.?visual)\b/i,
     captureInstagram: false,
     intent: /wedding|bridal/i,
   },
@@ -131,6 +139,8 @@ export const TYPE_PROFILES = {
     statewideQuery: (stateName) => `wedding florists in ${stateName}`,
     weak: new Set(['flower', 'flowers', 'floral', 'florals', 'florist', 'florists', 'bloom', 'blooms', 'blossom', 'blossoms', 'petal', 'petals', 'posy', 'stems', 'botanical', 'design', 'designs', 'studio', 'studios', 'shop', 'garden', 'gardens']),
     dedupStop: new Set(['floral', 'florals', 'florist', 'florists', 'flowers', 'flower', 'design', 'designs', 'studio', 'co', 'llc', 'inc', 'the']),
+    // "farm"/"garden" alone are legit florist names — only the unambiguous phrases prune.
+    junkName: /\b(nursery|nurseries|garden center|greenhouse|farm supply|landscap\w*)\b/i,
     captureInstagram: false,
     intent: /wedding|bridal/i,
   },
@@ -279,6 +289,27 @@ export function cleanInstagram(raw) {
   const NOT_PROFILES = new Set(['p', 'reel', 'reels', 'explore', 'stories', 'accounts', 'tv', 'share']);
   if (NOT_PROFILES.has(s.toLowerCase())) return '';
   return /^[a-z0-9._]{2,30}$/i.test(s) ? s : '';
+}
+
+/**
+ * Audit trail for proactively-removed rows (Kiara, 2026-07: prune noise mechanically —
+ * humans skim large lists, they don't audit them). Pruned rows never reach the working
+ * CSV / the DB, but live in <workdir>/pruned.csv (same columns, reason in `flags`) so a
+ * skim can rescue one by moving the row back. Dedupes by place_id (else normalized name)
+ * so re-runs don't stack duplicates.
+ */
+export function appendPruned(workdir, rows) {
+  if (!rows.length) return;
+  const file = `${workdir}/pruned.csv`;
+  const existing = readVenues(file);
+  const seen = new Set(existing.map((v) => v.place_id || norm(v.name)));
+  for (const r of rows) {
+    const k = r.place_id || norm(r.name);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    existing.push(r);
+  }
+  writeVenues(file, existing);
 }
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -14,7 +14,7 @@ Then the **wedding-intent check** (mandatory):
 ```
 node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs data/launchvendors/<slug> --type caterer
 ```
-Flags sweep rows with zero wedding/bridal evidence as `NON_WEDDING?` / `WED_UNVERIFIED`. Default at review is **delete `NON_WEDDING?` rows** — UNLESS a Reddit paste or a Google review ties them to a wedding (check `research/` before deleting; that's Kiara's explicit carve-out for this type).
+Kiara's rule is mechanized: a sweep row stays if its name, site, **or a Google review** shows wedding/bridal evidence (the script reads the place's reviews before deciding); everything else is **pruned automatically** to `pruned.csv` — relay the pruned names, rescue by moving a row back. The Reddit half of the rescue happens naturally: a caterer vouched in a paste re-enters via the research/candidates path (research-sourced rows skip wedcheck). Only `WED_UNVERIFIED` rows (unreadable site, no rescuing reviews) still need a human glance.
 
 ## Phase 2 — web research queries (3–5 WebSearches)
 - `{region} wedding caterers`
@@ -32,7 +32,7 @@ Fetch-extraction prompt (substitute region/state/domain):
 > Read every `reddit-*.txt` file in `<abs workdir>/research/`. They are raw Reddit-thread pastes about wedding catering near {REGION}, {ST}. Extract every distinct caterer (full-service, drop-off, food truck, or a restaurant commenters used to cater a wedding). Exclude venues, dessert/bakery-only shops, bartending services, other vendor types, and caterers clearly based in and serving another state. Append one JSON line per caterer to `<abs workdir>/candidates.jsonl`: {"name":"...","hint":"<base city if stated or inferable, else omit>","website":"<their own website if linked, else omit>","provenance":"reddit:<filename>","intel":"<any pricing, food-quality opinion, service-style, or wedding-experience detail commenters give, else omit>"}. Dedupe within your output; do not modify existing lines. Reply with only the count appended and any names you were unsure about.
 
 ## Phase 4 — review watchlist
-Beyond the standard flags: `NON_WEDDING?` rows (delete unless human recon vouches — see above), venues with in-house catering that slipped in (names with "events center"/"banquet"), dessert-only or bartending-only outfits, and restaurant locations where Google matched the dine-in spot rather than the catering arm (fine to keep — same business).
+Beyond the standard flags: venues with in-house catering that slipped in (names with "events center"/"banquet"), dessert-only or bartending-only outfits, and restaurant locations where Google matched the dine-in spot rather than the catering arm (fine to keep — same business). Non-wedding caterers are pruned mechanically (wedcheck incl. review evidence) — mention the pruned count and move on.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:
