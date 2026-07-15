@@ -52,6 +52,23 @@ export const CATEGORIES: Record<VendorType, CategoryMeta> = {
 
 export const CATEGORY_LIST: CategoryMeta[] = VENDOR_TYPES.map((t) => CATEGORIES[t]);
 
+/**
+ * Human plural nouns per vendor type, for counting headers (e.g. "12
+ * photographers available"). CategoryMeta.label is a UI category name
+ * ("Photos", "Music") that doesn't pluralize as a noun — use this when the copy
+ * counts vendors of a type.
+ */
+export const CATEGORY_PLURAL: Record<VendorType, string> = {
+  venue: "venues",
+  food: "caterers",
+  music: "musicians",
+  flowers: "florists",
+  dress: "dress shops",
+  planner: "planners",
+  photos: "photographers",
+  other: "vendors",
+};
+
 export const RECON_TYPES = ["online", "virtual", "in_person"] as const;
 export type ReconType = (typeof RECON_TYPES)[number];
 

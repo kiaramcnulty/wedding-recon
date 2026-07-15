@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Search, Loader2, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { VendorMap } from "@/components/map/vendor-map";
+import { VendorMap, type ClusterOpenPayload } from "@/components/map/vendor-map";
+import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
+import type { VendorType } from "@/lib/constants/categories";
 import { BrandLockup } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { cn } from "@/lib/utils";
@@ -37,8 +39,73 @@ export default function ExplorePage() {
   const [searching, setSearching] = useState(false);
   const [userPosition, setUserPosition] = useState<{ lng: number; lat: number } | null>(null);
   const [locating, setLocating] = useState(false);
+  // The open cluster list (null = closed). Opened on a cluster tap, or restored
+  // when returning from a vendor page (?restore=1).
+  const [cluster, setCluster] = useState<{ ids: string[]; vendorType: VendorType } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
+
+  // Restore the map view when returning from a vendor page (?restore=1). Read
+  // once, SSR-safe (window-guarded); used only imperatively by the map at init,
+  // so it can't cause a hydration mismatch.
+  const [initialView] = useState<{ lng: number; lat: number; zoom: number } | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      if (!new URLSearchParams(window.location.search).has("restore")) return null;
+      const raw = sessionStorage.getItem("wr:cluster");
+      if (!raw) return null;
+      const d = JSON.parse(raw) as { center?: [number, number]; zoom?: number };
+      if (!d.center || typeof d.zoom !== "number") return null;
+      return { lng: d.center[0], lat: d.center[1], zoom: d.zoom };
+    } catch {
+      return null;
+    }
+  });
+
+  // Persist the tapped cluster + map view, then open the list.
+  const openCluster = useCallback((payload: ClusterOpenPayload) => {
+    try {
+      sessionStorage.setItem(
+        "wr:cluster",
+        JSON.stringify({
+          ids: payload.ids,
+          vendorType: payload.vendorType,
+          center: payload.center,
+          zoom: payload.zoom,
+        }),
+      );
+    } catch {
+      // sessionStorage unavailable (e.g. private mode) — the sheet still opens;
+      // only restore-on-back is lost.
+    }
+    setCluster({ ids: payload.ids, vendorType: payload.vendorType });
+  }, []);
+
+  // On a restore mount, reopen the cluster sheet from the saved payload. The
+  // setState is deferred a tick (setTimeout 0) — the documented pattern for
+  // updating state from an effect without tripping set-state-in-effect, and it
+  // also lands the portal post-hydration so it never diffs against server HTML.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!new URLSearchParams(window.location.search).has("restore")) return;
+    let restored: { ids: string[]; vendorType: VendorType } | null = null;
+    try {
+      const raw = sessionStorage.getItem("wr:cluster");
+      if (raw) {
+        const d = JSON.parse(raw) as { ids?: string[]; vendorType?: VendorType };
+        if (d.ids?.length && d.vendorType) {
+          restored = { ids: d.ids, vendorType: d.vendorType };
+        }
+      }
+    } catch {
+      // ignore a malformed payload — the user just lands on the map
+    }
+    // Drop the marker so later in-page navigation doesn't re-trigger a restore.
+    window.history.replaceState(null, "", "/explore");
+    if (!restored) return;
+    const t = setTimeout(() => setCluster(restored), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   // Debounced autocomplete — always goes through setTimeout to avoid
   // calling setState synchronously in the effect body.
@@ -156,8 +223,22 @@ export default function ExplorePage() {
 
       {/* Full-bleed map behind everything */}
       <div className="absolute inset-0">
-        <VendorMap flyToPosition={flyTo} userPosition={userPosition} />
+        <VendorMap
+          flyToPosition={flyTo}
+          userPosition={userPosition}
+          onClusterOpen={openCluster}
+          initialView={initialView}
+        />
       </div>
+
+      {/* Cluster list feed (portals to <body>; opens on a cluster tap) */}
+      {cluster && (
+        <ClusterListSheet
+          ids={cluster.ids}
+          vendorType={cluster.vendorType}
+          onClose={() => setCluster(null)}
+        />
+      )}
 
       {/* Search bar + autocomplete dropdown, with the account control beside it */}
       <div className="relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">

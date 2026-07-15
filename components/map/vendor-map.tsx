@@ -181,15 +181,46 @@ function buildFeatureCollectionsByType(
   return byType;
 }
 
+/**
+ * Emitted when a cluster pin is tapped: the vendor ids it contains plus the map
+ * view at tap time, so the caller can reopen the same view after a round trip to
+ * a vendor page.
+ */
+export interface ClusterOpenPayload {
+  ids: string[];
+  vendorType: VendorType;
+  center: [number, number];
+  zoom: number;
+}
+
 interface VendorMapProps {
   /** External position to fly to. Pass zoom to override the default (14). */
   flyToPosition?: { lng: number; lat: number; zoom?: number } | null;
   /** The user's geolocated position — rendered as a "you are here" dot. */
   userPosition?: { lng: number; lat: number } | null;
+  /**
+   * Called when a cluster pin is tapped, with the vendors it contains. When
+   * provided, a cluster tap opens this list instead of zooming in.
+   */
+  onClusterOpen?: (payload: ClusterOpenPayload) => void;
+  /**
+   * Initial center/zoom — e.g. restoring the view after returning from a vendor
+   * page. Read once at map init; later changes are ignored.
+   */
+  initialView?: { lng: number; lat: number; zoom: number } | null;
 }
 
-export function VendorMap({ flyToPosition, userPosition }: VendorMapProps) {
+export function VendorMap({
+  flyToPosition,
+  userPosition,
+  onClusterOpen,
+  initialView,
+}: VendorMapProps) {
   const router = useRouter();
+  // Latest onClusterOpen, callable from the run-once init effect's handlers.
+  const onClusterOpenRef = useRef(onClusterOpen);
+  // Captured once — the map reads center/zoom at init only.
+  const initialViewRef = useRef(initialView);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -210,6 +241,12 @@ export function VendorMap({ flyToPosition, userPosition }: VendorMapProps) {
   const [loading, setLoading] = useState(true);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = createClient();
+
+  // Keep the ref current so the once-only init effect's click handlers always
+  // call the latest onClusterOpen (updating a ref during render is disallowed).
+  useEffect(() => {
+    onClusterOpenRef.current = onClusterOpen;
+  }, [onClusterOpen]);
 
   /**
    * Query the RPC for the current bounds. Returns the vendor rows, or null when
@@ -313,11 +350,12 @@ export function VendorMap({ flyToPosition, userPosition }: VendorMapProps) {
     (async () => {
       const maplibregl = (await import("maplibre-gl")).default;
 
+      const iv = initialViewRef.current;
       map = new maplibregl.Map({
         container: containerRef.current!,
         style: MAP_STYLE_URL,
-        center: DEFAULT_CENTER,
-        zoom: DEFAULT_ZOOM,
+        center: iv ? [iv.lng, iv.lat] : DEFAULT_CENTER,
+        zoom: iv?.zoom ?? DEFAULT_ZOOM,
         attributionControl: false,
       });
 
@@ -409,6 +447,30 @@ export function VendorMap({ flyToPosition, userPosition }: VendorMapProps) {
             if (!feature) return;
             const clusterId = feature.properties?.cluster_id;
             const src = map.getSource(source) as import("maplibre-gl").GeoJSONSource;
+
+            // With a list handler wired up, a cluster tap opens the feed of its
+            // vendors instead of zooming in. Pass the cluster's own point_count
+            // as the leaf limit so we get every vendor, not the default 10.
+            const onOpen = onClusterOpenRef.current;
+            if (onOpen) {
+              const count = (feature.properties?.point_count as number) ?? 0;
+              src.getClusterLeaves(clusterId, count, 0).then((leaves) => {
+                const ids = leaves
+                  .map((l) => l.properties?.id)
+                  .filter((id): id is string => typeof id === "string");
+                if (ids.length === 0) return;
+                const c = map.getCenter();
+                onOpen({
+                  ids,
+                  vendorType: t,
+                  center: [c.lng, c.lat],
+                  zoom: map.getZoom(),
+                });
+              });
+              return;
+            }
+
+            // Fallback (no handler): zoom to the cluster's expansion zoom.
             src.getClusterExpansionZoom(clusterId).then((zoom) => {
               const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
               map.easeTo({ center: [lng, lat], zoom });
