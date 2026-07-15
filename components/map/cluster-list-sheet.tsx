@@ -28,6 +28,15 @@ interface ClusterItem {
    * in order (each on error), falling through to a category placeholder.
    */
   photoCandidates: string[];
+  /** Text previews of the vendor's recon entries (newest first, text-less entries skipped). */
+  slides: ReconSlide[];
+}
+
+/** Abbreviated text-only preview of one recon entry (photos intentionally omitted). */
+interface ReconSlide {
+  priceText: string | null;
+  priceDetails: string | null;
+  notes: string | null;
 }
 
 /** Minimal row shapes for the on-tap detail fetch (client queries are untyped). */
@@ -39,6 +48,9 @@ interface VendorLite {
 }
 interface ReconRow {
   vendor_id: string;
+  price_text: string | null;
+  price_details: string | null;
+  notes: string | null;
   media: { thumb_path: string | null; storage_path: string }[] | null;
 }
 
@@ -98,9 +110,12 @@ export function ClusterListSheet({
           .in("id", idList),
         supabase
           .from("recon_entries")
-          .select("vendor_id, media:recon_media(thumb_path, storage_path)")
+          .select(
+            "vendor_id, price_text, price_details, notes, media:recon_media(thumb_path, storage_path)",
+          )
           .eq("status", "active")
-          .in("vendor_id", idList),
+          .in("vendor_id", idList)
+          .order("created_at", { ascending: false }),
       ]);
       if (cancelled) return;
 
@@ -110,9 +125,12 @@ export function ClusterListSheet({
       const vendorById = new Map<string, VendorLite>();
       for (const v of vendors) vendorById.set(v.id, v);
 
-      // Tally active recon counts + capture the first recon thumbnail per vendor.
+      // Tally active recon counts, capture the first recon thumbnail per vendor,
+      // and collect text previews (newest first — the query orders by created_at
+      // desc, matching the vendor page). Entries with no text get no slide.
       const counts = new Map<string, number>();
       const reconThumb = new Map<string, string>();
+      const slidesByVendor = new Map<string, ReconSlide[]>();
       for (const row of recons) {
         counts.set(row.vendor_id, (counts.get(row.vendor_id) ?? 0) + 1);
         if (!reconThumb.has(row.vendor_id)) {
@@ -125,6 +143,14 @@ export function ClusterListSheet({
                 .publicUrl,
             );
           }
+        }
+        const priceText = row.price_text?.trim() || null;
+        const priceDetails = row.price_details?.trim() || null;
+        const notes = row.notes?.trim() || null;
+        if (priceText || priceDetails || notes) {
+          const list = slidesByVendor.get(row.vendor_id) ?? [];
+          list.push({ priceText, priceDetails, notes });
+          slidesByVendor.set(row.vendor_id, list);
         }
       }
 
@@ -144,6 +170,7 @@ export function ClusterListSheet({
             name: v.name,
             reconCount: counts.get(id) ?? 0,
             photoCandidates: candidates,
+            slides: slidesByVendor.get(id) ?? [],
           },
         ];
       });
@@ -162,19 +189,35 @@ export function ClusterListSheet({
     const el = sheetRef.current;
     if (!el) return;
     let startY: number | null = null;
+    let startX = 0;
     let dragging = false;
+    // Axis lock: a touch that starts moving mostly horizontally belongs to a
+    // recon-preview carousel, so the sheet must not claim it as a swipe-down.
+    let axis: "h" | "v" | null = null;
     let dy = 0;
 
     const start = (e: TouchEvent) => {
       if ((scrollRef.current?.scrollTop ?? 0) > 0) return;
       startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
       dragging = true;
+      axis = null;
       dy = 0;
       el.style.transition = "none";
     };
     const move = (e: TouchEvent) => {
       if (!dragging || startY == null) return;
       dy = e.touches[0].clientY - startY;
+      if (axis === null) {
+        const dx = e.touches[0].clientX - startX;
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return; // not committed yet
+        axis = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+      }
+      if (axis === "h") {
+        dragging = false;
+        el.style.transform = "";
+        return;
+      }
       if (dy <= 0) {
         // Pulling up — hand control back to normal list scrolling.
         el.style.transform = "";
@@ -304,38 +347,53 @@ export function ClusterListSheet({
                   key={item.id}
                   // Native content-visibility virtualization: off-screen cards
                   // skip layout/paint, so a few-hundred-item feed stays smooth.
-                  className="[content-visibility:auto] [contain-intrinsic-size:auto_112px]"
+                  className={cn(
+                    "[content-visibility:auto]",
+                    item.slides.length > 0
+                      ? "[contain-intrinsic-size:auto_196px]"
+                      : "[contain-intrinsic-size:auto_112px]",
+                  )}
                 >
-                  <button
-                    type="button"
-                    onClick={() => openVendor(item.id)}
-                    className="flex w-full items-stretch gap-3 overflow-hidden rounded-xl border bg-card p-2 text-left transition-colors hover:bg-muted/40"
-                  >
-                    <ClusterCardPhoto
-                      candidates={item.photoCandidates}
-                      vendorType={vendorType}
-                      alt={item.name}
-                      className="size-24 shrink-0 rounded-lg"
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
-                      <span
-                        className="inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[11px] font-medium"
-                        style={{
-                          backgroundColor: category.lightHex,
-                          color: category.textHex,
-                        }}
-                      >
-                        <CategoryIcon className="size-3 shrink-0" />
-                        {category.label}
-                      </span>
-                      <span className="block truncate font-heading text-sm font-semibold">
-                        {item.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {reconLabel(item.reconCount)}
-                      </span>
-                    </div>
-                  </button>
+                  {/* The scrollable carousel can't live inside a <button>, so the
+                      card is a div: button row on top, swipeable previews below. */}
+                  <div className="overflow-hidden rounded-xl border bg-card transition-colors hover:bg-muted/40">
+                    <button
+                      type="button"
+                      onClick={() => openVendor(item.id)}
+                      className="flex w-full items-stretch gap-3 p-2 text-left"
+                    >
+                      <ClusterCardPhoto
+                        candidates={item.photoCandidates}
+                        vendorType={vendorType}
+                        alt={item.name}
+                        className="size-24 shrink-0 rounded-lg"
+                      />
+                      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
+                        <span
+                          className="inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[11px] font-medium"
+                          style={{
+                            backgroundColor: category.lightHex,
+                            color: category.textHex,
+                          }}
+                        >
+                          <CategoryIcon className="size-3 shrink-0" />
+                          {category.label}
+                        </span>
+                        <span className="block truncate font-heading text-sm font-semibold">
+                          {item.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {reconLabel(item.reconCount)}
+                        </span>
+                      </div>
+                    </button>
+                    {item.slides.length > 0 && (
+                      <ReconPreviewCarousel
+                        slides={item.slides}
+                        onOpen={() => openVendor(item.id)}
+                      />
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -344,6 +402,54 @@ export function ClusterListSheet({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Horizontal, swipeable strip of abbreviated recon-entry previews — text only,
+ * photos deliberately omitted at this altitude. Native scroll-snap does the
+ * swiping (the sheet's swipe-down handler yields via its axis lock); a tap
+ * anywhere opens the vendor page — browsers don't fire click after a scroll
+ * gesture, so swipes never navigate. Slides peek the next entry as the
+ * swipe affordance.
+ */
+function ReconPreviewCarousel({
+  slides,
+  onOpen,
+}: {
+  slides: ReconSlide[];
+  onOpen: () => void;
+}) {
+  return (
+    <div
+      onClick={onOpen}
+      className="flex cursor-pointer snap-x snap-mandatory gap-2 overflow-x-auto scroll-pl-2 px-2 pb-2"
+      style={{ scrollbarWidth: "none" }}
+    >
+      {slides.map((slide, i) => (
+        <div
+          key={i}
+          className={cn(
+            "flex shrink-0 snap-start flex-col gap-0.5 rounded-lg bg-muted/50 px-3 py-2",
+            slides.length === 1 ? "w-full" : "w-[85%]",
+          )}
+        >
+          {slide.priceText && (
+            <p className="truncate text-sm font-semibold">{slide.priceText}</p>
+          )}
+          {slide.priceDetails && (
+            <p className="truncate text-xs text-muted-foreground">
+              {slide.priceDetails}
+            </p>
+          )}
+          {slide.notes && (
+            <p className="line-clamp-2 text-xs leading-relaxed">
+              {slide.notes}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
