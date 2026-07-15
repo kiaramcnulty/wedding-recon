@@ -23,7 +23,7 @@ const profile = etype();
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const { data: all, error } = await supabase
   .from('vendors')
-  .select(`id, name, city, region, website, google_place_id${profile.serviceRegionRequired ? ', instagram' : ''}`)
+  .select(`id, name, city, region, website, google_place_id${profile.hasInstagram ? ', instagram' : ''}`)
   .eq('vendor_type', profile.vendorType).eq('region', region);
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
 

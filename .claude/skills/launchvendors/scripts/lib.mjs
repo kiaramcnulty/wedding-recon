@@ -97,6 +97,43 @@ export const TYPE_PROFILES = {
     // row only when its name or website homepage matches this; otherwise flags for review.
     intent: /wedding|elopement|bridal/i,
   },
+  food: {
+    vendorType: 'food',
+    csv: 'vendors.csv',
+    sweepQuery: (anchor) => `wedding caterer near ${anchor}`,
+    statewideQuery: (stateName) => `wedding catering in ${stateName}`,
+    // "X Catering" must never match "Y Catering" on the trade word alone.
+    weak: new Set(['catering', 'caterer', 'caterers', 'cuisine', 'kitchen', 'kitchens', 'food', 'foods', 'events', 'bbq', 'cafe', 'grill', 'chef', 'chefs', 'company', 'group', 'hospitality']),
+    dedupStop: new Set(['catering', 'caterer', 'caterers', 'events', 'co', 'llc', 'inc', 'the']),
+    captureInstagram: false,
+    // Wedding-specific results only (Kiara, 2026-07): a caterer with zero wedding evidence
+    // on name/site is flagged; a reddit thread or Google review describing their wedding
+    // work rescues the row at review even if the site never says "wedding".
+    intent: /wedding|bridal/i,
+  },
+  music: {
+    vendorType: 'music',
+    csv: 'vendors.csv',
+    // Three nets per anchor (Kiara, 2026-07): bands and DJs brand differently, and
+    // "wedding music" catches ceremony ensembles/pianists the other two miss.
+    // place_id dedup collapses the heavy overlap for free.
+    sweepQuery: (anchor) => [`wedding band near ${anchor}`, `wedding dj near ${anchor}`, `wedding music near ${anchor}`],
+    statewideQuery: (stateName) => [`wedding band in ${stateName}`, `wedding dj in ${stateName}`, `wedding music in ${stateName}`],
+    weak: new Set(['music', 'musicians', 'musician', 'band', 'bands', 'dj', 'djs', 'entertainment', 'events', 'productions', 'sound', 'sounds', 'strings', 'trio', 'quartet', 'ensemble', 'live', 'party', 'group', 'company']),
+    dedupStop: new Set(['music', 'band', 'dj', 'djs', 'entertainment', 'events', 'productions', 'llc', 'inc', 'co', 'the']),
+    captureInstagram: false,
+    intent: /wedding|bridal/i,
+  },
+  flowers: {
+    vendorType: 'flowers',
+    csv: 'vendors.csv',
+    sweepQuery: (anchor) => `wedding florist near ${anchor}`,
+    statewideQuery: (stateName) => `wedding florists in ${stateName}`,
+    weak: new Set(['flower', 'flowers', 'floral', 'florals', 'florist', 'florists', 'bloom', 'blooms', 'blossom', 'blossoms', 'petal', 'petals', 'posy', 'stems', 'botanical', 'design', 'designs', 'studio', 'studios', 'shop', 'garden', 'gardens']),
+    dedupStop: new Set(['floral', 'florals', 'florist', 'florists', 'flowers', 'flower', 'design', 'designs', 'studio', 'co', 'llc', 'inc', 'the']),
+    captureInstagram: false,
+    intent: /wedding|bridal/i,
+  },
 };
 
 /** Resolve --type (accepts user-facing aliases) to a profile; clear message on unknown. */
@@ -105,9 +142,12 @@ export function typeProfile() {
   const alias = {
     venue: 'venue', venues: 'venue',
     photographer: 'photos', photographers: 'photos', photography: 'photos', photos: 'photos', photo: 'photos',
+    caterer: 'food', caterers: 'food', catering: 'food', food: 'food',
+    music: 'music', musician: 'music', musicians: 'music', band: 'music', bands: 'music', dj: 'music', djs: 'music',
+    flowers: 'flowers', flower: 'flowers', florist: 'flowers', florists: 'flowers', floral: 'flowers',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers`); process.exit(1); }
   return { key, ...TYPE_PROFILES[key] };
 }
 

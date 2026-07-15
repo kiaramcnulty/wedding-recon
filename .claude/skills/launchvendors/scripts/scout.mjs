@@ -24,10 +24,11 @@ const seen = new Set(venues.map((v) => v.place_id).filter(Boolean));
 // Query intent per type lives in TYPE_PROFILES (lib.mjs) — keep it tight there.
 // --statewide <StateName> prepends a generic state-level query (e.g. "wedding photographer
 // in Colorado") ahead of the per-anchor queries — the primary net for service-area types.
+// A profile may return one query or an array per anchor (music sweeps band + dj + music).
 const statewide = argValue('statewide');
 const queries = [
-  ...(statewide ? [profile.statewideQuery(statewide)] : []),
-  ...[region, ...anchors].map((a) => profile.sweepQuery(a)),
+  ...(statewide ? [].concat(profile.statewideQuery(statewide)) : []),
+  ...[region, ...anchors].flatMap((a) => [].concat(profile.sweepQuery(a))),
 ];
 let added = 0, dup = 0, offState = 0;
 for (const q of queries) {

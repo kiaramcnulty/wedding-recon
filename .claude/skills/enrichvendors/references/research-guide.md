@@ -30,7 +30,7 @@ pricing`. Photographer guides, wedding-spot.com, Zola, eventective publish real 
 **The Knot `/marketplace/` pages TIME OUT — never WebFetch them**; use WebSearch with
 `allowed_domains: ["theknot.com"]` or its `/content/` articles. One timeout = skip that
 URL, don't retry. If pricing still isn't findable after the gap searches, write the
-honest "quote only" entry per entry-rules.md.
+honest "quote only" entry per common/entry-rules-core.md.
 
 ## Scratch extract (provenance only — nobody re-reads it in-pipeline)
 Write `research/<slug>/extract.md`, **≤400 words, bullets only**, each fact tagged:
