@@ -2,7 +2,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/scout.mjs <workdir> --region "Denver, CO" [--type photographer] [--statewide Colorado] [--anchors "Boulder, CO;Golden, CO"]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile } from './lib.mjs';
+import { readVenues, writeVenues, appendPruned, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile } from './lib.mjs';
 
 const workdir = process.argv[2];
 const region = argValue('region');
@@ -19,17 +19,20 @@ if (!process.env.GOOGLE_PLACES_API_KEY) { console.error('GOOGLE_PLACES_API_KEY m
 fs.mkdirSync(path.join(workdir, 'research'), { recursive: true });
 const file = path.join(workdir, profile.csv);
 const venues = readVenues(file);
-const seen = new Set(venues.map((v) => v.place_id).filter(Boolean));
+// seen includes pruned.csv so a re-sweep doesn't resurrect rows wedcheck/junk removed
+const seen = new Set([...venues, ...readVenues(path.join(workdir, 'pruned.csv'))].map((v) => v.place_id).filter(Boolean));
 
 // Query intent per type lives in TYPE_PROFILES (lib.mjs) — keep it tight there.
 // --statewide <StateName> prepends a generic state-level query (e.g. "wedding photographer
 // in Colorado") ahead of the per-anchor queries — the primary net for service-area types.
+// A profile may return one query or an array per anchor (music sweeps band + dj + music).
 const statewide = argValue('statewide');
 const queries = [
-  ...(statewide ? [profile.statewideQuery(statewide)] : []),
-  ...[region, ...anchors].map((a) => profile.sweepQuery(a)),
+  ...(statewide ? [].concat(profile.statewideQuery(statewide)) : []),
+  ...[region, ...anchors].flatMap((a) => [].concat(profile.sweepQuery(a))),
 ];
 let added = 0, dup = 0, offState = 0;
+const junk = [];
 for (const q of queries) {
   let pageToken;
   for (let page = 0; page < 3; page++) {
@@ -42,12 +45,18 @@ for (const q of queries) {
       const { city, state: st, cleanAddress } = parseCityState(p.formattedAddress || '', state);
       if (st !== state) { offState++; continue; }
       seen.add(p.id);
-      venues.push({
-        name: p.displayName?.text || '', address: cleanAddress, city, state: st,
-        website: await websiteWithFallback(p.id, p.websiteUri), instagram: '',
+      const name = p.displayName?.text || '';
+      const row = {
+        name, address: cleanAddress, city, state: st,
+        website: '', instagram: '',
         lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '',
         place_id: p.id, provenance: 'places-sweep', flags: '',
-      });
+      };
+      // Obvious noise by name (schools, AV rentals, nurseries — per-type junkName regex)
+      // never enters the CSV; it goes to pruned.csv with a reason (skip the website call).
+      if (profile.junkName?.test(name)) { row.flags = 'PRUNED:junk-name'; junk.push(row); continue; }
+      row.website = await websiteWithFallback(p.id, p.websiteUri);
+      venues.push(row);
       added++;
     }
     pageToken = data.nextPageToken;
@@ -57,4 +66,6 @@ for (const q of queries) {
   await sleep(150);
 }
 writeVenues(file, venues);
-console.log(`scout(${profile.key}): ${queries.length} queries | +${added} new | ${dup} repeat | ${offState} out-of-state | total ${venues.length} rows -> ${file}`);
+appendPruned(workdir, junk);
+console.log(`scout(${profile.key}): ${queries.length} queries | +${added} new | ${dup} repeat | ${offState} out-of-state | ${junk.length} junk-name pruned | total ${venues.length} rows -> ${file}`);
+if (junk.length) console.log(`  pruned by name (see pruned.csv): ${junk.map((v) => v.name).join('; ')}`);

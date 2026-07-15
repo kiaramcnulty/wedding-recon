@@ -1,28 +1,29 @@
 // One CLI for /enrichvendors batch mechanics. Replaces the throwaway orchestrator
 // scripts that previously burned a turn each (assign/coverage/repair/verify/state).
-// All commands accept --type <venue|photographer> (default venue — original behavior).
+// All commands accept --type <venue|photographer|caterer|music|flowers> (default venue).
 //
-//   batch      select venues with NO recon of ANY kind (bot OR human), dedupe same-named
-//              twins, assign bots + collected-dates, and write single-turn call files
-//              (rules + dossiers inlined) → drafts/<batch>-call-NN.md + <batch>-manifest.json
-//   status     parse draft CSVs: coverage vs manifest, field-shape, quick rule violations
-//   merge      repair (field overflow, bad vendor_id) + concat → recons-<batch>.csv, print samples
+//   batch      select vendors with NO recon of ANY kind (bot OR human), dedupe same-named
+//              twins, assign 1-3 ENTRIES per vendor from dossier richness (distinct bots
+//              + collected-dates per entry), and write single-turn call files (rules +
+//              dossiers inlined) → drafts/<batch>-call-NN.md + <batch>-manifest.json
+//              (manifest is FLAT: one row per (vendor, entry) slot)
+//   status     parse worker JSONL: coverage vs manifest slots, field-shape, rule violations
+//   merge      repair (bad vendor_id, bot reassignment) + concat → recons-<batch>.csv, print samples
 //   verify     post-upload DB check (inserted/active/photo gaps, public thumb); --fix-gaps
 //              deletes photo-partial entries so an idempotent upload --apply re-inserts them
 //   photos-map map screened keeper photos (photos/screen/keep-batch-*.json) into the CSV
+//              (first entry per vendor only — the same photo never appears on two entries)
 //
-// usage: node --env-file=.env.local .claude/skills/enrichvenues/scripts/pipeline.mjs <workdir> <cmd> [flags]
-//   batch:      --region ST --roster <path> --size N --batch <id> [--per-call 15]
+// usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> <cmd> [flags]
+//   batch:      --region ST --roster <path> --size N --batch <id> [--per-call 25]
 //   status:     --batch <id>
 //   merge:      --batch <id>
 //   verify:     --roster <path> --csv <name> [--fix-gaps]
 //   photos-map: --csv <name>
 //   health:     --batch <id>   (find harvests broken by network blips; exit 1 if any)
-//   rich:       --batch <id> --roster <path> --venues "slug;slug"   build a SECOND-entry
-//               call file for RICH-flagged venues (commentary cluster, a different bot than
-//               entry 1). Output uploads as a SEPARATE recons-<id>-rich.csv (its own run,
-//               so the ≤50/bot/run cap is per-file); dedup is safe (different author).
-// (status/merge/photos-map/health/rich are FS-only; batch/verify need the DB env keys.)
+// (status/merge/photos-map/health are FS-only; batch/verify need the DB env keys.)
+// (The old worker-flagged RICH second-entry pass is gone — richness now sets the entry
+//  count up front, inside the same call. See git history for rich/richout.)
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
@@ -31,9 +32,9 @@ import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
 const cmd = process.argv[3];
-const CMDS = ['batch', 'status', 'merge', 'verify', 'photos-map', 'health', 'rich', 'richout'];
+const CMDS = ['batch', 'status', 'merge', 'verify', 'photos-map', 'health'];
 if (!workdir || workdir.startsWith('--') || !CMDS.includes(cmd)) {
-  console.error(`usage: pipeline.mjs <workdir> <${CMDS.join('|')}> [--type venue|photographer] [flags]`); process.exit(1);
+  console.error(`usage: pipeline.mjs <workdir> <${CMDS.join('|')}> [--type venue|photographer|caterer|music|flowers] [flags]`); process.exit(1);
 }
 const profile = etype();
 const req = (k) => { const v = argValue(k); if (!v) { console.error(`--${k} is required for ${cmd}`); process.exit(1); } return v; };
@@ -154,38 +155,75 @@ async function cmdBatch() {
     process.exit(1);
   }
 
-  // bots: round-robin with a hard ≤50-per-run cap
-  const roster = JSON.parse(fs.readFileSync(rosterPath, 'utf8'));
-  if (picked.length > roster.length * 50) {
-    console.error(`batch of ${picked.length} exceeds roster capacity ${roster.length} bots × 50/run — add bots (usernames need user approval) or shrink --size`);
-    process.exit(1);
-  }
-  // collected-date: deterministic hash of vendor_id → 1-18 months back
+  // Entry count per vendor: 1-3, driven purely by the richness the dossier ACTUALLY has
+  // (Kiara, 2026-07: variance follows content found, never a forced quota). Reddit is the
+  // strongest signal; a 3-entry vendor needs real pricing AND strong commentary.
+  const entryCountFor = (dossierText) => {
+    const score = (/\$\s?\d/.test(dossierText) ? 1 : 0)
+      + (/^## google reviews/m.test(dossierText) ? 1 : 0)
+      + (/^## reddit/m.test(dossierText) ? 2 : 0)
+      + (/^## region pricing digests/m.test(dossierText) ? 1 : 0)
+      + (dossierText.length > 2200 ? 1 : 0);
+    return score >= 4 ? 3 : score >= 2 ? 2 : 1;
+  };
+
+  // collected-date: deterministic hash of a seed → 1-18 months back. The murmur-style
+  // finalizer matters: seeds like "id#0"/"id#1" differ only in the last char, and without
+  // it EVERY multi-entry vendor's dates land in consecutive months — a detectable pattern.
   const now = new Date();
-  const dateFor = (vid) => {
-    let h = 0; for (const ch of vid) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const dateFor = (seed) => {
+    let h = 0; for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 3266489909) >>> 0;
+    h = (h ^ (h >>> 16)) >>> 0;   // JS XOR yields signed int32 — keep h unsigned or dates go future
     const back = 1 + (h % 18);
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
     return { month: d.getUTCMonth() + 1, year: d.getUTCFullYear() };
   };
 
-  const manifest = picked.map((v, i) => {
-    const { month, year } = dateFor(v.id);
-    return { name: v.name, vendor_id: v.id, slug: slugOf(v.name), city: v.city, bot: roster[i % roster.length].key, month, year, call: Math.floor(i / perCall) + 1 };
+  // Manifest is FLAT: one row per (vendor, entry) slot. A vendor's entries get DISTINCT
+  // bots (global round-robin keeps load even) and distinct collected-dates, and all live
+  // in the same call file (the dossier is inlined once, extra entries only cost output).
+  const roster = JSON.parse(fs.readFileSync(rosterPath, 'utf8'));
+  const manifest = [];
+  let botPtr = 0;
+  picked.forEach((v, i) => {
+    const call = Math.floor(i / perCall) + 1;
+    const dossierText = fs.readFileSync(path.join(workdir, 'research', slugOf(v.name), 'dossier.md'), 'utf8');
+    const n = Math.min(entryCountFor(dossierText), roster.length);
+    for (let e = 0; e < n; e++) {
+      const { month, year } = dateFor(`${v.id}#${e}`);
+      manifest.push({ name: v.name, vendor_id: v.id, slug: slugOf(v.name), city: v.city, bot: roster[(botPtr + e) % roster.length].key, month, year, entry: e + 1, entries: n, call });
+    }
+    botPtr = (botPtr + n) % roster.length;
   });
+  const perBot = {};
+  for (const m of manifest) perBot[m.bot] = (perBot[m.bot] || 0) + 1;
+  const overloaded = Object.entries(perBot).filter(([, n]) => n > 50);
+  if (overloaded.length) {
+    console.error(`batch needs ${manifest.length} entries and overloads ${overloaded.map(([b, n]) => `${b}=${n}`).join(', ')} past 50/bot/run — add bots (usernames need user approval) or shrink --size`);
+    process.exit(1);
+  }
 
-  // call files: header (contract + entry rules + voice cards, inlined ONCE per call) + vendor blocks
+  // call files: header (contract + core rules + type rules + voice cards, inlined ONCE
+  // per call) + one block per vendor carrying its per-entry bot/date assignments
   const refDir = '.claude/skills/enrichvendors/references';
   const header = profile.refs
     .map((f) => fs.readFileSync(path.join(refDir, f), 'utf8')).join('\n\n---\n\n');
   fs.mkdirSync(draftsDir, { recursive: true });
-  const nCalls = Math.ceil(manifest.length / perCall);
+  const nCalls = Math.ceil(picked.length / perCall);
   let maxTok = 0;
   for (let c = 1; c <= nCalls; c++) {
-    const mine = manifest.filter((m) => m.call === c);
-    const blocks = mine.map((m) => {
+    const byVid = new Map();
+    for (const m of manifest.filter((m) => m.call === c)) {
+      if (!byVid.has(m.vendor_id)) byVid.set(m.vendor_id, []);
+      byVid.get(m.vendor_id).push(m);
+    }
+    const blocks = [...byVid.values()].map((ms) => {
+      const m = ms[0];
       const dossier = fs.readFileSync(path.join(workdir, 'research', m.slug, 'dossier.md'), 'utf8').trim();
-      return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | bot=${m.bot} | date=${m.month}/${m.year} ===\n${dossier}`;
+      const assign = ms.map((x) => `entry${x.entry}: bot=${x.bot} date=${x.month}/${x.year}`).join(' | ');
+      return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | entries=${ms.length} | ${assign} ===\n${dossier}`;
     });
     const out = `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-worker-${String(c).padStart(2, '0')}.jsonl\n`;
     fs.writeFileSync(path.join(draftsDir, `${batch}-call-${String(c).padStart(2, '0')}.md`), out);
@@ -193,20 +231,21 @@ async function cmdBatch() {
   }
   fs.writeFileSync(path.join(draftsDir, `${batch}-manifest.json`), JSON.stringify(manifest, null, 2));
 
-  const perBot = {};
-  for (const m of manifest) perBot[m.bot] = (perBot[m.bot] || 0) + 1;
-  console.log(`batch "${batch}": ${manifest.length} venues (pool had ${uniq.length} unreconned) → ${nCalls} call files of ≤${perCall}`);
+  const dist = {};
+  for (const m of manifest.filter((m) => m.entry === 1)) dist[m.entries] = (dist[m.entries] || 0) + 1;
+  console.log(`batch "${batch}": ${picked.length} vendors → ${manifest.length} entries (pool had ${uniq.length} unreconned) → ${nCalls} call files of ≤${perCall} vendors`);
+  console.log(`entry distribution: ${[1, 2, 3].map((n) => `${n}-entry×${dist[n] || 0}`).join(', ')} (richness-driven)`);
   console.log(`bot load: ${Object.entries(perBot).map(([b, n]) => `${b}=${n}`).join(', ')}`);
   console.log(`largest call file ≈ ${maxTok} tokens`);
-  console.log(`spawn one Sonnet agent per drafts/${batch}-call-NN.md`);
+  console.log(`spawn one draft-worker agent per drafts/${batch}-call-NN.md`);
 }
 
 // ── status ────────────────────────────────────────────────────────────────────
 function cmdStatus() {
   const batch = req('batch');
-  const manifest = loadManifest(batch);
+  const manifest = loadManifest(batch);   // flat: one row per (vendor, entry) slot
   const wantIds = new Set(manifest.map((m) => m.vendor_id));
-  const botByVid = new Map(manifest.map((m) => [m.vendor_id, m.bot]));
+  const wantPairs = new Set(manifest.map((m) => `${m.vendor_id}|${m.bot}`));
   const { perFile } = readWorkerRows(`${batch}-worker-`);
   const i = (n) => HEADERS.indexOf(n);
   const drafted = new Set(); let total = 0, malformed = 0, badVid = 0, badBot = 0, noPrice = 0, banned = 0, dashes = 0, noRegion = 0;
@@ -215,8 +254,10 @@ function cmdStatus() {
     for (const r of rows) {
       total++;
       const vid = (r[i('vendor_id')] ?? '').trim();
-      if (!wantIds.has(vid)) badVid++; else drafted.add(vid);
-      if (vid && botByVid.get(vid) && (r[i('bot')] ?? '').trim() !== botByVid.get(vid)) badBot++;
+      const pair = `${vid}|${(r[i('bot')] ?? '').trim()}`;
+      if (!wantIds.has(vid)) badVid++;
+      else if (!wantPairs.has(pair)) badBot++;   // bot not assigned to this vendor (merge repairs)
+      else drafted.add(pair);
       if (!(r[i('price_text')] ?? '').trim() || !(r[i('price_details')] ?? '').trim()) noPrice++;
       if (profile.serviceRegionRequired && !(r[i('service_region')] ?? '').trim()) noRegion++;
       const text = `${r[i('price_text')]} ${r[i('price_details')]} ${r[i('notes')]}`;
@@ -225,36 +266,48 @@ function cmdStatus() {
     }
     console.log(`  ${f}: ${rows.length} rows${problems.length ? ` | ${problems.length} unparseable JSON lines` : ''}`);
   }
-  const missing = manifest.filter((m) => !drafted.has(m.vendor_id));
-  console.log(`\ndrafted ${drafted.size}/${manifest.length} | rows ${total} | malformed ${malformed} | bad vendor_id ${badVid} | bot mismatch ${badBot}`);
+  const missing = manifest.filter((m) => !drafted.has(`${m.vendor_id}|${m.bot}`));
+  console.log(`\ndrafted ${drafted.size}/${manifest.length} entry slots | rows ${total} | malformed ${malformed} | bad vendor_id ${badVid} | bot mismatch ${badBot}`);
   console.log(`missing price fields ${noPrice} | banned phrases ${banned} | em-dashes ${dashes}${profile.serviceRegionRequired ? ` | missing service_region ${noRegion}` : ''}`);
-  if (missing.length) console.log(`MISSING: ${missing.map((m) => m.name).join('; ')}`);
+  if (missing.length) console.log(`MISSING SLOTS (SHORT/THIN-flagged ones are intentional): ${missing.map((m) => `${m.name} (${m.bot})`).join('; ')}`);
 }
 
 // ── merge ─────────────────────────────────────────────────────────────────────
 function cmdMerge() {
   const batch = req('batch');
-  const manifest = loadManifest(batch);
+  const manifest = loadManifest(batch);   // flat: one row per (vendor, entry) slot
   const idByName = new Map(manifest.map((m) => [norm(m.name), m.vendor_id]));
   const wantIds = new Set(manifest.map((m) => m.vendor_id));
-  const botByVid = new Map(manifest.map((m) => [m.vendor_id, m.bot]));
+  const botsByVid = new Map();            // vid → assigned bots in entry order
+  for (const m of manifest) {
+    if (!botsByVid.has(m.vendor_id)) botsByVid.set(m.vendor_id, []);
+    botsByVid.get(m.vendor_id).push(m.bot);
+  }
   const { perFile } = readWorkerRows(`${batch}-worker-`);
   if (!perFile.length) { console.error('no worker JSONL files found'); process.exit(1); }
 
   const iBot = HEADERS.indexOf('bot');
-  const out = [HEADERS]; const seenVid = new Set(); const problems = []; let repaired = 0;
+  const out = [HEADERS]; const seenPair = new Set(); const rowsPerVid = new Map(); const problems = []; let repaired = 0;
   for (const { file: f, rows, problems: fileProblems } of perFile) {
     problems.push(...fileProblems);
     for (const r of rows) {
       let vid = (r[1] ?? '').trim();
       if (!wantIds.has(vid)) {
         const fix = idByName.get(norm(r[0] ?? ''));
-        if (fix && !seenVid.has(fix)) { r[1] = fix; vid = fix; repaired++; }
+        if (fix) { r[1] = fix; vid = fix; repaired++; }
         else { problems.push(`${f}: unknown vendor_id for "${r[0]}"`); continue; }
       }
-      if (seenVid.has(vid)) { problems.push(`${f}: duplicate vendor "${r[0]}"`); continue; }
-      seenVid.add(vid);
-      if (botByVid.get(vid) && (r[iBot] ?? '').trim() !== botByVid.get(vid)) { r[iBot] = botByVid.get(vid); repaired++; }
+      const assigned = botsByVid.get(vid);
+      if ((rowsPerVid.get(vid) || 0) >= assigned.length) { problems.push(`${f}: extra row for "${r[0]}" beyond its ${assigned.length} assigned entries`); continue; }
+      // Bot must be one of THIS vendor's assigned bots and unused for it — repair to the
+      // next open slot otherwise (a bot posting twice on one vendor is a hard tell).
+      const bot = (r[iBot] ?? '').trim();
+      if (!assigned.includes(bot) || seenPair.has(`${vid}|${bot}`)) {
+        r[iBot] = assigned.find((b) => !seenPair.has(`${vid}|${b}`));
+        repaired++;
+      }
+      seenPair.add(`${vid}|${r[iBot]}`);
+      rowsPerVid.set(vid, (rowsPerVid.get(vid) || 0) + 1);
       out.push(r);
     }
   }
@@ -267,7 +320,8 @@ function cmdMerge() {
 
   const { recons } = loadCsvRecons(csvName);
   const priced = recons.filter((r) => !/^quote only/i.test(r.price_text)).length;
-  console.log(`merged ${recons.length}/${manifest.length} rows → ${csvName} (backup saved) | repaired ${repaired} | real pricing ${priced} | quote-only ${recons.length - priced}`);
+  const nVendors = new Set(recons.map((r) => r.vendor_id)).size;
+  console.log(`merged ${recons.length}/${manifest.length} entry slots (${nVendors} vendors) → ${csvName} (backup saved) | repaired ${repaired} | real pricing ${priced} | quote-only ${recons.length - priced}`);
   for (const r of recons.filter((_, i) => i % Math.ceil(recons.length / 3) === 0).slice(0, 3)) {
     console.log(`\n── ${r.venue} [${r.bot}, ${r.month}/${r.year}]\n   ${r.price_text}\n   ${r.notes.slice(0, 220)}${r.notes.length > 220 ? '…' : ''}`);
   }
@@ -346,10 +400,15 @@ function cmdPhotosMap() {
   const hdr = rows[0].map((h) => h.trim());
   const iN = hdr.indexOf('venue'), iP = hdr.indexOf('photos');
   let mapped = 0, imgs = 0;
+  const usedSlug = new Set();   // multi-entry vendors: photos go on the FIRST entry only
   const out = rows.map((r, idx) => {
     if (idx === 0 || !r.some((c) => c && c.trim())) return idx === 0 ? r : null;
-    const arr = keepers[slugOf(r[iN] ?? '')] || [];
-    if (arr.length) { r[iP] = arr.map((fn) => `photos/${slugOf(r[iN])}/${fn}`).join(';'); mapped++; imgs += arr.length; }
+    const slug = slugOf(r[iN] ?? '');
+    const arr = keepers[slug] || [];
+    if (arr.length && !usedSlug.has(slug)) {
+      usedSlug.add(slug);
+      r[iP] = arr.map((fn) => `photos/${slug}/${fn}`).join(';'); mapped++; imgs += arr.length;
+    }
     return r;
   }).filter(Boolean);
   fs.writeFileSync(csvPath, out.map((row) => row.map(csvEsc).join(',')).join('\n') + '\n');
@@ -364,8 +423,10 @@ function cmdPhotosMap() {
 function cmdHealth() {
   const batch = req('batch');
   const manifest = loadManifest(batch);
-  const broken = [];
+  const broken = []; const seenSlug = new Set();
   for (const m of manifest) {
+    if (seenSlug.has(m.slug)) continue;   // flat manifest repeats multi-entry vendors
+    seenSlug.add(m.slug);
     const hp = path.join(workdir, 'research', m.slug, 'harvest.json');
     if (!fs.existsSync(hp)) { broken.push({ ...m, why: 'no harvest.json' }); continue; }
     const h = JSON.parse(fs.readFileSync(hp, 'utf8'));
@@ -374,74 +435,18 @@ function cmdHealth() {
     if (placeBroken || siteBroken) broken.push({ ...m, why: [placeBroken && `places:${h.google?.err || 'missing'}`, siteBroken && `site:${h.site_error}`].filter(Boolean).join(' ') });
   }
   const calls = [...new Set(broken.map((b) => b.call))].sort((a, b) => a - b);
-  console.log(`broken harvests: ${broken.length}/${manifest.length} | affected calls: ${calls.join(', ') || 'none'}`);
+  console.log(`broken harvests: ${broken.length}/${seenSlug.size} vendors | affected calls: ${calls.join(', ') || 'none'}`);
   for (const b of broken) console.log(`  ${b.name} [call ${b.call}] — ${b.why}`);
   if (broken.length) console.log(`\nre-harvest:\nharvest --venues "${broken.map((b) => b.name).join(';')}"`);
   const stale = calls
-    .map((c) => `${batch}-worker-${String(c).padStart(2, '0')}.csv`)
+    .map((c) => `${batch}-worker-${String(c).padStart(2, '0')}.jsonl`)
     .filter((f) => fs.existsSync(path.join(draftsDir, f)));
-  if (stale.length) console.log(`stale worker CSVs to delete before respawn: ${stale.join(', ')}`);
+  if (stale.length) console.log(`stale worker JSONL files to delete before respawn: ${stale.join(', ')}`);
   process.exit(broken.length ? 1 : 0);
-}
-
-// ── rich ──────────────────────────────────────────────────────────────────────
-function cmdRich() {
-  const batch = req('batch'), rosterPath = req('roster');
-  const want = (argValue('venues') || '').split(';').map((s) => s.trim()).filter(Boolean);
-  if (!want.length) { console.error('--venues "slug;slug" required (the RICH-flagged slugs)'); process.exit(1); }
-  const manifest = loadManifest(batch);
-  const bySlug = new Map(manifest.map((m) => [m.slug, m]));
-  const roster = JSON.parse(fs.readFileSync(rosterPath, 'utf8'));
-  const { recons } = loadCsvRecons(`recons-${batch}.csv`);
-  const byVid = new Map(recons.map((r) => [r.vendor_id, r]));
-  const load = {}; for (const r of recons) load[r.bot] = (load[r.bot] || 0) + 1;
-
-  const dateFor = (seed) => { let h = 0; for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const back = 1 + (h % 18); const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - back, 1)); return { month: d.getUTCMonth() + 1, year: d.getUTCFullYear() }; };
-  const rich = []; const missing = [];
-  for (const slug of want) {
-    const m = bySlug.get(slug); if (!m) { missing.push(slug); continue; }
-    const first = byVid.get(m.vendor_id);
-    const secondBot = roster.map((b) => b.key).filter((k) => k !== first?.bot).sort((a, b) => (load[a] || 0) - (load[b] || 0))[0];
-    load[secondBot] = (load[secondBot] || 0) + 1;
-    const { month, year } = dateFor(m.vendor_id + 'rich');
-    rich.push({ ...m, firstBot: first?.bot, firstPrice: first?.price_text || '', secondBot, month, year });
-  }
-  if (missing.length) { console.error(`not in ${batch} manifest: ${missing.join('; ')}`); process.exit(1); }
-
-  const refDir = '.claude/skills/enrichvendors/references';
-  const header = profile.refs.map((f) => fs.readFileSync(path.join(refDir, f), 'utf8')).join('\n\n---\n\n');
-  const blocks = rich.map((m) => {
-    const dossier = fs.readFileSync(path.join(workdir, 'research', m.slug, 'dossier.md'), 'utf8').trim();
-    return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | bot=${m.secondBot} | date=${m.month}/${m.year} ===\n`
-      + `SECOND ENTRY — this vendor is rich enough for two. A DIFFERENT couple (bot=${m.firstBot}) already wrote entry 1 covering PRICING: "${m.firstPrice}". You are a different couple: lead with the REVIEW / EXPERIENCE / LOGISTICS cluster (staff, vibe, what working with them was like, quirks). price_text + price_details are still required: derive a HEDGED version of the vendor's real pricing in your own words (e.g. "going off their posted rates it's about $X-$Y", "reviews put saturdays around $X"), or an honest "Quote only" if the dossier has no number. Do NOT copy entry 1's pricing verbatim, and NEVER reference "entry 1" / the other entry / another listing — a reader sees separate cards from different people, so each entry must stand alone. Clearly different voice and opening from a typical first entry.\n${dossier}`;
-  });
-  fs.mkdirSync(draftsDir, { recursive: true });
-  fs.writeFileSync(path.join(draftsDir, `${batch}-rich-call.md`), `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-rich-worker.jsonl\n`);
-  fs.writeFileSync(path.join(draftsDir, `${batch}-rich-manifest.json`), JSON.stringify(rich, null, 2));
-  console.log(`rich second-entry call for ${rich.length} venues → drafts/${batch}-rich-call.md`);
-  console.log(`second bots: ${rich.map((m) => `${m.slug}=${m.secondBot}(vs ${m.firstBot})`).join(', ')}`);
-  console.log(`spawn one draft-worker on it; then: pipeline richout --batch ${batch} → recons-${batch}-rich.csv, upload as a separate --apply run`);
-}
-
-// ── richout ───────────────────────────────────────────────────────────────────
-// Convert the rich worker's JSONL into recons-<batch>-rich.csv for upload.
-function cmdRichout() {
-  const batch = req('batch');
-  const { perFile } = readWorkerRows(`${batch}-rich-worker`);
-  if (!perFile.length) { console.error(`no ${batch}-rich-worker.jsonl found`); process.exit(1); }
-  const out = [HEADERS];
-  let bad = 0;
-  for (const { rows, problems } of perFile) { out.push(...rows); bad += problems.length; }
-  const csvName = `recons-${batch}-rich.csv`;
-  fs.writeFileSync(path.join(workdir, csvName), out.map((row) => row.map(csvEsc).join(',')).join('\n') + '\n');
-  console.log(`${out.length - 1} rich rows → ${csvName}${bad ? ` | ${bad} unparseable lines DROPPED` : ''}`);
-  if (bad) process.exit(1);
 }
 
 if (cmd === 'batch') await cmdBatch();
 else if (cmd === 'status') cmdStatus();
-else if (cmd === 'rich') cmdRich();
-else if (cmd === 'richout') cmdRichout();
 else if (cmd === 'merge') cmdMerge();
 else if (cmd === 'verify') await cmdVerify();
 else if (cmd === 'photos-map') cmdPhotosMap();

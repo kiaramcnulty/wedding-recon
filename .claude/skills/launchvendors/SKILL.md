@@ -1,6 +1,6 @@
 ---
 name: launchvendors
-description: Launch a region's wedding-vendor directory in Wedding Recon for a given vendor type (venues, photographers; more types over time). Sweeps Google Places for a baseline list, mines web listicles and user-pasted Reddit/Instagram content for vendors Google Maps misses, resolves candidates to canonical Google places (with a no-place fallback), hands the user one CSV to review, then bulk-uploads deduplicated vendor-only rows to Supabase. Use when the user wants to seed, launch, or bulk-import a vendor category for a city/region (e.g. "launch Richmond", "seed venues for Austin", "launch Denver photographers").
+description: Launch a region's wedding-vendor directory in Wedding Recon for a given vendor type (venues, photographers, caterers, music, flowers). Sweeps Google Places for a baseline list, mines web listicles and user-pasted Reddit/Instagram content for vendors Google Maps misses, resolves candidates to canonical Google places (with a no-place fallback), hands the user one CSV to review, then bulk-uploads deduplicated vendor-only rows to Supabase. Use when the user wants to seed, launch, or bulk-import a vendor category for a city/region (e.g. "launch Richmond", "seed venues for Austin", "launch Denver photographers", "seed Denver caterers").
 ---
 
 # /launchvendors — seed a region's vendors for one vendor type
@@ -13,11 +13,11 @@ Goal: vendor-only placeholder rows in the `vendors` table (pins with name/locati
 
 All commands run from the repo root. Scripts live in `.claude/skills/launchvendors/scripts/` and need `.env.local` (`GOOGLE_PLACES_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) — they fail fast with a clear message if a key is missing; relay that to the user and stop.
 
-Cost note: the whole pipeline is ~15–60 Places API calls (sweep) + 1–2 per researched candidate — pennies, mostly inside Google's free tier.
+Cost note: the whole pipeline is ~15–60 Places API calls (sweep; music runs 3 queries per anchor so ~3×, still trivial) + 1–2 per researched candidate + ≤1 Place Details (reviews) per evidence-less sweep row in wedcheck — pennies, mostly inside Google's free tier.
 
 ## Phase 0 — Setup (one short exchange, then no questions until Phase 4)
 
-1. Parse the skill argument as `<type?> <region>` (e.g. `/launchvendors photographer Denver` or `/launchvendors Richmond`). If the first token is a known type alias (venue(s), photographer(s)/photos — see `typeProfile()` in `lib.mjs`), use it; otherwise the type is **venue**. Read `types/<type>.md` before anything else; it may add preflight requirements (e.g. photographers require migration `0016`).
+1. Parse the skill argument as `<type?> <region>` (e.g. `/launchvendors photographer Denver` or `/launchvendors Richmond`). If the first token is a known type alias (venue(s), photographer(s)/photos, caterer(s)/catering, music/band/dj, flowers/florist(s) — see `typeProfile()` in `lib.mjs`), use it; otherwise the type is **venue**. Read `types/<type>.md` before anything else; it may add preflight requirements (e.g. photographers require migration `0016`).
 2. Normalize region to `"City, ST"`. If the state isn't obvious from the city name, ask. **The state parameterizes everything downstream** — never assume CO. A bare state ("Colorado") means a **statewide** launch: pick the largest city as the region arg and pass `--statewide <StateName>` to scout (prepends a generic state-level query — the primary net for service-area types that brand statewide and miss city-"near" queries).
 3. Propose 4–8 anchor towns (suburbs/nearby towns that widen the sweep, e.g. Denver → Boulder, Golden, Littleton, Aurora, Morrison, Westminster; statewide launches span the state's metros + relevant destination towns and may run longer). One message: confirm type, region, state, anchors. **Never ask about scrape CSVs** — if the user has one they'll volunteer it (Kiara, 2026-07: "default is that it's not coming"); `ingest.mjs` handles a volunteered file. Wait for the reply, then run everything through Phase 3 without further questions.
 4. Workdir: `data/launchvendors/<type>-<region-slug>/` (gitignored). Scripts create it. (Pre-rename venue workdirs live in `data/launchvenues/` — leave them; `/enrichvenues` reads them.)
@@ -60,6 +60,9 @@ Tell the user: open the working CSV in any spreadsheet app or editor. Only flagg
 - `CHECK: was "X"` — resolver matched a differently-named place; confirm or fix.
 - `APPROX;NEEDS_ADDRESS` — city-centroid only; paste a street address into `address` if known (fine to leave for service-area vendors).
 - `NO_MATCH;NEEDS_ADDRESS` — nothing found; fix the name/city or add an address.
+- `WED_UNVERIFIED` (intent-checked types) — site exists but unreadable and reviews don't rescue it; keep or delete on a glance.
+
+Mechanically **pruned** rows (junk names, no wedding evidence in name/site/Google reviews) never reach this CSV — they're in `pruned.csv` with a reason; report the count and names, and a row is rescued by moving it back. Humans skim large lists rather than audit them (Kiara, 2026-07) — the pipeline prunes proactively so this review stays short.
 
 Also relay any type-card review watchlist (e.g. photographers: photo-booth rentals, video-only outfits). They may freely edit/add/delete rows (keep the header row). Wait for "done", then **re-read the file fresh. Never reference or assume row numbers across a user-edit boundary** — the user may have added, deleted, or reordered rows; every operation keys on `place_id` (else normalized name). This rule is absolute; violating it corrupted data in a live session.
 
