@@ -184,7 +184,14 @@ export default async function VendorPage({
   const textHex = category?.textHex ?? "#444441";
   const categoryLabel = category?.label ?? vendor.vendor_type;
 
-  const addressParts = [vendor.address_text, vendor.city]
+  // Centroid-fallback vendors store "City, ST" as address_text; don't append
+  // the city again ("Littleton, CO, Littleton").
+  const addressParts = [
+    vendor.address_text,
+    vendor.address_text?.toLowerCase().includes((vendor.city ?? "").toLowerCase())
+      ? null
+      : vendor.city,
+  ]
     .filter(Boolean)
     .join(", ");
 
