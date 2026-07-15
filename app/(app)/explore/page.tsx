@@ -74,6 +74,8 @@ export default function ExplorePage() {
           zoom: payload.zoom,
         }),
       );
+      // Fresh cluster → open at the top (drop any saved feed scroll position).
+      sessionStorage.removeItem("wr:clusterScroll");
     } catch {
       // sessionStorage unavailable (e.g. private mode) — the sheet still opens;
       // only restore-on-back is lost.

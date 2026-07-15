@@ -10,6 +10,7 @@ import {
   CATEGORY_PLURAL,
   type VendorType,
 } from "@/lib/constants/categories";
+import { cn } from "@/lib/utils";
 
 interface ClusterListSheetProps {
   /** Vendor ids in the tapped cluster (leaf order from the map). */
@@ -59,6 +60,10 @@ export function ClusterListSheet({
   const [items, setItems] = React.useState<ClusterItem[] | null>(null);
   const sheetRef = React.useRef<HTMLDivElement>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  // A cluster is single-type, so the pill/placeholder category is fixed here.
+  const category = CATEGORIES[vendorType];
+  const CategoryIcon = category.icon;
 
   // Stable key so the fetch effect doesn't re-run on array identity changes.
   const idsKey = ids.join(",");
@@ -208,7 +213,38 @@ export function ClusterListSheet({
     };
   }, [onClose]);
 
+  // Restore the feed's scroll position after returning from a vendor page. Set
+  // before paint (layout effect) so the list doesn't flash at the top first.
+  React.useLayoutEffect(() => {
+    if (items === null) return;
+    let saved: number | null = null;
+    try {
+      const raw = sessionStorage.getItem("wr:clusterScroll");
+      if (raw != null) {
+        saved = Number(raw);
+        sessionStorage.removeItem("wr:clusterScroll");
+      }
+    } catch {
+      // sessionStorage unavailable — nothing to restore
+    }
+    if (saved != null && !Number.isNaN(saved) && scrollRef.current) {
+      scrollRef.current.scrollTop = saved;
+    }
+  }, [items]);
+
   function openVendor(id: string) {
+    // Remember where we are in the feed so returning here (?restore=1) lands in
+    // roughly the same spot instead of back at the top.
+    try {
+      if (scrollRef.current) {
+        sessionStorage.setItem(
+          "wr:clusterScroll",
+          String(scrollRef.current.scrollTop),
+        );
+      }
+    } catch {
+      // sessionStorage unavailable — back will just land at the top
+    }
     // `from` returns the back button here: /explore?restore=1 reopens this sheet
     // and restores the map view (see explore/page.tsx).
     router.push(`/vendor/${id}?from=${encodeURIComponent("/explore?restore=1")}`);
@@ -268,19 +304,30 @@ export function ClusterListSheet({
                   key={item.id}
                   // Native content-visibility virtualization: off-screen cards
                   // skip layout/paint, so a few-hundred-item feed stays smooth.
-                  className="[content-visibility:auto] [contain-intrinsic-size:auto_300px]"
+                  className="[content-visibility:auto] [contain-intrinsic-size:auto_112px]"
                 >
                   <button
                     type="button"
                     onClick={() => openVendor(item.id)}
-                    className="block w-full overflow-hidden rounded-xl border bg-card text-left transition-colors hover:bg-muted/40"
+                    className="flex w-full items-stretch gap-3 overflow-hidden rounded-xl border bg-card p-2 text-left transition-colors hover:bg-muted/40"
                   >
                     <ClusterCardPhoto
                       candidates={item.photoCandidates}
                       vendorType={vendorType}
                       alt={item.name}
+                      className="size-24 shrink-0 rounded-lg"
                     />
-                    <div className="flex flex-col gap-0.5 px-3 py-2.5">
+                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
+                      <span
+                        className="inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[11px] font-medium"
+                        style={{
+                          backgroundColor: category.lightHex,
+                          color: category.textHex,
+                        }}
+                      >
+                        <CategoryIcon className="size-3 shrink-0" />
+                        {category.label}
+                      </span>
                       <span className="block truncate font-heading text-sm font-semibold">
                         {item.name}
                       </span>
@@ -314,10 +361,12 @@ function ClusterCardPhoto({
   candidates,
   vendorType,
   alt,
+  className,
 }: {
   candidates: string[];
   vendorType: VendorType;
   alt: string;
+  className?: string;
 }) {
   const [idx, setIdx] = React.useState(0);
   const category = CATEGORIES[vendorType];
@@ -327,11 +376,11 @@ function ClusterCardPhoto({
     const Icon = category.icon;
     return (
       <div
-        className="flex aspect-[16/10] w-full items-center justify-center"
+        className={cn("flex items-center justify-center", className)}
         style={{ backgroundColor: category.lightHex, color: category.textHex }}
         aria-hidden
       >
-        <Icon className="size-8 opacity-70" />
+        <Icon className="size-7 opacity-70" />
       </div>
     );
   }
@@ -343,7 +392,7 @@ function ClusterCardPhoto({
       loading="lazy"
       decoding="async"
       onError={() => setIdx((i) => i + 1)}
-      className="aspect-[16/10] w-full bg-muted object-cover"
+      className={cn("bg-muted object-cover", className)}
     />
   );
 }
