@@ -52,6 +52,8 @@ for (const [i, r] of recons.entries()) {
   if (!r.vendor_id) errors.push(`${at}: missing vendor_id`);
   if (!RECON_TYPES.has(r.recon_type)) errors.push(`${at}: bad recon_type "${r.recon_type}"`);
   if (!r.price_text || !r.price_details) errors.push(`${at}: price_text and price_details are REQUIRED on every entry`);
+  // Comma-split tell: "$3,400" torn across two columns ("Starting at $3" + "400…").
+  if (/\$\d{1,3}$/.test(r.price_text) && /^\d{3}\b/.test(r.price_details)) errors.push(`${at}: price looks comma-split across price_text/price_details ("${r.price_text}" + "${r.price_details.slice(0, 20)}") — rejoin the dollar amount`);
   if (profile.serviceRegionRequired && !(r.service_region || '').trim()) errors.push(`${at}: service_region is REQUIRED on every ${profile.key} entry`);
   const text = `${r.price_text} ${r.price_details} ${r.notes}`;
   const banned = text.match(BANNED);
