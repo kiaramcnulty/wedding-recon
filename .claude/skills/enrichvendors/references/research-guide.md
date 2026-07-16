@@ -39,10 +39,12 @@ Hedge unknowns explicitly ("catering policy not confirmed"). Then write the CSV 
 
 ## Reddit paste protocol (orchestrator, Phase 0)
 Reddit blocks fetching. The user searches Reddit themselves and pastes threads into
-chat. Save every paste VERBATIM to `research/reddit-NN.txt` with a header line
+chat. Save every paste to `research/reddit-NN.txt` with a header line
 `[subreddit — "title" — posted Xmo ago (~Mon YYYY), captured YYYY-MM-DD]` BEFORE doing
-anything else with it, then re-run `roster.mjs --slices`. Raw threads are hard to
-re-acquire.
+anything else with it, then re-run `roster.mjs --slices`. Post + comment text stays
+VERBATIM (usernames, ages, flairs included — ages anchor dates); page chrome may be
+dropped on save (promoted ads, nav, vote/Share buttons, the Community Info/rules/
+moderators/footer block). Raw threads are hard to re-acquire.
 
 ## Region pricing pass (orchestrator, Phase 1, once per region)
 ~5 fetches that cover pricing for dozens of venues at once: the wedding-spot.com city
