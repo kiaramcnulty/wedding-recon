@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { parseCSV, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { parseCSV, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
 import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
@@ -103,7 +103,7 @@ const missingVendors = vendorIds.filter((id) => !known.has(id));
 if (missingVendors.length) { console.error('unknown vendor_ids:\n' + missingVendors.join('\n')); process.exit(1); }
 
 const botIds = bots.map((b) => b.user_id).filter(Boolean);
-const { data: existing } = await supabase.from('recon_entries').select('author_id, vendor_id').in('author_id', botIds.length ? botIds : ['00000000-0000-0000-0000-000000000000']);
+const { data: existing } = await selectAll(() => supabase.from('recon_entries').select('author_id, vendor_id').order('id').in('author_id', botIds.length ? botIds : ['00000000-0000-0000-0000-000000000000']));
 const done = new Set((existing || []).map((e) => `${e.author_id}|${e.vendor_id}`));
 
 const toInsert = recons.filter((r) => !botByKey.get(r.bot).user_id || !done.has(`${botByKey.get(r.bot).user_id}|${r.vendor_id}`));
@@ -169,7 +169,7 @@ for (const r of toInsert) {
 }
 
 // ── Verify ────────────────────────────────────────────────────────────────────
-const { data: after } = await supabase.from('recon_entries').select('author_id, vendor_id').in('author_id', botIds);
+const { data: after } = await selectAll(() => supabase.from('recon_entries').select('author_id, vendor_id').order('id').in('author_id', botIds));
 const pairs = (after || []).map((e) => `${e.author_id}|${e.vendor_id}`);
 const dups = pairs.filter((p, i) => pairs.indexOf(p) !== i);
 console.log(`\nAPPLIED: ${inserted} entries, ${media} photos | bot entries in DB now: ${after?.length ?? '?'}`);

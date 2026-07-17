@@ -27,7 +27,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { norm, parseCSV, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { norm, parseCSV, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
 import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
@@ -111,7 +111,7 @@ async function cmdBatch() {
   if (error) { console.error('DB read failed:', error.message); process.exit(1); }
   // Exclude venues with ANY recon — bot OR human. (roster.mjs only counts bot recon;
   // the product rule for backfills is "no recon of any kind".)
-  const { data: allRecon, error: rErr } = await supabase.from('recon_entries').select('vendor_id');
+  const { data: allRecon, error: rErr } = await selectAll(() => supabase.from('recon_entries').select('id, vendor_id').order('id'));
   if (rErr) { console.error('DB read failed:', rErr.message); process.exit(1); }
   const hasRecon = new Set((allRecon || []).map((e) => e.vendor_id));
 
@@ -340,7 +340,7 @@ async function cmdVerify() {
   const uids = [...new Set(items.map((r) => r.uid).filter(Boolean))];
   const batchVids = new Set(items.map((r) => r.vendor_id));
 
-  const { data: entries, error } = await supabase.from('recon_entries').select('id, author_id, vendor_id, status').in('author_id', uids);
+  const { data: entries, error } = await selectAll(() => supabase.from('recon_entries').select('id, author_id, vendor_id, status').order('id').in('author_id', uids));
   if (error) { console.error('DB read failed:', error.message); process.exit(1); }
   const mine = (entries || []).filter((e) => batchVids.has(e.vendor_id));
   const byPair = new Map(mine.map((e) => [`${e.author_id}|${e.vendor_id}`, e]));

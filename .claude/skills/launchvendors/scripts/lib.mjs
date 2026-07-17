@@ -314,3 +314,17 @@ export function appendPruned(workdir, rows) {
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function argValue(name) { const i = process.argv.indexOf(`--${name}`); return i === -1 ? null : process.argv[i + 1]; }
+
+// Supabase caps a plain .select() at 1000 rows, so counts/coverage silently
+// under-report past 1000. Page through in 1000-row chunks. `make` must return a
+// fresh, ORDERED query builder each call (order by a unique col for stable paging).
+export async function selectAll(make) {
+  const out = []; const size = 1000;
+  for (let from = 0; ; from += size) {
+    const { data, error } = await make().range(from, from + size - 1);
+    if (error) return { data: null, error };
+    out.push(...(data || []));
+    if (!data || data.length < size) break;
+  }
+  return { data: out, error: null };
+}
