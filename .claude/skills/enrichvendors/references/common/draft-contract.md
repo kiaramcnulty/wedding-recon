@@ -8,6 +8,7 @@ You are drafting bot recon entries for the wedding vendors listed below. Everyth
 - Each entry stands ALONE. Different bots are different couples: clearly different voice and opening, NEVER reference another entry ("as someone else said", "the other listing") or hint the vendor is one of a set. A reader sees separate cards from different people.
 - Every entry still carries `price_text` + `price_details`. Non-pricing-cluster entries derive a HEDGED version of the vendor's sourced pricing in their own words ("going off their posted rates it's about $X-$Y", "reviews put it around $X") or an honest "Quote only" — never copy a sibling entry's pricing wording verbatim, and ideally cite a different source than the sibling.
 - If the dossier can't support N distinct honest entries, write fewer and append ` SHORT:<slug>` to your reply. Fewer real entries always beats padded ones.
+- Write EXACTLY the assigned rows and no more — never an extra row, a test row, or any row containing placeholder text (`PLACEHOLDER`, `REMOVE`, `TODO`); one stray row fails the whole merge.
 
 ## Every row
 - `recon_type` is always `online`.
@@ -20,8 +21,8 @@ You are drafting bot recon entries for the wedding vendors listed below. Everyth
 - `service_region`: see the type rules — required for some types, always-null for others (include the key only when the type rules require it).
 
 ## Flags (append to your one-line reply, never draft a row for them)
-- ` <NOTFLAG>:<slug>` — the exact wrong-type flag named in the type rules (e.g. `NOTAVENUE`, `NOTCATERER`): the dossier shows this vendor is NOT the type this run is for. Write NO rows for it. When unsure, draft the row(s) and flag it; the orchestrator decides.
-- ` THIN:<slug>` — essentially nothing beyond name/city (no site text, no reviews, no digest or reddit lines, no google summary). Write NO rows; an entry must contain at least one real sourced fact.
+- ` <NOTFLAG>:<slug>` — the exact wrong-type flag named in the type rules (e.g. `NOTAVENUE`, `NOTCATERER`): the dossier shows this vendor is a fundamentally DIFFERENT KIND of business than this run's type (a planner, rental company, caterer, officiant, tour operator, retail shop, day-use attraction). It is NOT for a business that plausibly IS the type but whose dossier lacks type-specific content — a hotel, resort, restaurant, ranch, or golf club with no wedding text is `THIN`, not `<NOTFLAG>` (venues host events even when their reviews are all about skiing). Write NO rows for it. When genuinely unsure, draft the row(s) NORMALLY (real facts, in voice — never meta-commentary like "flagging separately" or placeholder text; validator-rejected) and add the flag; the orchestrator decides.
+- ` THIN:<slug>` — essentially nothing beyond name/city (no site text, no reviews, no digest or reddit lines, no google summary), OR a plausible-type business whose dossier has no honest type-relevant fact to write. Write NO rows; an entry must contain at least one real sourced fact.
 - ` SHORT:<slug>` — you wrote fewer rows than the block assigned (dossier couldn't honestly support them all).
 
 ## Output format (exact) — JSON Lines
