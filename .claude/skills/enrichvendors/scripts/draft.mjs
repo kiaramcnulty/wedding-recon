@@ -195,9 +195,12 @@ async function cmdCollect() {
     if (msg.stop_reason !== 'end_turn') { failed.push({ id, why: `stop_reason=${msg.stop_reason} (truncated/refused — not written)` }); continue; }
     const text = msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
     const { rows, flags, chatter } = parseResponseText(text);
-    if (!rows.length) { failed.push({ id, why: 'no JSON rows in response' }); continue; }
+    // Zero rows is a valid outcome when every vendor in the call got flagged
+    // THIN/NOT*/SHORT-to-zero (draft-contract.md: "Write NO rows for it") — only
+    // treat it as a failure when there's no _flags line either (a genuinely empty reply).
+    if (!rows.length && flags === null) { failed.push({ id, why: 'no JSON rows and no _flags line in response' }); continue; }
     const out = outFileFor(id);
-    fs.writeFileSync(path.join(draftsDir, out), rows.join('\n') + '\n');
+    fs.writeFileSync(path.join(draftsDir, out), rows.length ? rows.join('\n') + '\n' : '');
     if (flags !== null) flagsAll[id] = flags;
     written++;
     console.log(`  ${out}: ${rows.length} rows${flags ? ` | flags: ${flags}` : ''}${flags === null ? ' | WARNING: no _flags line' : ''}${chatter ? ` | ${chatter} non-JSON line(s) dropped` : ''}`);
