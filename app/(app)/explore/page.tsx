@@ -1,16 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Search, Loader2, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  VendorMap,
-  type ClusterOpenPayload,
-  type PinOpenPayload,
-} from "@/components/map/vendor-map";
+import { VendorMap, type ClusterOpenPayload } from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
 import type { VendorType } from "@/lib/constants/categories";
 import { BrandLockup } from "@/components/brand-lockup";
@@ -37,7 +32,6 @@ const MAP_TILE_ORIGIN = (() => {
 })();
 
 export default function ExplorePage() {
-  const router = useRouter();
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -51,14 +45,16 @@ export default function ExplorePage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
-  // Restore the map view when returning from a vendor page (?restore=1). Read
-  // once, SSR-safe (window-guarded); used only imperatively by the map at init,
-  // so it can't cause a hydration mismatch.
+  // Restore the last map view whenever Explore mounts — returning from a vendor
+  // by ANY route (in-app back, browser/OS back gesture, or the bottom nav), not
+  // just the in-app back button. The view is persisted on every settled map move
+  // (see saveMapView). sessionStorage is per-tab, so a brand-new session still
+  // opens on the default region. Read once, SSR-safe (window-guarded); used only
+  // imperatively by the map at init, so it can't cause a hydration mismatch.
   const [initialView] = useState<{ lng: number; lat: number; zoom: number } | null>(() => {
     if (typeof window === "undefined") return null;
     try {
-      if (!new URLSearchParams(window.location.search).has("restore")) return null;
-      const raw = sessionStorage.getItem("wr:cluster");
+      const raw = sessionStorage.getItem("wr:mapView");
       if (!raw) return null;
       const d = JSON.parse(raw) as { center?: [number, number]; zoom?: number };
       if (!d.center || typeof d.zoom !== "number") return null;
@@ -68,50 +64,37 @@ export default function ExplorePage() {
     }
   });
 
-  // Persist the tapped cluster + map view, then open the list.
+  // Persist the tapped cluster's identity so it can be reopened on return
+  // (?restore=1), then open the list. The map view is persisted separately by
+  // saveMapView, so it isn't duplicated here.
   const openCluster = useCallback((payload: ClusterOpenPayload) => {
     try {
       sessionStorage.setItem(
         "wr:cluster",
-        JSON.stringify({
-          ids: payload.ids,
-          vendorType: payload.vendorType,
-          center: payload.center,
-          zoom: payload.zoom,
-        }),
+        JSON.stringify({ ids: payload.ids, vendorType: payload.vendorType }),
       );
       // Fresh cluster → open at the top (drop any saved feed scroll position).
       sessionStorage.removeItem("wr:clusterScroll");
     } catch {
       // sessionStorage unavailable (e.g. private mode) — the sheet still opens;
-      // only restore-on-back is lost.
+      // only reopen-on-back is lost.
     }
     setCluster({ ids: payload.ids, vendorType: payload.vendorType });
   }, []);
 
-  // Direct pin tap: persist just the map view (no cluster sheet to reopen), then
-  // open the vendor page with a `from` that returns to /explore?restore=1, so the
-  // back button lands on the same search zone instead of the Denver default.
-  const openVendorFromPin = useCallback(
-    (payload: PinOpenPayload) => {
+  // Persist the map view on every settled move, so returning to Explore restores
+  // the same view (see initialView). Keyed separately from the cluster payload so
+  // the two never clobber each other.
+  const saveMapView = useCallback(
+    (view: { center: [number, number]; zoom: number }) => {
       try {
-        sessionStorage.setItem(
-          "wr:cluster",
-          JSON.stringify({ center: payload.center, zoom: payload.zoom }),
-        );
-        // No sheet on a direct pin — drop any saved feed scroll so a later
-        // restore can't misapply it. The restore reader ignores an ids-less
-        // payload, so only the map view comes back (see initialView above).
-        sessionStorage.removeItem("wr:clusterScroll");
+        sessionStorage.setItem("wr:mapView", JSON.stringify(view));
       } catch {
-        // sessionStorage unavailable (e.g. private mode) — navigation still
-        // works; only restore-on-back of the view is lost.
+        // sessionStorage unavailable (e.g. private mode) — restore-on-return is
+        // lost, nothing else breaks.
       }
-      router.push(
-        `/vendor/${payload.id}?from=${encodeURIComponent("/explore?restore=1")}`,
-      );
     },
-    [router],
+    [],
   );
 
   // On a restore mount, reopen the cluster sheet from the saved payload. The
@@ -260,7 +243,7 @@ export default function ExplorePage() {
           flyToPosition={flyTo}
           userPosition={userPosition}
           onClusterOpen={openCluster}
-          onPinOpen={openVendorFromPin}
+          onViewChange={saveMapView}
           initialView={initialView}
         />
       </div>

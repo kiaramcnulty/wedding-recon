@@ -193,17 +193,6 @@ export interface ClusterOpenPayload {
   zoom: number;
 }
 
-/**
- * Emitted when an individual vendor pin is tapped: the vendor id plus the map
- * view at tap time, so the caller can restore the same view after a round trip
- * to that vendor's page.
- */
-export interface PinOpenPayload {
-  id: string;
-  center: [number, number];
-  zoom: number;
-}
-
 interface VendorMapProps {
   /** External position to fly to. Pass zoom to override the default (14). */
   flyToPosition?: { lng: number; lat: number; zoom?: number } | null;
@@ -215,11 +204,11 @@ interface VendorMapProps {
    */
   onClusterOpen?: (payload: ClusterOpenPayload) => void;
   /**
-   * Called when an individual vendor pin is tapped, with the map view at tap
-   * time. When provided, the caller owns navigation (so it can persist the view
-   * for restore-on-back); otherwise the map just pushes the vendor page.
+   * Called after every map move settles, with the new center/zoom. The caller
+   * persists it so returning to Explore — by any route: in-app back, browser/OS
+   * back, or the bottom nav — reopens on the same view instead of the default.
    */
-  onPinOpen?: (payload: PinOpenPayload) => void;
+  onViewChange?: (view: { center: [number, number]; zoom: number }) => void;
   /**
    * Initial center/zoom — e.g. restoring the view after returning from a vendor
    * page. Read once at map init; later changes are ignored.
@@ -231,14 +220,14 @@ export function VendorMap({
   flyToPosition,
   userPosition,
   onClusterOpen,
-  onPinOpen,
+  onViewChange,
   initialView,
 }: VendorMapProps) {
   const router = useRouter();
   // Latest onClusterOpen, callable from the run-once init effect's handlers.
   const onClusterOpenRef = useRef(onClusterOpen);
-  // Latest onPinOpen, same reason (init effect wires the click handler once).
-  const onPinOpenRef = useRef(onPinOpen);
+  // Latest onViewChange, same reason (init effect wires the moveend handler once).
+  const onViewChangeRef = useRef(onViewChange);
   // Captured once — the map reads center/zoom at init only.
   const initialViewRef = useRef(initialView);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -262,12 +251,12 @@ export function VendorMap({
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = createClient();
 
-  // Keep the refs current so the once-only init effect's click handlers always
-  // call the latest callbacks (updating a ref during render is disallowed).
+  // Keep the refs current so the once-only init effect's handlers always call
+  // the latest callbacks (updating a ref during render is disallowed).
   useEffect(() => {
     onClusterOpenRef.current = onClusterOpen;
-    onPinOpenRef.current = onPinOpen;
-  }, [onClusterOpen, onPinOpen]);
+    onViewChangeRef.current = onViewChange;
+  }, [onClusterOpen, onViewChange]);
 
   /**
    * Query the RPC for the current bounds. Returns the vendor rows, or null when
@@ -500,17 +489,7 @@ export function VendorMap({
 
           map.on("click", pins, (e) => {
             const id = e.features?.[0]?.properties?.id;
-            if (typeof id !== "string") return;
-            // With a handler wired up, hand navigation to the caller with the
-            // current view so it can persist it for restore-on-back; otherwise
-            // just open the vendor page.
-            const onOpen = onPinOpenRef.current;
-            if (onOpen) {
-              const c = map.getCenter();
-              onOpen({ id, center: [c.lng, c.lat], zoom: map.getZoom() });
-            } else {
-              router.push(`/vendor/${id}`);
-            }
+            if (typeof id === "string") router.push(`/vendor/${id}`);
           });
 
           for (const layer of [clusters, pins]) {
@@ -530,7 +509,16 @@ export function VendorMap({
           clearTimeout(loadTimeoutRef.current);
           loadTimeoutRef.current = null;
         }
-        map.on("moveend", scheduleRefresh);
+        // On every settled move: refresh pins for the new bounds, and report the
+        // view so the page can persist it for restore-on-return.
+        map.on("moveend", () => {
+          scheduleRefresh();
+          const c = map.getCenter();
+          onViewChangeRef.current?.({
+            center: [c.lng, c.lat],
+            zoom: map.getZoom(),
+          });
+        });
       });
     })();
 
