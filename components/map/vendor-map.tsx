@@ -214,6 +214,12 @@ interface VendorMapProps {
    * page. Read once at map init; later changes are ignored.
    */
   initialView?: { lng: number; lat: number; zoom: number } | null;
+  /**
+   * Vendor types to show. Empty (the default) shows all. Applied as a per-type
+   * layer-visibility toggle — no refetch, since every type already has its own
+   * source + layers.
+   */
+  selectedTypes?: VendorType[];
 }
 
 export function VendorMap({
@@ -222,6 +228,7 @@ export function VendorMap({
   onClusterOpen,
   onViewChange,
   initialView,
+  selectedTypes,
 }: VendorMapProps) {
   const router = useRouter();
   // Latest onClusterOpen, callable from the run-once init effect's handlers.
@@ -230,6 +237,8 @@ export function VendorMap({
   const onViewChangeRef = useRef(onViewChange);
   // Captured once — the map reads center/zoom at init only.
   const initialViewRef = useRef(initialView);
+  // Latest type filter, read by the init effect once the layers first exist.
+  const selectedTypesRef = useRef(selectedTypes);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -346,6 +355,38 @@ export function VendorMap({
     }, DEBOUNCE_MS);
   }, [refreshMarkers]);
 
+  /**
+   * Show only the selected vendor types (empty selection = show all). Cheap: the
+   * per-type pin + cluster layers already exist, so this is just a visibility
+   * toggle — no refetch, no source churn. Hidden layers also can't be tapped, so
+   * the cluster-list sheet respects the filter for free. Reads the selection from
+   * a ref so the run-once init effect can call it right after adding the layers.
+   */
+  const applyTypeFilter = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const sel = selectedTypesRef.current ?? [];
+    const showAll = sel.length === 0;
+    for (const t of VENDOR_TYPES) {
+      const visibility = showAll || sel.includes(t) ? "visible" : "none";
+      // Guarded: on early renders the layers don't exist yet (map still loading).
+      if (map.getLayer(pinLayerId(t))) {
+        map.setLayoutProperty(pinLayerId(t), "visibility", visibility);
+      }
+      if (map.getLayer(clusterLayerId(t))) {
+        map.setLayoutProperty(clusterLayerId(t), "visibility", visibility);
+      }
+    }
+  }, []);
+
+  // Re-apply on every selection change, keeping the ref in sync so the init
+  // effect's post-load call sees the current value too. A no-op until the layers
+  // exist, so a change mid-load is safe (the load handler applies it then).
+  useEffect(() => {
+    selectedTypesRef.current = selectedTypes;
+    applyTypeFilter();
+  }, [selectedTypes, applyTypeFilter]);
+
   // Initialize the map once on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -445,6 +486,10 @@ export function VendorMap({
             },
           });
         }
+
+        // All layers now exist — apply any active type filter before wiring
+        // interactions (hidden layers emit no clicks).
+        applyTypeFilter();
 
         // Interaction: cluster → zoom to expansion; pin → open vendor page.
         for (const t of VENDOR_TYPES) {

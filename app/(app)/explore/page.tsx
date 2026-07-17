@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { VendorMap, type ClusterOpenPayload } from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
-import type { VendorType } from "@/lib/constants/categories";
+import { VendorTypeFilter } from "@/components/map/vendor-type-filter";
+import { VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 import { BrandLockup } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,10 @@ export default function ExplorePage() {
   // The open cluster list (null = closed). Opened on a cluster tap, or restored
   // when returning from a vendor page (?restore=1).
   const [cluster, setCluster] = useState<{ ids: string[]; vendorType: VendorType } | null>(null);
+  // Selected vendor-type filter (empty = show all). Starts empty so the first
+  // client render matches the server; any persisted selection is restored after
+  // mount (see below) to avoid a hydration mismatch on the chip states.
+  const [selectedTypes, setSelectedTypes] = useState<VendorType[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
@@ -96,6 +101,44 @@ export default function ExplorePage() {
     },
     [],
   );
+
+  // Update the type filter and persist it per-tab, so it survives a round trip to
+  // a vendor page (restored on mount, below) just like the map view.
+  const updateSelectedTypes = useCallback((next: VendorType[]) => {
+    setSelectedTypes(next);
+    try {
+      sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
+    } catch {
+      // sessionStorage unavailable — the filter still applies this session.
+    }
+  }, []);
+
+  // Restore the persisted type filter after mount. Deferred a tick (setTimeout 0,
+  // same pattern as the cluster restore below) so the first client render matches
+  // the server's default ("all shown") before any saved selection is applied.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let restored: VendorType[] | null = null;
+    try {
+      const raw = sessionStorage.getItem("wr:typeFilter");
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const clean = parsed.filter(
+            (t): t is VendorType =>
+              typeof t === "string" &&
+              (VENDOR_TYPES as readonly string[]).includes(t),
+          );
+          if (clean.length) restored = clean;
+        }
+      }
+    } catch {
+      // malformed payload — fall back to showing all
+    }
+    if (!restored) return;
+    const t = setTimeout(() => setSelectedTypes(restored), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   // On a restore mount, reopen the cluster sheet from the saved payload. The
   // setState is deferred a tick (setTimeout 0) — the documented pattern for
@@ -245,6 +288,7 @@ export default function ExplorePage() {
           onClusterOpen={openCluster}
           onViewChange={saveMapView}
           initialView={initialView}
+          selectedTypes={selectedTypes}
         />
       </div>
 
@@ -312,6 +356,12 @@ export default function ExplorePage() {
         </div>
 
         <ProfileMenu className="shrink-0" />
+      </div>
+
+      {/* Vendor-type filter: scrollable color chips beneath the search bar,
+          in the same floating column. Doubles as the map's pin-color legend. */}
+      <div className="relative z-10 mx-auto w-full max-w-[520px] px-3 pt-2">
+        <VendorTypeFilter selected={selectedTypes} onChange={updateSelectedTypes} />
       </div>
 
       {/* Bottom row over the map, lifted clear of the map attribution along
