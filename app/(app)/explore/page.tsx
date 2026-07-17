@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Loader2, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { VendorMap, type ClusterOpenPayload } from "@/components/map/vendor-map";
+import {
+  VendorMap,
+  type ClusterOpenPayload,
+  type PinOpenPayload,
+} from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
 import type { VendorType } from "@/lib/constants/categories";
 import { BrandLockup } from "@/components/brand-lockup";
@@ -32,6 +37,7 @@ const MAP_TILE_ORIGIN = (() => {
 })();
 
 export default function ExplorePage() {
+  const router = useRouter();
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -82,6 +88,31 @@ export default function ExplorePage() {
     }
     setCluster({ ids: payload.ids, vendorType: payload.vendorType });
   }, []);
+
+  // Direct pin tap: persist just the map view (no cluster sheet to reopen), then
+  // open the vendor page with a `from` that returns to /explore?restore=1, so the
+  // back button lands on the same search zone instead of the Denver default.
+  const openVendorFromPin = useCallback(
+    (payload: PinOpenPayload) => {
+      try {
+        sessionStorage.setItem(
+          "wr:cluster",
+          JSON.stringify({ center: payload.center, zoom: payload.zoom }),
+        );
+        // No sheet on a direct pin — drop any saved feed scroll so a later
+        // restore can't misapply it. The restore reader ignores an ids-less
+        // payload, so only the map view comes back (see initialView above).
+        sessionStorage.removeItem("wr:clusterScroll");
+      } catch {
+        // sessionStorage unavailable (e.g. private mode) — navigation still
+        // works; only restore-on-back of the view is lost.
+      }
+      router.push(
+        `/vendor/${payload.id}?from=${encodeURIComponent("/explore?restore=1")}`,
+      );
+    },
+    [router],
+  );
 
   // On a restore mount, reopen the cluster sheet from the saved payload. The
   // setState is deferred a tick (setTimeout 0) — the documented pattern for
@@ -229,6 +260,7 @@ export default function ExplorePage() {
           flyToPosition={flyTo}
           userPosition={userPosition}
           onClusterOpen={openCluster}
+          onPinOpen={openVendorFromPin}
           initialView={initialView}
         />
       </div>
