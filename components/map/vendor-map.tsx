@@ -204,6 +204,12 @@ interface VendorMapProps {
    */
   onClusterOpen?: (payload: ClusterOpenPayload) => void;
   /**
+   * Called after every map move settles, with the new center/zoom. The caller
+   * persists it so returning to Explore — by any route: in-app back, browser/OS
+   * back, or the bottom nav — reopens on the same view instead of the default.
+   */
+  onViewChange?: (view: { center: [number, number]; zoom: number }) => void;
+  /**
    * Initial center/zoom — e.g. restoring the view after returning from a vendor
    * page. Read once at map init; later changes are ignored.
    */
@@ -214,11 +220,14 @@ export function VendorMap({
   flyToPosition,
   userPosition,
   onClusterOpen,
+  onViewChange,
   initialView,
 }: VendorMapProps) {
   const router = useRouter();
   // Latest onClusterOpen, callable from the run-once init effect's handlers.
   const onClusterOpenRef = useRef(onClusterOpen);
+  // Latest onViewChange, same reason (init effect wires the moveend handler once).
+  const onViewChangeRef = useRef(onViewChange);
   // Captured once — the map reads center/zoom at init only.
   const initialViewRef = useRef(initialView);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -242,11 +251,12 @@ export function VendorMap({
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = createClient();
 
-  // Keep the ref current so the once-only init effect's click handlers always
-  // call the latest onClusterOpen (updating a ref during render is disallowed).
+  // Keep the refs current so the once-only init effect's handlers always call
+  // the latest callbacks (updating a ref during render is disallowed).
   useEffect(() => {
     onClusterOpenRef.current = onClusterOpen;
-  }, [onClusterOpen]);
+    onViewChangeRef.current = onViewChange;
+  }, [onClusterOpen, onViewChange]);
 
   /**
    * Query the RPC for the current bounds. Returns the vendor rows, or null when
@@ -499,7 +509,16 @@ export function VendorMap({
           clearTimeout(loadTimeoutRef.current);
           loadTimeoutRef.current = null;
         }
-        map.on("moveend", scheduleRefresh);
+        // On every settled move: refresh pins for the new bounds, and report the
+        // view so the page can persist it for restore-on-return.
+        map.on("moveend", () => {
+          scheduleRefresh();
+          const c = map.getCenter();
+          onViewChangeRef.current?.({
+            center: [c.lng, c.lat],
+            zoom: map.getZoom(),
+          });
+        });
       });
     })();
 

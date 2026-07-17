@@ -288,8 +288,8 @@ export function ClusterListSheet({
     } catch {
       // sessionStorage unavailable — back will just land at the top
     }
-    // `from` returns the back button here: /explore?restore=1 reopens this sheet
-    // and restores the map view (see explore/page.tsx).
+    // `from` returns the back button here: /explore?restore=1 reopens this sheet.
+    // (The map view restores independently on any return — see explore/page.tsx.)
     router.push(`/vendor/${id}?from=${encodeURIComponent("/explore?restore=1")}`);
   }
 
