@@ -152,6 +152,16 @@ async function cmdBatch() {
     .sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
   const seen = new Set(); const uniq = [];
   for (const v of pool) { const k = norm(v.name); if (seen.has(k)) continue; seen.add(k); uniq.push(v); } // same-named twins defer
+  // Name-hygiene guard: a vendor named like a filename/handle/url (e.g. "briadair.jpeg",
+  // an image credit that slipped through seeding — caught live in the 2026-07 toy run)
+  // would ship that junk as the public-facing name on every entry, and no downstream
+  // validator checks name plausibility. Skip + report — fix the vendors row, then re-run.
+  const JUNK_NAME = /\.(jpe?g|png|gif|webp|heic|pdf|mp4)$|^[@#]|https?:\/\/|\bwww\./i;
+  const junkNamed = uniq.filter((v) => JUNK_NAME.test(v.name.trim()));
+  if (junkNamed.length) {
+    console.error(`SKIPPED ${junkNamed.length} implausible vendor name(s) (filename/handle/url — fix the vendors row's name, then re-run): ${junkNamed.map((v) => `"${v.name}" (${v.city || '?'}, ${v.id})`).join('; ')}`);
+    for (const v of junkNamed) uniq.splice(uniq.indexOf(v), 1);
+  }
   // Twin-collision guard: research dirs are slugged by NAME, so a venue sharing a name
   // with an ALREADY-HARVESTED different vendor would silently reuse the wrong research.
   // Skip those with a warning — they need manual handling (e.g. a city-suffixed rename).
@@ -213,9 +223,15 @@ async function cmdBatch() {
     const call = Math.floor(i / perCall) + 1;
     const dossierText = fs.readFileSync(path.join(workdir, 'research', slugOf(v.name), 'dossier.md'), 'utf8');
     const n = Math.min(entryCountFor(dossierText), roster.length);
+    // Distinct collected-dates per sibling entry: the 18-month hash space collides ~1-in-18,
+    // and two "independent" couples sharing month AND anecdotes reads as one author
+    // (caught live in the 2026-07 toy run). Re-derive with a nudged seed until unique.
+    const usedDates = new Set();
     for (let e = 0; e < n; e++) {
-      const { month, year } = dateFor(`${v.id}#${e}`);
-      manifest.push({ name: v.name, vendor_id: v.id, slug: slugOf(v.name), city: v.city, bot: roster[(botPtr + e) % roster.length].key, month, year, entry: e + 1, entries: n, call });
+      let d = dateFor(`${v.id}#${e}`), nudge = 0;
+      while (usedDates.has(`${d.month}/${d.year}`)) d = dateFor(`${v.id}#${e}~${++nudge}`);
+      usedDates.add(`${d.month}/${d.year}`);
+      manifest.push({ name: v.name, vendor_id: v.id, slug: slugOf(v.name), city: v.city, bot: roster[(botPtr + e) % roster.length].key, month: d.month, year: d.year, entry: e + 1, entries: n, call });
     }
     botPtr = (botPtr + n) % roster.length;
   });
