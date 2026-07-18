@@ -2,7 +2,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/scout.mjs <workdir> --region "Denver, CO" [--type photographer] [--statewide Colorado] [--anchors "Boulder, CO;Golden, CO"]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, appendPruned, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile } from './lib.mjs';
+import { readVenues, writeVenues, appendPruned, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile, wrongTypeByName } from './lib.mjs';
 
 const workdir = process.argv[2];
 const region = argValue('region');
@@ -55,6 +55,9 @@ for (const q of queries) {
       // Obvious noise by name (schools, AV rentals, nurseries — per-type junkName regex)
       // never enters the CSV; it goes to pruned.csv with a reason (skip the website call).
       if (profile.junkName?.test(name)) { row.flags = 'PRUNED:junk-name'; junk.push(row); continue; }
+      // Wrong-TYPE noise by name (planners in photographer sweeps etc. — per-type
+      // wrongType/ownSignal in lib.mjs); same pruned.csv trail as junk-name.
+      if (wrongTypeByName(profile, name)) { row.flags = 'PRUNED:wrong-type-name'; junk.push(row); continue; }
       row.website = await websiteWithFallback(p.id, p.websiteUri);
       venues.push(row);
       added++;

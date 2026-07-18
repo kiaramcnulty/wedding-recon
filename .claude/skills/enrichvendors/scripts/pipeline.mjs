@@ -16,9 +16,10 @@
 //
 // usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> <cmd> [flags]
 //   batch:      --region ST --roster <path> --size N --batch <id> [--per-call 25]
-//               [--mode api]  build call files for the Batch API (draft.mjs) instead of
-//               harness draft-workers: appends a no-tools delivery override (JSON lines
-//               in the response body + a final {"_flags": ...} line).
+//               [--mode api|harness]  api (DEFAULT): call files carry a no-tools delivery
+//               override (JSON lines in the response body + a final {"_flags": ...} line)
+//               and go to the Batch API via draft.mjs. harness: plain call files for
+//               draft-worker agents (the no-key fallback).
 //   status:     --batch <id>
 //   merge:      --batch <id>
 //   verify:     --roster <path> --csv <name> [--fix-gaps]
@@ -125,7 +126,10 @@ async function cmdBatch() {
   // 25/call keeps files ~14-18k tokens at ≤~600-token dossiers (measured: photographer
   // dossiers avg ~410) — 40% fewer worker spawns than the old 15 default.
   const perCall = parseInt(argValue('per-call') || '25', 10);
-  const apiMode = argValue('mode') === 'api';
+  // API drafting is the DEFAULT (Kiara 2026-07-18) — pass --mode harness for draft-worker
+  // call files (no delivery override). draft.mjs refuses harness-mode files, so a mix-up
+  // fails loudly at submit, not silently at collect.
+  const apiMode = (argValue('mode') || 'api') !== 'harness';
   const supabase = db();
 
   const { data: venues, error } = await supabase.from('vendors')

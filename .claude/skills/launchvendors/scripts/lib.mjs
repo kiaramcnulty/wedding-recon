@@ -67,6 +67,17 @@ export function tokensOverlap(a, b, weak = VENUE_WEAK) {
  * ../types/<card>.md — keep the two in sync. The venue profile encodes the original
  * /launchvenues behavior exactly; adding a type here must not change venue runs.
  */
+// Cross-type name guard (Kiara 2026-07-18, after planners kept landing in photographer
+// sweeps — e.g. "Belleview Weddings & Events" seeded as a photographer, caught only at
+// enrichment as NOTPHOTOG). A row is pruned when its NAME unambiguously signals a
+// DIFFERENT vendor type (wrongType) AND carries no own-type trade word (ownSignal).
+// The own-signal override keeps hybrids: "Ever After Events Photography" stays a
+// photographer, "The Rose Event Center & Catering" stays a venue. False prunes land in
+// pruned.csv (humans skim it), missed ones still get the enrich-time NOT* flag — so this
+// leans decisive on unambiguous names and silent on ambiguous ones.
+export const wrongTypeByName = (profile, name) =>
+  !!(profile.wrongType?.test(name) && !profile.ownSignal?.test(name));
+
 export const TYPE_PROFILES = {
   venue: {
     vendorType: 'venue',
@@ -78,6 +89,10 @@ export const TYPE_PROFILES = {
     weak: VENUE_WEAK,
     dedupStop: new Set(),         // no trade words stripped — venue names dedupe on norm() alone
     captureInstagram: false,
+    // NOTE "events" is NOT a wrong-signal for venues — "Grandview Events" is a plausible
+    // venue name. Planners without planner-words slip through to the enrich-time flag.
+    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|dj|salon|makeup|beauty bar|bridal (shop|boutique)|tuxedo|jewel\w*|limo\w*|(party|event|tent) rentals?)\b/i,
+    ownSignal: /\b(venue|barn|ranch|estate|manor|hall|lodge|garden|farm|inn|hotel|resort|club|chateau|château|villa|winery|vineyard|brewery|distillery|ballroom|center|centre|space|loft|museum|chapel|church|mansion|house|terrace|pavilion|park|room|gallery|homestead|orchard|meadow|grove)\b/i,
   },
   photos: {
     vendorType: 'photos',
@@ -100,6 +115,9 @@ export const TYPE_PROFILES = {
     // Places pads results with general portrait/family studios. wedcheck.mjs keeps a sweep
     // row only when its name or website homepage matches this; otherwise flags for review.
     intent: /wedding|elopement|bridal/i,
+    // "weddings & events"/trailing-"Events" names are planner-shaped; photo/film words rescue.
+    wrongType: /\b(plann(er|ers|ing)|coordinat\w*|weddings? (&|and) events?|events?$|rentals?|cater\w*|florists?|florals?|venue|banquet|officiants?|salon|makeup|bridal (shop|boutique)|tuxedo|jewel\w*|cakes?|bakery|limo\w*)\b/i,
+    ownSignal: /\b(photo\w*|pictures?|imag(e|es|ery)|studios?|films?|media|lens|captured?|visuals?|cinema\w*|portraits?|exposures?|shutter)\b/i,
   },
   food: {
     vendorType: 'food',
@@ -115,6 +133,8 @@ export const TYPE_PROFILES = {
     // on name/site is flagged; a reddit thread or Google review describing their wedding
     // work rescues the row at review even if the site never says "wedding".
     intent: /wedding|bridal/i,
+    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|florists?|florals?|venues?|dj|salon|makeup|tuxedo|jewel\w*|limo\w*)\b/i,
+    ownSignal: /\b(cater\w*|cuisine|kitchens?|foods?|bbq|barbecue|cafe|grill|chefs?|bak(e|ery|ing|ed)|bistro|restaurant|taco|pizza|eats|dining|provisions|table|feast|roast|smoke\w*|spice|hospitality)\b/i,
   },
   music: {
     vendorType: 'music',
@@ -131,6 +151,8 @@ export const TYPE_PROFILES = {
     junkName: /\b(school|schools|academy|conservatory|lessons?|tuition|karaoke|instrument store|music store|guitar center|equipment rental|av rental|audio.?visual)\b/i,
     captureInstagram: false,
     intent: /wedding|bridal/i,
+    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|venues?|salon|makeup|tuxedo|jewel\w*|limo\w*)\b/i,
+    ownSignal: /\b(music\w*|bands?|djs?|entertain\w*|sounds?|strings|trio|quartet|ensemble|sing\w*|piano|guitar|violin|cello|harp|orchestra|acoustic|beats|audio|vocal\w*|brass|jazz|keys)\b/i,
   },
   flowers: {
     vendorType: 'flowers',
@@ -143,6 +165,8 @@ export const TYPE_PROFILES = {
     junkName: /\b(nursery|nurseries|garden center|greenhouse|farm supply|landscap\w*)\b/i,
     captureInstagram: false,
     intent: /wedding|bridal/i,
+    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|venues?|djs?|salon|makeup|tuxedo|jewel\w*|limo\w*)\b/i,
+    ownSignal: /\b(flowers?|florals?|florists?|blooms?|blossoms?|petals?|posy|stems?|botanic\w*|bouquets?|roses?|peon(y|ies)|lil(y|ies)|ivy|ferns?|greenery|gardens?|buds?|wildflower\w*|stemm\w*|sage|lavender)\b/i,
   },
 };
 
