@@ -12,10 +12,14 @@ interface VendorTypeFilterProps {
 }
 
 /**
- * Explore-map filter: a horizontally scrollable row of category chips beneath
- * the search bar. Multi-select — tap chips to narrow the map to those vendor
- * types (OR across the selection). An empty selection means "show all", surfaced
- * as a highlighted **All** chip that also resets.
+ * Explore-map filter: a wrapping row of category chips beneath the search bar.
+ * Multi-select — tap chips to narrow the map to those vendor types (OR across
+ * the selection). An empty selection means "show all", surfaced as a highlighted
+ * **All** chip that also resets.
+ *
+ * The chips wrap onto a second line rather than scroll: the set is fixed at nine
+ * (All + eight types), so every option — and the full color legend — stays
+ * visible at a glance, with no hidden-scroll affordance to miss.
  *
  * Selected chips fill with the category's own color (the same hue as its map
  * pins), so the row doubles as the map's color legend. Unselected chips are the
@@ -43,9 +47,10 @@ export function VendorTypeFilter({
       role="group"
       aria-label="Filter vendors by type"
       className={cn(
-        // Hide the scrollbar (chips overflow past ~5 on a phone) but keep the
-        // row swipeable; slight vertical padding so shadows aren't clipped.
-        "flex items-center gap-2 overflow-x-auto py-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        // Wrap onto multiple lines instead of scrolling; gap-2 spaces both the
+        // rows and the chips. Tiny vertical padding so chip shadows aren't
+        // clipped at the top/bottom edges.
+        "flex flex-wrap items-center gap-2 py-0.5",
         className,
       )}
     >
