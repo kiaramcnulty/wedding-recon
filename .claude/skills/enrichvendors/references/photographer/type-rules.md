@@ -1,11 +1,14 @@
 # Type rules — photographers (`entries` blocks label: PHOTOGRAPHER)
 
-## Wrong type? Flag `NOTPHOTOG:<slug>` (write no rows)
-- The dossier shows: a VENUE with its own event space, a photo-booth rental, a video-only
-  production company, or a portrait/family/boudoir studio with no wedding work. (Signals:
-  capacity/rental/room language, "book our booth", site is all newborn/headshot galleries.)
-  A photographer who also sells video, films, or Super 8 add-ons IS a wedding
-  photographer — keep. When unsure, draft the row(s) and flag; the orchestrator decides.
+## Wrong type? Two tiers (draft-contract has the full rule; write NO rows for either)
+- `NOTPHOTOG!:<slug>` (STRONG — positive evidence, auto-removed) — the dossier shows a
+  VENUE with its own event space, a photo-booth rental, a video-only production company,
+  or a portrait/family/boudoir studio with no wedding work. (Signals: capacity/rental/room
+  language, "book our booth", site is all newborn/headshot galleries.)
+- `NOTPHOTOG:<slug>` (SOFT — looks off but not certain) — draft the row(s) normally and
+  flag; the orchestrator vets before removing.
+- KEEP (never a flag): a photographer who also sells video, films, or Super 8 add-ons IS a
+  wedding photographer.
 
 ## service_region — REQUIRED on every row
 - Where they shoot, sourced from the dossier: site copy ("serving Denver and the Front

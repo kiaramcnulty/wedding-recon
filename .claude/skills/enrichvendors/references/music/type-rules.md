@@ -1,11 +1,14 @@
 # Type rules — music acts (`entries` blocks label: MUSIC ACT)
 
-## Wrong type? Flag `NOTMUSIC:<slug>` (write no rows)
-- The dossier shows: a venue that hosts live music, an AV/production rental company,
-  a music school or instrument shop, a photo/video vendor, or a different vendor type
-  entirely. A DJ company that also rents uplighting/photo booths IS a music act — keep.
+## Wrong type? Two tiers (draft-contract has the full rule; write NO rows for either)
+- `NOTMUSIC!:<slug>` (STRONG — positive evidence, auto-removed) — the dossier shows a
+  venue that hosts live music (but isn't itself a bookable act), an AV/production rental
+  company, a music school or instrument shop, or a photo/video vendor.
+- `NOTMUSIC:<slug>` (SOFT — looks off but not certain) — draft the row(s) normally and
+  flag; the orchestrator vets before removing.
+- KEEP (never a flag): a DJ company that also rents uplighting/photo booths IS a music act.
   An entertainment AGENCY booking multiple acts is also in scope — keep, and say it's an
-  agency. When unsure, draft the row(s) and flag; the orchestrator decides.
+  agency.
 
 ## service_region — REQUIRED on every row
 - Where they perform, sourced from the dossier. **Multi-state service is common for this

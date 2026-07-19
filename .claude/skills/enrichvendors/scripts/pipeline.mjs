@@ -59,7 +59,8 @@ const draftsDir = path.join(workdir, 'drafts');
 // --mode api: call files go to the Message Batches API via draft.mjs instead of
 // harness draft-worker agents. The reference header's delivery contract (Write tool +
 // reply line) doesn't exist there, so API-mode call files carry this override as the
-// FINAL block. Keep the flag vocabulary in sync with references/<type>/draft-call-header.md.
+// FINAL block. Keep the flag vocabulary in sync with references/common/draft-contract.md
+// (the two wrong-type tiers) + references/<type>/type-rules.md.
 const API_FOOTER = `
 === API MODE — DELIVERY OVERRIDE (no tools) ===
 You are running as a plain API call. There is no Write tool and no separate reply
@@ -68,7 +69,8 @@ apply. Instead:
 - Your ENTIRE response must be JSON Lines: one JSON object per row, one object per line.
 - No markdown fences, no preamble, no commentary — nothing before, between, or after rows.
 - After the last row, emit exactly ONE final line carrying the reply-line flags defined
-  above (same vocabulary, space-separated): {"_flags": "NOTAVENUE: slug1 THIN: slug2, slug3 SHORT: slug4"}
+  above (same vocabulary, space-separated; the strong wrong-type tier keeps its trailing
+  "!"): {"_flags": "NOTAVENUE!: slug0 NOTAVENUE: slug1 THIN: slug2, slug3 SHORT: slug4"}
   If there are no flags, end with {"_flags": ""}.
 - The OUTPUT FILE line above is bookkeeping for the collector script — do not mention it.
 `;

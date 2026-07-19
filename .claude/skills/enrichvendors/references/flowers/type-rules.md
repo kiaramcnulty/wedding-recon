@@ -1,12 +1,14 @@
 # Type rules — florists (`entries` blocks label: FLORIST)
 
-## Wrong type? Flag `NOTFLORIST:<slug>` (write no rows)
-- The dossier shows: a venue, a planner/design studio that subcontracts florals, a garden
-  center/nursery with no arrangement work, or a different vendor type entirely. An
-  everyday-delivery flower shop that ALSO does weddings/events is a florist — keep.
-  Non-boutique chains (Costco, Trader Joe's, grocery floral counters) are VALID vendors
-  for this type when they were seeded — they got in on human recon; write their entry
-  from that recon. When unsure, draft the row(s) and flag; the orchestrator decides.
+## Wrong type? Two tiers (draft-contract has the full rule; write NO rows for either)
+- `NOTFLORIST!:<slug>` (STRONG — positive evidence, auto-removed) — the dossier shows a
+  venue, a planner/design studio that subcontracts florals, or a garden center/nursery
+  with no arrangement work.
+- `NOTFLORIST:<slug>` (SOFT — looks off but not certain) — draft the row(s) normally and
+  flag; the orchestrator vets before removing.
+- KEEP (never a flag): an everyday-delivery flower shop that ALSO does weddings/events is a
+  florist. Non-boutique chains (Costco, Trader Joe's, grocery floral counters) are VALID
+  when seeded — they got in on human recon; write their entry from that recon, don't flag.
 
 ## Wedding/event validation (Kiara, 2026-07)
 - Look for it on the site (weddings/events page, bridal gallery). For chains and shops

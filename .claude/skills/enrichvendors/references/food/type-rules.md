@@ -1,11 +1,14 @@
 # Type rules — caterers (`entries` blocks label: CATERER)
 
-## Wrong type? Flag `NOTCATERER:<slug>` (write no rows)
-- The dossier shows: a VENUE with in-house-only catering (capacity/rental/room language),
-  a restaurant with no catering operation, a dessert/bakery-only shop, a bartending-only
-  service, or a different vendor type entirely. A restaurant that demonstrably caters
-  events IS a caterer — keep. A caterer that also rents its own hall belongs in venues,
-  not here. When unsure, draft the row(s) and flag; the orchestrator decides.
+## Wrong type? Two tiers (draft-contract has the full rule; write NO rows for either)
+- `NOTCATERER!:<slug>` (STRONG — positive evidence, auto-removed) — the dossier shows a
+  VENUE with in-house-only catering (capacity/rental/room language), a restaurant with no
+  catering operation (dine-in only), a dessert/bakery-only shop, or a bartending-only
+  service.
+- `NOTCATERER:<slug>` (SOFT — looks off but not certain) — draft the row(s) normally and
+  flag; the orchestrator vets before removing.
+- KEEP (never a flag): a restaurant that demonstrably caters events IS a caterer. (A
+  caterer that also rents its own hall belongs in venues, not here — re-type, don't flag.)
 
 ## Wedding verification (Kiara, 2026-07)
 - Look for evidence of WEDDING catering specifically: a weddings page on the site, a
