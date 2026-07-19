@@ -316,6 +316,21 @@ export default async function VendorPage({
               : `${entries.length} recon entries`}
         </p>
 
+        {/* Add recon CTA — sits at the top of the entries so it's reachable
+            without scrolling past the list; hidden once the viewer has already
+            contributed. Filled with the vendor's category color (the app's only
+            accent) so it pops against the otherwise grayscale UI. */}
+        {!userHasRecon && (
+          <Link
+            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${encodeURIComponent(`/vendor/${vendor.id}`)}`}
+            style={{ backgroundColor: colorHex }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+          >
+            <PlusCircle className="size-4" />
+            Add recon
+          </Link>
+        )}
+
         {entries.map((entry) => (
           <ReconCard
             key={entry.id}
@@ -324,19 +339,6 @@ export default async function VendorPage({
           />
         ))}
       </div>
-
-      {/* Add recon CTA — hidden once the user has already contributed */}
-      {!userHasRecon && (
-        <div className="mt-6 px-4">
-          <Link
-            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${encodeURIComponent(`/vendor/${vendor.id}`)}`}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/80"
-          >
-            <PlusCircle className="size-4" />
-            Add recon
-          </Link>
-        </div>
-      )}
 
       <BrandFooter />
     </div>
