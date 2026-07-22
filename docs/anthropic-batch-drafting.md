@@ -25,7 +25,17 @@ The original proposal below is kept for context.
 - **Result hygiene:** `collect` refuses non-`end_turn` results (a `max_tokens`
   truncation would corrupt the JSONL), strips fences/chatter defensively, warns when a
   response lacks its `_flags` line, and handles errored/canceled/expired with the exact
-  resubmit command.
+  resubmit command. Because a refused truncation forces a resubmit and thus **double-bills**
+  (you pay for the truncated attempt too), `max_tokens` **defaults to 96000**. The real JSONL
+  output is small — measured ~6-9k tokens for a full 25-vendor call (CO caterer run,
+  2026-07). The ceiling is headroom for the model INTERMITTENTLY prepending a long reasoning
+  preamble ahead of the JSON: `collect` strips the preamble, but if preamble+JSON exceeds the
+  ceiling the message stops with `stop_reason=max_tokens` and is refused. History: that run
+  truncated 7/9 calls at 32k and every one came back whole at 64k (caterers then ran 48k);
+  96k gives entry-dense multi-entry calls wide margin. The worst-case cost gate scales with
+  max_tokens, so the default `--max-cost` rises to **12** — otherwise a ~12-call 300-vendor
+  run self-blocks. If `collect` still reports a truncation, resubmit just those calls with
+  `--max-tokens 120000 --max-cost 15`.
 - **Key naming:** `ANTHROPIC_BATCH_API_KEY`, deliberately not `ANTHROPIC_API_KEY` (which
   would shadow Claude Code's subscription auth if it leaked into a shell env).
 - **Knobs for the quality A/B:** `--model` (try `claude-haiku-4-5`) and `--effort`
@@ -83,7 +93,7 @@ emit JSON lines. Nothing about that requires the agent harness.
 
 1. Glob `drafts/<batch>-call-*.md`.
 2. Submit ONE batch: `client.messages.batches.create({ requests })` — one request per
-   call file, `custom_id` = the call number, `params` = `{ model, max_tokens: ~16000,
+   call file, `custom_id` = the call number, `params` = `{ model, max_tokens: 96000,
    messages: [{ role: "user", content: <call file text> }] }`.
 3. Poll `client.messages.batches.retrieve(id)` until `processing_status === "ended"`
    (most batches finish well under an hour; 24h max).

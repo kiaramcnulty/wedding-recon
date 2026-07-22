@@ -9,8 +9,8 @@
 //             estimate, gate on --max-cost, create ONE message batch, and record its id in
 //             drafts/<batch>-batchapi.json (resumable — nothing else is in memory).
 //             [--calls "02,05"] submit only those call files (targeted re-drafting)
-//             [--model claude-sonnet-5] [--max-tokens 16000] [--effort low|medium|high]
-//             [--max-cost 5] (USD, worst-case gate) [--dry-run] (estimate only, no submit)
+//             [--model claude-sonnet-5] [--max-tokens 96000] [--effort low|medium|high]
+//             [--max-cost 12] (USD, worst-case gate) [--dry-run] (estimate only, no submit)
 //   status    print processing_status + request counts; [--wait] poll every 60s until ended
 //   collect   write succeeded results → drafts/<batch>-worker-NN.jsonl and flags →
 //             drafts/<batch>-flags.json; report failures/truncations with the exact
@@ -42,7 +42,20 @@ const statePath = path.join(draftsDir, `${batch}-batchapi.json`);
 const flagsPath = path.join(draftsDir, `${batch}-flags.json`);
 
 const MODEL = argValue('model') || 'claude-sonnet-5';
-const MAX_TOKENS = parseInt(argValue('max-tokens') || '16000', 10);
+// Default 96000 (Kiara 2026-07-22). The real JSONL output is small — measured ~6-9k tokens for
+// a full 25-vendor call (CO caterer run, 2026-07). The ceiling is NOT sized to that; it's
+// headroom for the model INTERMITTENTLY prepending a long reasoning preamble ahead of the JSON,
+// and for entry-dense calls (multi-entry vendors run longer). `collect` strips the preamble, but
+// if preamble+JSON exceeds max_tokens the message stops with stop_reason=max_tokens and collect
+// REFUSES it (a truncation would corrupt the JSONL) — which forces a resubmit and thus
+// DOUBLE-BILLS. History: 32k truncated 7/9 calls, 64k came back whole, caterers ran 48k; bumped
+// to 96k for margin on entry-dense music call files. claude-sonnet-5 caps output at 128k, so 96k
+// is valid without a beta header, and the Batch API is async so a big ceiling never risks an HTTP
+// timeout. NOTE the worst-case cost gate = calls × max_tokens × out-rate, so this 96k default
+// raises the default --max-cost to 12 (below) — otherwise a ~12-call 300-vendor run self-blocks.
+// If collect still reports any max_tokens truncation, resubmit just those with a higher ceiling:
+// draft.mjs <wd> submit --batch <id> --calls "NN" --max-tokens 120000 --max-cost 15
+const MAX_TOKENS = parseInt(argValue('max-tokens') || '96000', 10);
 const IN_RATE = parseFloat(argValue('in-rate') || '1.50');   // $/MTok, batch input
 const OUT_RATE = parseFloat(argValue('out-rate') || '7.50'); // $/MTok, batch output
 const usd = (nIn, nOut) => (nIn / 1e6) * IN_RATE + (nOut / 1e6) * OUT_RATE;
@@ -98,7 +111,7 @@ async function cmdSubmit() {
   console.log(`${reqs.length} call file(s), ~${vendors} vendors | est input ${inTok} tok`);
   console.log(`cost estimate: expected ≈ $${usd(inTok, expOut).toFixed(2)} | worst case (every request maxes ${MAX_TOKENS} out) ≈ $${usd(inTok, worstOut).toFixed(2)}  [rates $${IN_RATE}/$${OUT_RATE} per MTok]`);
 
-  const maxCost = parseFloat(argValue('max-cost') || '5');
+  const maxCost = parseFloat(argValue('max-cost') || '12');  // raised alongside the 96k max-tokens default (worst case ≈ calls × 96k × out-rate)
   if (usd(inTok, worstOut) > maxCost) {
     console.error(`worst case exceeds --max-cost $${maxCost.toFixed(2)} — raise it explicitly if intended`); process.exit(1);
   }

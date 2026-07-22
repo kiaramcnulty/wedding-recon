@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { readVenues, writeVenues, nameKey, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep, typeProfile } from './lib.mjs';
+import { readVenues, writeVenues, nameKey, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep, typeProfile, selectAll } from './lib.mjs';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -53,9 +53,13 @@ for (const v of venues) {
 // re-inserted as a new type. Name+city dedup stays type-scoped ("The Broadmoor" the venue
 // must not swallow "The Broadmoor Photography"). Types with captureInstagram require
 // migration 0016 — the select fails fast with guidance if the column is missing.
-const { data: existing, error } = await supabase
+// MUST page every row via selectAll: a plain .select() caps at 1000, so on a DB with >1000
+// vendors the pid dedup would miss existing place_ids past row 1000 and the insert would
+// then trip the global google_place_id unique constraint (ordered by id for stable paging).
+const { data: existing, error } = await selectAll(() => supabase
   .from('vendors')
-  .select(`id, name, city, vendor_type, google_place_id, website${profile.captureInstagram ? ', instagram' : ''}`);
+  .select(`id, name, city, vendor_type, google_place_id, website${profile.captureInstagram ? ', instagram' : ''}`)
+  .order('id'));
 if (error) {
   console.error(error.code === '42703'
     ? 'vendors.instagram column missing — hand-apply supabase/migrations/0016_vendor_instagram.sql in the Supabase SQL editor, then re-run.'
@@ -153,7 +157,7 @@ for (const b of backfill) {
 }
 
 // ── Verify ────────────────────────────────────────────────────────────────────
-const { data: after } = await supabase.from('vendors').select('name, city, google_place_id').eq('vendor_type', profile.vendorType);
+const { data: after } = await selectAll(() => supabase.from('vendors').select('id, name, city, google_place_id').eq('vendor_type', profile.vendorType).order('id'));
 const pidCount = new Map(), nameCount = new Map();
 for (const v of after ?? []) {
   if (v.google_place_id) pidCount.set(v.google_place_id, (pidCount.get(v.google_place_id) || 0) + 1);

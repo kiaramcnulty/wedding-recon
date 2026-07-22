@@ -74,7 +74,7 @@ node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <wo
 
 **API drafting is the DEFAULT** (needs `ANTHROPIC_BATCH_API_KEY` in `.env.local`) — `batch` writes API-mode call files unless you pass `--mode harness`. Then, instead of spawning workers:
 ```
-node --env-file=.env.local .claude/skills/enrichvendors/scripts/draft.mjs <workdir> submit  --batch <id>          # cost-gated (--max-cost 5 default); --dry-run to preview
+node --env-file=.env.local .claude/skills/enrichvendors/scripts/draft.mjs <workdir> submit  --batch <id>          # cost-gated (--max-cost 12 default); --max-tokens defaults to 96000 so entry-dense call files don't truncate; --dry-run to preview
 node --env-file=.env.local .claude/skills/enrichvendors/scripts/draft.mjs <workdir> status  --batch <id> --wait   # polls to ended (usually <1h)
 node --env-file=.env.local .claude/skills/enrichvendors/scripts/draft.mjs <workdir> collect --batch <id>          # writes worker JSONLs + <id>-flags.json, prints actual $ cost
 ```
@@ -129,9 +129,9 @@ node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <wo
 
 Supabase Storage intermittently drops uploads; the converging loop is `verify --fix-gaps` → `upload --apply` → `verify`, until verify exits 0. Two consecutive no-progress failures → stop and report. Report counts + workdir; **do not delete the workdir.**
 
-## Optional photo pass (decoupled — OFF by default)
+## Photo pass (decoupled — ON by default)
 
-Run ONLY when the user asks for photos, and only **between Phase 3 and Phase 6**. Rules are PER TYPE (`references/<type>/photo-rules.md`). Venue target: 1-2 photos on ~75% of entries. **Photographer target: ~3 per vendor that has that many qualifying images** (photos are critical for this type — Kiara 2026-07); run `photos.mjs --type photographer --per-venue 5` so screeners can keep ~3. Caterer/music/flowers target: 1-2 (food shots / performance shots / arrangement shots respectively). The portrait-URL pre-filter is per-type (couple portraits are junk for venues/caterers/florists, the PRODUCT for photographers and music acts). Screeners (`model: "haiku"`, ~25 vendors each, single pass) view each `_thumb.jpg` per the type's photo-rules, write keep/drop to `photos/screen/keep-batch-NN.json`, reply one line per vendor. Then `pipeline.mjs <workdir> photos-map --type <type> --csv recons-<id>.csv` (multi-entry vendors: photos land on the FIRST entry only — the same photo on two entries is a tell) and continue to Phase 4/6. The orchestrator never views images.
+**Runs by default on every enrichment run** (Kiara, 2026-07-22) — the photo pass is no longer opt-in; run it unless the user explicitly opts out (e.g. "no photos"). Still decoupled and **between Phase 3 and Phase 6** (or, if entries were already uploaded photo-less, attach after the fact via the `verify --fix-gaps` → `upload --apply` → `verify` loop). It uses cheap Haiku screeners + a modest storage/egress cost; the orchestrator never views images, so it does not affect the drafting token budget. Rules are PER TYPE (`references/<type>/photo-rules.md`). Venue target: 1-2 photos on ~75% of entries. **Photographer target: ~3 per vendor that has that many qualifying images** (photos are critical for this type — Kiara 2026-07); run `photos.mjs --type photographer --per-venue 5` so screeners can keep ~3. Caterer/music/flowers target: 1-2 (food shots / performance shots / arrangement shots respectively). The portrait-URL pre-filter is per-type (couple portraits are junk for venues/caterers/florists, the PRODUCT for photographers and music acts). Screeners (`model: "haiku"`, ~25 vendors each, single pass) view each `_thumb.jpg` per the type's photo-rules, write keep/drop to `photos/screen/keep-batch-NN.json`, reply one line per vendor. Then `pipeline.mjs <workdir> photos-map --type <type> --csv recons-<id>.csv` (multi-entry vendors: photos land on the FIRST entry only — the same photo on two entries is a tell) and continue to Phase 4/6. The orchestrator never views images.
 
 ## Hard rules (unchanged spirit, v2 mechanics)
 
