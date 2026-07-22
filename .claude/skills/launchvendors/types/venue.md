@@ -13,7 +13,7 @@ Query per anchor: `wedding venue near {anchor}` ("event venue" pulls in meeting 
 
 Then WebFetch the top listicle/aggregator hits (Here Comes The Guide, local blogs, photographer guides, **Zola**). Fetch-extraction prompt (substitute region/state/domain):
 
-> List every wedding venue or event space on this page located in or near {REGION}, {ST}. Output ONLY JSON lines, one per venue: {"name":"...","hint":"City, ST","website":"<the venue's OWN website if the page links it, else omit — never a social, maps, or directory link>","provenance":"web:{domain}","intel":"<any pricing, capacity, or package detail the page gives, else omit>"}. No commentary, no markdown.
+> List every wedding venue or event space on this page located in or near {REGION}, {ST}. Output ONLY JSON lines, one per venue: {"name":"...","hint":"City, ST","website":"<the venue's OWN website if the page links it, else omit — never a social, maps, or directory link>","provenance":"web:{domain}","intel":"<any pricing, capacity, package, catering-policy, on-site-lodging, or shuttle detail the page gives, else omit>"}. No commentary, no markdown.
 
 ## Phase 2 — Reddit-paste extraction prompt
 
@@ -23,4 +23,4 @@ Then WebFetch the top listicle/aggregator hits (Here Comes The Guide, local blog
 Standard flags (`CHECK`, `APPROX`, `NO_MATCH`), plus: venue sweeps reliably over-catch **service vendors and non-venues** that later cost an enrichment dossier each before being caught (2026-07 western-CO run: 47 removed post-hoc). Skim the CSV names for these and delete before upload — planners/coordinators ("...Events", "...Weddings" without a place), rental companies, caterers, officiants/celebrants, tour/adventure operators, vacation-rental managers, spas/salons, day-use attractions (caverns, trams, hot-springs pools), chambers of commerce, libraries, schools. Keep anything that plausibly hosts events (hotels, restaurants, breweries, ranches, golf clubs, parks).
 
 ## Enrichment handoff
-`intel` (pricing/capacity/package details) and raw `research/` files feed the later enrichment pass. Venue recon focuses: pricing/packages, capacity, catering policy, indoor/outdoor spaces.
+`intel` (pricing/capacity/package details) and raw `research/` files feed the later enrichment pass. Venue recon focuses: pricing/packages, capacity, catering policy (in-house vs approved-list vs open), indoor/outdoor spaces, transport/shuttle requirements, and on-site lodging/buyout terms.
