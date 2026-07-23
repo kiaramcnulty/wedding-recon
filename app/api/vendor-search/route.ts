@@ -10,6 +10,9 @@ export interface VendorSearchSuggestion {
   name: string;
   /** Address (preferred) or city — the line rendered under the vendor name. */
   secondaryText: string;
+  /** Pin coordinates, so the Explore bar can fly the map straight to it. */
+  lng: number;
+  lat: number;
 }
 
 /**
@@ -39,51 +42,46 @@ type VendorRow = {
   city: string | null;
   address_text: string | null;
   source: "google" | "user" | "seed";
+  lng: number;
+  lat: number;
 };
 
 /**
  * GET /api/vendor-search?q=<query>
  *   Vendor-only autocomplete for the Explore search bar: matches the community
  *   vendor directory by name, street address, or city so a couple can jump
- *   straight to a specific vendor (e.g. "Spruce Mountain Ranch") instead of only
- *   panning the map to an area. Google Places is deliberately NOT queried here —
- *   Explore searches *our* vendors; area navigation stays with /api/geocode.
- *   Returns VendorSearchSuggestion[] ranked by name relevance.
+ *   straight to a specific vendor (e.g. "Spruce Mountain Ranch") — the Explore
+ *   bar flies the map to the returned pin. Google Places is deliberately NOT
+ *   queried here (Explore searches *our* directory; area navigation stays with
+ *   /api/geocode). Returns VendorSearchSuggestion[] ranked by name relevance.
+ *
+ *   Backed by the search_vendors RPC (migration 0018), which returns coordinates
+ *   flattened from the PostGIS geography. If that migration hasn't been applied
+ *   yet the RPC errors and this route degrades to no vendor results — the bar's
+ *   Areas group is unaffected.
  */
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (q.length < 2) return NextResponse.json([] as VendorSearchSuggestion[]);
 
   const supabase = await createClient();
-  // Escape LIKE metacharacters so a stray % or _ in the query isn't a wildcard.
-  const pattern = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
-  const cols = "id, name, vendor_type, city, address_text, source";
+  const { data, error } = await supabase.rpc("search_vendors", {
+    q,
+    max_rows: 24,
+  });
 
-  // Three parallel ilike lookups (name / address / city) rather than one .or():
-  // a .or() embeds the raw query into its filter string and would break on a
-  // comma in a typed address ("123 Main St, Larkspur"). Merged + deduped below.
-  const [byName, byAddr, byCity] = await Promise.all([
-    supabase.from("vendors").select(cols).ilike("name", pattern).limit(8),
-    supabase.from("vendors").select(cols).ilike("address_text", pattern).limit(8),
-    supabase.from("vendors").select(cols).ilike("city", pattern).limit(8),
-  ]);
-
-  const addrOrCityIds = new Set<string>();
-  const byId = new Map<string, VendorRow>();
-  for (const row of (byName.data ?? []) as VendorRow[]) byId.set(row.id, row);
-  for (const res of [byAddr, byCity]) {
-    for (const row of (res.data ?? []) as VendorRow[]) {
-      addrOrCityIds.add(row.id);
-      if (!byId.has(row.id)) byId.set(row.id, row);
-    }
+  if (error || !data) {
+    if (error) console.error("[vendor-search] rpc error", error.message);
+    return NextResponse.json([] as VendorSearchSuggestion[]);
   }
 
-  const results: VendorSearchSuggestion[] = [...byId.values()]
+  const results: VendorSearchSuggestion[] = (data as VendorRow[])
     .map((v) => {
-      // Rank by name relevance; an address/city-only hit (name score 0) still
-      // surfaces with a modest floor so "type the address" finds the vendor.
+      // Rank by name relevance; the RPC only returns rows that matched name,
+      // address, or city, so a name score of 0 means it matched on address/city
+      // — give it a modest floor so "type the address" still surfaces it.
       const nameScore = scoreMatch(v.name, q);
-      const score = nameScore > 0 ? nameScore : addrOrCityIds.has(v.id) ? 25 : 0;
+      const score = nameScore > 0 ? nameScore : 25;
       return {
         score,
         s: {
@@ -92,6 +90,8 @@ export async function GET(req: NextRequest) {
           source: v.source,
           name: v.name,
           secondaryText: v.address_text ?? v.city ?? "",
+          lng: v.lng,
+          lat: v.lat,
         } as VendorSearchSuggestion,
       };
     })

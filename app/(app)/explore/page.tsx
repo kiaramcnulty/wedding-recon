@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Search, Loader2, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -27,6 +26,8 @@ interface VendorSuggestion {
   source: "google" | "user" | "seed";
   name: string;
   secondaryText: string;
+  lng: number;
+  lat: number;
 }
 
 // Origin of the basemap tiles — preconnected below so the TLS handshake happens
@@ -43,7 +44,6 @@ const MAP_TILE_ORIGIN = (() => {
 })();
 
 export default function ExplorePage() {
-  const router = useRouter();
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
   const [vendorResults, setVendorResults] = useState<VendorSuggestion[]>([]);
@@ -226,11 +226,16 @@ export default function ExplorePage() {
     setShowSuggestions(false);
   }
 
-  // Tapping a vendor result opens its page (with a return path back to Explore),
-  // rather than panning the map — the vendor is what the user was looking for.
+  // Tapping a vendor flies the map straight to its pin (rather than opening the
+  // vendor page) — the vendor is centered on the map, ready to tap. Zoom 15 is
+  // close enough that a single pin reads clearly.
   function selectVendor(v: VendorSuggestion) {
+    suppressFetchRef.current = true; // don't reopen the dropdown on the query change
+    setCityQuery(v.name);
+    setFlyTo({ lng: v.lng, lat: v.lat, zoom: 15 });
+    setSuggestions([]);
+    setVendorResults([]);
     setShowSuggestions(false);
-    router.push(`/vendor/${v.vendorId}?from=/explore`);
   }
 
   async function handleSearch(e: React.FormEvent<HTMLFormElement>) {
