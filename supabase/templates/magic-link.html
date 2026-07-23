@@ -7,10 +7,22 @@
       • "Magic Link"      (used when an existing user signs in)
       • "Confirm signup"  (used for a brand-new user's first sign-in)
     so every sign-in email looks the same. Both templates expose the same
-    {{ .ConfirmationURL }} variable, so this markup works unchanged in each.
+    {{ .TokenHash }} variable, so this markup works unchanged in each.
 
   Suggested subject line:
     Your Wedding Recon sign-in link
+
+  Why the link is {{ .SiteURL }}/auth/callback?token_hash=…&type=email and NOT
+  {{ .ConfirmationURL }}:
+    {{ .ConfirmationURL }} uses the PKCE flow, which only completes in the SAME
+    browser that requested the link (it needs a code-verifier cookie set there).
+    People routinely open sign-in emails in a different browser than the one they
+    typed their email into — type it in an in-app browser, tap the link from the
+    Mail app, and it opens in Safari — so PKCE silently fails and bounces them
+    back to the login page in an endless loop. The token_hash link is verified
+    server-side (app/auth/callback/route.ts → verifyOtp) and needs no cookie, so
+    it signs the user in from any browser. If you change this, keep the callback's
+    token_hash handling in sync.
 
   Notes:
     - Email clients (esp. Gmail) strip <svg>, so the logo is a text wordmark
@@ -54,7 +66,7 @@
         <!-- CTA button -->
         <tr>
           <td align="center" style="padding:0 32px 8px 32px;">
-            <a href="{{ .ConfirmationURL }}"
+            <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email"
                style="display:inline-block;background-color:#1D9E75;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 28px;border-radius:12px;">
               Log in to Wedding Recon
             </a>
@@ -68,7 +80,7 @@
               Or paste this link into your browser:
             </p>
             <p style="margin:0;font-size:12px;word-break:break-all;">
-              <a href="{{ .ConfirmationURL }}" style="color:#1D9E75;">{{ .ConfirmationURL }}</a>
+              <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email" style="color:#1D9E75;">{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email</a>
             </p>
           </td>
         </tr>
