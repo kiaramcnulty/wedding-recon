@@ -4,9 +4,14 @@ Status: **approved direction; build in progress** (Kiara, 2026-07-23). This doc 
 reference for the discovery/search workstream: what we're building, why, the data
 model, and a phased plan concrete enough for an agent to execute phase by phase.
 
-**Progress:** §5 (negativity / watch-outs — the harvest + dossier + draft-rule side that
-feeds sourced negatives into free-text recon) is **complete** (PR #34, 2026-07-23). All
-other sections remain unbuilt.
+**Progress:**
+- §5 (negativity / watch-outs — the harvest + dossier + draft-rule side that feeds
+  sourced negatives into free-text recon) is **complete** (PR #34, 2026-07-23).
+- The vendor-find slice of the unified search bar (§7 Phase A, "Shipped early") is
+  **in production** — vendor name/address search + fly-to-pin on select, backed by
+  the `search_vendors` RPC (migration `0018`).
+
+All other sections remain unbuilt.
 
 ## 1. Problem
 
@@ -57,7 +62,11 @@ These came out of the 2026-07-23 design discussion:
 8. **Free-tier economics hold.** Everything below runs on Supabase free tier +
    pennies of metered Anthropic usage. No new paid services.
 
-## 3. Data model (new migrations, starting at `0018`)
+## 3. Data model (new migrations, starting at `0019`)
+
+> `0018` is already taken by the early `search_vendors` RPC shipped with the
+> unified-bar vendor slice (§7 Phase A, "Shipped early"), so the discovery-stack
+> migrations below start at `0019`.
 
 All migrations idempotent, hand-applied in the Supabase SQL editor (house rules in
 CLAUDE.md). Split as numbered below so phases can ship independently.
@@ -152,10 +161,10 @@ Prune with the daily `/api/health` hook if it ever grows large (same pattern as
 
 ### 3.5 Later phases
 
-- `0021` (Phase 4): `alter table vendor_discovery add column if not exists
+- `0022` (Phase 4): `alter table vendor_discovery add column if not exists
   embedding vector(1024);` + `create extension if not exists vector;` + ivfflat/hnsw
   index. Dimension per chosen embedding model (Voyage `voyage-3.5-lite` — see §8).
-- `0022` (Phase 5): wedding profile columns on `profiles` (region, date,
+- `0023` (Phase 5): wedding profile columns on `profiles` (region, date,
   guest_count, budget_cents, vibe_words text[]).
 
 ## 4. Extraction
@@ -282,18 +291,53 @@ tooltip: "Consistently recommended in wedding communities and reviews."
 
 ## 7. Search
 
-### Phase A — unified bar: blended geocode + FTS (no AI)
+### Phase A — unified bar: blended geocode + vendor search (no AI)
 
-- New RPC `search_vendors(q text, p_types vendor_type[] default null, max_rows int
-  default 20)`: `websearch_to_tsquery('english', q)` against
-  `vendor_discovery.notes_tsv`, joined to `vendors`, ranked by `ts_rank` +
-  a name-match boost (reuse the relevance idea from `/api/places` blended search).
-- Explore bar (`app/(app)/explore/page.tsx`): keep the existing geocode flow, add
-  a parallel `search_vendors` call; render grouped suggestions — **Areas** (MapPin
-  rows, current behavior) and **Vendors** (category icon + name + tldr snippet).
-  Tap area → flyTo (unchanged). Tap vendor → `/vendor/[id]?from=/explore`.
-  Submit free text with no area match → open the list view (§9) fed by FTS
-  results. Log to `search_queries` (parsed = null).
+> **Shipped early (2026-07-23), ahead of Phases 1–2.** The reported Explore bug —
+> typing a vendor's name or its address ("Spruce Mountain Ranch", Larkspur)
+> returned nothing because the bar only geocoded *areas* and never queried
+> `vendors` — didn't need the discovery stack, so a lightweight slice of this
+> phase now runs in production:
+> - `search_vendors` RPC (**migration `0018`**, ilike form): matches `vendors` on
+>   **name + `address_text` + `city`** and returns each hit's `lng`/`lat`
+>   flattened from the PostGIS geography (same `st_x/st_y` trick as
+>   `vendors_in_bbox`), so the client can fly to the pin. Idempotent; **must be
+>   hand-applied in the Supabase SQL editor** like every migration here — until it
+>   is, the route below degrades to no vendor results (Areas group unaffected).
+> - `app/api/vendor-search/route.ts` — vendor-only autocomplete over that RPC,
+>   ranked by the same name-relevance score as `/api/places`. No Google Places
+>   call (Explore searches *our* directory; area nav stays with `/api/geocode`),
+>   no `vendor_discovery`/FTS dependency.
+> - Explore bar fetches `/api/geocode` and `/api/vendor-search` in parallel and
+>   renders two groups — **Vendors** (category icon + name + address line) and
+>   **Areas**. Tap area → flyTo (unchanged); **tap vendor → flyTo its pin at zoom
+>   15** (keeps the user on the map, vendor centered); Enter prefers an area
+>   match, else the top vendor.
+>
+> When Phases 1–2 land, `create or replace` the same `search_vendors` function
+> with the FTS body below (adds tags/tldr/recon-note matching + `ts_rank`); the
+> route and Explore UI — grouped dropdown, fly-to-pin, submit fallback — stay
+> as-is. Query logging (`search_queries`) is deferred with the rest of Phase 2.
+
+- `search_vendors` upgrade (Phase 2): keep the signature, swap the ilike body for
+  `websearch_to_tsquery('english', q)` against `vendor_discovery.notes_tsv`,
+  joined to `vendors`, ranked by `ts_rank` + a name-match boost, and add the
+  `p_types vendor_type[]` filter. **Address is not in `notes_tsv`** (it's name +
+  tags + tldr + notes), so keep the ilike match on `address_text`/`city` from the
+  shipped `0018` body — or, better, treat a typed address as a **proximity**
+  query: geocode it (existing `/api/geocode`), then surface vendors near that
+  point via a `vendors_near`/bbox lookup. Proximity is the robust fix for "exact
+  address → vendor" (plain string matching only fires when the typed text is a
+  substring of the stored address, and misses entirely when the pin sits at a
+  city-centroid fallback); it's the recommended upgrade over the shipped ilike
+  slice.
+- Explore bar (`app/(app)/explore/page.tsx`): the two-group dropdown is already
+  live (above). Phase 2 adds the tldr snippet in place of the address line under
+  each vendor once §8 exists, and routes a free-text submit with no area match to
+  the list view (§9) fed by FTS results. The vendor tap flies to the vendor's
+  **stored** coords (from the RPC) — never a re-geocode of the address, which
+  would break for approximate/centroid pins. Log to `search_queries` (parsed =
+  null).
 
 ### Phase B — AI parser + scored ranking
 
@@ -360,7 +404,7 @@ system:
   cards: photo thumb, name, TL;DR, price band, tags row, Well-loved badge,
   recon count. Sort control: Popularity (default) / Price low→high / Newest recon.
   Cap 100 with a "zoom in to narrow" hint.
-- Needs the bbox RPC to also return discovery fields: `0020` extends
+- Needs the bbox RPC to also return discovery fields: `0021` extends
   `vendors_in_bbox` (it's `create or replace` — same signature + new columns
   `tldr, tags, price_low_cents, price_high_cents, popular`, left-joined from
   `vendor_discovery`).
@@ -409,7 +453,7 @@ Each phase is independently shippable; an executing agent should do exactly one
 phase per instruction and stop at its gate.
 
 **Phase 1 — Foundation (schema + extraction + backfill).**
-Migrations `0018`+`0019`; `lib/constants/discovery.ts`; `extract.mjs` +
+Migrations `0019`+`0020`; `lib/constants/discovery.ts`; `extract.mjs` +
 `upload-extractions.mjs`; nightly `/api/cron/extract`; ~~dossier/skill watch-outs
 edits (§5)~~ **✅ done (PR #34)**; backfill CO venues + one non-venue type end-to-end.
 *Accept:* every active recon entry has an extraction row; `vendor_discovery`
@@ -419,10 +463,11 @@ green. *Gate:* Kiara reviews a sample of ~30 tldr/tags/price rows in a CSV befor
 anything is surfaced in UI.
 
 **Phase 2 — Surfacing (no AI at runtime).**
-`0020` bbox RPC extension; list view + sort; TL;DR in cluster sheet + vendor
-page; Well-loved badge; unified bar Phase A (blended geocode+FTS) + query
-logging. *Accept:* list toggle works over live viewport data; searching "barn"
-surfaces tagged/noted vendors grouped under "Vendors"; queries land in
+`0021` bbox RPC extension; list view + sort; TL;DR in cluster sheet + vendor
+page; Well-loved badge; **upgrade** the already-shipped unified-bar vendor slice
+(§7 Phase A "Shipped early") from `ilike` to the `search_vendors` FTS RPC + add
+query logging. *Accept:* list toggle works over live viewport data; searching
+"barn" surfaces tagged/noted vendors grouped under "Vendors"; queries land in
 `search_queries`. *Gate:* Kiara approves badge copy + list card layout.
 
 **Phase 3 — AI search bar.**
@@ -432,12 +477,12 @@ returns ranked list with budget/tag badges, including over-budget and
 no-quote barns labeled as such; route degrades to FTS with the key unset.
 *Gate:* Kiara runs ~10 real queries and signs off on ranking quality.
 
-**Phase 4 — Embedding layer.** `0021`, Voyage backfill, hybrid free-term
+**Phase 4 — Embedding layer.** `0022`, Voyage backfill, hybrid free-term
 scoring. *Accept:* "moody forest elopement feel" measurably beats the
 Phase 3 ts_rank baseline on the logged-query replay set.
 
 **Phase 5 — Wedding profile + fit ranking (design sketch only, spec before
-building).** `0022` profile fields; onboarding step; default ranking becomes
+building).** `0023` profile fields; onboarding step; default ranking becomes
 fit-to-profile; per-person price obs projected via guest count; compare table
 in Hub reading the same facets.
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { VendorMap, type ClusterOpenPayload } from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
 import { VendorTypeFilter } from "@/components/map/vendor-type-filter";
-import { VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
+import { CATEGORIES, VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 import { BrandLockup } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,17 @@ interface GeocodeSuggestion {
   name: string;
   lat: number;
   lng: number;
+}
+
+// A vendor match from /api/vendor-search — the "Vendors" group in the dropdown.
+interface VendorSuggestion {
+  vendorId: string;
+  vendorType: string;
+  source: "google" | "user" | "seed";
+  name: string;
+  secondaryText: string;
+  lng: number;
+  lat: number;
 }
 
 // Origin of the basemap tiles — preconnected below so the TLS handshake happens
@@ -35,6 +46,7 @@ const MAP_TILE_ORIGIN = (() => {
 export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
+  const [vendorResults, setVendorResults] = useState<VendorSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom?: number } | null>(null);
   const [searching, setSearching] = useState(false);
@@ -167,7 +179,10 @@ export default function ExplorePage() {
   }, []);
 
   // Debounced autocomplete — always goes through setTimeout to avoid
-  // calling setState synchronously in the effect body.
+  // calling setState synchronously in the effect body. Areas (geocode) and
+  // vendors (our directory) are fetched in parallel and shown as two groups,
+  // so typing a vendor name — "Spruce Mountain Ranch" — finds the vendor, not
+  // just a place to pan to.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -180,18 +195,21 @@ export default function ExplorePage() {
       }
       if (q.length < 2) {
         setSuggestions([]);
+        setVendorResults([]);
         setShowSuggestions(false);
         return;
       }
-      try {
-        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-        if (!res.ok) return;
-        const data: GeocodeSuggestion[] = await res.json();
-        setSuggestions(data);
-        setShowSuggestions(data.length > 0);
-      } catch {
-        // network error — silently ignore
-      }
+      const [areas, vendors] = await Promise.all([
+        fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+          .then((r) => (r.ok ? (r.json() as Promise<GeocodeSuggestion[]>) : []))
+          .catch(() => [] as GeocodeSuggestion[]),
+        fetch(`/api/vendor-search?q=${encodeURIComponent(q)}`)
+          .then((r) => (r.ok ? (r.json() as Promise<VendorSuggestion[]>) : []))
+          .catch(() => [] as VendorSuggestion[]),
+      ]);
+      setSuggestions(areas);
+      setVendorResults(vendors);
+      setShowSuggestions(areas.length > 0 || vendors.length > 0);
     }, 300);
 
     return () => {
@@ -204,6 +222,19 @@ export default function ExplorePage() {
     setCityQuery(s.name.split(",")[0]);
     setFlyTo({ lng: s.lng, lat: s.lat, zoom: 9 });
     setSuggestions([]);
+    setVendorResults([]);
+    setShowSuggestions(false);
+  }
+
+  // Tapping a vendor flies the map straight to its pin (rather than opening the
+  // vendor page) — the vendor is centered on the map, ready to tap. Zoom 15 is
+  // close enough that a single pin reads clearly.
+  function selectVendor(v: VendorSuggestion) {
+    suppressFetchRef.current = true; // don't reopen the dropdown on the query change
+    setCityQuery(v.name);
+    setFlyTo({ lng: v.lng, lat: v.lat, zoom: 15 });
+    setSuggestions([]);
+    setVendorResults([]);
     setShowSuggestions(false);
   }
 
@@ -212,9 +243,15 @@ export default function ExplorePage() {
     const q = cityQuery.trim();
     if (!q) return;
 
-    // Use first suggestion if dropdown is already populated.
+    // Prefer an already-populated area match (submit = "take me there"); fall
+    // back to the top vendor match so an Enter on a pure vendor query still lands
+    // somewhere useful.
     if (suggestions.length > 0) {
       selectSuggestion(suggestions[0]);
+      return;
+    }
+    if (vendorResults.length > 0) {
+      selectVendor(vendorResults[0]);
       return;
     }
 
@@ -314,7 +351,10 @@ export default function ExplorePage() {
               placeholder="Search city or area for wedding vendors…"
               value={cityQuery}
               onChange={(e) => setCityQuery(e.target.value)}
-              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onFocus={() =>
+                (suggestions.length > 0 || vendorResults.length > 0) &&
+                setShowSuggestions(true)
+              }
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               className={cn(
                 "h-7 border-0 bg-transparent px-0 text-sm shadow-none",
@@ -337,22 +377,87 @@ export default function ExplorePage() {
             )}
           </form>
 
-          {showSuggestions && suggestions.length > 0 && (
-            <ul role="listbox" className="border-t border-border pb-1">
-              {suggestions.map((s, i) => (
-                <li
-                  key={i}
-                  role="option"
-                  aria-selected={false}
-                  onMouseDown={() => selectSuggestion(s)}
-                  className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"
-                >
-                  <MapPin size={13} className="shrink-0 text-muted-foreground" />
-                  <span className="truncate">{s.name}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          {showSuggestions &&
+            (vendorResults.length > 0 || suggestions.length > 0) && (
+              <div className="border-t border-border py-1">
+                {/* Vendors group: a direct match in our directory. */}
+                {vendorResults.length > 0 && (
+                  <>
+                    {suggestions.length > 0 && (
+                      <div className="px-3 pt-1 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Vendors
+                      </div>
+                    )}
+                    <ul role="listbox" aria-label="Vendors">
+                      {vendorResults.map((v) => {
+                        const cat =
+                          CATEGORIES[v.vendorType as VendorType] ??
+                          CATEGORIES.other;
+                        const Icon = cat.icon;
+                        return (
+                          <li
+                            key={`v:${v.vendorId}`}
+                            role="option"
+                            aria-selected={false}
+                            onMouseDown={() => selectVendor(v)}
+                            className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"
+                          >
+                            <span
+                              className="flex size-6 shrink-0 items-center justify-center rounded-full"
+                              style={{ backgroundColor: cat.lightHex }}
+                            >
+                              <Icon
+                                size={13}
+                                style={{ color: cat.colorHex }}
+                                aria-hidden
+                              />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium">
+                                {v.name}
+                              </span>
+                              {v.secondaryText && (
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  {v.secondaryText}
+                                </span>
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                )}
+
+                {/* Areas group: geocoded places to pan the map to (unchanged). */}
+                {suggestions.length > 0 && (
+                  <>
+                    {vendorResults.length > 0 && (
+                      <div className="px-3 pt-1.5 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Areas
+                      </div>
+                    )}
+                    <ul role="listbox" aria-label="Areas">
+                      {suggestions.map((s, i) => (
+                        <li
+                          key={i}
+                          role="option"
+                          aria-selected={false}
+                          onMouseDown={() => selectSuggestion(s)}
+                          className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"
+                        >
+                          <MapPin
+                            size={13}
+                            className="shrink-0 text-muted-foreground"
+                          />
+                          <span className="truncate">{s.name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
         </div>
 
         <ProfileMenu className="shrink-0" />
