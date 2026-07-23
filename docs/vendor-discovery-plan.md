@@ -1,10 +1,17 @@
 # Vendor Discovery — spec & implementation plan
 
-Status: **approved direction; a first slice shipped** (Kiara, 2026-07-23). The
-vendor-find slice of the unified search bar (Phase A, §7) is in production — see
-"Shipped early" there. Everything else below is still the reference for the
-remaining discovery/search workstream: what we're building, why, the data model,
-and a phased plan concrete enough for an agent to execute phase by phase.
+Status: **approved direction; build in progress** (Kiara, 2026-07-23). This doc is the
+reference for the discovery/search workstream: what we're building, why, the data
+model, and a phased plan concrete enough for an agent to execute phase by phase.
+
+**Progress:**
+- §5 (negativity / watch-outs — the harvest + dossier + draft-rule side that feeds
+  sourced negatives into free-text recon) is **complete** (PR #34, 2026-07-23).
+- The vendor-find slice of the unified search bar (§7 Phase A, "Shipped early") is
+  **in production** — vendor name/address search + fly-to-pin on select, backed by
+  the `search_vendors` RPC (migration `0018`).
+
+All other sections remain unbuilt.
 
 ## 1. Problem
 
@@ -226,20 +233,24 @@ enumerable facts only (decision #4). Starting sets (Kiara can prune/extend):
 Stylistic vocabulary ("moody", "boho") deliberately excluded — that's FTS/embedding
 territory. Promote a term to a tag only when the query log (§3.4) shows demand.
 
-## 5. Pipeline changes for negativity (watch-outs)
+## 5. Pipeline changes for negativity (watch-outs) — ✅ DONE (PR #34, 2026-07-23)
 
-Skill-construction edits, no app code:
+Skill-construction edits, no app code. **All three shipped as specified** — the internal
+dossier section landed as `## watch-outs`, and the user-facing "heads-up" surface stays
+deferred (§13 Q5). The numbered spec below is now the as-built record.
 
-1. **`dossier.mjs`:** add a dedicated `WATCH-OUTS:` line to the dossier format —
+1. **`dossier.mjs` (done):** add a dedicated `WATCH-OUTS:` line to the dossier format —
    a targeted cut that preserves critical fragments (review sentences containing
    "but/however/only downside", sub-5★ review text, negative-valence Reddit
    fragments) so they survive the ~500-token compression instead of losing the
-   space race to pricing.
-2. **Region research pass (SKILL.md Phase 1):** for the region's top ~20 vendors
+   space race to pricing. (Built as an internal `## watch-outs` section: sub-5★ first,
+   then review caveats, then reddit; capped at 4, deduped, omitted when nothing negative
+   is sourced.)
+2. **Region research pass (SKILL.md Phase 1) (done):** for the region's top ~20 vendors
    by review count, add `"<vendor>" reddit` complaint/problem-flavored queries to
    the pricing-pass WebSearch list; digests land in `research/` like the pricing
    digests and flow into dossiers automatically.
-3. **`entry-rules-core.md`:** strengthen "Include negatives and quirks when
+3. **`entry-rules-core.md` (done):** strengthen "Include negatives and quirks when
    sources have them" to require that a dossier `WATCH-OUTS` line **must** be
    carried into at least one of the vendor's entries (attributed inline, as the
    rules already mandate). Add the explicit inverse guard: never manufacture a
@@ -443,8 +454,8 @@ phase per instruction and stop at its gate.
 
 **Phase 1 — Foundation (schema + extraction + backfill).**
 Migrations `0019`+`0020`; `lib/constants/discovery.ts`; `extract.mjs` +
-`upload-extractions.mjs`; nightly `/api/cron/extract`; dossier/skill watch-outs
-edits (§5); backfill CO venues + one non-venue type end-to-end.
+`upload-extractions.mjs`; nightly `/api/cron/extract`; ~~dossier/skill watch-outs
+edits (§5)~~ **✅ done (PR #34)**; backfill CO venues + one non-venue type end-to-end.
 *Accept:* every active recon entry has an extraction row; `vendor_discovery`
 populated with tldr/tags/price band/popularity for backfilled regions; a new
 recon entry gets extracted within 24h with zero manual steps; `npm run build`
