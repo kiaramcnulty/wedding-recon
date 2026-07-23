@@ -267,7 +267,7 @@ async function cmdBatch() {
       const m = ms[0];
       const dossier = fs.readFileSync(path.join(workdir, 'research', m.slug, 'dossier.md'), 'utf8').trim();
       const assign = ms.map((x) => `entry${x.entry}: bot=${x.bot} date=${x.month}/${x.year}`).join(' | ');
-      return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | entries=${ms.length} | ${assign} ===\n${dossier}`;
+      return `\n\n=== ${profile.label}: ${m.name} | vendor_id=${m.vendor_id} | slug=${m.slug} | entries=${ms.length} | ${assign} ===\n${dossier}`;
     });
     const out = `${header}${blocks.join('')}\n\nOUTPUT FILE: ${draftsDir}/${batch}-worker-${String(c).padStart(2, '0')}.jsonl\n${apiMode ? API_FOOTER : ''}`;
     fs.writeFileSync(path.join(draftsDir, `${batch}-call-${String(c).padStart(2, '0')}.md`), out);

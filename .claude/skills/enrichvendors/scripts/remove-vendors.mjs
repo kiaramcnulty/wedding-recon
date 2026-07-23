@@ -95,9 +95,42 @@ if (strongFrom) {
   const manifestFiles = process.argv.map((a, i) => (a === '--manifest' ? process.argv[i + 1] : null)).filter(Boolean);
   if (!manifestFiles.length) { console.error('--strong-from needs at least one --manifest <file> to resolve slugs to vendor ids'); process.exit(1); }
   const slugToId = new Map();
-  for (const mf of manifestFiles) for (const row of JSON.parse(fs.readFileSync(mf, 'utf8'))) if (row.slug && row.vendor_id) slugToId.set(row.slug, row.vendor_id);
+  // Worker LLMs slugify the vendor NAME by their own rules — they DROP apostrophes and "&",
+  // where slugOf (the manifest slug) turns "'" into a separator and "&" into "and". So an
+  // apostrophe/ampersand vendor's worker-emitted flag slug ("aprils-garden",
+  // "sweet-heart-winery-event-center") never string-equals the manifest slug
+  // ("april-s-garden", "sweet-heart-winery-and-event-center") and used to fall through as
+  // UNRESOLVED (12 of 81 strong flags on the 2026-07 CO music run). canonKey collapses both
+  // conventions — drop apostrophes, treat every other non-alnum run as a word gap, drop the
+  // standalone word "and" (which "&" becomes under slugOf) — so the two forms reconcile.
+  // Used only as a FALLBACK after exact match, and only when the key maps to a SINGLE vendor.
+  const canonKey = (s) => (s || '').toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter((w) => w && w !== 'and').join('');
+  const canonToId = new Map(); const canonConflict = new Set(); const canonByVid = new Map();
+  for (const mf of manifestFiles) for (const row of JSON.parse(fs.readFileSync(mf, 'utf8'))) {
+    if (row.slug && row.vendor_id) slugToId.set(row.slug, row.vendor_id);
+    if (!row.vendor_id) continue;
+    if (row.name) canonByVid.set(row.vendor_id, canonKey(row.name));   // full-name canon, for the prefix fallback
+    for (const key of new Set([canonKey(row.slug), canonKey(row.name)])) {
+      if (!key) continue;
+      if (canonToId.has(key) && canonToId.get(key) !== row.vendor_id) canonConflict.add(key);
+      else canonToId.set(key, row.vendor_id);
+    }
+  }
+  const canonVendors = [...canonByVid.entries()].map(([vid, c]) => ({ vid, c }));
   const unresolved = [];
-  for (const slug of strongSlugs) { const id = slugToId.get(slug); if (id) ids.push(id); else unresolved.push(slug); }
+  for (const slug of strongSlugs) {
+    const ck = canonKey(slug);
+    let id = slugToId.get(slug) || (ck && !canonConflict.has(ck) ? canonToId.get(ck) : undefined);
+    if (!id && ck.length >= 6) {
+      // A worker sometimes SHORTENS a long name — dropping a trailing "- descriptor" or
+      // "(note)" ("J. Cotter Gallery" for "J. Cotter Gallery - The Gold and Silversmith of
+      // Vail"), so its canon is a PREFIX of the manifest canon. Resolve only when the prefix
+      // hits exactly one vendor (the ≥6 length guard keeps short slugs from colliding).
+      const hits = [...new Set(canonVendors.filter((v) => v.c.startsWith(ck)).map((v) => v.vid))];
+      if (hits.length === 1) id = hits[0];
+    }
+    if (id) ids.push(id); else unresolved.push(slug);
+  }
   console.log(`strong (auto-remove) slugs: ${strongSlugs.size} | resolved ${strongSlugs.size - unresolved.length}${unresolved.length ? ` | UNRESOLVED ${unresolved.length}: ${unresolved.join(', ')}` : ''}`);
   if (unresolved.length) console.log('  (unresolved slugs are not in the given manifest(s) — pass the matching --manifest, or remove by --id)');
 }
