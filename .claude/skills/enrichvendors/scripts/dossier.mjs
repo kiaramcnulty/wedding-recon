@@ -75,8 +75,35 @@ for (const slug of fs.readdirSync(researchDir).sort()) {
 
   // 4) reddit slice (already pre-cut) + pdf pointers (not fetched — honesty hint only)
   const rs = path.join(dir, 'reddit-slice.txt');
-  const reddit = fs.existsSync(rs) ? fs.readFileSync(rs, 'utf8').trim().slice(0, 900) : '';
+  const redditFull = fs.existsSync(rs) ? fs.readFileSync(rs, 'utf8').trim() : '';
+  const reddit = redditFull.slice(0, 900);
   const pdfs = (h.pdfs || []).slice(0, 2);
+
+  // 5) watch-outs — rescue SOURCED negative/caveat signal that the positivity-skewed
+  // top-3 review pick and the 900-char reddit cut above would otherwise bury: sub-5★
+  // review text, caveat sentences ("...but...", "only downside...") from any review,
+  // and negative-valence reddit fragments. This is candidate material, not a mandate —
+  // the draft rules forbid inventing criticism, so an empty section is correct and common
+  // (Places exposes only 5 "most relevant" reviews, which skew positive). Sub-5★ first
+  // (strongest signal), then review caveats, then reddit; capped + deduped.
+  const CAVEAT = /\b(but|however|although|only downside|downside|drawback|unfortunately|disappoint|wish (?:they|it|we|the|i)|complaint|the only (?:thing|issue|problem)|slow to|no response|never (?:heard|got|responded)|unrespons|rude|unprofessional|overpriced|pricey|not worth|nickel and dim|hidden fee|watch out|avoid|beware|regret|too (?:small|far|expensive|pricey|tight))\b/i;
+  const clip = (s, n) => { s = (s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n) + '…' : s; };
+  const watchOuts = [];
+  const wseen = new Set();
+  const pushWatch = (label, text) => {
+    const t = clip(text, 200);
+    const k = norm(t).slice(0, 60);
+    if (t.length < 15 || wseen.has(k)) return false;
+    wseen.add(k);
+    watchOuts.push(`- ${label} ${t}`);
+    return watchOuts.length >= 4; // true = section full, stop scanning
+  };
+  const reviews = h.google?.reviews || [];
+  for (const r of reviews) { if ((r.rating ?? 5) <= 4 && pushWatch(`(${r.rating}★)`, r.text)) break; }
+  if (watchOuts.length < 4) outerW: for (const r of reviews) {
+    for (const sent of (r.text || '').split(/(?<=[.!?])\s+/)) if (CAVEAT.test(sent) && pushWatch('(review)', sent)) break outerW;
+  }
+  if (watchOuts.length < 4) for (const line of redditFull.split('\n')) if (CAVEAT.test(line) && pushWatch('(reddit)', line)) break;
 
   const parts = [
     `# ${h.name} (${h.city || '?'}) — vendor_id=${h.vendor_id}`,
@@ -85,6 +112,7 @@ for (const slug of fs.readdirSync(researchDir).sort()) {
     `\n## ${profile.dossierPriceTitle}\n${priceLines.length ? priceLines.join('\n') : '(none found on site)'}`,
     pdfs.length ? `pdf rate cards seen on site (not fetched): ${pdfs.join(' ; ')}` : '',
     revs.length ? `\n## google reviews (top ${revs.length})\n${revs.join('\n')}` : '',
+    watchOuts.length ? `\n## watch-outs (sourced negatives)\n${watchOuts.join('\n')}` : '',
     digestHits.length ? `\n## region pricing digests\n${digestHits.join('\n')}` : '',
     reddit ? `\n## reddit\n${reddit}` : '',
   ].filter(Boolean);

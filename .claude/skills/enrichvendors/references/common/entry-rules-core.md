@@ -43,8 +43,18 @@
   `google-reviews`, `reddit:reddit-NN.txt`).
 - Borrowed experiences are attributed IN the text: "a bride on reddit said...",
   "a review called it...". Never first person for things the bot didn't do.
-- Include negatives and quirks when sources have them (slow email replies, bad lighting,
-  early last call, travel fees stacking up). Warts make entries credible and useful.
+- **Carry a sourced negative into the notes when the dossier has one.** Include negatives
+  and quirks when sources have them (slow email replies, bad lighting, early last call,
+  travel fees stacking up) — warts make entries credible and useful. If the dossier has a
+  `## watch-outs` section, at least ONE of its items must land in the free-text `notes` of
+  at least one of the vendor's entries, attributed inline ("a review flagged...", "a bride
+  on reddit warned..."). On a multi-entry vendor it rides the experience/review entry. It
+  goes in the prose of `notes` like any other fact — there is no separate field, label, or
+  "watch-out" heading in the entry itself.
+- **Never manufacture a negative.** No `## watch-outs` section (or nothing negative in the
+  sources) means the entry stays positive — do NOT invent a downside for "balance".
+  Unsourced criticism of a real business is worse than none; every wart traces to a named
+  source in `sources`, exactly like every other fact.
 
 ## Other fields
 - `venue` column = the vendor's business name (historical column name, all types).
