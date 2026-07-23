@@ -1,8 +1,10 @@
 # Vendor Discovery — spec & implementation plan
 
-Status: **approved direction, not yet built** (Kiara, 2026-07-23). This doc is the
-reference for the discovery/search workstream: what we're building, why, the data
-model, and a phased plan concrete enough for an agent to execute phase by phase.
+Status: **approved direction; a first slice shipped** (Kiara, 2026-07-23). The
+vendor-find slice of the unified search bar (Phase A, §7) is in production — see
+"Shipped early" there. Everything else below is still the reference for the
+remaining discovery/search workstream: what we're building, why, the data model,
+and a phased plan concrete enough for an agent to execute phase by phase.
 
 ## 1. Problem
 
@@ -274,18 +276,49 @@ tooltip: "Consistently recommended in wedding communities and reviews."
 
 ## 7. Search
 
-### Phase A — unified bar: blended geocode + FTS (no AI)
+### Phase A — unified bar: blended geocode + vendor search (no AI)
+
+> **Shipped early (2026-07-23), ahead of Phases 1–2.** The reported Explore bug —
+> typing a vendor's name or its address ("Spruce Mountain Ranch", Larkspur)
+> returned nothing because the bar only geocoded *areas* and never queried
+> `vendors` — didn't need the discovery stack, so a lightweight slice of this
+> phase now runs in production:
+> - `app/api/vendor-search/route.ts` — vendor-only autocomplete: three parallel
+>   `ilike` lookups over `vendors` (**name + `address_text` + `city`**), merged,
+>   deduped, ranked by the same name-relevance score as `/api/places`. No Google
+>   Places call (Explore searches *our* directory; area nav stays with
+>   `/api/geocode`), no `vendor_discovery`/FTS dependency, **no migration**.
+> - Explore bar fetches `/api/geocode` and `/api/vendor-search` in parallel and
+>   renders two groups — **Vendors** (category icon + name + address line) and
+>   **Areas**. Tap area → flyTo (unchanged); tap vendor →
+>   `/vendor/[id]?from=/explore`; Enter prefers an area match, else the top vendor.
+>
+> When Phases 1–2 land, swap the `ilike` lookup for the `search_vendors` RPC below
+> (adds tags/tldr/recon-note matching + `ts_rank`); the Explore UI — grouped
+> dropdown, tap-through, submit fallback — stays as-is. Query logging
+> (`search_queries`) is deferred with the rest of Phase 2.
 
 - New RPC `search_vendors(q text, p_types vendor_type[] default null, max_rows int
   default 20)`: `websearch_to_tsquery('english', q)` against
   `vendor_discovery.notes_tsv`, joined to `vendors`, ranked by `ts_rank` +
   a name-match boost (reuse the relevance idea from `/api/places` blended search).
+  **Address is not in `notes_tsv`** (it's name + tags + tldr + notes), so to keep
+  the early slice's address search the RPC must *also* match `address_text`/`city`
+  directly — or, better, treat a typed address as a **proximity** query: geocode
+  it (existing `/api/geocode`), then surface vendors near that point via a
+  `vendors_near`/bbox lookup. Proximity is the robust fix for "exact address →
+  vendor" (plain string matching only fires when the typed text is a substring of
+  the stored address, and misses entirely when the pin sits at a city-centroid
+  fallback); it's the recommended Phase-2 upgrade over the shipped `ilike` slice.
 - Explore bar (`app/(app)/explore/page.tsx`): keep the existing geocode flow, add
-  a parallel `search_vendors` call; render grouped suggestions — **Areas** (MapPin
-  rows, current behavior) and **Vendors** (category icon + name + tldr snippet).
-  Tap area → flyTo (unchanged). Tap vendor → `/vendor/[id]?from=/explore`.
-  Submit free text with no area match → open the list view (§9) fed by FTS
-  results. Log to `search_queries` (parsed = null).
+  a parallel vendor call; render grouped suggestions — **Areas** (MapPin rows,
+  current behavior) and **Vendors** (category icon + name + tldr snippet — tldr
+  replaces the address line once §8 exists). Tap area → flyTo (unchanged). Tap
+  vendor → `/vendor/[id]?from=/explore`. If a future variant flies to a vendor on
+  the map instead of opening its page, use the vendor's **stored** coords, never a
+  re-geocode of the address (re-geocoding is exactly what breaks for
+  approximate/centroid pins). Submit free text with no area match → open the list
+  view (§9) fed by FTS results. Log to `search_queries` (parsed = null).
 
 ### Phase B — AI parser + scored ranking
 
@@ -412,9 +445,10 @@ anything is surfaced in UI.
 
 **Phase 2 — Surfacing (no AI at runtime).**
 `0020` bbox RPC extension; list view + sort; TL;DR in cluster sheet + vendor
-page; Well-loved badge; unified bar Phase A (blended geocode+FTS) + query
-logging. *Accept:* list toggle works over live viewport data; searching "barn"
-surfaces tagged/noted vendors grouped under "Vendors"; queries land in
+page; Well-loved badge; **upgrade** the already-shipped unified-bar vendor slice
+(§7 Phase A "Shipped early") from `ilike` to the `search_vendors` FTS RPC + add
+query logging. *Accept:* list toggle works over live viewport data; searching
+"barn" surfaces tagged/noted vendors grouped under "Vendors"; queries land in
 `search_queries`. *Gate:* Kiara approves badge copy + list card layout.
 
 **Phase 3 — AI search bar.**
