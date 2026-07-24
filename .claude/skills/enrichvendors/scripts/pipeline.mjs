@@ -1,6 +1,6 @@
 // One CLI for /enrichvendors batch mechanics. Replaces the throwaway orchestrator
 // scripts that previously burned a turn each (assign/coverage/repair/verify/state).
-// All commands accept --type <venue|photographer|caterer|music|flowers> (default venue).
+// All commands accept --type <venue|photographer|caterer|music|flowers|dress> (default venue).
 //
 //   batch      select vendors with NO recon of ANY kind (bot OR human), dedupe same-named
 //              twins, assign 1-3 ENTRIES per vendor from dossier richness (distinct bots
@@ -38,7 +38,7 @@ const workdir = process.argv[2];
 const cmd = process.argv[3];
 const CMDS = ['batch', 'status', 'merge', 'verify', 'photos-map', 'health'];
 if (!workdir || workdir.startsWith('--') || !CMDS.includes(cmd)) {
-  console.error(`usage: pipeline.mjs <workdir> <${CMDS.join('|')}> [--type venue|photographer|caterer|music|flowers] [flags]`); process.exit(1);
+  console.error(`usage: pipeline.mjs <workdir> <${CMDS.join('|')}> [--type venue|photographer|caterer|music|flowers|dress] [flags]`); process.exit(1);
 }
 const profile = etype();
 const req = (k) => { const v = argValue(k); if (!v) { console.error(`--${k} is required for ${cmd}`); process.exit(1); } return v; };
