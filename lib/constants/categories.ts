@@ -26,7 +26,7 @@ export const VENDOR_TYPES = [
 /**
  * Legacy vendor-type values that still exist in the DB enum but are no longer
  * offered anywhere in the UI. `music` was split into `dj` + `band` ("Live
- * music") — see migrations 0019/0020. Kept here (and given a CATEGORIES entry
+ * music") — see migrations 0020/0021. Kept here (and given a CATEGORIES entry
  * below) so any straggler `music` row still renders its icon/color/label
  * instead of crashing a `CATEGORIES[...]` lookup; deliberately excluded from
  * VENDOR_TYPES so it never appears in the type picker, Explore filter, or Hub.

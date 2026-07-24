@@ -88,7 +88,7 @@ export const wrongTypeByName = (profile, name) =>
 // like "Productions"/"Entertainment"/"Sound" are NOT a DJ signal — live acts use them just
 // as much ("West Star Productions" is a live string ensemble). Everything not explicitly a
 // DJ defaults to 'band'. The CSV `subtype` column is human-reviewed before upload; and once
-// recon text exists, the recon-first migration 0020 sets the authoritative DB type.
+// recon text exists, the recon-first migration 0021 sets the authoritative DB type.
 const MUSIC_LIVE = /\b(bands?|quartets?|trios?|duos?|ensembles?|orchestras?|strings?|choir|acoustic|jazz|mariachi|bluegrass|pian(o|os|ist|ists)|guitars?|violins?|cellos?|harp|harpists?|sax|saxophone|vocals?|vocalist|singers?|symphony|a cappella)\b/i;
 const MUSIC_DJ = /\bdjs?\b|\bdisc jockeys?\b/i;
 export function classifyMusic(name) {

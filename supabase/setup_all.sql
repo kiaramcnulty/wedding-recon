@@ -5,7 +5,7 @@ create extension if not exists postgis;
 
 -- Enums -----------------------------------------------------------------------
 -- `music` is legacy — split into `dj` + `band` ("Live music"); see migrations
--- 0019/0020. Kept in the enum for parity so a hand-run of 0020 never errors.
+-- 0020/0021. Kept in the enum for parity so a hand-run of 0021 never errors.
 create type vendor_type as enum ('venue','food','music','dj','band','flowers','dress','planner','photos','other');
 create type vendor_source as enum ('google','user','seed');
 create type recon_type as enum ('online','virtual','in_person');

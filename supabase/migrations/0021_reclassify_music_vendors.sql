@@ -1,7 +1,7 @@
 -- Reclassify music vendors into `dj` / `band` ("Live music") — RECON-FIRST.
 --
--- RUN AFTER 0019 — the `dj`/`band` enum values must already be committed (Postgres forbids
--- adding an enum value and using it in the same transaction). Run 0019 on its own, then this.
+-- RUN AFTER 0020 — the `dj`/`band` enum values must already be committed (Postgres forbids
+-- adding an enum value and using it in the same transaction). Run 0020 on its own, then this.
 --
 -- Why recon-first: a vendor's NAME is a weak, misleading signal — "West Star Productions"
 -- is a live string ensemble, not a DJ. The enrichment recon, by contrast, states the act

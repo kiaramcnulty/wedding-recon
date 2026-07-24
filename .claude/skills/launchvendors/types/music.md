@@ -5,7 +5,7 @@ Profile key `music` → **two** `vendor_type`s, tagged per row: **`dj`** (app ca
 ## Subtype tagging (`dj` vs `band`) — the split output
 - `classifyMusic(name)` (in `lib.mjs`) tags every swept/ingested/resolved row into the `subtype` column from the **NAME only** (all launch has — no recon yet). It is **conservative toward `band`**: a row is `dj` only on an **explicit DJ word** (`dj`/`disc jockey`) with no live-instrument word. Company words like "… Productions"/"… Entertainment"/"… Sound" are **not** a DJ signal — live acts use them just as often (*"West Star Productions" is a live string ensemble*), so they default to `band`.
 - **Review `subtype` before `--apply`.** Names lie, so this is a first guess: it under-calls DJs (a DJ company without "DJ" in its name lands in `band`) on purpose, to avoid false DJs. The `upload.mjs` dry-run prints a `by type: dj N, band M` breakdown — skim it, and promote any real DJ to `dj` from its intel/site.
-- The authoritative type is set later by the **recon-first migration `0020`**, which reads each vendor's recon act-type text ("Act: live string musicians", "Act: DJ") — far more reliable than the name — and self-corrects any launch mis-tag once recon exists.
+- The authoritative type is set later by the **recon-first migration `0021`**, which reads each vendor's recon act-type text ("Act: live string musicians", "Act: DJ") — far more reliable than the name — and self-corrects any launch mis-tag once recon exists.
 - A blank/invalid `subtype` at upload time is re-classified as a safety net (default `band`), so a research-merged row is never left untyped.
 
 ## Ground truth (from Kiara, 2026-07)
