@@ -13,11 +13,28 @@ for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'GOOGL
   if (!process.env[k]) { console.error(`${k} missing — run with --env-file=.env.local from the repo root`); process.exit(1); }
 }
 const profile = typeProfile();
+// A type may fan one sweep across several vendor_types (music → dj|band). typeScope is the
+// set of vendor_types this run owns — used for dedup scoping and the final verify. Single-
+// type runs (venue, photos, …) keep the original one-element scope, unchanged behavior.
+const typeScope = profile.vendorTypes ?? [profile.vendorType];
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const file = path.join(workdir, profile.csv);
 const venues = readVenues(file);
 if (!venues.length) { console.error(`no rows in ${file}`); process.exit(1); }
+
+// Split types carry each row's vendor_type in the `subtype` column (scout auto-classifies;
+// the human may edit it during review). Repair any blank/invalid subtype so every row has a
+// concrete type before dedup + insert — a research-merged row with no subtype is classified
+// here as a safety net (default = profile.vendorType).
+if (profile.vendorTypes) {
+  for (const v of venues) {
+    if (!profile.vendorTypes.includes(v.subtype)) {
+      const guess = profile.classify ? profile.classify(v.name) : '';
+      v.subtype = profile.vendorTypes.includes(guess) ? guess : profile.vendorType;
+    }
+  }
+}
 
 // ── Late-resolve: the user may have filled street addresses during review ────
 // A row with an address containing digits but no place_id gets one more Places
@@ -67,7 +84,10 @@ if (error) {
   process.exit(1);
 }
 const dbPid = new Map(existing.filter((v) => v.google_place_id).map((v) => [v.google_place_id, v]));
-const dbName = new Map(existing.filter((v) => v.vendor_type === profile.vendorType)
+// Name+city dedup is scoped to the run's type(s). For a split run this spans BOTH dj and band
+// so the same act can't land twice differing only by subtype ("The Groove Band" the band must
+// swallow a "The Groove Band" re-swept as a dj).
+const dbName = new Map(existing.filter((v) => typeScope.includes(v.vendor_type))
   .map((v) => [nameKey(v.name, profile) + '|' + nameKey(v.city || '', null), v]));
 
 // An existing DB row that lacks a website/instagram but whose CSV twin now has one gets the
@@ -86,7 +106,7 @@ for (const v of venues) {
   const nk = nameKey(v.name, profile) + '|' + nameKey(v.city, null);
   if (v.place_id && dbPid.has(v.place_id)) {
     const hit = dbPid.get(v.place_id);
-    if (hit.vendor_type === profile.vendorType) { maybeBackfill(hit, v); skipDbPid.push(v.name); }
+    if (typeScope.includes(hit.vendor_type)) { maybeBackfill(hit, v); skipDbPid.push(v.name); }
     else skipOtherType.push(`${v.name} (already in DB as ${hit.vendor_type})`);
     continue;
   }
@@ -102,7 +122,8 @@ const hasLoc = (v) => v.lat !== '' && v.lng !== '' && !Number.isNaN(parseFloat(v
 // with no handles) never reference the column and work without migration 0016.
 const payload = toInsert.map((v) => ({
   name: v.name,
-  vendor_type: profile.vendorType,
+  // Split types write the per-row subtype (dj|band); everything else the fixed profile type.
+  vendor_type: profile.vendorTypes ? v.subtype : profile.vendorType,
   google_place_id: v.place_id || null,
   address_text: v.address || null,
   city: v.city || null,
@@ -130,6 +151,7 @@ lines.push(`skip — duplicate within batch (${skipBatch.length}): ${skipBatch.j
 if (skipNoName.length) lines.push(`skip — blank name: ${skipNoName.length}`);
 if (backfill.length) lines.push(`BACKFILL on existing rows (${backfill.length}): ${backfill.map((b) => `${b.name} (${Object.keys(b.patch).join('+')})`).join(', ')}`);
 lines.push(`TO INSERT: ${payload.length}  (google-matched ${payload.filter((p) => p.source === 'google').length}, approximate-pin ${approx.length}, NO LOCATION ${noLoc.length}${profile.captureInstagram ? `, with instagram ${toInsert.filter((v) => v.instagram).length}` : ''})`);
+if (profile.vendorTypes) lines.push(`  by type (from CSV subtype — review before --apply): ${typeScope.map((t) => `${t} ${payload.filter((p) => p.vendor_type === t).length}`).join(', ')}`);
 if (approx.length) lines.push(`  approximate (city-centroid, dashed pin): ${approx.join(', ')}`);
 if (noLoc.length) lines.push(`  no location — searchable by name but NO map pin: ${noLoc.join(', ')}`);
 lines.push(`to-insert export (for review/download): ${toInsertCsv}`);
@@ -157,7 +179,7 @@ for (const b of backfill) {
 }
 
 // ── Verify ────────────────────────────────────────────────────────────────────
-const { data: after } = await selectAll(() => supabase.from('vendors').select('id, name, city, google_place_id').eq('vendor_type', profile.vendorType).order('id'));
+const { data: after } = await selectAll(() => supabase.from('vendors').select('id, name, city, google_place_id').in('vendor_type', typeScope).order('id'));
 const pidCount = new Map(), nameCount = new Map();
 for (const v of after ?? []) {
   if (v.google_place_id) pidCount.set(v.google_place_id, (pidCount.get(v.google_place_id) || 0) + 1);
@@ -167,7 +189,7 @@ for (const v of after ?? []) {
 const dupPids = [...pidCount.entries()].filter(([, n]) => n > 1);
 const dupNames = [...nameCount.entries()].filter(([, n]) => n > 1);
 const verify = [
-  `\nAPPLIED: inserted ${inserted.length} ${profile.vendorType} vendors${backfill.length ? ` | backfilled ${backfilled}/${backfill.length} existing rows` : ''} | DB ${profile.vendorType} total now ${after?.length ?? '?'}`,
+  `\nAPPLIED: inserted ${inserted.length} ${typeScope.join('+')} vendors${backfill.length ? ` | backfilled ${backfilled}/${backfill.length} existing rows` : ''} | DB ${typeScope.join('+')} total now ${after?.length ?? '?'}`,
   `verify — duplicate place_ids in DB: ${dupPids.length ? dupPids.map(([p]) => p).join(', ') : 'none'}`,
   `verify — duplicate name+city in DB: ${dupNames.length ? dupNames.map(([n]) => n).join('; ') : 'none'}`,
 ];

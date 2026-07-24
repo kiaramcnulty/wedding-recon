@@ -24,7 +24,8 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 const { data: all, error } = await supabase
   .from('vendors')
   .select(`id, name, city, region, website, google_place_id${profile.hasInstagram ? ', instagram' : ''}`)
-  .eq('vendor_type', profile.vendorType).eq('region', region);
+  // Split types (music → dj|band) harvest across all their vendor_types in one run.
+  .in('vendor_type', profile.vendorTypes ?? [profile.vendorType]).eq('region', region);
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
 
 let targets = all;

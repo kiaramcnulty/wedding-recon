@@ -1,6 +1,11 @@
 # Type card: music (`--type music`)
 
-Profile key `music` → `vendor_type='music'` (app category: Music icon, indigo; plural copy "musicians"), working CSV `vendors.csv`. No instagram capture. No extra preflight.
+Profile key `music` → **two** `vendor_type`s, tagged per row: **`dj`** (app category "DJs", violet, turntable icon) and **`band`** ("Live music" — bands, quartets, soloists, pianists, ceremony ensembles; indigo, music-note icon). One `--type music` run still drives the whole sweep; each row is classified `dj`/`band` into the CSV **`subtype`** column and `upload.mjs` writes `vendor_type` from it. Working CSV `vendors.csv`. No instagram capture. No extra preflight.
+
+## Subtype tagging (`dj` vs `band`) — the split output
+- `classifyMusic(name)` (in `lib.mjs`, mirrored by DB migration `0020`) tags every swept/ingested/resolved row into the `subtype` column: **`band` is the broad default** (all live performers); a row is **`dj`** only on an explicit DJ word (`dj`/`disc jockey`) or a DJ-leaning company word (`sound`/`productions`/`entertainment`/`mobile`/`spin`/`mix`) with **no** live-instrument word present.
+- **Review `subtype` before `--apply`.** It's name-only and best-effort: an agency that does both, or a bare "… Entertainment", may guess wrong. The `upload.mjs` dry-run prints a `by type: dj N, band M` breakdown — skim it, and edit the `subtype` cell (`dj`/`band`) on any row the name fooled. Consult intel/site when the name isn't enough.
+- A blank/invalid `subtype` at upload time is re-classified as a safety net (default `band`), so a research-merged row is never left untyped.
 
 ## Ground truth (from Kiara, 2026-07)
 - **Acts range from solo DJs to 10-piece bands to agencies** — a "vendor" here may be a person, a band, or an entertainment company with multiple acts. Keep agencies as one row (their site is the booking surface).
@@ -33,6 +38,8 @@ Fetch-extraction prompt (substitute region/state/domain):
 
 ## Phase 4 — review watchlist
 Beyond the standard flags: venues that host live music that slipped past the filters (delete), duplicate act-vs-agency rows (an agency AND one of its named bands may both appear — keep both only if each has its own booking surface), and name-collision dedup on generic act names ("Soul Fire Band" vs "Soulfire"). Schools/AV/instrument-shop noise is pruned mechanically — mention the pruned count and move on.
+
+**Also review the `subtype` column** (`dj`/`band`) — see "Subtype tagging" above. Fix any the name-only classifier got wrong (agencies that do both, bare "… Entertainment"/"… Productions") before `upload.mjs --apply` writes `vendor_type`.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:

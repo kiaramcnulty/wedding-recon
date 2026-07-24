@@ -59,7 +59,12 @@ export const ETYPES = {
   },
   music: {
     key: 'music',
-    vendorType: 'music',
+    // Music is split across TWO vendor_types in the DB: 'dj' and 'band' ("Live music").
+    // One `--type music` run still enriches BOTH — vendor selection reads vendorTypes, and
+    // recon content is subtype-agnostic ("say what they are" already covers DJ vs band).
+    // Enrich never writes vendor_type (only recon_entries), so no per-row typing is needed.
+    vendorType: 'band',
+    vendorTypes: ['dj', 'band'],
     label: 'MUSIC ACT',
     headers: [...BASE_HEADERS, 'service_region'],
     serviceRegionRequired: true,       // multi-state service is common — state it exactly (Kiara, 2026-07)

@@ -20,7 +20,8 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 const profile = etype();
 const { data: venues, error } = await supabase
   .from('vendors').select('id, name, city, website, google_place_id')
-  .eq('vendor_type', profile.vendorType).eq('region', region).order('name');
+  // Split types (music → dj|band) select across all their vendor_types in one run.
+  .in('vendor_type', profile.vendorTypes ?? [profile.vendorType]).eq('region', region).order('name');
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
 
 const { data: botProfiles } = await supabase.from('profiles').select('id, username').eq('is_bot', true);

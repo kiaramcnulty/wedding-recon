@@ -33,8 +33,8 @@ values
   ('00000000-0000-0000-0000-000000000103','Platte River Pavilion','venue','Confluence Park','Denver','CO', st_setsrid(st_makepoint(-105.000, 39.753),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
   ('00000000-0000-0000-0000-000000000104','Bloom & Co Florals','flowers','S Broadway','Denver','CO', st_setsrid(st_makepoint(-104.987, 39.740),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
   ('00000000-0000-0000-0000-000000000105','Front Range Catering','food','Larimer St','Denver','CO', st_setsrid(st_makepoint(-104.970, 39.748),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
-  ('00000000-0000-0000-0000-000000000106','Aspen Strings Quartet','music','Capitol Hill','Denver','CO', st_setsrid(st_makepoint(-104.980, 39.737),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
-  ('00000000-0000-0000-0000-000000000107','Summit Sound DJs','music','RiNo','Denver','CO', st_setsrid(st_makepoint(-104.983, 39.765),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
+  ('00000000-0000-0000-0000-000000000106','Aspen Strings Quartet','band','Capitol Hill','Denver','CO', st_setsrid(st_makepoint(-104.980, 39.737),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
+  ('00000000-0000-0000-0000-000000000107','Summit Sound DJs','dj','RiNo','Denver','CO', st_setsrid(st_makepoint(-104.983, 39.765),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
   ('00000000-0000-0000-0000-000000000108','Rocky Mountain Photo','photos','Wash Park','Denver','CO', st_setsrid(st_makepoint(-104.965, 39.700),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
   ('00000000-0000-0000-0000-000000000109','Evergreen Event Planning','planner','LoDo','Denver','CO', st_setsrid(st_makepoint(-105.000, 39.752),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa'),
   ('00000000-0000-0000-0000-00000000010a','The Bridal Loft','dress','Cherry Creek','Denver','CO', st_setsrid(st_makepoint(-104.955, 39.718),4326)::geography,'seed','00000000-0000-0000-0000-0000000000aa')

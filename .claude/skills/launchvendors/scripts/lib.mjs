@@ -1,7 +1,10 @@
 // Shared helpers for the /launchvendors pipeline. Node built-ins only.
 import fs from 'node:fs';
 
-export const HEADERS = ['name', 'address', 'city', 'state', 'website', 'instagram', 'lat', 'lng', 'place_id', 'provenance', 'flags'];
+// `subtype` carries a per-row vendor-type refinement for types that split one sweep across
+// several vendor_types (music → 'dj' | 'band'). Blank for every other type — appended LAST
+// so column indexes for existing workdirs are untouched and old CSVs read it back as ''.
+export const HEADERS = ['name', 'address', 'city', 'state', 'website', 'instagram', 'lat', 'lng', 'place_id', 'provenance', 'flags', 'subtype'];
 
 export function parseCSV(text) {
   const rows = []; let row = [], field = '', q = false;
@@ -78,6 +81,22 @@ export function tokensOverlap(a, b, weak = VENUE_WEAK) {
 export const wrongTypeByName = (profile, name) =>
   !!(profile.wrongType?.test(name) && !profile.ownSignal?.test(name));
 
+// Music splits one sweep across two vendor_types: 'dj' and 'band' ("Live music" — the
+// broad live-performer bucket). classifyMusic tags a swept act from its NAME, mirroring
+// migration 0020's SQL heuristic so launch and the DB reclassification agree. Default is
+// 'band' (live is the broad default); a row is 'dj' only on an explicit DJ word, OR a
+// DJ-leaning company word with NO live-instrument word present. Best-effort — the CSV
+// `subtype` column is human-reviewable (and overridable) before upload writes vendor_type.
+const MUSIC_LIVE = /\b(bands?|quartets?|trios?|duos?|ensembles?|orchestras?|strings?|choir|acoustic|jazz|mariachi|bluegrass|pian(o|os|ist|ists)|guitars?|violins?|cellos?|harp|harpists?|sax|saxophone|vocals?|vocalist|singers?|symphony|a cappella)\b/i;
+const MUSIC_DJ = /\bdjs?\b|\bdisc jockeys?\b/i;
+const MUSIC_DJ_SOFT = /\b(sounds?|productions?|entertainment|mobile|spins?|mix(es)?)\b/i;
+export function classifyMusic(name) {
+  const n = name || '';
+  if (MUSIC_DJ.test(n)) return 'dj';
+  if (MUSIC_DJ_SOFT.test(n) && !MUSIC_LIVE.test(n)) return 'dj';
+  return 'band';
+}
+
 export const TYPE_PROFILES = {
   venue: {
     vendorType: 'venue',
@@ -137,7 +156,13 @@ export const TYPE_PROFILES = {
     ownSignal: /\b(cater\w*|cuisine|kitchens?|foods?|bbq|barbecue|cafe|grill|chefs?|bak(e|ery|ing|ed)|bistro|restaurant|taco|pizza|eats|dining|provisions|table|feast|roast|smoke\w*|spice|hospitality)\b/i,
   },
   music: {
-    vendorType: 'music',
+    // One sweep, TWO output types: each row is tagged 'dj' or 'band' ("Live music") by
+    // classifyMusic into the CSV `subtype` column (human-reviewable), and upload.mjs writes
+    // vendor_type per-row from it. `vendorType` here is the DEFAULT for a blank subtype;
+    // `vendorTypes` scopes dedup across both. (`--type music` still drives the whole run.)
+    vendorType: 'band',
+    vendorTypes: ['dj', 'band'],
+    classify: classifyMusic,
     csv: 'vendors.csv',
     // Three nets per anchor (Kiara, 2026-07): bands and DJs brand differently, and
     // "wedding music" catches ceremony ensembles/pianists the other two miss.

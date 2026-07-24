@@ -135,7 +135,8 @@ async function cmdBatch() {
   const supabase = db();
 
   const { data: venues, error } = await supabase.from('vendors')
-    .select('id, name, city, website, google_place_id').eq('vendor_type', profile.vendorType).eq('region', region).order('name');
+    // Split types (music → dj|band) draft across all their vendor_types in one run.
+    .select('id, name, city, website, google_place_id').in('vendor_type', profile.vendorTypes ?? [profile.vendorType]).eq('region', region).order('name');
   if (error) { console.error('DB read failed:', error.message); process.exit(1); }
   // Exclude venues with ANY recon — bot OR human. (roster.mjs only counts bot recon;
   // the product rule for backfills is "no recon of any kind".)

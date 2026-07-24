@@ -14,12 +14,14 @@ for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'GOOGL
   if (!process.env[k]) { console.error(`${k} missing — run with --env-file=.env.local from the repo root`); process.exit(1); }
 }
 const profile = typeProfile();
+// Split types (music → dj|band) own several vendor_types; scope the backfill to all of them.
+const typeScope = profile.vendorTypes ?? [profile.vendorType];
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const region = argValue('region');           // optional: limit to one state, e.g. --region CO
 const limit = parseInt(argValue('limit') || '0', 10);   // optional: cap Places calls this run
 
 let query = supabase.from('vendors').select('id, name, region, website, google_place_id')
-  .eq('vendor_type', profile.vendorType).not('google_place_id', 'is', null).order('name');
+  .in('vendor_type', typeScope).not('google_place_id', 'is', null).order('name');
 if (region) query = query.eq('region', region);
 const { data: rows, error } = await query;
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }

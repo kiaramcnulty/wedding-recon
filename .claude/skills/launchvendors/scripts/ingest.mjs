@@ -40,6 +40,7 @@ for (const r of rows.slice(1)) {
     instagram: profile.captureInstagram && I.ig !== -1 ? cleanInstagram(r[I.ig]) : '',
     lat: I.lat !== -1 ? (r[I.lat] || '').trim() : '', lng: I.lng !== -1 ? (r[I.lng] || '').trim() : '',
     place_id: pid, provenance: 'user-scrape', flags: '',
+    subtype: profile.classify ? profile.classify(name) : '',
   });
   added++;
 }

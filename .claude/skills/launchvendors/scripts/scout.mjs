@@ -51,6 +51,8 @@ for (const q of queries) {
         website: '', instagram: '',
         lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '',
         place_id: p.id, provenance: 'places-sweep', flags: '',
+        // Types that split one sweep across vendor_types tag each row here (music → dj|band).
+        subtype: profile.classify ? profile.classify(name) : '',
       };
       // Obvious noise by name (schools, AV rentals, nurseries — per-type junkName regex)
       // never enters the CSV; it goes to pruned.csv with a reason (skip the website call).

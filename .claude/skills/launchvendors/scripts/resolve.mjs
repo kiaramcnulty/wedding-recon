@@ -65,6 +65,7 @@ for (const c of cands) {
       name: gName, address: cleanAddress, city, state: st, website, instagram: ig,
       lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '', place_id: p.id,
       provenance: c.provenance || 'research', flags,
+      subtype: profile.classify ? profile.classify(gName) : '',
     };
     venues.push(newRow);
     seenPid.add(p.id); byPid.set(p.id, newRow);
@@ -81,6 +82,7 @@ for (const c of cands) {
     let row = {
       name: c.name, address: '', city: '', state, website: researchWebsite, instagram: ig, lat: '', lng: '', place_id: '',
       provenance: c.provenance || 'research', flags: 'NO_MATCH;NEEDS_ADDRESS',
+      subtype: profile.classify ? profile.classify(c.name) : '',
     };
     if (cityHint) {
       try {

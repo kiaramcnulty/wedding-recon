@@ -11,7 +11,7 @@ import Link from "next/link";
 
 import { Mail } from "lucide-react";
 
-import { CATEGORY_LIST, RECON_TYPES, RECON_TYPE_LABELS, VENDOR_TYPES } from "@/lib/constants/categories";
+import { ALL_VENDOR_TYPES, CATEGORIES, CATEGORY_LIST, RECON_TYPES, RECON_TYPE_LABELS, VENDOR_TYPES } from "@/lib/constants/categories";
 import type { VendorType, ReconType } from "@/lib/constants/categories";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -43,7 +43,10 @@ import { uploadReconImages } from "@/lib/recon-upload";
 // ── Zod schema ────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  vendorType: z.enum(["venue", "food", "music", "flowers", "dress", "planner", "photos", "other"], {
+  // Derived from the single source of truth so new/retired types never drift.
+  // ALL_VENDOR_TYPES (not VENDOR_TYPES) so an existing vendor whose canonical
+  // type is a legacy value still validates when its chip is locked read-only.
+  vendorType: z.enum(ALL_VENDOR_TYPES, {
     error: "Please choose a type of vendor",
   }),
   reconType: z.enum(["online", "virtual", "in_person"], {
@@ -526,9 +529,10 @@ function AddReconForm() {
             control={control}
             name="vendorType"
             render={({ field }) => {
-              // Locked, read-only display for an existing vendor.
+              // Locked, read-only display for an existing vendor. Resolve via
+              // CATEGORIES (not CATEGORY_LIST) so a legacy type still renders.
               if (lockVendorType) {
-                const cat = CATEGORY_LIST.find((c) => c.type === field.value);
+                const cat = field.value ? CATEGORIES[field.value] : undefined;
                 if (!cat) return <></>;
                 const Icon = cat.icon;
                 return (

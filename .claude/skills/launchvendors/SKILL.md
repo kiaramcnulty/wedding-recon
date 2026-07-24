@@ -97,6 +97,7 @@ Report: baseline count, researched count, resolved/approx/no-match, skipped dupl
 - Headless only: files + scripts + WebSearch/WebFetch. No browser automation, no Sheets, no clipboard, no screenshots. No fetching or automating Instagram/Facebook — user pastes only.
 - `place_id` is dedup truth. Type-aware name+city (normalized: lowercase, `&`→`and`, alnum-only, trade words stripped per type) is the fallback. Both are enforced in scripts — don't hand-dedupe.
 - Insert semantics: `vendor_type=<profile.vendorType>`, `source='google'` iff `place_id` else `'user'`, `region=<ST>`, `location='SRID=4326;POINT(lng lat)'` (**lng first**), nulls allowed elsewhere. Direct service-role Supabase insert — there is no app bulk endpoint (`/api/places` is autocomplete-only).
+  - **Split types** (music) fan one sweep across several `vendor_type`s: `upload.mjs` writes `vendor_type` per-row from the CSV `subtype` column (`dj`/`band`), not a fixed profile type, and dedup is scoped across all of them. Review `subtype` before `--apply` — see `types/music.md`.
 - Rows without any location still upload (findable via name search) but get no map pin — call them out in the summary.
 - Don't research reviews/pricing/recon depth at this stage; archive raw sources + provenance/intel tags only.
 - Keep file contents out of the ORCHESTRATOR context: relay script summaries, one-line agent replies, and flagged lists — never CSVs, fetched pages, paste text, or candidate JSONL (Write-tool round-trips count as context too). Research passes run in subagents.

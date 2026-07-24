@@ -1,5 +1,7 @@
 # Type rules — music acts (`entries` blocks label: MUSIC ACT)
 
+Music vendors are stored under **two** `vendor_type`s — `dj` and `band` ("Live music") — and one `--type music` run enriches **both** together. These content rules are subtype-agnostic: "say WHAT they are, first" (below) already distinguishes a DJ from a band/quartet/soloist, so draft the same way regardless of which type a row carries. You never write `vendor_type` here (enrich only writes recon_entries).
+
 ## Wrong type? Two tiers (draft-contract has the full rule; write NO rows for either)
 - `NOTMUSIC!:<slug>` (STRONG — positive evidence, auto-removed) — the dossier shows a
   venue that hosts live music (but isn't itself a bookable act), an AV/production rental
