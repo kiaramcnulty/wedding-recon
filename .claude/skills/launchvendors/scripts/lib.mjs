@@ -82,19 +82,18 @@ export const wrongTypeByName = (profile, name) =>
   !!(profile.wrongType?.test(name) && !profile.ownSignal?.test(name));
 
 // Music splits one sweep across two vendor_types: 'dj' and 'band' ("Live music" — the
-// broad live-performer bucket). classifyMusic tags a swept act from its NAME, mirroring
-// migration 0020's SQL heuristic so launch and the DB reclassification agree. Default is
-// 'band' (live is the broad default); a row is 'dj' only on an explicit DJ word, OR a
-// DJ-leaning company word with NO live-instrument word present. Best-effort — the CSV
-// `subtype` column is human-reviewable (and overridable) before upload writes vendor_type.
+// broad live-performer bucket). classifyMusic tags a swept act from its NAME ALONE (the
+// only signal at launch — no recon yet), and is deliberately CONSERVATIVE toward 'band':
+// a row is 'dj' only on an EXPLICIT DJ word AND with no live-instrument word. Company words
+// like "Productions"/"Entertainment"/"Sound" are NOT a DJ signal — live acts use them just
+// as much ("West Star Productions" is a live string ensemble). Everything not explicitly a
+// DJ defaults to 'band'. The CSV `subtype` column is human-reviewed before upload; and once
+// recon text exists, the recon-first migration 0020 sets the authoritative DB type.
 const MUSIC_LIVE = /\b(bands?|quartets?|trios?|duos?|ensembles?|orchestras?|strings?|choir|acoustic|jazz|mariachi|bluegrass|pian(o|os|ist|ists)|guitars?|violins?|cellos?|harp|harpists?|sax|saxophone|vocals?|vocalist|singers?|symphony|a cappella)\b/i;
 const MUSIC_DJ = /\bdjs?\b|\bdisc jockeys?\b/i;
-const MUSIC_DJ_SOFT = /\b(sounds?|productions?|entertainment|mobile|spins?|mix(es)?)\b/i;
 export function classifyMusic(name) {
   const n = name || '';
-  if (MUSIC_DJ.test(n)) return 'dj';
-  if (MUSIC_DJ_SOFT.test(n) && !MUSIC_LIVE.test(n)) return 'dj';
-  return 'band';
+  return MUSIC_DJ.test(n) && !MUSIC_LIVE.test(n) ? 'dj' : 'band';
 }
 
 export const TYPE_PROFILES = {
