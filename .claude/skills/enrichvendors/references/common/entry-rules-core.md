@@ -22,6 +22,15 @@
   around $30pp for buffet", "Quote only".
 - `price_details`: the shape — packages/tiers, minimums, deposits, per-person or hourly
   rates, add-ons, what's included (specifics per type rules).
+- **Contract minimums are MUST-SURFACE — if any source states one, DEFINITELY call it out
+  (every vendor type).** This means any floor a couple is forced to clear: a spend /
+  food-and-beverage minimum, a minimum guest count, minimum hours or coverage, a minimum
+  order or booking value, an off-peak/weekday minimum, or a minimum-budget requirement.
+  Put it in `price_details`, and lift it into the `price_text` headline when it's the number
+  a couple would actually budget around ("$5k F&B minimum", "8-hr minimum booking"). A
+  minimum is the hidden cost that blows a budget, so never bury it or leave a sourced one
+  out. Attribute it like any other fact; never invent, round up, or estimate a minimum no
+  source states.
 - No published pricing (common — many say "inquire"): `price_text` = `Quote only`,
   `price_details` honestly says what you checked and that pricing is on inquiry; then let
   `notes` lead with services/style/specialties instead. NEVER invent numbers, NEVER
