@@ -192,6 +192,35 @@ export const TYPE_PROFILES = {
     wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|venues?|djs?|salon|makeup|tuxedo|jewel\w*|limo\w*)\b/i,
     ownSignal: /\b(flowers?|florals?|florists?|blooms?|blossoms?|petals?|posy|stems?|botanic\w*|bouquets?|roses?|peon(y|ies)|lil(y|ies)|ivy|ferns?|greenery|gardens?|buds?|wildflower\w*|stemm\w*|sage|lavender)\b/i,
   },
+  planner: {
+    vendorType: 'planner',
+    csv: 'vendors.csv',
+    // Two nets per anchor (Kiara, 2026-07): "planner" and "coordinator" brand differently
+    // ("... Events / Planning" vs "... Coordination"), and the user tracks day-of
+    // coordination as a distinct service worth catching. place_id dedup collapses overlap.
+    sweepQuery: (anchor) => [`wedding planner near ${anchor}`, `wedding coordinator near ${anchor}`],
+    // Planners are service-area vendors (they travel to the couple's venue) — most miss
+    // city-"near" queries and brand statewide, so the statewide query is the primary net.
+    statewideQuery: (stateName) => [`wedding planners in ${stateName}`, `wedding coordinators in ${stateName}`],
+    // "X Events" must never match "Y Events" on the trade word alone.
+    weak: new Set(['planner', 'planners', 'planning', 'plans', 'coordinator', 'coordinators', 'coordination', 'events', 'event', 'celebrations', 'celebration', 'occasions', 'affairs', 'soiree', 'soirees', 'design', 'designs', 'studio', 'studios', 'company', 'collective', 'co']),
+    // Sole-proprietor variants: "Jane Doe Events" ≡ "Jane Doe Events & Planning".
+    dedupStop: new Set(['events', 'event', 'planning', 'planner', 'planners', 'coordination', 'coordinator', 'co', 'llc', 'inc', 'the']),
+    // "planner" is overloaded — drop the clearly-non-wedding senses (financial/estate/etc.)
+    // by NAME before they enter the CSV. Corporate/party/event planners are NOT junked here:
+    // they share wedding-planner branding, so wedcheck sorts them on wedding evidence instead.
+    junkName: /\b(financial|retirement|wealth|estate|tax|insurance|mortgage|investment)\s+plann(er|ers|ing)\b|\bfinancial advis/i,
+    captureInstagram: false,
+    // WEDDING planners only (Kiara, 2026-07): the sweep pads with corporate/party/event
+    // planners. wedcheck keeps a sweep row only when its name, site, or Google reviews show
+    // wedding evidence; research-sourced rows (already wedding-scoped) are exempt.
+    intent: /wedding|elopement|bridal/i,
+    // Photographer/florist/caterer/venue/band names caught in the planner sweep; an "events"/
+    // "planning"/"coordination" own-word rescues true planner-hybrids ("Ashley Events &
+    // Photography" stays; a plain "Ashley Photography" is pruned).
+    wrongType: /\b(photograph\w*|videograph\w*|florists?|florals?|cater\w*|venues?|banquet|djs?|bands?|salon|makeup|bridal (shop|boutique)|tuxedo|jewel\w*|cakes?|bakery|officiants?|limo\w*|(party|event|tent) rentals?)\b/i,
+    ownSignal: /\b(plann(er|ers|ing)|coordinat\w*|events?|celebrations?|soir[ée]es?|occasions?|affairs?|weddings? (&|and) events?|day.of)\b/i,
+  },
   dress: {
     vendorType: 'dress',
     csv: 'vendors.csv',
@@ -230,9 +259,10 @@ export function typeProfile() {
     music: 'music', musician: 'music', musicians: 'music', band: 'music', bands: 'music', dj: 'music', djs: 'music',
     flowers: 'flowers', flower: 'flowers', florist: 'flowers', florists: 'flowers', floral: 'flowers',
     dress: 'dress', dresses: 'dress', bridal: 'dress', bridals: 'dress', gown: 'dress', gowns: 'dress',
+    planner: 'planner', planners: 'planner', planning: 'planner', coordinator: 'planner', coordinators: 'planner', coordination: 'planner',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner`); process.exit(1); }
   return { key, ...TYPE_PROFILES[key] };
 }
 

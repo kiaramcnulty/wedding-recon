@@ -105,6 +105,22 @@ export const ETYPES = {
     photoCap: 2,
     notFlag: 'NOTDRESS',
   },
+  planner: {
+    key: 'planner',
+    vendorType: 'planner',
+    label: 'PLANNER',
+    headers: [...BASE_HEADERS, 'service_region'],
+    serviceRegionRequired: true,       // service-area vendor; default to the run's state, note travel fees (Kiara, 2026-07)
+    refs: refsFor('planner'),
+    subpage: /(pric|package|rate|invest|service|wedding|event|about|process|experience|coordinat|plann|portfolio|gallery|faq|book|contact)/i,
+    // Planner pricing shapes: full/partial planning, day-of & month-of coordination, hourly,
+    // flat fee, or a PERCENTAGE of the total wedding budget (10-15% is a real model — keep % lines).
+    priceLine: /\$\s?\d|packag|full (service|planning|wedding)|partial (planning|service)|day.of|month.of|coordinat|starting (at|price)|invest|retainer|deposit|hourly|per hour|flat (fee|rate)|percent|% of|travel fee|pric(e|ing)|\brates?\b/i,
+    dossierPriceTitle: 'site pricing/package lines',
+    portraitFilter: false,             // a planner's portfolio IS the styled wedding they produced — couples, ceremonies, tablescapes are the work, not junk; don't pre-drop portrait URLs
+    photoCap: 2,
+    notFlag: 'NOTPLANNER',
+  },
 };
 
 /** Resolve --type (user-facing aliases accepted) to a profile; clear message on unknown. */
@@ -117,8 +133,9 @@ export function etype() {
     music: 'music', musician: 'music', musicians: 'music', band: 'music', bands: 'music', dj: 'music', djs: 'music',
     flowers: 'flowers', flower: 'flowers', florist: 'flowers', florists: 'flowers', floral: 'flowers',
     dress: 'dress', dresses: 'dress', bridal: 'dress', bridals: 'dress', gown: 'dress', gowns: 'dress',
+    planner: 'planner', planners: 'planner', planning: 'planner', coordinator: 'planner', coordinators: 'planner', coordination: 'planner',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner`); process.exit(1); }
   return ETYPES[key];
 }
