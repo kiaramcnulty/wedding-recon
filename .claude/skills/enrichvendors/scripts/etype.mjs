@@ -90,6 +90,21 @@ export const ETYPES = {
     photoCap: 2,
     notFlag: 'NOTFLORIST',
   },
+  dress: {
+    key: 'dress',
+    vendorType: 'dress',
+    label: 'BRIDAL SHOP',
+    headers: [...BASE_HEADERS, 'service_region'],
+    serviceRegionRequired: true,       // most are storefronts — shop city/metro is a fine sourced fallback
+    refs: refsFor('dress'),
+    hasInstagram: true,                // vendors.instagram is pipeline-populated for this type (migration 0016)
+    subpage: /(pric|appoint|book|designer|collection|gown|dress|bridal|bridesmaid|trunk|sample|about|faq|service)/i,
+    priceLine: /\$\s?\d|gowns?|dress(es)?|designer|trunk show|sample sale|off.the.rack|made.to.(order|measure)|special order|alteration|appointment|deposit|budget|price range|starting (at|price)|pric(e|ing)|\brates?\b/i,
+    dossierPriceTitle: 'site pricing/designer lines',
+    portraitFilter: false,             // the GOWN is the product but it's worn — gown-on-model/mannequin shots are keepers, don't pre-drop "bride" URLs
+    photoCap: 2,
+    notFlag: 'NOTDRESS',
+  },
 };
 
 /** Resolve --type (user-facing aliases accepted) to a profile; clear message on unknown. */
@@ -101,8 +116,9 @@ export function etype() {
     caterer: 'food', caterers: 'food', catering: 'food', food: 'food',
     music: 'music', musician: 'music', musicians: 'music', band: 'music', bands: 'music', dj: 'music', djs: 'music',
     flowers: 'flowers', flower: 'flowers', florist: 'flowers', florists: 'flowers', floral: 'flowers',
+    dress: 'dress', dresses: 'dress', bridal: 'dress', bridals: 'dress', gown: 'dress', gowns: 'dress',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress`); process.exit(1); }
   return ETYPES[key];
 }

@@ -192,6 +192,32 @@ export const TYPE_PROFILES = {
     wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|venues?|djs?|salon|makeup|tuxedo|jewel\w*|limo\w*)\b/i,
     ownSignal: /\b(flowers?|florals?|florists?|blooms?|blossoms?|petals?|posy|stems?|botanic\w*|bouquets?|roses?|peon(y|ies)|lil(y|ies)|ivy|ferns?|greenery|gardens?|buds?|wildflower\w*|stemm\w*|sage|lavender)\b/i,
   },
+  dress: {
+    vendorType: 'dress',
+    csv: 'vendors.csv',
+    // Two nets per anchor: "bridal shop" is how these brand; "wedding dress shop" catches
+    // designer/gown boutiques the shop-word alone misses. place_id dedup collapses the overlap.
+    sweepQuery: (anchor) => [`bridal shop near ${anchor}`, `wedding dress shop near ${anchor}`],
+    statewideQuery: (stateName) => [`bridal shops in ${stateName}`, `wedding dress shops in ${stateName}`],
+    // "X Bridal" must never match "Y Bridal" on the trade word alone.
+    weak: new Set(['bridal', 'bridals', 'bride', 'brides', 'boutique', 'boutiques', 'shop', 'shops', 'shoppe', 'salon', 'salons', 'gown', 'gowns', 'dress', 'dresses', 'couture', 'atelier', 'collection', 'collections', 'formal', 'formals', 'gallery', 'studio', 'studios', 'co', 'company']),
+    dedupStop: new Set(['bridal', 'bridals', 'boutique', 'boutiques', 'gown', 'gowns', 'dress', 'dresses', 'salon', 'shop', 'shoppe', 'couture', 'atelier', 'co', 'llc', 'inc', 'the']),
+    // Unambiguous non-gown-shop noise dropped by NAME (dry cleaners, dress-preservation
+    // services, costume shops) before it enters the CSV. Menswear/tux is left to wrongType,
+    // where a bridal/gown word can rescue a "Tux & Bridal" hybrid.
+    junkName: /\b(dry ?clean\w*|cleaners|preservation|costumes?)\b/i,
+    captureInstagram: true,       // requires vendors.instagram (migration 0016) at upload time
+    // BRIDAL-GOWN intent only (Kiara, 2026-07): the sweep pulls in menswear/tux, prom-only,
+    // and wedding-GUEST attire shops. wedcheck keeps a sweep row only when its name, site, or
+    // reviews show bridal-gown evidence; a "wedding guest dresses" retailer that never says
+    // "bridal" is pruned. A shop that ALSO sells guest/mother-of-the-bride dresses still
+    // passes as long as it carries actual bridal gowns (its site will say "bridal").
+    intent: /bridal|wedding dress|wedding gown/i,
+    // Menswear/tux and other-vendor-type names are wrong-type; a bridal/gown word rescues a
+    // hybrid ("Tux & Bridal Boutique" stays; a plain "Men's Wearhouse" is pruned).
+    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|venues?|djs?|tuxedos?|menswear|men'?s (wear|wearhouse|warehouse)|barber|jewel\w*|(party|event|tent) rentals?|limo\w*)\b/i,
+    ownSignal: /\b(bridal|brides?|gowns?|dress(es)?|boutique|couture|atelier|bridesmaids?|trunk show|veils?)\b/i,
+  },
 };
 
 /** Resolve --type (accepts user-facing aliases) to a profile; clear message on unknown. */
@@ -203,9 +229,10 @@ export function typeProfile() {
     caterer: 'food', caterers: 'food', catering: 'food', food: 'food',
     music: 'music', musician: 'music', musicians: 'music', band: 'music', bands: 'music', dj: 'music', djs: 'music',
     flowers: 'flowers', flower: 'flowers', florist: 'flowers', florists: 'flowers', floral: 'flowers',
+    dress: 'dress', dresses: 'dress', bridal: 'dress', bridals: 'dress', gown: 'dress', gowns: 'dress',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress`); process.exit(1); }
   return { key, ...TYPE_PROFILES[key] };
 }
 
