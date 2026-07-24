@@ -298,12 +298,18 @@ tooltip: "Consistently recommended in wedding communities and reviews."
 > returned nothing because the bar only geocoded *areas* and never queried
 > `vendors` — didn't need the discovery stack, so a lightweight slice of this
 > phase now runs in production:
-> - `search_vendors` RPC (**migration `0018`**, ilike form): matches `vendors` on
->   **name + `address_text` + `city`** and returns each hit's `lng`/`lat`
->   flattened from the PostGIS geography (same `st_x/st_y` trick as
->   `vendors_in_bbox`), so the client can fly to the pin. Idempotent; **must be
->   hand-applied in the Supabase SQL editor** like every migration here — until it
->   is, the route below degrades to no vendor results (Areas group unaffected).
+> - `search_vendors` RPC (**migration `0018`**, ilike form; **migration `0019`**
+>   makes it token-aware): matches `vendors` on **name + `address_text` +
+>   `city`** and returns each hit's `lng`/`lat` flattened from the PostGIS
+>   geography (same `st_x/st_y` trick as `vendors_in_bbox`), so the client can
+>   fly to the pin. `0019` splits the query into tokens, drops stop words, and
+>   requires **every** token to appear (AND) — so a leading article or reordered
+>   words still matches ("the sanctuary" → "Sanctuary Golf Course"), without
+>   loosening into fuzzy/typo territory (stop-word list mirrored in
+>   `lib/search/tokens.ts`, which `/api/places` uses for the same fix).
+>   Idempotent; **must be hand-applied in the Supabase SQL editor** like every
+>   migration here — until it is, the route below degrades to no vendor results
+>   (Areas group unaffected).
 > - `app/api/vendor-search/route.ts` — vendor-only autocomplete over that RPC,
 >   ranked by the same name-relevance score as `/api/places`. No Google Places
 >   call (Explore searches *our* directory; area nav stays with `/api/geocode`),

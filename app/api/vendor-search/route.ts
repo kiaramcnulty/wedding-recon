@@ -55,9 +55,12 @@ type VendorRow = {
  *   queried here (Explore searches *our* directory; area navigation stays with
  *   /api/geocode). Returns VendorSearchSuggestion[] ranked by name relevance.
  *
- *   Backed by the search_vendors RPC (migration 0018), which returns coordinates
- *   flattened from the PostGIS geography. If that migration hasn't been applied
- *   yet the RPC errors and this route degrades to no vendor results — the bar's
+ *   Backed by the search_vendors RPC (migration 0018; token-aware since 0019),
+ *   which returns coordinates flattened from the PostGIS geography. The RPC
+ *   splits the query into tokens, drops stop words, and requires every token to
+ *   appear in name/address/city, so "the sanctuary" resolves "Sanctuary Golf
+ *   Course" (see lib/search/tokens.ts). If neither migration has been applied
+ *   the RPC errors and this route degrades to no vendor results — the bar's
  *   Areas group is unaffected.
  */
 export async function GET(req: NextRequest) {
