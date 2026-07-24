@@ -26,14 +26,15 @@
 ## What couples actually want captured
 - Pricing packages (season/day-of-week/ceremony vs reception), capacity, what's included
   vs required, how the ownership/staff operates (responsive? family-run? corporate?),
-  vibe, indoor/outdoor spaces, the three logistics below, and ANY firsthand commentary
+  vibe, indoor/outdoor spaces, the four logistics below, and ANY firsthand commentary
   from reviews/reddit.
 
 ## Logistics couples specifically ask about (capture only when a source states it)
-These three drive real go/no-go and budget calls, so surface them whenever the site,
+These four drive real go/no-go and budget calls, so surface them whenever the site,
 reviews, or reddit actually address them. NEVER infer them from venue type — a remote
 ranch does not automatically require a shuttle, a resort does not automatically offer
-buyout lodging. If a source is silent on one, leave it out rather than guess; a hedged
+buyout lodging, a big full-service venue does not automatically include a day-of
+coordinator. If a source is silent on one, leave it out rather than guess; a hedged
 "their site doesn't spell out the catering policy" is fine when it's genuinely unclear.
 - **Catering policy** — which of the three models: in-house / exclusive caterer ONLY, an
   approved / preferred vendor LIST only, or open to any licensed outside caterer. Note
@@ -44,7 +45,13 @@ buyout lodging. If a source is silent on one, leave it out rather than guess; a 
 - **On-site lodging** — is there housing on the property, and for whom (the whole guest
   party, or just the couple / wedding party / immediate family)? Is a full-property BUYOUT
   or minimum-night stay REQUIRED to book, and at what cost?
+- **Day-of coordinator / venue manager** — does the venue PROVIDE a day-of coordinator or
+  on-site event manager, and is that person INCLUDED in the booking, an add-on at extra
+  cost, or is hiring one REQUIRED (some venues mandate their own coordinator, or proof of
+  an outside planner, to book)? Note the coordinator fee if stated, and distinguish a true
+  day-of/planning coordinator who runs the timeline from a "venue manager" who only opens
+  the building and enforces house rules.
 
 ## price_details specifics
 - Packages, seasonal tables, minimums (beverage/food minimums count), deposits,
-  per-person rates, site/venue fees.
+  per-person rates, site/venue fees, day-of coordinator fee when charged as an add-on.
