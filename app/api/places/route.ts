@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { searchTokens } from "@/lib/search/tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,17 @@ interface PlaceDetails {
   lat: number | null;
   lng: number | null;
   website: string | null;
+}
+
+/** The vendor columns the autocomplete lookup selects. */
+interface DbVendorRow {
+  id: string;
+  name: string;
+  vendor_type: string;
+  city: string | null;
+  address_text: string | null;
+  google_place_id: string | null;
+  source: "google" | "user" | "seed";
 }
 
 /**
@@ -71,12 +83,25 @@ export async function GET(req: NextRequest) {
 
     // Existing community vendors and Google predictions, fetched in parallel so
     // the added DB lookup doesn't extend the dropdown's latency.
+    //
+    // Match per-token (AND) rather than as one contiguous substring, so a
+    // leading article or reordered words still finds the vendor — "the
+    // sanctuary" resolves the row stored as "Sanctuary Golf Course". See
+    // lib/search/tokens.ts (and the search_vendors RPC, which mirrors this for
+    // the Explore bar).
     const supabase = await createClient();
-    const dbPromise = supabase
+    const tokens = searchTokens(query);
+    let dbQuery = supabase
       .from("vendors")
-      .select("id, name, vendor_type, city, address_text, google_place_id, source")
-      .ilike("name", `%${query}%`)
-      .limit(8);
+      .select("id, name, vendor_type, city, address_text, google_place_id, source");
+    for (const tok of tokens) {
+      dbQuery = dbQuery.ilike("name", `%${tok}%`);
+    }
+    // No usable tokens (query was only punctuation/wildcards) → skip the DB
+    // lookup rather than fetching every vendor; Google predictions still run.
+    const dbPromise: PromiseLike<{ data: DbVendorRow[] | null }> = tokens.length
+      ? dbQuery.limit(8)
+      : Promise.resolve({ data: [] as DbVendorRow[] });
 
     const googlePromise = apiKey
       ? fetch("https://places.googleapis.com/v1/places:autocomplete", {
