@@ -7,12 +7,12 @@ Profile key `dress` → `vendor_type='dress'` (app category: Shirt icon, warm or
 ## Ground truth
 - **Most bridal shops are storefronts with a specific Google Maps address** — expect a strong Places sweep and a LOW centroid/no-match rate (like florists, unlike photographers). By-appointment home studios and independent designers exist but are the minority; they come in through research + pastes.
 - **THE exclusion — guest attire vs. the bride/bridal party.** This category is shops that sell **wedding gowns for the bride** (and, commonly, the bridal party — bridesmaids). EXCLUDE shops that only dress wedding *guests*: department stores and boutiques selling "wedding guest dresses" / cocktail / evening / prom / mother-of-the-bride attire with **no actual bridal gowns**. A shop that *also* carries guest, mother-of-the-bride, or bridesmaid dresses is **fine to include as long as it sells real bridal gowns for the bride.** Bridal-party-only shops (bridesmaids/flower-girl but no bride gowns) are a judgment call — keep if they clearly serve wedding parties, note that they're party-only.
-- Also exclude (different businesses, not dresses): menswear/tuxedo shops, jewelers, dress alterations/preservation/dry-cleaning services, costume shops. The sweep prunes the unambiguous ones by name; the rest are a Phase 4 glance.
+- Also exclude (different businesses, not dresses): menswear/tuxedo shops, jewelers, dress preservation/dry-cleaning services, costume shops, and alterations/tailoring/seamstress shops (they legitimately say "wedding dress" — they *alter* gowns, they don't sell them). The sweep prunes the unambiguous ones by name; hybrids with a rescuing bridal/gown word (and jewelers) are a Phase 4 glance.
 
 ## Phase 1 — sweep
 Two queries per anchor: `bridal shop near {anchor}` and `wedding dress shop near {anchor}` (place_id dedup collapses the overlap for free); statewide launches add `bridal shops in {StateName}` + `wedding dress shops in {StateName}`. All encoded in `TYPE_PROFILES.dress`.
 
-Noise is handled mechanically (Kiara, 2026-07: prune proactively — humans skim, they don't audit): the sweep drops dry cleaners / dress-preservation services / costume shops **by name**, and prunes menswear/tux + other-vendor-type names via the cross-type guard (a bridal/gown word rescues a "Tux & Bridal" hybrid). Then the **bridal-gown intent check** (mandatory):
+Noise is handled mechanically (Kiara, 2026-07: prune proactively — humans skim, they don't audit): the sweep drops dry cleaners / dress-preservation services / costume shops **unconditionally by name**, and prunes menswear/tux + alterations/tailoring/seamstress/dressmaker shops + other-vendor-type names via the cross-type guard (a bridal/gown/boutique/couture word rescues a hybrid — "Tux & Bridal", "Heartstrings Vintage Bridal & Tailoring"). The alterations family was the sweep's single biggest false-positive (2026-07-25 CO run: ~22 tailor/seamstress/dressmaker shops needed manual removal at enrichment) — a handful of real gown shops that also carry a tailoring/alterations word in their name (e.g. "Saira's Tailoring Boutique") still survive by design, since they also carry a rescuing word; those and "X Bridal" hair/makeup studios fall to the Phase 4 glance / enrich-stage `NOTDRESS!` flag instead. Then the **bridal-gown intent check** (mandatory):
 ```
 node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs data/launchvendors/<slug> --type dress
 ```
@@ -42,6 +42,7 @@ Instagram pages are browsed and pasted **by the user** — never fetched or auto
 Beyond the standard flags, ask Kiara to eyeball for:
 - **Guest-attire shops** that slipped through (cocktail/evening/prom/mother-of-the-bride only, no bridal gowns) — delete.
 - **Menswear/tuxedo** shops and jewelers with a "bridal" word (kept by the hybrid rescue) — delete unless they genuinely sell bridal gowns.
+- **Alterations/tailoring/seamstress** shops that survived because their name also carries a bridal/gown/boutique/couture word (e.g. "Saira's Tailoring Boutique", "Elena's Bridal Alteration Shop") — delete unless they genuinely sell bridal gowns (most don't; they only alter them).
 - **Bridal-party-only** shops (bridesmaids/accessories, no bride gowns) — keep or delete on the shop's focus.
 - Name-variant dedup collisions (the profile treats "X Bridal" ≡ "X Bridal Boutique" — the dry-run's name+city skip list shows what collided).
 

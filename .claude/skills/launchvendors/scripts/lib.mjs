@@ -231,9 +231,10 @@ export const TYPE_PROFILES = {
     // "X Bridal" must never match "Y Bridal" on the trade word alone.
     weak: new Set(['bridal', 'bridals', 'bride', 'brides', 'boutique', 'boutiques', 'shop', 'shops', 'shoppe', 'salon', 'salons', 'gown', 'gowns', 'dress', 'dresses', 'couture', 'atelier', 'collection', 'collections', 'formal', 'formals', 'gallery', 'studio', 'studios', 'co', 'company']),
     dedupStop: new Set(['bridal', 'bridals', 'boutique', 'boutiques', 'gown', 'gowns', 'dress', 'dresses', 'salon', 'shop', 'shoppe', 'couture', 'atelier', 'co', 'llc', 'inc', 'the']),
-    // Unambiguous non-gown-shop noise dropped by NAME (dry cleaners, dress-preservation
-    // services, costume shops) before it enters the CSV. Menswear/tux is left to wrongType,
-    // where a bridal/gown word can rescue a "Tux & Bridal" hybrid.
+    // Unambiguous non-gown-shop noise dropped UNCONDITIONALLY by NAME (dry cleaners,
+    // dress-preservation services, costume shops) before it enters the CSV — these carry no
+    // gown signal, so no rescue is needed. Menswear/tux AND alterations/tailoring/seamstress
+    // shops instead go to wrongType (below), where a bridal/gown word can rescue a hybrid.
     junkName: /\b(dry ?clean\w*|cleaners|preservation|costumes?)\b/i,
     captureInstagram: true,       // requires vendors.instagram (migration 0016) at upload time
     // BRIDAL-GOWN intent only (Kiara, 2026-07): the sweep pulls in menswear/tux, prom-only,
@@ -242,9 +243,16 @@ export const TYPE_PROFILES = {
     // "bridal" is pruned. A shop that ALSO sells guest/mother-of-the-bride dresses still
     // passes as long as it carries actual bridal gowns (its site will say "bridal").
     intent: /bridal|wedding dress|wedding gown/i,
-    // Menswear/tux and other-vendor-type names are wrong-type; a bridal/gown word rescues a
-    // hybrid ("Tux & Bridal Boutique" stays; a plain "Men's Wearhouse" is pruned).
-    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|venues?|djs?|tuxedos?|menswear|men'?s (wear|wearhouse|warehouse)|barber|jewel\w*|(party|event|tent) rentals?|limo\w*)\b/i,
+    // Menswear/tux, alterations/tailoring/seamstress shops, and other-vendor-type names are
+    // wrong-type; a bridal/gown/boutique/couture word (ownSignal) rescues a hybrid. The
+    // alterations family is the "bridal shop near X" sweep's biggest false-positive: tailor/
+    // seamstress/sewing/dressmaker services that legitimately say "wedding dress" (they ALTER
+    // gowns) but don't sell them — "EROL'S Tailoring", "The Sewing Room", "Denver Dressmakers"
+    // prune, while "Heartstrings Vintage Bridal & Tailoring" (a real gown shop) is rescued by
+    // "Bridal". Alterations shops that carry a gown word (Saira's Tailoring BOUTIQUE, Elena's
+    // BRIDAL Alteration) and "X Bridal" hair/makeup studios can't be name-pruned without
+    // endangering real shops — those are left to the enrich-stage NOTDRESS! flag.
+    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|venues?|djs?|tuxedos?|menswear|men'?s (wear|wearhouse|warehouse)|barber|jewel\w*|(party|event|tent) rentals?|limo\w*|alterations?|tailor\w*|seamstress(es)?|sewing|sew ?it|dressmakers?|stitch\w*|needle\w*|custom apparel)\b/i,
     ownSignal: /\b(bridal|brides?|gowns?|dress(es)?|boutique|couture|atelier|bridesmaids?|trunk show|veils?)\b/i,
   },
 };
