@@ -24,7 +24,7 @@ A property with **wedding event space** (ballroom, ceremony lawn, reception hall
 
 ### Other ground truth
 - **Strong Places sweep, unlike the service types.** Hotels are real addressed businesses, so expect a high match rate and a LOW centroid/no-match count. The hard part here is never "finding hotels" — it's proving a block exists.
-- **Block terms are almost never on a homepage.** They live on a `/weddings`, `/groups`, or `/meetings` subpage, or in a review. `wedcheck` only reads the homepage + Google reviews, so it will prune real block hotels. That's expected — Phase 2 research is what rescues them, and `pruned.csv` keeps every one recoverable.
+- **Block terms are almost never on a homepage** — they live on a `/weddings`, `/groups`, or `/meetings` subpage. `wedcheck` handles this directly for this type: it **follows the hotel's own same-host links** (≤3, matched on href or nav label) before giving up, so a property that documents its block anywhere on its site is kept and counted as `by subpage` in the summary. `pruned.csv` is the backstop for the rest, not the primary path.
 - **Chains vs. independents:** both are in scope. Chain properties (Hampton, Courtyard, Hyatt Place) are the workhorses of guest blocks; boutique/independent hotels often have the more interesting terms.
 - **Excluded (can't hold a block):** hostels, RV parks/campgrounds, vacation-rental and short-term-rental agencies, realty/property management, timeshares, extended-stay corporate housing, travel agencies. Most are pruned by name at sweep time.
 
@@ -35,7 +35,7 @@ Then the **intent check** (mandatory, but read its output differently for this t
 ```
 node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs data/launchvendors/<slug> --type hotelblocks
 ```
-The regex is a cheap prefilter (`wedding|bridal|room block|group rate/block/booking/sales`), NOT the evidence bar — it keeps anything wedding- or group-shaped and prunes the generic roadside motel. **Expect a heavy prune count here and don't panic**: block language lives on subpages wedcheck never fetches. Relay the pruned names, then treat `pruned.csv` as a worklist — Phase 2 research routinely rescues real block hotels from it (`--rescue` in Phase 4).
+The regex is a cheap prefilter (`wedding|bridal|room block|group rate/block/booking/sales`), NOT the evidence bar — it keeps anything wedding- or group-shaped and prunes the generic roadside motel. For this type wedcheck also **follows the hotel's own `/weddings`, `/groups`, `/meetings` links** (`intentSubpage`, ≤3 pages, same host only), which is where block language actually lives; those keeps show up as `by subpage` in the summary. Still relay the pruned names and treat `pruned.csv` as a backstop worklist — a hotel whose site says nothing but that HotelPlanner or a reddit thread evidences comes back through Phase 2 research (or `--rescue` in Phase 4).
 
 ## Phase 2 — web research queries (4–6 WebSearches)
 Research carries more weight for this type than for any other, because the evidence bar lives here.

@@ -96,6 +96,24 @@ export function classifyMusic(name) {
   return MUSIC_DJ.test(n) && !MUSIC_LIVE.test(n) ? 'dj' : 'band';
 }
 
+/**
+ * Same-host links wedcheck will follow when a vendor's HOMEPAGE shows no wedding evidence
+ * (see `subpagesHaveIntent` in wedcheck.mjs). Matched against a link's href OR its anchor
+ * text, so both "/weddings" and a "Private Events" nav label qualify.
+ *
+ * Why this is on by default (Kiara, 2026-07-26): the pipeline is ASYMMETRIC about errors.
+ * A false positive — junk kept — has a downstream backstop (enrich's NOT* flag, then
+ * remove-vendors.mjs). A false negative — a real vendor pruned — has NONE: it sits in
+ * pruned.csv and is lost unless someone skims. So buying recall here is the right trade,
+ * and it is nearly free: these are plain HTTP fetches inside a script (zero orchestrator
+ * tokens, zero API quota) that run BEFORE the PAID Places reviews call, so a subpage hit
+ * saves a call rather than adding one. The cost is wall-clock, not money or context.
+ *
+ * Deliberately TIGHT (wedding-ish pages only, ≤3 followed): a broad regex would spend the
+ * cap on About/Contact pages that carry no evidence either way.
+ */
+const INTENT_SUBPAGE = /wedding|bridal|event|private|celebrat|occasion/i;
+
 export const TYPE_PROFILES = {
   venue: {
     vendorType: 'venue',
@@ -133,6 +151,8 @@ export const TYPE_PROFILES = {
     // Places pads results with general portrait/family studios. wedcheck.mjs keeps a sweep
     // row only when its name or website homepage matches this; otherwise flags for review.
     intent: /wedding|elopement|bridal/i,
+    // Probe subpages when the homepage is silent — a portrait/family studio's wedding work often lives on a /weddings gallery.
+    intentSubpage: INTENT_SUBPAGE,
     // "weddings & events"/trailing-"Events" names are planner-shaped; photo/film words rescue.
     wrongType: /\b(plann(er|ers|ing)|coordinat\w*|weddings? (&|and) events?|events?$|rentals?|cater\w*|florists?|florals?|venue|banquet|officiants?|salon|makeup|bridal (shop|boutique)|tuxedo|jewel\w*|cakes?|bakery|limo\w*)\b/i,
     ownSignal: /\b(photo\w*|pictures?|imag(e|es|ery)|studios?|films?|media|lens|captured?|visuals?|cinema\w*|portraits?|exposures?|shutter)\b/i,
@@ -151,6 +171,8 @@ export const TYPE_PROFILES = {
     // on name/site is flagged; a reddit thread or Google review describing their wedding
     // work rescues the row at review even if the site never says "wedding".
     intent: /wedding|bridal/i,
+    // Probe subpages when the homepage is silent — a general caterer's wedding menus usually live on a /weddings or /events page.
+    intentSubpage: INTENT_SUBPAGE,
     wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|florists?|florals?|venues?|dj|salon|makeup|tuxedo|jewel\w*|limo\w*)\b/i,
     ownSignal: /\b(cater\w*|cuisine|kitchens?|foods?|bbq|barbecue|cafe|grill|chefs?|bak(e|ery|ing|ed)|bistro|restaurant|taco|pizza|eats|dining|provisions|table|feast|roast|smoke\w*|spice|hospitality)\b/i,
   },
@@ -175,6 +197,8 @@ export const TYPE_PROFILES = {
     junkName: /\b(school|schools|academy|conservatory|lessons?|tuition|karaoke|instrument store|music store|guitar center|equipment rental|av rental|audio.?visual)\b/i,
     captureInstagram: false,
     intent: /wedding|bridal/i,
+    // Probe subpages when the homepage is silent — a working band's wedding sets usually live on a /weddings or /private-events page.
+    intentSubpage: INTENT_SUBPAGE,
     wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|venues?|salon|makeup|tuxedo|jewel\w*|limo\w*)\b/i,
     ownSignal: /\b(music\w*|bands?|djs?|entertain\w*|sounds?|strings|trio|quartet|ensemble|sing\w*|piano|guitar|violin|cello|harp|orchestra|acoustic|beats|audio|vocal\w*|brass|jazz|keys)\b/i,
   },
@@ -189,6 +213,8 @@ export const TYPE_PROFILES = {
     junkName: /\b(nursery|nurseries|garden center|greenhouse|farm supply|landscap\w*)\b/i,
     captureInstagram: false,
     intent: /wedding|bridal/i,
+    // Probe subpages when the homepage is silent — an everyday flower shop's wedding arm usually lives on a /weddings page.
+    intentSubpage: INTENT_SUBPAGE,
     wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|venues?|djs?|salon|makeup|tuxedo|jewel\w*|limo\w*)\b/i,
     ownSignal: /\b(flowers?|florals?|florists?|blooms?|blossoms?|petals?|posy|stems?|botanic\w*|bouquets?|roses?|peon(y|ies)|lil(y|ies)|ivy|ferns?|greenery|gardens?|buds?|wildflower\w*|stemm\w*|sage|lavender)\b/i,
   },
@@ -215,6 +241,8 @@ export const TYPE_PROFILES = {
     // planners. wedcheck keeps a sweep row only when its name, site, or Google reviews show
     // wedding evidence; research-sourced rows (already wedding-scoped) are exempt.
     intent: /wedding|elopement|bridal/i,
+    // Probe subpages when the homepage is silent — a corporate/event planner's wedding work often lives on a /weddings page.
+    intentSubpage: INTENT_SUBPAGE,
     // Photographer/florist/caterer/venue/band names caught in the planner sweep; an "events"/
     // "planning"/"coordination" own-word rescues true planner-hybrids ("Ashley Events &
     // Photography" stays; a plain "Ashley Photography" is pruned).
@@ -243,6 +271,13 @@ export const TYPE_PROFILES = {
     // "bridal" is pruned. A shop that ALSO sells guest/mother-of-the-bride dresses still
     // passes as long as it carries actual bridal gowns (its site will say "bridal").
     intent: /bridal|wedding dress|wedding gown/i,
+    // NO intentSubpage on purpose (Kiara, 2026-07-26). Every other wedcheck type probes
+    // subpages for recall, but this type's biggest documented false positive is the
+    // alterations/tailoring family, which legitimately says "wedding dress" (they ALTER
+    // gowns, they don't sell them) — the 2026-07-25 CO run needed ~22 removed by hand.
+    // Crawling deeper finds that exact phrase on MORE pages, amplifying the one failure
+    // mode this type already fights, while adding little recall: a real bridal shop says
+    // "bridal" on its homepage. Keep the check homepage-only here.
     // Menswear/tux, alterations/tailoring/seamstress shops, and other-vendor-type names are
     // wrong-type; a bridal/gown/boutique/couture word (ownSignal) rescues a hybrid. The
     // alterations family is the "bridal shop near X" sweep's biggest false-positive: tailor/
@@ -281,6 +316,8 @@ export const TYPE_PROFILES = {
     // never touched a wedding. wedcheck keeps a row only when its name, site, or Google
     // reviews show bridal evidence; research-sourced rows are exempt.
     intent: /wedding|bridal|bride/i,
+    // Probe subpages when the homepage is silent — an everyday salon's bridal service usually lives on a /bridal or /weddings page.
+    intentSubpage: INTENT_SUBPAGE,
     // Other vendor types caught in this sweep — bridal DRESS shops especially (the
     // "bridal hair and makeup" query pulls them in), plus photographers/planners/florists.
     // An own-trade word (hair/makeup/beauty/glam/lashes...) rescues a hybrid, so
@@ -317,6 +354,12 @@ export const TYPE_PROFILES = {
     // prunes the generic roadside motel. The HARD bar — documented evidence of an actual
     // block — is a Phase 4 judgment call, not this regex. See types/hotelblocks.md.
     intent: /wedding|bridal|room block|group (rate|block|booking|sales)|group rates/i,
+    // Follow the hotel's OWN links to the pages where block language actually lives. Only
+    // this type sets it, so wedcheck's behavior for every other type is unchanged. Matched
+    // against a link's href OR its anchor text, so both "/weddings" and a "Groups & Meetings"
+    // nav label qualify. This is what makes the intent check real for hotels instead of a
+    // homepage lottery — see wedcheck.mjs `subpagesHaveIntent`.
+    intentSubpage: /wedding|group|meeting|block|room|celebrat|occasion/i,
     // Other vendor types swept up by the query. Venue words are intentionally absent (see
     // the note above); a lodging word rescues a hybrid.
     wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|djs?|bands?|salon|makeup|bridal (shop|boutique)|gowns?|tuxedos?|jewel\w*|cakes?|bakery|officiants?|limo\w*|(party|event|tent) rentals?)\b/i,

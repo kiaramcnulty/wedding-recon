@@ -13,7 +13,7 @@ Goal: vendor-only placeholder rows in the `vendors` table (pins with name/locati
 
 All commands run from the repo root. Scripts live in `.claude/skills/launchvendors/scripts/` and need `.env.local` (`GOOGLE_PLACES_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) — they fail fast with a clear message if a key is missing; relay that to the user and stop.
 
-Cost note: the whole pipeline is ~15–60 Places API calls (sweep; music runs 3 queries per anchor so ~3×, still trivial) + 1–2 per researched candidate + ≤1 Place Details (reviews) per evidence-less sweep row in wedcheck — pennies, mostly inside Google's free tier.
+Cost note: the whole pipeline is ~15–60 Places API calls (sweep; music runs 3 queries per anchor so ~3×, still trivial) + 1–2 per researched candidate + ≤1 Place Details (reviews) per evidence-less sweep row in wedcheck — pennies, mostly inside Google's free tier. `wedcheck` also follows up to 3 of a vendor's OWN same-host subpages when its homepage is silent; those are plain HTTP fetches (no API quota, no tokens) and they run BEFORE the paid reviews call, so they save quota more often than they cost wall-clock.
 
 ## Phase 0 — Setup (one short exchange, then no questions for the rest of the run)
 
