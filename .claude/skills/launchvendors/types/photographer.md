@@ -40,8 +40,8 @@ Most Places-less photographers still have a findable site. For each candidate **
 
 Instagram pages are browsed and pasted **by the user** — never fetched or automated (Meta ToS).
 
-## Phase 4 — review watchlist
-Beyond the standard flags, ask Kiara to eyeball for: video-only outfits, and name-variant dedup collisions (the type profile treats "Jane Doe Photography" ≡ "Jane Doe Photo" — the dry-run's name+city skip list shows what collided). Photo-booth rentals and non-wedding studios are pruned mechanically now (junk-name filter + wedcheck) — mention the pruned count and move on.
+## Phase 4 — adjudication watchlist (your call, not Kiara's)
+Beyond the standard docket, remove: video-only outfits, and name-variant dedup collisions (the type profile treats "Jane Doe Photography" ≡ "Jane Doe Photo" — the dry-run's name+city skip list shows what collided). Photo-booth rentals and non-wedding studios are pruned mechanically now (junk-name filter + wedcheck) — mention the pruned count and move on.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:

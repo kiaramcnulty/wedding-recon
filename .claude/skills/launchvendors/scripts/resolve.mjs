@@ -1,13 +1,14 @@
 // Resolve researched candidates (<workdir>/candidates.jsonl) to Google Places -> append to the working CSV.
 // Each line: {"name":"...","hint":"City, ST area (optional)","website":"...","instagram":"...","provenance":"reddit:r/Denver-01"}
-// usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/resolve.mjs <workdir> --state CO [--type photographer]
+// usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/resolve.mjs <workdir> --state CO [--region "Denver, CO"] [--type photographer]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, nameKey, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, cleanWebsite, cleanInstagram, sleep, argValue, typeProfile } from './lib.mjs';
+import { readVenues, writeVenues, nameKey, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, centroidLookup, cleanWebsite, cleanInstagram, sleep, argValue, typeProfile } from './lib.mjs';
 
 const workdir = process.argv[2];
 const state = argValue('state');
-if (!workdir || workdir.startsWith('--') || !state) { console.error('usage: resolve.mjs <workdir> --state CO [--type photographer]'); process.exit(1); }
+const region = argValue('region');   // "City, ST" — centroid of last resort when a candidate has no city hint
+if (!workdir || workdir.startsWith('--') || !state) { console.error('usage: resolve.mjs <workdir> --state CO [--region "Denver, CO"] [--type photographer]'); process.exit(1); }
 if (!process.env.GOOGLE_PLACES_API_KEY) { console.error('GOOGLE_PLACES_API_KEY missing — run with --env-file=.env.local from the repo root'); process.exit(1); }
 const profile = typeProfile();
 
@@ -73,7 +74,10 @@ for (const c of cands) {
     resolved++;
     if (flags) flagged.push(`${gName} | ${flags}`);
   } else {
-    // No trusted business match — fall back to a city-centroid approximate row.
+    // No trusted business match — fall back to an approximate centroid row: the candidate's
+    // own city hint first, then the run's region (Kiara, 2026-07-26: a vendor we believe in
+    // but can't place gets a centroid pin rather than a row waiting on a human for an
+    // address — service-area vendors often have no street address to find).
     // address stays "City, ST" (no street digits) so the app's dashed approximate-pin heuristic fires.
     const cityHint = (c.hint || '').split(',')[0].replace(/\barea\b/gi, '').trim();
     // No Google place, but keep a website research surfaced (backend-only, non-Google row).
@@ -81,18 +85,15 @@ for (const c of cands) {
     if (researchWebsite) researchSite++;
     let row = {
       name: c.name, address: '', city: '', state, website: researchWebsite, instagram: ig, lat: '', lng: '', place_id: '',
-      provenance: c.provenance || 'research', flags: 'NO_MATCH;NEEDS_ADDRESS',
+      provenance: c.provenance || 'research', flags: 'NO_MATCH',
       subtype: profile.classify ? profile.classify(c.name) : '',
     };
-    if (cityHint) {
-      try {
-        const d = await placesSearch(`${cityHint}, ${state}`);
-        const g = d.places?.[0];
-        if (g && (g.formattedAddress || '').includes(state)) {
-          row = { ...row, address: `${cityHint}, ${state}`, city: cityHint, lat: g.location?.latitude ?? '', lng: g.location?.longitude ?? '', flags: 'APPROX;NEEDS_ADDRESS' };
-        }
-      } catch { /* keep NO_MATCH */ }
-      await sleep(120);
+    const hit = await centroidLookup([cityHint && `${cityHint}, ${state}`, region], state);
+    if (hit) {
+      row = {
+        ...row, address: hit.label, city: hit.city, lat: hit.lat, lng: hit.lng,
+        flags: hit.label === region ? 'APPROX:region' : 'APPROX:city',
+      };
     }
     venues.push(row);
     knownNames.push(key); if (!byKey.has(key)) byKey.set(key, row);
@@ -103,4 +104,4 @@ for (const c of cands) {
 
 writeVenues(file, venues);
 console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known (${donated} donated ig/website to existing rows) | +${researchSite} using a research website | total ${venues.length}`);
-if (flagged.length) { console.log('\nFLAGGED FOR REVIEW:'); for (const f of flagged) console.log('  ' + f); }
+if (flagged.length) { console.log('\nFLAGGED (adjudicate in Phase 4 — see adjudicate.mjs):'); for (const f of flagged) console.log('  ' + f); }

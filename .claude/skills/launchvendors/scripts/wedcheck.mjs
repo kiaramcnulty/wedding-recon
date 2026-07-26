@@ -10,7 +10,8 @@
 //   PRUNED:non-wedding   site read fine + reviews read fine, zero wedding evidence
 //   PRUNED:no-evidence   no website at all and no wedding evidence in reviews
 //   WED_UNVERIFIED       has a website we could NOT read and reviews don't rescue it —
-//                        the only case a human still glances at (kept, flagged)
+//                        kept + flagged, and settled in Phase 4 by adjudicate.mjs (agent
+//                        judgment since 2026-07-26, no human review pass)
 // Research-sourced rows (reddit/ig/web provenance) are skipped: their sources are already
 // wedding-scoped. Idempotent — flagged/pruned rows are not re-fetched or resurrected.
 // usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs <workdir> [--type music]
@@ -68,7 +69,7 @@ for (let i = 0; i < queue.length; i += CONC) {
     if (await reviewsHaveIntent(v.place_id)) { keptReviews++; return; }
     if (v.website && siteVerdict === null) {
       // A site exists but we couldn't read it, and reviews don't rescue — the one case
-      // that still needs a human glance. Keep, flagged.
+      // that still needs a judgment call. Keep, flagged for Phase 4 adjudication.
       v.flags = v.flags ? `${v.flags};WED_UNVERIFIED` : 'WED_UNVERIFIED';
       flaggedUnv++;
       return;
@@ -88,6 +89,6 @@ if (pruned.length) {
 }
 const flagged = venues.filter((v) => !prunedSet.has(v) && /WED_UNVERIFIED/.test(v.flags));
 if (flagged.length) {
-  console.log('\nFLAGGED (site exists but unreadable — glance at these):');
+  console.log('\nFLAGGED (site exists but unreadable — adjudicate these in Phase 4):');
   for (const v of flagged) console.log(`  ${v.name} (${v.city || '?'}) | ${v.website}`);
 }

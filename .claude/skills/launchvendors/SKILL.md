@@ -1,6 +1,6 @@
 ---
 name: launchvendors
-description: Launch a region's wedding-vendor directory in Wedding Recon for a given vendor type (venues, photographers, caterers, music, flowers, bridal/dress shops, wedding planners). Sweeps Google Places for a baseline list, mines web listicles and user-pasted Reddit/Instagram content for vendors Google Maps misses, resolves candidates to canonical Google places (with a no-place fallback), hands the user one CSV to review, then bulk-uploads deduplicated vendor-only rows to Supabase. Use when the user wants to seed, launch, or bulk-import a vendor category for a city/region (e.g. "launch Richmond", "seed venues for Austin", "launch Denver photographers", "seed Denver caterers", "launch Denver bridal shops", "launch Denver wedding planners").
+description: Launch a region's wedding-vendor directory in Wedding Recon for a given vendor type (venues, photographers, caterers, music, flowers, bridal/dress shops, wedding planners). Sweeps Google Places for a baseline list, mines web listicles and user-pasted Reddit/Instagram content for vendors Google Maps misses, resolves candidates to canonical Google places (with a centroid fallback), adjudicates questionable rows itself, then bulk-uploads deduplicated vendor-only rows to Supabase. Use when the user wants to seed, launch, or bulk-import a vendor category for a city/region (e.g. "launch Richmond", "seed venues for Austin", "launch Denver photographers", "seed Denver caterers", "launch Denver bridal shops", "launch Denver wedding planners").
 ---
 
 # /launchvendors — seed a region's vendors for one vendor type
@@ -15,11 +15,12 @@ All commands run from the repo root. Scripts live in `.claude/skills/launchvendo
 
 Cost note: the whole pipeline is ~15–60 Places API calls (sweep; music runs 3 queries per anchor so ~3×, still trivial) + 1–2 per researched candidate + ≤1 Place Details (reviews) per evidence-less sweep row in wedcheck — pennies, mostly inside Google's free tier.
 
-## Phase 0 — Setup (one short exchange, then no questions until Phase 4)
+## Phase 0 — Setup (one short exchange, then no questions until the Phase 5 upload gate)
 
 1. Parse the skill argument as `<type?> <region>` (e.g. `/launchvendors photographer Denver` or `/launchvendors Richmond`). If the first token is a known type alias (venue(s), photographer(s)/photos, caterer(s)/catering, music/band/dj, flowers/florist(s), dress(es)/bridal/gown(s), planner(s)/coordinator(s) — see `typeProfile()` in `lib.mjs`), use it; otherwise the type is **venue**. Read `types/<type>.md` before anything else; it may add preflight requirements (e.g. photographers and dress shops require migration `0016` for the instagram column).
 2. Normalize region to `"City, ST"`. If the state isn't obvious from the city name, ask. **The state parameterizes everything downstream** — never assume CO. A bare state ("Colorado") means a **statewide** launch: pick the largest city as the region arg and pass `--statewide <StateName>` to scout (prepends a generic state-level query — the primary net for service-area types that brand statewide and miss city-"near" queries).
-3. Propose 4–8 anchor towns (suburbs/nearby towns that widen the sweep, e.g. Denver → Boulder, Golden, Littleton, Aurora, Morrison, Westminster; statewide launches span the state's metros + relevant destination towns and may run longer). One message: confirm type, region, state, anchors. **Never ask about scrape CSVs** — if the user has one they'll volunteer it (Kiara, 2026-07: "default is that it's not coming"); `ingest.mjs` handles a volunteered file. Wait for the reply, then run everything through Phase 3 without further questions.
+3. Propose 4–8 anchor towns (suburbs/nearby towns that widen the sweep, e.g. Denver → Boulder, Golden, Littleton, Aurora, Morrison, Westminster; statewide launches span the state's metros + relevant destination towns and may run longer). One message: confirm type, region, state, anchors. **Never ask about scrape CSVs** — if the user has one they'll volunteer it (Kiara, 2026-07: "default is that it's not coming"); `ingest.mjs` handles a volunteered file. Wait for the reply, then run everything through Phase 4 without further questions.
+   - **Chained run** (the user asked for launch **and** enrich, or said to run unattended): add one clause to that same message asking whether to pre-authorize the Phase 5 upload gate. A yes makes the whole chain — launch → upload → `/enrichvendors` — run without stopping. No answer to that clause = the normal gate still applies; don't ask twice.
 4. Workdir: `data/launchvendors/<type>-<region-slug>/` (gitignored). Scripts create it. (Pre-rename venue workdirs live in `data/launchvenues/` — leave them; `/enrichvenues` reads them.)
 5. The working CSV name is per-type (`venues.csv` for venues — historical; `vendors.csv` otherwise). The scripts handle this; use the name the script summaries print.
 
@@ -51,22 +52,34 @@ Then spawn the extractor (ALWAYS a subagent — never read pastes inline, whatev
 ## Phase 3 — Resolve candidates to Google places
 
 ```
-node --env-file=.env.local .claude/skills/launchvendors/scripts/resolve.mjs data/launchvendors/<slug> --state CO --type <type>
+node --env-file=.env.local .claude/skills/launchvendors/scripts/resolve.mjs data/launchvendors/<slug> --state CO --region "Denver, CO" --type <type>
 ```
 
-The script dedupes against known names (type-aware: trade words like "Photography"/"Photo" are stripped so sole-proprietor variants collide), applies the **wrong-match guard** (matched name must share a significant, non-generic token AND sit in the target state — "first Google result" is NOT a match without this), adopts the canonical Google name, keeps research-sourced website/instagram, and falls back to a city-centroid row for no-matches (`address` stays `"City, ST"` — no street digits — so the app renders the dashed approximate pin). Relay the FLAGGED list verbatim. For service-area types, a high no-match/centroid rate is expected — say so rather than treating it as failure.
+The script dedupes against known names (type-aware: trade words like "Photography"/"Photo" are stripped so sole-proprietor variants collide), applies the **wrong-match guard** (matched name must share a significant, non-generic token AND sit in the target state — "first Google result" is NOT a match without this), adopts the canonical Google name, keeps research-sourced website/instagram, and falls back to a centroid row for no-matches — the candidate's own city hint, then `--region` (`address` stays `"City, ST"`, no street digits, so the app renders the dashed approximate pin). Pass `--region` always; without it a hintless candidate lands as `NO_MATCH` with no pin. Relay the FLAGGED list verbatim — it becomes the Phase 4 docket. For service-area types, a high no-match/centroid rate is expected — say so rather than treating it as failure.
 
-## Phase 4 — User review (local CSV, the only human step)
+## Phase 4 — Adjudicate the flagged rows (your judgment — do NOT wait for the user)
 
-Tell the user: open the working CSV in any spreadsheet app or editor. Only flagged rows need attention:
-- `CHECK: was "X"` — resolver matched a differently-named place; confirm or fix.
-- `APPROX;NEEDS_ADDRESS` — city-centroid only; paste a street address into `address` if known (fine to leave for service-area vendors).
-- `NO_MATCH;NEEDS_ADDRESS` — nothing found; fix the name/city or add an address.
-- `WED_UNVERIFIED` (intent-checked types) — site exists but unreadable and reviews don't rescue it; keep or delete on a glance.
+**Kiara, 2026-07-26: don't hold the run open for my review of questionable rows. Decide yourself — your call is usually right and a few wrong on the margin is fine.** The standing rule:
 
-Mechanically **pruned** rows (junk names; wrong-type names — a planner/florist/etc. caught in another type's sweep, `PRUNED:wrong-type-name`; no wedding evidence in name/site/Google reviews) never reach this CSV — they're in `pruned.csv` with a reason; report the count and names, and a row is rescued by moving it back. The wrong-type guard is decisive only on unambiguous names and keeps hybrids (a name with its own type's trade word survives), so it under-prunes rather than over-prunes; the enrich-time `NOT*` flag is the backstop for whatever slips through. Humans skim large lists rather than audit them (Kiara, 2026-07) — the pipeline prunes proactively so this review stays short.
+- **Think it's a `<type>` → keep.**
+- **Think it isn't → remove.**
+- **Think it's a valid `<type>` but there's no address → keep it on a centroid**, especially when Reddit or Google reviews vouch for it. A pin in the right city beats no vendor.
 
-Also relay any type-card review watchlist (e.g. photographers: photo-booth rentals, video-only outfits). They may freely edit/add/delete rows (keep the header row). Wait for "done", then **re-read the file fresh. Never reference or assume row numbers across a user-edit boundary** — the user may have added, deleted, or reordered rows; every operation keys on `place_id` (else normalized name). This rule is absolute; violating it corrupted data in a live session.
+Decide from the docket alone where you can. Ask the user nothing, and never end the turn on "let me know which to keep" — if you genuinely can't call a row from its name, city, and website, spend one cheap `WebSearch` on it (delegate to a subagent if it's more than ~3 rows), then decide. Ties go to keep for a research-sourced row (a human already vouched for it) and to remove for a bare sweep row with no wedding evidence.
+
+```
+node --env-file=.env.local .claude/skills/launchvendors/scripts/adjudicate.mjs data/launchvendors/<slug> --type <type> --region "Denver, CO"
+node --env-file=.env.local .claude/skills/launchvendors/scripts/adjudicate.mjs data/launchvendors/<slug> --type <type> --region "Denver, CO" \
+  --remove "Portrait Studio" --remove "Corporate Catering Co" [--rescue "Vouched Florist"] --apply
+```
+
+The dry run prints the **docket** — one line per undecided row (name | city | flags | website | provenance), which is all you need to judge; **still never cat the CSV**. Add `--names` when the type card's watchlist targets rows that were never flagged — wrong-type businesses that passed the intent check clean (venue: service vendors and non-venues; dress: alterations/menswear hybrids; planner: in-house venue coordinators; photographer: video-only outfits). It prints name | city (| subtype for split types) for every row, still far cheaper than the CSV. For split types, `--subtype "Name=dj"` retypes a row the name-only classifier got wrong (see `types/music.md`) — do that here, not by editing the CSV. `--apply` moves your `--remove` rows to `pruned.csv` (`PRUNED:judgment`), pulls any `--rescue` row back out of it, **centroid-fills every kept row that has no coordinates** (its own city first, then `--region`), and clears the review flags to `OK:auto`. Keys are `place_id` or normalized name — **never row numbers**; an unmatched or ambiguous key aborts the apply before anything is written. (This rule is absolute even now that the user isn't editing: rows move between the two CSVs. Violating it corrupted data in a live session.)
+
+What lands on the docket: `CHECK: was "X"` (resolver matched a differently-named place — is it the same vendor?), `WED_UNVERIFIED` (site exists but unreadable, reviews didn't rescue it), `APPROX:city` / `APPROX:region` (centroid pin — keep unless the vendor itself is wrong), `NO_MATCH` (no place and no centroid yet). Apply the type card's review watchlist here (e.g. photographers: photo-booth rentals, video-only outfits) — that's a removal list, not a question list.
+
+Mechanically **pruned** rows (junk names; wrong-type names — a planner/florist/etc. caught in another type's sweep, `PRUNED:wrong-type-name`; no wedding evidence in name/site/Google reviews) never reach the docket — they're in `pruned.csv` with a reason. Report the count and names in the wrap-up, and `--rescue` any you think the guard got wrong. The wrong-type guard is decisive only on unambiguous names and keeps hybrids, so it under-prunes rather than over-prunes; the enrich-time `NOT*` flag is the backstop for whatever slips through.
+
+The user may still ask to look — if they do, give them the CSV path, wait for "done", and **re-read the file fresh** (they may have added, deleted, or reordered rows). That's their option to exercise, never a gate you impose.
 
 ## Phase 5 — Upload (one confirmation gate)
 
@@ -75,7 +88,7 @@ node --env-file=.env.local .claude/skills/launchvendors/scripts/upload.mjs data/
 node --env-file=.env.local .claude/skills/launchvendors/scripts/upload.mjs data/launchvendors/<slug> --type <type> --apply    # after explicit user yes
 ```
 
-Dry-run first, always. It late-resolves rows where the user added a street address (business match with guard, else coords-only geocode — an address geocode is never stored as a `place_id`), then dedupes: DB `place_id` → DB name+city (type-aware keys) → within-batch. A dedup hit against an existing DB row whose `website`/`instagram` is blank gets that column **backfilled** from the CSV row (fills blanks only, never overwrites — insert is otherwise insert-only). Show the user the dry-run summary (including any `BACKFILL` line) and get an **explicit yes** before `--apply`. This is the only confirmation gate in the pipeline — don't add others, never skip this one. The script verifies after applying (count delta + DB-wide duplicate place_id/name scan) and writes `upload-report.txt`.
+Dry-run first, always. It late-resolves rows carrying a street address but no `place_id` (business match with guard, else coords-only geocode — an address geocode is never stored as a `place_id`), then dedupes: DB `place_id` → DB name+city (type-aware keys) → within-batch. A dedup hit against an existing DB row whose `website`/`instagram` is blank gets that column **backfilled** from the CSV row (fills blanks only, never overwrites — insert is otherwise insert-only). Show the user the dry-run summary (including any `BACKFILL` line) and get an **explicit yes** before `--apply` — unless they pre-authorized it in Phase 0 (chained/unattended run), in which case post the same summary and proceed without stopping. This is the only confirmation gate in the pipeline — don't add others, never skip it without that recorded pre-authorization. The script verifies after applying (count delta + DB-wide duplicate place_id/name scan) and writes `upload-report.txt`.
 
 Types that capture instagram require migration `0016_vendor_instagram.sql` applied (hand-run in the Supabase SQL editor); upload fails fast with that guidance if the column is missing. If the insert fails, nothing was partially written — fix and re-run; dedup makes re-runs safe.
 
@@ -90,7 +103,9 @@ node --env-file=.env.local .claude/skills/launchvendors/scripts/backfill-website
 
 ## Phase 6 — Wrap up
 
-Report: baseline count, researched count, resolved/approx/no-match, skipped duplicates, inserted total, and the workdir path. Remind the user that `research/` (raw pastes + web extracts) and the `provenance`/`intel` fields are the starting inventory for the recon-enrichment skill — **do not delete the workdir**.
+Report: baseline count, researched count, resolved/approx/no-match, adjudication (kept / removed by judgment / centroid-filled, with the removed names), skipped duplicates, inserted total, and the workdir path. Remind the user that `research/` (raw pastes + web extracts) and the `provenance`/`intel` fields are the starting inventory for the recon-enrichment skill — **do not delete the workdir**.
+
+**Chained handoff — don't wait for a "go."** If the user asked for enrichment too ("launch and enrich Denver photographers", "then enrich them"), invoke `/enrichvendors <type> <region>` **immediately** after this report, in the same turn. Kiara, 2026-07-26: asking for both *is* the go-ahead — never end the turn on "ready to enrich whenever you are." Say one line ("launch done — starting enrichment"), then start. The enrich skill's own gates still apply, but its Phase 0 scope becomes an announcement rather than a question (see its Phase 0 chained-run note): the batch is what you just launched. Only when the user asked for launch alone do you stop here.
 
 ## Hard rules (distilled from live runs)
 
@@ -98,7 +113,8 @@ Report: baseline count, researched count, resolved/approx/no-match, skipped dupl
 - `place_id` is dedup truth. Type-aware name+city (normalized: lowercase, `&`→`and`, alnum-only, trade words stripped per type) is the fallback. Both are enforced in scripts — don't hand-dedupe.
 - Insert semantics: `vendor_type=<profile.vendorType>`, `source='google'` iff `place_id` else `'user'`, `region=<ST>`, `location='SRID=4326;POINT(lng lat)'` (**lng first**), nulls allowed elsewhere. Direct service-role Supabase insert — there is no app bulk endpoint (`/api/places` is autocomplete-only).
   - **Split types** (music) fan one sweep across several `vendor_type`s: `upload.mjs` writes `vendor_type` per-row from the CSV `subtype` column (`dj`/`band`), not a fixed profile type, and dedup is scoped across all of them. Review `subtype` before `--apply` — see `types/music.md`.
-- Rows without any location still upload (findable via name search) but get no map pin — call them out in the summary.
+- Rows without any location still upload (findable via name search) but get no map pin — call them out in the summary. A vendor you believe in should rarely be one: centroid it (Phase 4) rather than shipping it pinless.
+- **One human gate, at upload.** Phase 4 is yours to decide (keep / remove / centroid) — never convert it back into a question, and never end a turn waiting on row-by-row approval.
 - Don't research reviews/pricing/recon depth at this stage; archive raw sources + provenance/intel tags only.
 - Keep file contents out of the ORCHESTRATOR context: relay script summaries, one-line agent replies, and flagged lists — never CSVs, fetched pages, paste text, or candidate JSONL (Write-tool round-trips count as context too). Research passes run in subagents.
 - If Places/Supabase errors persist after one retry, stop and report — don't improvise an alternative data path.

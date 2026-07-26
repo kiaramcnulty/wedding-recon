@@ -37,10 +37,10 @@ Fetch-extraction prompt (substitute region/state/domain):
 
 > Read every `reddit-*.txt` file in `<abs workdir>/research/`. They are raw Reddit-thread pastes about wedding music near {REGION}, {ST}. Extract every distinct wedding music act — DJs, live bands, ceremony musicians (quartets, pianists, guitarists), singers, entertainment agencies. Exclude venues, AV rental companies, music schools, other vendor types, and acts clearly based in and serving another state. Append one JSON line per act to `<abs workdir>/candidates.jsonl`: {"name":"...","hint":"<base city if stated or inferable, else omit>","website":"<their own website if linked, else omit>","provenance":"reddit:<filename>","intel":"<act type, pricing, what parts of the day they covered, genre/instrument, showcase mentions, or experience detail commenters give, else omit>"}. Dedupe within your output; do not modify existing lines. Reply with only the count appended and any names you were unsure about.
 
-## Phase 4 — review watchlist
-Beyond the standard flags: venues that host live music that slipped past the filters (delete), duplicate act-vs-agency rows (an agency AND one of its named bands may both appear — keep both only if each has its own booking surface), and name-collision dedup on generic act names ("Soul Fire Band" vs "Soulfire"). Schools/AV/instrument-shop noise is pruned mechanically — mention the pruned count and move on.
+## Phase 4 — adjudication watchlist (your call)
+Beyond the standard docket: venues that host live music that slipped past the filters (delete), duplicate act-vs-agency rows (an agency AND one of its named bands may both appear — keep both only if each has its own booking surface), and name-collision dedup on generic act names ("Soul Fire Band" vs "Soulfire"). Schools/AV/instrument-shop noise is pruned mechanically — mention the pruned count and move on.
 
-**Also review the `subtype` column** (`dj`/`band`) — see "Subtype tagging" above. Fix any the name-only classifier got wrong (agencies that do both, bare "… Entertainment"/"… Productions") before `upload.mjs --apply` writes `vendor_type`.
+**Also settle the `subtype` column** (`dj`/`band`) — see "Subtype tagging" above. Run `adjudicate.mjs <workdir> --type music --names` (prints subtype per row) and fix any the name-only classifier got wrong with `--subtype "Name=dj"` before `upload.mjs --apply` writes `vendor_type`. Your call, not Kiara's — and `0021` self-corrects from recon text later anyway, so don't agonize over agencies that do both.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:

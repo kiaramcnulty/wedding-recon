@@ -351,6 +351,29 @@ export async function websiteWithFallback(placeId, searchWebsite) {
   } catch { return ''; }
 }
 
+/**
+ * Centroid for the first geocodable label in `labels` (e.g. ["Lyons, CO", "Denver, CO"]).
+ * The approximate-location fallback for a vendor we believe in but can't place at a street
+ * address (Kiara, 2026-07-26: a valid vendor with no address gets a centroid pin, not a
+ * hold-for-review row). Labels are tried in order — most specific first — and a hit must
+ * sit in `state`. Returns { label, city, lat, lng } or null; costs one Places call per
+ * label actually tried.
+ */
+export async function centroidLookup(labels, state) {
+  for (const label of labels) {
+    if (!label || !label.trim()) continue;
+    try {
+      const d = await placesSearch(label);
+      await sleep(120);
+      const g = d.places?.[0];
+      if (g?.location && (!state || (g.formattedAddress || '').includes(state))) {
+        return { label, city: label.split(',')[0].trim(), lat: g.location.latitude, lng: g.location.longitude };
+      }
+    } catch { /* try the next label */ }
+  }
+  return null;
+}
+
 // Domains that are never a vendor's OWN website — social, maps/search, and wedding/review
 // DIRECTORIES. A listicle or scrape often lists one of these as a vendor's "site"; we only
 // want the vendor's own domain, so a directory/social link is dropped rather than stored.

@@ -56,8 +56,8 @@ Fetch-extraction prompt (substitute region/state/domain):
 Anecdotal customer evidence is the highest-value intel for this type — weight the Reddit
 pass accordingly and keep the good/bad specifics verbatim in `intel`.
 
-## Phase 4 — review watchlist
-Beyond the standard flags, ask Kiara to eyeball for: **venues with an in-house coordinator**
+## Phase 4 — adjudication watchlist (your call, not Kiara's)
+Beyond the standard docket, scan for and remove: **venues with an in-house coordinator**
 that slipped in (the coordinator is a venue staffer, not a standalone planner — delete),
 corporate/party/**financial** planners the intent check missed, florists or "event
 designers" who style but don't coordinate, and name-variant dedup collisions (the profile

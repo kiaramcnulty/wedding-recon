@@ -31,8 +31,8 @@ Fetch-extraction prompt (substitute region/state/domain):
 
 > Read every `reddit-*.txt` file in `<abs workdir>/research/`. They are raw Reddit-thread pastes about wedding flowers near {REGION}, {ST}. Extract every distinct source of wedding flowers commenters used or recommend — boutique florists, home studios, AND non-boutique options (Costco, Trader Joe's, grocery floral counters, flower markets) when a commenter actually used them for a wedding. Exclude venues, planners, other vendor types, and florists clearly based in and serving another state. Append one JSON line per source to `<abs workdir>/candidates.jsonl`: {"name":"...","hint":"<base city or store location if stated, else omit>","website":"<their own website if linked, else omit>","provenance":"reddit:<filename>","intel":"<pricing, what the commenter ordered (bouquets, centerpieces, DIY buckets), how it turned out, delivery/pickup notes, else omit>"}. Dedupe within your output; do not modify existing lines. Reply with only the count appended and any names you were unsure about.
 
-## Phase 4 — review watchlist
-Beyond the standard flags: chain rows (confirm the resolved store location matches what the thread pointed at) and planner/design studios that subcontract florals rather than doing them (delete). Everyday-delivery shops and garden centers are pruned mechanically — mention the pruned count and move on.
+## Phase 4 — adjudication watchlist (your call)
+Beyond the standard docket: chain rows (confirm the resolved store location matches what the thread pointed at) and planner/design studios that subcontract florals rather than doing them (delete). Everyday-delivery shops and garden centers are pruned mechanically — mention the pruned count and move on.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:

@@ -31,8 +31,8 @@ Fetch-extraction prompt (substitute region/state/domain):
 
 > Read every `reddit-*.txt` file in `<abs workdir>/research/`. They are raw Reddit-thread pastes about wedding catering near {REGION}, {ST}. Extract every distinct caterer (full-service, drop-off, food truck, or a restaurant commenters used to cater a wedding). Exclude venues, dessert/bakery-only shops, bartending services, other vendor types, and caterers clearly based in and serving another state. Append one JSON line per caterer to `<abs workdir>/candidates.jsonl`: {"name":"...","hint":"<base city if stated or inferable, else omit>","website":"<their own website if linked, else omit>","provenance":"reddit:<filename>","intel":"<any pricing, food-quality opinion, service-style, or wedding-experience detail commenters give, else omit>"}. Dedupe within your output; do not modify existing lines. Reply with only the count appended and any names you were unsure about.
 
-## Phase 4 — review watchlist
-Beyond the standard flags: venues with in-house catering that slipped in (names with "events center"/"banquet"), dessert-only or bartending-only outfits, and restaurant locations where Google matched the dine-in spot rather than the catering arm (fine to keep — same business). Non-wedding caterers are pruned mechanically (wedcheck incl. review evidence) — mention the pruned count and move on.
+## Phase 4 — adjudication watchlist (your call)
+Beyond the standard docket: venues with in-house catering that slipped in (names with "events center"/"banquet"), dessert-only or bartending-only outfits, and restaurant locations where Google matched the dine-in spot rather than the catering arm (fine to keep — same business). Non-wedding caterers are pruned mechanically (wedcheck incl. review evidence) — mention the pruned count and move on.
 
 ## Enrichment handoff (recon guidelines — Kiara, 2026-07)
 Archive into `intel` now; the enrichment pass consumes it:
