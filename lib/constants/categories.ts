@@ -7,6 +7,7 @@ import {
   Shirt,
   ClipboardList,
   Camera,
+  Sparkles,
   MapPin,
   type LucideIcon,
 } from "lucide-react";
@@ -18,6 +19,7 @@ export const VENDOR_TYPES = [
   "band",
   "flowers",
   "dress",
+  "beauty",
   "planner",
   "photos",
   "other",
@@ -77,6 +79,11 @@ export const CATEGORIES: Record<VendorType, CategoryMeta> = {
   band: { type: "band", label: "Live music", icon: Music, colorHex: "#534AB7", textHex: "#3C3489", lightHex: "#EEEDFE" },
   flowers: { type: "flowers", label: "Flowers", icon: Flower2, colorHex: "#D4537E", textHex: "#72243E", lightHex: "#FBEAF0" },
   dress: { type: "dress", label: "Dress", icon: Shirt, colorHex: "#D85A30", textHex: "#712B13", lightHex: "#FAECE7" },
+  // ONE joint type for wedding-day hair AND makeup (Kiara, 2026-07): most artists do
+  // both, and a hair-only or makeup-only artist belongs in the same bucket rather than
+  // a second category. Teal is the only unclaimed hue that reads distinctly from the
+  // venue green and the photos blue on a map.
+  beauty: { type: "beauty", label: "Hair & makeup", icon: Sparkles, colorHex: "#0F9BA8", textHex: "#0A4E56", lightHex: "#E2F4F6" },
   planner: { type: "planner", label: "Planner", icon: ClipboardList, colorHex: "#639922", textHex: "#27500A", lightHex: "#EAF3DE" },
   photos: { type: "photos", label: "Photos", icon: Camera, colorHex: "#378ADD", textHex: "#0C447C", lightHex: "#E6F1FB" },
   other: { type: "other", label: "Other", icon: MapPin, colorHex: "#888780", textHex: "#444441", lightHex: "#F1EFE8" },
@@ -100,6 +107,7 @@ export const CATEGORY_PLURAL: Record<VendorType, string> = {
   band: "musicians",
   flowers: "florists",
   dress: "dress shops",
+  beauty: "hair & makeup artists",
   planner: "planners",
   photos: "photographers",
   other: "vendors",

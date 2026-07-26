@@ -105,6 +105,25 @@ export const ETYPES = {
     photoCap: 2,
     notFlag: 'NOTDRESS',
   },
+  beauty: {
+    key: 'beauty',
+    vendorType: 'beauty',
+    label: 'HAIR & MAKEUP ARTIST',
+    headers: [...BASE_HEADERS, 'service_region'],
+    serviceRegionRequired: true,       // mobile artists travel to the couple — where they'll go IS the product
+    refs: refsFor('hairmakeup'),
+    hasInstagram: true,                // vendors.instagram is pipeline-populated for this type (migration 0016);
+                                       // these vendors often have a thin site and a rich IG, so the handle matters
+    subpage: /(pric|package|rate|invest|servic|wedding|bridal|book|faq|about|hair|makeup|beauty|glam|gallery|portfolio|team|travel)/i,
+    // This type USUALLY POSTS its rate card (Kiara, 2026-07): bride hair / bride makeup /
+    // combined, per-person bridal-party rates, trial fee, add-ons, and — the one couples get
+    // surprised by — travel/mileage/minimum/early-start terms. Cast wide enough to catch all of it.
+    priceLine: /\$\s?\d|per (person|service|head)|packag|bride|bridal (hair|makeup|party|beauty)|bridesmaids?|mother of the|flower girl|trial|preview|touch.?up|lash(es)?|extensions?|updo|blowout|airbrush|veil|travel fee|mileage|on.?(site|location)|minimum|deposit|retainer|early (start|morning)|starting (at|price)|pric(e|ing)|\brates?\b/i,
+    dossierPriceTitle: 'site pricing/package lines',
+    portraitFilter: false,             // the FACE is the product — a bride's hair/makeup close-up is the portfolio, not junk
+    photoCap: 3,                       // 2-3 close-ups of brides / bridal party (Kiara, 2026-07)
+    notFlag: 'NOTBEAUTY',
+  },
   planner: {
     key: 'planner',
     vendorType: 'planner',
@@ -134,8 +153,12 @@ export function etype() {
     flowers: 'flowers', flower: 'flowers', florist: 'flowers', florists: 'flowers', floral: 'flowers',
     dress: 'dress', dresses: 'dress', bridal: 'dress', bridals: 'dress', gown: 'dress', gowns: 'dress',
     planner: 'planner', planners: 'planner', planning: 'planner', coordinator: 'planner', coordinators: 'planner', coordination: 'planner',
+    // Hair & makeup is ONE joint type — every hair-ish and makeup-ish alias lands on it.
+    beauty: 'beauty', hairmakeup: 'beauty', 'hair-makeup': 'beauty', 'hair+makeup': 'beauty', 'hair&makeup': 'beauty',
+    hair: 'beauty', makeup: 'beauty', 'make-up': 'beauty', hmua: 'beauty', hmu: 'beauty',
+    stylist: 'beauty', stylists: 'beauty', glam: 'beauty',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner, hairmakeup`); process.exit(1); }
   return ETYPES[key];
 }

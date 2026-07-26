@@ -17,9 +17,10 @@ interface VendorTypeFilterProps {
  * the selection). An empty selection means "show all", surfaced as a highlighted
  * **All** chip that also resets.
  *
- * The chips wrap onto a second line rather than scroll: the set is fixed at nine
- * (All + eight types), so every option — and the full color legend — stays
- * visible at a glance, with no hidden-scroll affordance to miss.
+ * The chips wrap onto further lines rather than scroll: the set is small and
+ * fixed (All + every entry in CATEGORY_LIST), so every option — and the full
+ * color legend — stays visible at a glance, with no hidden-scroll affordance to
+ * miss.
  *
  * Selected chips fill with the category's own color (the same hue as its map
  * pins), so the row doubles as the map's color legend. Unselected chips are the

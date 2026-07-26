@@ -255,6 +255,39 @@ export const TYPE_PROFILES = {
     wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|venues?|djs?|tuxedos?|menswear|men'?s (wear|wearhouse|warehouse)|barber|jewel\w*|(party|event|tent) rentals?|limo\w*|alterations?|tailor\w*|seamstress(es)?|sewing|sew ?it|dressmakers?|stitch\w*|needle\w*|custom apparel)\b/i,
     ownSignal: /\b(bridal|brides?|gowns?|dress(es)?|boutique|couture|atelier|bridesmaids?|trunk show|veils?)\b/i,
   },
+  beauty: {
+    vendorType: 'beauty',
+    csv: 'vendors.csv',
+    // ONE joint type for hair AND makeup (Kiara, 2026-07) — most artists do both, and a
+    // hair-only or makeup-only artist belongs in the same bucket. Three nets per anchor,
+    // because these brand three different ways ("... Bridal Beauty", "... Makeup Artistry",
+    // "... Hair Studio") and no single query catches all of them; place_id dedup collapses
+    // the heavy overlap for free.
+    sweepQuery: (anchor) => [`bridal hair and makeup near ${anchor}`, `wedding makeup artist near ${anchor}`, `wedding hair stylist near ${anchor}`],
+    // Mobile artists travel to the couple and brand statewide, so — like photographers and
+    // planners — the statewide query is a primary net, not an afterthought.
+    statewideQuery: (stateName) => [`bridal hair and makeup in ${stateName}`, `wedding makeup artists in ${stateName}`, `wedding hair stylists in ${stateName}`],
+    // "X Beauty" must never match "Y Beauty" on the trade word alone.
+    weak: new Set(['hair', 'makeup', 'beauty', 'bridal', 'bride', 'brides', 'artistry', 'artist', 'artists', 'salon', 'salons', 'studio', 'studios', 'glam', 'glamour', 'style', 'styles', 'styling', 'stylist', 'stylists', 'looks', 'airbrush', 'company', 'collective', 'team', 'co']),
+    // Sole-proprietor variants: "Jane Doe Makeup Artistry" ≡ "Jane Doe Beauty".
+    dedupStop: new Set(['hair', 'makeup', 'beauty', 'bridal', 'artistry', 'artist', 'artists', 'salon', 'studio', 'studios', 'glam', 'styling', 'stylist', 'llc', 'inc', 'co', 'the']),
+    // The beauty sweep's own noise: adjacent personal-care businesses that are NOT
+    // wedding-day hair/makeup. Pruned unconditionally by NAME — they carry no bridal-glam
+    // signal, so no rescue is needed. Deliberately NOT here: "salon"/"studio"/"spa" alone,
+    // since plenty of real bridal hair-and-makeup teams work out of one.
+    junkName: /\b(nails?|nail (salon|bar|spa)|barbers?|barbershops?|med ?spa|botox|filler|laser|dermatolog\w*|tanning|spray tan|wax(ing)?|threading|massage|tattoos?|piercing|microblading|permanent makeup|beauty supply|cosmetolog\w*|beauty (school|academy)|wigs?|(lash|brow) (bar|lounge)|hair (loss|restoration|transplant|extensions? (studio|bar)))\b/i,
+    captureInstagram: true,       // requires vendors.instagram (migration 0016) at upload time
+    // WEDDING/BRIDAL work only: the sweep pads heavily with everyday hair salons that have
+    // never touched a wedding. wedcheck keeps a row only when its name, site, or Google
+    // reviews show bridal evidence; research-sourced rows are exempt.
+    intent: /wedding|bridal|bride/i,
+    // Other vendor types caught in this sweep — bridal DRESS shops especially (the
+    // "bridal hair and makeup" query pulls them in), plus photographers/planners/florists.
+    // An own-trade word (hair/makeup/beauty/glam/lashes...) rescues a hybrid, so
+    // "Blush Bridal Boutique" prunes while "Blush Bridal Beauty" stays.
+    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|venues?|banquet|djs?|bands?|bridal (shop|boutique)|gowns?|dress(es)?|tuxedos?|menswear|alterations?|tailor\w*|jewel\w*|cakes?|bakery|officiants?|limo\w*|(party|event|tent) rentals?)\b/i,
+    ownSignal: /\b(hair|makeup|make ?up|mua|beauty|glam\w*|artistry|stylists?|styling|blowouts?|updos?|lashes|lash|brows?|airbrush|cosmetic\w*|salon|braids?|extensions?|skin ?care|esthetic\w*|face|faces)\b/i,
+  },
 };
 
 /** Resolve --type (accepts user-facing aliases) to a profile; clear message on unknown. */
@@ -268,9 +301,14 @@ export function typeProfile() {
     flowers: 'flowers', flower: 'flowers', florist: 'flowers', florists: 'flowers', floral: 'flowers',
     dress: 'dress', dresses: 'dress', bridal: 'dress', bridals: 'dress', gown: 'dress', gowns: 'dress',
     planner: 'planner', planners: 'planner', planning: 'planner', coordinator: 'planner', coordinators: 'planner', coordination: 'planner',
+    // Hair & makeup is ONE joint type — every hair-ish and makeup-ish alias lands on it.
+    // Judgment card: types/hairmakeup.md.
+    beauty: 'beauty', hairmakeup: 'beauty', 'hair-makeup': 'beauty', 'hair+makeup': 'beauty', 'hair&makeup': 'beauty',
+    hair: 'beauty', makeup: 'beauty', 'make-up': 'beauty', hmua: 'beauty', hmu: 'beauty',
+    stylist: 'beauty', stylists: 'beauty', glam: 'beauty',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner, hairmakeup`); process.exit(1); }
   return { key, ...TYPE_PROFILES[key] };
 }
 
