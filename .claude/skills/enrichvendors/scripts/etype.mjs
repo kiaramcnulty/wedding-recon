@@ -124,6 +124,24 @@ export const ETYPES = {
     photoCap: 3,                       // 2-3 close-ups of brides / bridal party (Kiara, 2026-07)
     notFlag: 'NOTBEAUTY',
   },
+  hotel: {
+    key: 'hotel',
+    vendorType: 'hotel',
+    label: 'HOTEL (GUEST ROOM BLOCKS)',
+    headers: [...BASE_HEADERS, 'service_region'],
+    serviceRegionRequired: true,       // fixed property — its city/metro is the sourced fallback
+    refs: refsFor('hotelblocks'),
+    subpage: /(wedding|group|block|room|rate|reserv|book|meeting|event|faq|amenit|parking|shuttle|breakfast|accommodat|stay|about)/i,
+    // Block economics, not nightly-rate marketing: the courtesy-vs-attrition distinction,
+    // contract minimums, who pays, and how the block rate compares to the going rate are
+    // what couples need (Kiara, 2026-07). Amenity words are here too because parking and
+    // shuttle costs are part of what a guest actually pays.
+    priceLine: /\$\s?\d|per night|nightly|room block|group (rate|block|booking|sales)|courtesy block|attrition|guaranteed|cut.?off|rack rate|discount|complimentary|comp\b|minimum|contract|deposit|prepay|reimburs|room rate|parking|shuttle|breakfast|resort fee|facility fee|tax|suites?|king|queen|double queen/i,
+    dossierPriceTitle: 'site room-block/rate lines',
+    portraitFilter: true,              // rooms and the property are the product; couple portraits are junk here
+    photoCap: 2,
+    notFlag: 'NOTHOTEL',
+  },
   planner: {
     key: 'planner',
     vendorType: 'planner',
@@ -157,8 +175,12 @@ export function etype() {
     beauty: 'beauty', hairmakeup: 'beauty', 'hair-makeup': 'beauty', 'hair+makeup': 'beauty', 'hair&makeup': 'beauty',
     hair: 'beauty', makeup: 'beauty', 'make-up': 'beauty', hmua: 'beauty', hmu: 'beauty',
     stylist: 'beauty', stylists: 'beauty', glam: 'beauty',
+    // Hotel room blocks for guests (stay-only properties — a hotel with event space is a venue).
+    hotel: 'hotel', hotels: 'hotel', hotelblock: 'hotel', hotelblocks: 'hotel',
+    'hotel-block': 'hotel', 'hotel-blocks': 'hotel', block: 'hotel', blocks: 'hotel',
+    lodging: 'hotel', accommodation: 'hotel', accommodations: 'hotel', rooms: 'hotel',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner, hairmakeup`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner, hairmakeup, hotelblocks`); process.exit(1); }
   return ETYPES[key];
 }

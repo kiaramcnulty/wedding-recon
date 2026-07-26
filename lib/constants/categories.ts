@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Camera,
   Sparkles,
+  Hotel,
   MapPin,
   type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ export const VENDOR_TYPES = [
   "flowers",
   "dress",
   "beauty",
+  "hotel",
   "planner",
   "photos",
   "other",
@@ -84,6 +86,12 @@ export const CATEGORIES: Record<VendorType, CategoryMeta> = {
   // a second category. Teal is the only unclaimed hue that reads distinctly from the
   // venue green and the photos blue on a map.
   beauty: { type: "beauty", label: "Hair & makeup", icon: Sparkles, colorHex: "#0F9BA8", textHex: "#0A4E56", lightHex: "#E2F4F6" },
+  // Guest-lodging room blocks, NOT wedding event space. **Venue supersedes hotel**: a hotel
+  // with a ballroom/ceremony site is a `venue`; this type is stay-only properties that hold
+  // a block of guest rooms. Navy was picked by perceptual distance — its nearest neighbor
+  // (photos blue) sits at ΔE 33, comfortably past the tightest pair already shipping (dj vs
+  // band, ΔE 21), so the pins stay separable on a dense map.
+  hotel: { type: "hotel", label: "Hotel blocks", icon: Hotel, colorHex: "#34557A", textHex: "#16304D", lightHex: "#E6EDF5" },
   planner: { type: "planner", label: "Planner", icon: ClipboardList, colorHex: "#639922", textHex: "#27500A", lightHex: "#EAF3DE" },
   photos: { type: "photos", label: "Photos", icon: Camera, colorHex: "#378ADD", textHex: "#0C447C", lightHex: "#E6F1FB" },
   other: { type: "other", label: "Other", icon: MapPin, colorHex: "#888780", textHex: "#444441", lightHex: "#F1EFE8" },
@@ -108,6 +116,7 @@ export const CATEGORY_PLURAL: Record<VendorType, string> = {
   flowers: "florists",
   dress: "dress shops",
   beauty: "hair & makeup artists",
+  hotel: "hotels",
   planner: "planners",
   photos: "photographers",
   other: "vendors",

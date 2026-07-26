@@ -288,6 +288,40 @@ export const TYPE_PROFILES = {
     wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|venues?|banquet|djs?|bands?|bridal (shop|boutique)|gowns?|dress(es)?|tuxedos?|menswear|alterations?|tailor\w*|jewel\w*|cakes?|bakery|officiants?|limo\w*|(party|event|tent) rentals?)\b/i,
     ownSignal: /\b(hair|makeup|make ?up|mua|beauty|glam\w*|artistry|stylists?|styling|blowouts?|updos?|lashes|lash|brows?|airbrush|cosmetic\w*|salon|braids?|extensions?|skin ?care|esthetic\w*|face|faces)\b/i,
   },
+  hotel: {
+    vendorType: 'hotel',
+    csv: 'vendors.csv',
+    // GUEST LODGING (room blocks), not event space. **Venue supersedes hotel** (Kiara,
+    // 2026-07): a property with a ballroom / ceremony site / reception space is a `venue`
+    // even when it also blocks rooms; `hotel` is for stay-only properties. That rule needs
+    // no name regex — it is enforced (a) mechanically at upload, where google_place_id
+    // dedup is GLOBAL across types so a property already seeded as a venue is skipped, and
+    // (b) by judgment in Phase 4, since "Hilton Denver" reads identically whether or not it
+    // has a ballroom. Deliberately NOT in wrongType below: hotels legitimately carry
+    // venue-ish words (resort, lodge, inn), so name-pruning on them would be wrong.
+    sweepQuery: (anchor) => `wedding hotel blocks near ${anchor}`,
+    statewideQuery: (stateName) => `wedding hotel blocks in ${stateName}`,
+    // Chain names share these constantly — "Hampton Inn" must never match "Holiday Inn" on
+    // "inn" alone, nor "Courtyard Denver" match "Courtyard Boulder" on "courtyard".
+    weak: new Set(['hotel', 'hotels', 'inn', 'inns', 'suites', 'suite', 'lodge', 'lodges', 'lodging', 'resort', 'resorts', 'motel', 'motels', 'house', 'rooms', 'room', 'block', 'blocks', 'express', 'garden', 'plaza', 'place', 'center', 'centre', 'downtown', 'airport', 'group', 'collection', 'by', 'and']),
+    // Brand + location variants: "Hampton Inn Denver" ≡ "Hampton Inn & Suites Denver".
+    dedupStop: new Set(['hotel', 'hotels', 'inn', 'inns', 'suites', 'suite', 'motel', 'lodging', 'rooms', 'llc', 'inc', 'co', 'the', 'by', 'and']),
+    // Lodging-adjacent businesses that can't hold a wedding room block, dropped by NAME.
+    // "vacation rental"/"realty"/"property management" list individual homes; hostels,
+    // RV parks, campgrounds and extended-stay corporate housing aren't block properties.
+    junkName: /\b(hostels?|rv park|campgrounds?|camping|koa|mobile home|trailer park|apartments?|realty|real estate|property management|rental agency|vacation rentals?|timeshare|travel agency|storage|parking)\b/i,
+    captureInstagram: false,      // corporate/chain IG accounts add nothing for this type
+    // Wedding-BLOCK intent. Deliberately broader than "room block" alone: the phrase almost
+    // never appears on a hotel homepage (it lives on a groups/weddings subpage or in a
+    // review), so this is a cheap prefilter that keeps anything wedding- or group-shaped and
+    // prunes the generic roadside motel. The HARD bar — documented evidence of an actual
+    // block — is a Phase 4 judgment call, not this regex. See types/hotelblocks.md.
+    intent: /wedding|bridal|room block|group (rate|block|booking|sales)|group rates/i,
+    // Other vendor types swept up by the query. Venue words are intentionally absent (see
+    // the note above); a lodging word rescues a hybrid.
+    wrongType: /\b(photograph\w*|videograph\w*|plann(er|ers|ing)|coordinat\w*|cater\w*|florists?|florals?|djs?|bands?|salon|makeup|bridal (shop|boutique)|gowns?|tuxedos?|jewel\w*|cakes?|bakery|officiants?|limo\w*|(party|event|tent) rentals?)\b/i,
+    ownSignal: /\b(hotels?|inns?|suites?|lodge|lodging|resorts?|motels?|residences?|marriott|hilton|hyatt|sheraton|westin|doubletree|embassy|hampton|holiday|courtyard|renaissance|kimpton|aloft|element|moxy|springhill|towneplace|fairfield|homewood|staybridge|candlewood|drury|omni|loews|four seasons|ritz|regis|autograph|curio|tapestry|tribute|conrad|waldorf|marquis|best western|la quinta|comfort|quality|sleep|super 8|motel 6|travelodge|wyndham|ramada|radisson|crowne|intercontinental|sonesta|hotel indigo)\b/i,
+  },
 };
 
 /** Resolve --type (accepts user-facing aliases) to a profile; clear message on unknown. */
@@ -306,9 +340,13 @@ export function typeProfile() {
     beauty: 'beauty', hairmakeup: 'beauty', 'hair-makeup': 'beauty', 'hair+makeup': 'beauty', 'hair&makeup': 'beauty',
     hair: 'beauty', makeup: 'beauty', 'make-up': 'beauty', hmua: 'beauty', hmu: 'beauty',
     stylist: 'beauty', stylists: 'beauty', glam: 'beauty',
+    // Hotel room blocks for guests. Judgment card: types/hotelblocks.md.
+    hotel: 'hotel', hotels: 'hotel', hotelblock: 'hotel', hotelblocks: 'hotel',
+    'hotel-block': 'hotel', 'hotel-blocks': 'hotel', block: 'hotel', blocks: 'hotel',
+    lodging: 'hotel', accommodation: 'hotel', accommodations: 'hotel', rooms: 'hotel',
   };
   const key = alias[raw];
-  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner, hairmakeup`); process.exit(1); }
+  if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner, hairmakeup, hotelblocks`); process.exit(1); }
   return { key, ...TYPE_PROFILES[key] };
 }
 
