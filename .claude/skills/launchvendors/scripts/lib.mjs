@@ -259,14 +259,14 @@ export const TYPE_PROFILES = {
     vendorType: 'beauty',
     csv: 'vendors.csv',
     // ONE joint type for hair AND makeup (Kiara, 2026-07) — most artists do both, and a
-    // hair-only or makeup-only artist belongs in the same bucket. Three nets per anchor,
-    // because these brand three different ways ("... Bridal Beauty", "... Makeup Artistry",
-    // "... Hair Studio") and no single query catches all of them; place_id dedup collapses
-    // the heavy overlap for free.
-    sweepQuery: (anchor) => [`bridal hair and makeup near ${anchor}`, `wedding makeup artist near ${anchor}`, `wedding hair stylist near ${anchor}`],
+    // hair-only or makeup-only artist belongs in the same bucket. ONE sweep query, not a
+    // per-alias fan-out (Kiara, 2026-07-26): "wedding hair and makeup" is the query, and
+    // hair-only / makeup-only artists come in through research + pastes rather than extra
+    // Places nets that mostly pull in everyday salons.
+    sweepQuery: (anchor) => `wedding hair and makeup near ${anchor}`,
     // Mobile artists travel to the couple and brand statewide, so — like photographers and
     // planners — the statewide query is a primary net, not an afterthought.
-    statewideQuery: (stateName) => [`bridal hair and makeup in ${stateName}`, `wedding makeup artists in ${stateName}`, `wedding hair stylists in ${stateName}`],
+    statewideQuery: (stateName) => `wedding hair and makeup in ${stateName}`,
     // "X Beauty" must never match "Y Beauty" on the trade word alone.
     weak: new Set(['hair', 'makeup', 'beauty', 'bridal', 'bride', 'brides', 'artistry', 'artist', 'artists', 'salon', 'salons', 'studio', 'studios', 'glam', 'glamour', 'style', 'styles', 'styling', 'stylist', 'stylists', 'looks', 'airbrush', 'company', 'collective', 'team', 'co']),
     // Sole-proprietor variants: "Jane Doe Makeup Artistry" ≡ "Jane Doe Beauty".
