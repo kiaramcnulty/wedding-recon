@@ -48,10 +48,17 @@ export function VendorTypeFilter({
       role="group"
       aria-label="Filter vendors by type"
       className={cn(
-        // Wrap onto multiple lines instead of scrolling; gap-2 spaces both the
-        // rows and the chips. Tiny vertical padding so chip shadows aren't
+        // Wrap onto multiple lines instead of scrolling; the gap spaces both
+        // the rows and the chips. Tiny vertical padding so chip shadows aren't
         // clipped at the top/bottom edges.
-        "flex flex-wrap items-center gap-2 py-0.5",
+        //
+        // gap-1.5 + the chips' px-2.5 (rather than gap-2 + px-3) is deliberate
+        // packing, not cosmetics: at 393px the wider spacing left ~101px dead on
+        // each of the first two rows because the next chip missed fitting by
+        // 2-5px, which pushed "Other" onto a fourth row of its own. Shaving a
+        // few px per chip pulls the set into three rows and hands a row of map
+        // back. Re-check the packing here if a category is ever added.
+        "flex flex-wrap items-center gap-1.5 py-0.5",
         className,
       )}
     >
@@ -60,7 +67,7 @@ export function VendorTypeFilter({
         onClick={() => onChange([])}
         aria-pressed={allActive}
         className={cn(
-          "flex shrink-0 items-center rounded-full px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur-sm transition-colors",
+          "flex shrink-0 items-center rounded-full px-2.5 py-1.5 text-xs font-medium shadow-md backdrop-blur-sm transition-colors",
           allActive
             ? "bg-foreground text-background"
             : "bg-background/95 text-muted-foreground hover:text-foreground",
@@ -79,7 +86,7 @@ export function VendorTypeFilter({
             onClick={() => toggle(cat.type)}
             aria-pressed={isSelected}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur-sm transition-colors",
+              "flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium shadow-md backdrop-blur-sm transition-colors",
               !isSelected && "bg-background/95 text-foreground hover:bg-background",
             )}
             // Category color is data (categories.ts), so it stays inline — same
