@@ -30,6 +30,18 @@ export const MIN_SEARCH_QUERY_LENGTH = 2;
  */
 const ADDRESS_MATCH_SCORE = 25;
 
+/**
+ * Score for a typo-tolerant near-miss — a row the RPC's trigram tier returned
+ * because nothing matched literally ("sanctaury" → "Sanctuary Golf Course",
+ * migration `0026`). Below every literal match by construction: a near-miss is a
+ * "did you mean", so it must never outrank something the user actually typed.
+ * These rows arrive from SQL already ordered best-first (weakest token
+ * similarity), and giving them all one score keeps that order — `sort` is stable,
+ * so equal scores preserve arrival order. Don't spread this into distinct scores
+ * without carrying the similarity through from the RPC.
+ */
+const FUZZY_MATCH_SCORE = 12;
+
 /** Rows to ask the RPC for before ranking. Ranking then trims to `limit`. */
 const DEFAULT_MAX_ROWS = 24;
 
@@ -47,6 +59,12 @@ export interface VendorMatch {
   lat: number | null;
   /** Name-match relevance, 0–100. See `scoreVendorMatch`. */
   score: number;
+  /**
+   * True when this row came back from the RPC's typo-tolerant tier — the user's
+   * words don't all appear in it, so it's a near-miss guess, not a match. Ranked
+   * last; a surface can label these ("did you mean…") if it wants to.
+   */
+  fuzzy: boolean;
 }
 
 /** The `search_vendors` RPC row shape (migration `0025`). */
@@ -96,10 +114,12 @@ export function scoreVendorMatch(name: string, query: string): number {
  * Search the vendor directory by name, street address, or city.
  *
  * Backed by the `search_vendors` RPC (migrations `0018` → `0019` token-aware →
- * `0025` shared shape), which splits the query into tokens, drops stop words,
- * and requires every remaining token to appear in name/address/city — so "the
- * sanctuary" resolves "Sanctuary Golf Course" (`lib/search/tokens.ts` mirrors
- * the stop-word list).
+ * `0025` shared shape → `0026` typo tolerance), which splits the query into
+ * tokens, drops stop words, and requires every remaining token to appear in
+ * name/address/city — so "the sanctuary" resolves "Sanctuary Golf Course"
+ * (`lib/search/tokens.ts` mirrors the stop-word list). When that finds nothing,
+ * a trigram tier returns up to 5 near-misses on name ("sanctaury" → "Sanctuary
+ * Golf Course"), flagged `fuzzy` and ranked below every literal match.
  *
  * Never throws: a missing or erroring RPC (e.g. a migration not yet hand-applied)
  * logs and returns no matches, so the calling surface degrades to its other
@@ -115,7 +135,8 @@ export async function searchVendors(
   if (q.length < MIN_SEARCH_QUERY_LENGTH) return [];
   // Only punctuation/wildcards typed → the RPC would match everything, so skip
   // the round trip entirely.
-  if (searchTokens(q).length === 0) return [];
+  const tokens = searchTokens(q);
+  if (tokens.length === 0) return [];
 
   const { data, error } = await supabase.rpc("search_vendors", {
     q,
@@ -130,6 +151,11 @@ export async function searchVendors(
   return (data as SearchVendorsRow[])
     .filter((v) => !requireCoords || (v.lng != null && v.lat != null))
     .map((v) => {
+      // Which tier produced this row: literal (every token present in
+      // name/address/city, the RPC's strict rule) vs. typo-tolerant near-miss.
+      // This classifies rows we already have — the matching itself stays in SQL.
+      const haystack = `${v.name} ${v.address_text ?? ""} ${v.city ?? ""}`.toLowerCase();
+      const literal = tokens.every((t) => haystack.includes(t));
       const nameScore = scoreVendorMatch(v.name, q);
       return {
         id: v.id,
@@ -143,7 +169,12 @@ export async function searchVendors(
         source: v.source,
         lng: v.lng ?? null,
         lat: v.lat ?? null,
-        score: nameScore > 0 ? nameScore : ADDRESS_MATCH_SCORE,
+        score: literal
+          ? nameScore > 0
+            ? nameScore
+            : ADDRESS_MATCH_SCORE
+          : FUZZY_MATCH_SCORE,
+        fuzzy: !literal,
       };
     })
     .sort((a, b) => b.score - a.score)
