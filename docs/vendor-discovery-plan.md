@@ -302,14 +302,15 @@ tooltip: "Consistently recommended in wedding communities and reviews."
 > `vendors` — didn't need the discovery stack, so a lightweight slice of this
 > phase now runs in production:
 > - `search_vendors` RPC (**migration `0018`**, ilike form; **migration `0019`**
->   makes it token-aware; **migration `0025`** makes it the shared matcher):
+>   makes it token-aware; **migration `0025`** makes it the shared matcher;
+>   **migration `0026`** adds typo tolerance):
 >   matches `vendors` on **name + `address_text` + `city`** and returns each
 >   hit's `lng`/`lat` flattened from the PostGIS geography (same `st_x/st_y`
 >   trick as `vendors_in_bbox`), so the client can fly to the pin. `0019` splits
 >   the query into tokens, drops stop words, and requires **every** token to
 >   appear (AND) — so a leading article or reordered words still matches ("the
->   sanctuary" → "Sanctuary Golf Course"), without loosening into fuzzy/typo
->   territory (stop-word list mirrored in `lib/search/tokens.ts`). `0025` adds
+>   sanctuary" → "Sanctuary Golf Course") — strictly, no fuzzy matching in this
+>   tier (stop-word list mirrored in `lib/search/tokens.ts`). `0025` adds
 >   `google_place_id` to the return and drops the `location is not null` filter
 >   (`lng`/`lat` nullable) so **the Add Recon box can call the same function**;
 >   it's a `drop function` + `create`, since a changed return shape can't go
@@ -317,6 +318,20 @@ tooltip: "Consistently recommended in wedding communities and reviews."
 >   Supabase SQL editor** like every migration here — until `0018`/`0019` are,
 >   the route below degrades to no vendor results (Areas group unaffected); until
 >   `0025` is, Add Recon loses only the place_id dedup.
+>   `0026` adds a **second tier** that fires only when the strict tier returns
+>   nothing: `pg_trgm` `word_similarity` over **name** at 0.35, every token
+>   required to clear it (tokens under 4 chars still literal), ordered by the
+>   weakest token's similarity, capped at 5 rows — so "sanctaury" finds
+>   "Sanctuary Golf Course" while "sweet pea events" (a business we don't have)
+>   stays empty rather than guessing. Strict results are never reordered or
+>   diluted by it, and near-misses are flagged `fuzzy` and scored below every
+>   literal match, so a "did you mean" can't outrank what the user typed. The
+>   all-tokens-must-clear rule is what holds precision ("mountain view lodge"
+>   does not match "Spruce Mountain Ranch"). Plain `create or replace` — shape
+>   unchanged from `0025`, so no app code depends on it landing.
+>   Phase 2's FTS body should keep this tier (or fold it into `ts_rank`); the
+>   earlier "no fuzzy/typo" stance was about the strict tier, not a ban on a
+>   fallback.
 > - `app/api/vendor-search/route.ts` — vendor-only autocomplete over that RPC.
 >   No Google Places call (Explore searches *our* directory; area nav stays with
 >   `/api/geocode`), no `vendor_discovery`/FTS dependency.
