@@ -3,6 +3,7 @@
 // file: shared common/draft-contract.md + common/entry-rules-core.md + the type's
 // type-rules.md + voice-cards.md. The venue profile keeps the original 11 CSV columns
 // so old venue batch artifacts keep working.
+import pathMod from 'node:path';
 import { argValue } from '../../launchvendors/scripts/lib.mjs';
 
 const BASE_HEADERS = ['venue', 'vendor_id', 'recon_type', 'month', 'year', 'price_text', 'price_details', 'notes', 'photos', 'sources', 'bot'];
@@ -160,10 +161,12 @@ export const ETYPES = {
   },
 };
 
-/** Resolve --type (user-facing aliases accepted) to a profile; clear message on unknown. */
-export function etype() {
-  const raw = (argValue('type') || 'venue').toLowerCase();
-  const alias = {
+/**
+ * Every accepted --type alias -> profile key. Module-level (not inlined in etype()) so
+ * researchDirs() can walk it to find a launch workdir named after a DIFFERENT alias of
+ * the same type.
+ */
+export const TYPE_ALIASES = {
     venue: 'venue', venues: 'venue',
     photographer: 'photos', photographers: 'photos', photography: 'photos', photos: 'photos', photo: 'photos',
     caterer: 'food', caterers: 'food', catering: 'food', food: 'food',
@@ -179,8 +182,45 @@ export function etype() {
     hotel: 'hotel', hotels: 'hotel', hotelblock: 'hotel', hotelblocks: 'hotel',
     'hotel-block': 'hotel', 'hotel-blocks': 'hotel', block: 'hotel', blocks: 'hotel',
     lodging: 'hotel', accommodation: 'hotel', accommodations: 'hotel', rooms: 'hotel',
-  };
-  const key = alias[raw];
+};
+
+/** Resolve --type (user-facing aliases accepted) to a profile; clear message on unknown. */
+export function etype() {
+  const raw = (argValue('type') || 'venue').toLowerCase();
+  const key = TYPE_ALIASES[raw];
   if (!key) { console.error(`unknown --type "${raw}" — known: venue, photographer, caterer, music, flowers, dress, planner, hairmakeup, hotelblocks`); process.exit(1); }
   return ETYPES[key];
+}
+
+/**
+ * Every directory that may hold this run's archived research (raw reddit pastes, web
+ * extracts, pricing digests): the enrich workdir itself, plus the matching LAUNCH workdir.
+ *
+ * Why this is not just `basename(workdir)`: the two skills name their directories from
+ * different things. `/launchvendors --type hairmakeup` resolves to profile key `beauty`
+ * and its workdir is usually `beauty-<region>`, while the enrich side is just as often
+ * `hairmakeup-<region>`. A basename-only lookup then silently finds NOTHING — no error,
+ * no missing file, just a whole region drafted with zero reddit content. That happened on
+ * the 2026-07-29 CO beauty run and was caught only because `reddit threads on file: 0`
+ * looked wrong by eye.
+ *
+ * So: try the basename, and also the same region slug under this type's OWN key and every
+ * alias that maps to it. Callers should pass `profileKey` (etype().key).
+ */
+export function researchDirs(workdir, profileKey) {
+  const path = pathMod;
+  const base = path.basename(workdir);
+  // region slug = basename minus a leading type token, e.g. "hairmakeup-colorado" -> "colorado"
+  const region = base.includes('-') ? base.slice(base.indexOf('-') + 1) : base;
+  const names = new Set([base]);
+  if (profileKey) {
+    names.add(`${profileKey}-${region}`);
+    for (const [a, k] of Object.entries(TYPE_ALIASES)) if (k === profileKey) names.add(`${a}-${region}`);
+  }
+  const dirs = [path.join(workdir, 'research')];
+  for (const n of names) {
+    dirs.push(path.join('data/launchvenues', n, 'research'));
+    dirs.push(path.join('data/launchvendors', n, 'research'));
+  }
+  return [...new Set(dirs)];
 }

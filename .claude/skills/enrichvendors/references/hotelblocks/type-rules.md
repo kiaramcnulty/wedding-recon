@@ -19,6 +19,27 @@ LODGING and the economics of the block — not the wedding day, not event space.
 - KEEP (never a flag): a hotel whose block comes with **no discount at all**. Plenty hold a
   block purely as an availability guarantee at the going rate — that is a legitimate,
   useful listing. Say so plainly; don't treat it as a defect or a wrong-type signal.
+- KEEP (never a flag): a chain property whose evidence is **brand-level rather than
+  property-level.** Big chains publish nothing useful about blocks at the individual-property
+  level, so these arrive with little or no site material. **Thin research is NOT evidence that
+  the property takes no blocks** — do not flag on that basis. When the research below carries
+  a brand-level note (someone describing how Marriott / Hilton / Hyatt / Best Western /
+  Quality Inn / Comfort Inn / Holiday Inn blocks work), that IS your evidence: this property
+  is one of those, so write the entry.
+
+  **Attribute it as brand-level and never launder it into a property-specific claim.** Right:
+  "someone on reddit said any Marriott or Hilton property will do a room block with a signed
+  agreement, attrition usually 90-95%; nothing specific published for this location, so the
+  terms would come from their group sales desk." Wrong: "this hotel offers a room block with
+  90-95% attrition" (states as fact about the property something the source said about the
+  brand), or inventing a rate, minimum, or cut-off date the source never gave.
+
+  **Say the fact, never the plumbing.** Write "they don't publish rates" or "nothing specific
+  published for this location" — a couple would say that. NEVER reference how the research
+  reached you or why it is thin: no mention of crawling, scraping, fetching, blocked or
+  unreadable sites, HTTP status codes, automated lookups, research files, or this pipeline's
+  own vocabulary. That an entry's source material was hard to gather is invisible to the
+  reader and must stay that way.
 
 ## service_region — REQUIRED on every row
 - The area its guests are staying for, sourced: the property's city/metro is the normal

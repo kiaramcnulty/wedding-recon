@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { norm, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
-import { etype } from './etype.mjs';
+import { etype, researchDirs } from './etype.mjs';
 
 const workdir = process.argv[2];
 const region = argValue('region');
@@ -40,7 +40,7 @@ for (const e of botEntries || []) {
 }
 
 // Reddit mentions: count archived threads (this workdir + the launchvenues one) that name each venue.
-const redditDirs = [path.join(workdir, 'research'), path.join('data/launchvenues', path.basename(workdir), 'research'), path.join('data/launchvendors', path.basename(workdir), 'research')];
+const redditDirs = researchDirs(workdir, profile.key);
 const threads = [];
 for (const dir of redditDirs) {
   if (!fs.existsSync(dir)) continue;
@@ -112,6 +112,13 @@ if (process.argv.includes('--slices')) {
 }
 
 console.log(`${region} venues: ${venues.length} | already enriched: ${enriched} | reddit threads on file: ${threads.length}`);
+// A 0 here right after a launch run that archived pastes means the workdir names don't
+// line up, not that no research exists. Print the dirs actually searched so it's obvious.
+if (!threads.length) {
+  console.log('NOTE: no reddit threads found. Searched:');
+  for (const d of redditDirs) console.log(`  ${fs.existsSync(d) ? '[found] ' : '[missing]'} ${d}`);
+  console.log('  If the launch run archived pastes elsewhere, rename this workdir to match the launch workdir (do NOT copy the files — both dirs are scanned and copies double every excerpt).');
+}
 console.log(`bots (${(botProfiles || []).length}): ${(botProfiles || []).map((b) => `${b.username}=${entriesPerBot.get(b.id) || 0}`).join(', ') || '—'}`);
 console.log('\nUNENRICHED, richest first (score = 3×reddit-threads + places-reviews + website):');
 for (const r of rows.filter((r) => !r.done).sort((a, b) => b.score - a.score)) {

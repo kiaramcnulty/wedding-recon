@@ -154,6 +154,31 @@ lines.push(`TO INSERT: ${payload.length}  (google-matched ${payload.filter((p) =
 if (profile.vendorTypes) lines.push(`  by type (from CSV subtype — review before --apply): ${typeScope.map((t) => `${t} ${payload.filter((p) => p.vendor_type === t).length}`).join(', ')}`);
 if (approx.length) lines.push(`  approximate (city-centroid, dashed pin): ${approx.join(', ')}`);
 if (noLoc.length) lines.push(`  no location — searchable by name but NO map pin: ${noLoc.join(', ')}`);
+// Instagram collision guard. The research pass hunts handles by name-searching the open
+// web, so it can staple ANOTHER business's handle onto a similarly-named vendor — the
+// 2026-07-29 CO beauty run gave "Alchemy Face Bar" the handle @beautybarinc, which belongs
+// to a different vendor in the same batch. A handle is effectively an identity, so one
+// handle on two vendors is always wrong: at least one of them is mis-attributed.
+if (profile.captureInstagram) {
+  const igSeen = new Map();
+  for (const v of toInsert) if (v.instagram) {
+    const h = v.instagram.toLowerCase();
+    if (!igSeen.has(h)) igSeen.set(h, []);
+    igSeen.get(h).push(v.name);
+  }
+  const dbIg = new Map();
+  for (const d of existing) if (d.instagram) dbIg.set(d.instagram.toLowerCase(), d.name);
+  const clashes = [];
+  for (const [h, names] of igSeen) {
+    if (names.length > 1) clashes.push(`@${h} claimed by ${names.length} rows in this batch: ${names.join(' / ')}`);
+    const owner = dbIg.get(h);
+    if (owner && !names.includes(owner)) clashes.push(`@${h} is already on existing vendor "${owner}" but this batch puts it on ${names.join(' / ')}`);
+  }
+  if (clashes.length) {
+    lines.push(`WARNING — instagram handle collisions (${clashes.length}); at least one side is mis-attributed, clear the wrong one before --apply:`);
+    for (const c of clashes) lines.push(`  ${c}`);
+  }
+}
 lines.push(`to-insert export (for review/download): ${toInsertCsv}`);
 console.log(lines.join('\n'));
 

@@ -44,6 +44,34 @@ const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgetta
 // is part of a scripted set being processed ("from this batch", "the enrichment run",
 // "seeded venues") — a couple's note references the venue, never how the note was made.
 const PROCESS = /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?|launchintel|digest\w*)\b/i;
+// Research-artifact narration: describing the SOURCE MATERIAL instead of the vendor. A
+// couple writes "they don't post prices anywhere"; only a script writes "reviews go back
+// to 2020-2023" or "site didn't load (404)". Added 2026-07-29 — PROCESS missed this whole
+// family, so it reached the CO beauty CSV and needed a 76-row rewrite pass.
+// The load-failure half must be SUBJECT-AGNOSTIC. Anchoring it to "site|page|website" let
+// eight real variants through in the 2026-07-29 CO hotel run — "kept 403ing on me", "their
+// site 403s to any automated check", "rate card PDFs did not load", "Site pricing wouldn't
+// load", "sites dont load for automated lookups" — because the subject was a PDF, a bare
+// noun, or the failure was named by status code instead of by verb. Each escape cost a
+// rewrite pass, and each narrower patch found one more spelling.
+// The negation is REQUIRED before `load` so legitimate wedding usage survives: "vendor
+// load-in starts at 9am" and "guests can load in through the side door" must NOT match.
+const RESEARCH = new RegExp([
+  /\b404\b|\b403\w*/,                                             // status codes, incl. "403s"/"403ing"
+  /\bunreachable\b|\bautomated (check|lookup|request|tool)s?\b/,   // how it failed / who it failed for
+  /\b(reviews (go|going) back to|no pricing to pull|nothing to pull)\b/,
+  /(?:(?:did|would|could|does|do|will|can)\s*(?:n'?t|not)|failed to|never)\s+load\b(?!\s*-?\s*in\b)/,
+  /\bsite (is|was)?\s*(down|unavailable|unreadable|inaccessible)\b/,
+  /\b(couldn'?t|could not|can'?t|cannot) (access|reach|open|read) (the |their )?(site|page|website)\b/,
+  /\bsite is (a )?dead link\b|\bper (their|the) (site|listing) copy\b/,
+].map((r) => r.source).join('|'), 'i');
+// NO bullet-style check here, deliberately. A NOTESTYLE regex briefly flagged notes that
+// OPEN with a bullet as "a research scratchpad" — Kiara reversed that on 2026-07-29:
+// "the bullets are okay and encouraged, the variety is good." Real people jot notes both
+// ways, and a corpus where every entry is uniform prose reads MORE synthetic, not less.
+// `debullet()` below already turns bullet boundaries into real newlines at insert, and the
+// vendor page renders them with whitespace-pre-line, so this is a supported format that
+// displays correctly. Do not re-add the check.
 const EMDASH = /[—–]/; // no em/en dashes anywhere in entry text — real users type hyphens
 const errors = [];
 const perBot = new Map(), perBotVenue = new Set();
@@ -60,6 +88,8 @@ for (const [i, r] of recons.entries()) {
   if (banned) errors.push(`${at}: banned marketing/AI phrase "${banned[0]}" — rephrase in the entry's voice`);
   const tell = text.match(PROCESS);
   if (tell) errors.push(`${at}: process-tell "${tell[0]}" — rephrase as a person would (never reference scraping, batches, or how this entry was produced)`);
+  const artifact = text.match(RESEARCH);
+  if (artifact) errors.push(`${at}: research-artifact narration "${artifact[0]}" — say what's true of the VENDOR ("they don't post pricing"), not what the source material looked like`);
   if (EMDASH.test(text)) errors.push(`${at}: em/en dash in entry text — use a comma, period, or hyphen`);
   const m = parseInt(r.month, 10), y = parseInt(r.year, 10);
   if (!(m >= 1 && m <= 12)) errors.push(`${at}: bad month "${r.month}"`);

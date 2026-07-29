@@ -99,16 +99,27 @@ async function cmdSubmit() {
       custom_id: f.replace(/\.md$/, ''),
       file: f,
       inTok: Math.round(text.length / 4),
-      vendors: (text.match(/^=== \w+: /gm) || []).length, // "=== VENUE: ..." block labels only (not the API MODE footer)
+      // Count vendor blocks by the field every one carries. The old `^=== \w+: ` pattern
+      // silently matched ZERO for any type whose label has a space or punctuation
+      // (HAIR & MAKEUP ARTIST, MUSIC ACT, BRIDAL SHOP, HOTEL (GUEST ROOM BLOCKS)) — the
+      // 2026-07-29 beauty run reported "~2 vendors" for 187 and estimated 10x low.
+      vendors: (text.match(/^=== .*\bvendor_id=/gm) || []).length,
+      // Output scales with ENTRIES, not vendors (a 3-entry vendor emits 3 rows from one block).
+      entries: (text.match(/\bentries=(\d+)/g) || []).reduce((s, m) => s + parseInt(m.slice(8), 10), 0),
       params: { model: MODEL, max_tokens: MAX_TOKENS, messages: [{ role: 'user', content: text }], ...(effort ? { output_config: { effort } } : {}) },
     };
   });
 
   const inTok = reqs.reduce((s, r) => s + r.inTok, 0);
   const vendors = reqs.reduce((s, r) => s + r.vendors, 0);
-  const expOut = vendors * 350; // measured rows run ~200-300 output tokens + flags line
+  const entries = reqs.reduce((s, r) => s + r.entries, 0) || vendors;
+  // ~1200 output tokens per ENTRY, measured end-to-end on the 2026-07-29 CO beauty run
+  // (324,183 output tokens / 280 rows = 1158). The old 350/vendor figure under-modelled
+  // by ~10x once multi-entry vendors became the norm; an estimate that low makes the
+  // --max-cost gate meaningless, so keep this honest rather than flattering.
+  const expOut = entries * 1200;
   const worstOut = reqs.length * MAX_TOKENS;
-  console.log(`${reqs.length} call file(s), ~${vendors} vendors | est input ${inTok} tok`);
+  console.log(`${reqs.length} call file(s), ${vendors} vendors / ${entries} entries | est input ${inTok} tok`);
   console.log(`cost estimate: expected ≈ $${usd(inTok, expOut).toFixed(2)} | worst case (every request maxes ${MAX_TOKENS} out) ≈ $${usd(inTok, worstOut).toFixed(2)}  [rates $${IN_RATE}/$${OUT_RATE} per MTok]`);
 
   const maxCost = parseFloat(argValue('max-cost') || '12');  // raised alongside the 96k max-tokens default (worst case ≈ calls × 96k × out-rate)
