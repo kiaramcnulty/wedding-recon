@@ -33,7 +33,7 @@ const ADDRESS_MATCH_SCORE = 25;
 /**
  * Score for a typo-tolerant near-miss — a row the RPC's trigram tier returned
  * because nothing matched literally ("sanctaury" → "Sanctuary Golf Course",
- * migration `0026`). Below every literal match by construction: a near-miss is a
+ * migrations `0026`/`0027`). Below every literal match by construction: a near-miss is a
  * "did you mean", so it must never outrank something the user actually typed.
  * These rows arrive from SQL already ordered best-first (weakest token
  * similarity), and giving them all one score keeps that order — `sort` is stable,
@@ -114,7 +114,7 @@ export function scoreVendorMatch(name: string, query: string): number {
  * Search the vendor directory by name, street address, or city.
  *
  * Backed by the `search_vendors` RPC (migrations `0018` → `0019` token-aware →
- * `0025` shared shape → `0026` typo tolerance), which splits the query into
+ * `0025` shared shape → `0026`/`0027` typo tolerance), which splits the query into
  * tokens, drops stop words, and requires every remaining token to appear in
  * name/address/city — so "the sanctuary" resolves "Sanctuary Golf Course"
  * (`lib/search/tokens.ts` mirrors the stop-word list). When that finds nothing,
