@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { norm, parseCSV, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
-import { etype } from './etype.mjs';
+import { etype, researchDirs } from './etype.mjs';
 
 const workdir = process.argv[2];
 const cmd = process.argv[3];
@@ -51,6 +51,30 @@ const db = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 const HEADERS = profile.headers;
 const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
 const EMDASH = /[—–]/;
+// Keep these THREE in lockstep with upload.mjs — `status` is the cheap pre-check and must
+// fail on everything the upload gate fails on, or a defect only surfaces after merge.
+// (2026-07-29: status lacked PROCESS entirely, so 21 process-tells sailed through it and
+// were only caught at the upload dry-run, after the CSV had already been built.)
+const PROCESS = /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?|launchintel|digest\w*)\b/i;
+// Research-artifact narration: describing the SOURCE MATERIAL rather than the vendor.
+// A couple says "they don't post prices"; only a script says "reviews go back to 2020-2023".
+// KEEP THIS BYTE-IDENTICAL TO upload.mjs — status is the cheap pre-check for that gate.
+// Subject-agnostic on purpose: anchoring the load-failure half to "site|page|website" let
+// eight variants through in the 2026-07-29 CO hotel run (PDFs, bare nouns, "403ing").
+// The negation before `load` is required so "vendor load-in starts at 9am" survives.
+const RESEARCH = new RegExp([
+  /\b404\b|\b403\w*/,                                             // status codes, incl. "403s"/"403ing"
+  /\bunreachable\b|\bautomated (check|lookup|request|tool)s?\b/,   // how it failed / who it failed for
+  /\b(reviews (go|going) back to|no pricing to pull|nothing to pull)\b/,
+  /(?:(?:did|would|could|does|do|will|can)\s*(?:n'?t|not)|failed to|never)\s+load\b(?!\s*-?\s*in\b)/,
+  /\bsite (is|was)?\s*(down|unavailable|unreadable|inaccessible)\b/,
+  /\b(couldn'?t|could not|can'?t|cannot) (access|reach|open|read) (the |their )?(site|page|website)\b/,
+  /\bsite is (a )?dead link\b|\bper (their|the) (site|listing) copy\b/,
+].map((r) => r.source).join('|'), 'i');
+// NO bullet-style check, deliberately — matches upload.mjs, see the note there. A
+// NOTESTYLE regex briefly flagged bullet-opening notes as scratchpad dumps; Kiara reversed
+// that on 2026-07-29: "the bullets are okay and encouraged, the variety is good." Mixed
+// prose and bullet notes read MORE human than a uniformly-formatted corpus. Do not re-add.
 const slugOf = (s) => norm(s).replace(/ /g, '-').slice(0, 60);
 const nameKey = (s) => norm(s).replace(/\b(the|at|by|of|a)\b/g, ' ').replace(/\s+/g, ' ').trim();
 const csvEsc = (s) => (/[",\n]/.test(s ?? '') ? `"${String(s).replace(/"/g, '""')}"` : (s ?? ''));
@@ -146,11 +170,15 @@ async function cmdBatch() {
 
   // reddit mentions (same signal as roster.mjs) for ordering
   const threads = [];
-  for (const dir of [path.join(workdir, 'research'), path.join('data/launchvenues', path.basename(workdir), 'research'), path.join('data/launchvendors', path.basename(workdir), 'research')]) {
+  for (const dir of researchDirs(workdir, profile.key)) {
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir).filter((f) => f.startsWith('reddit-') && f.endsWith('.txt')))
       threads.push(norm(fs.readFileSync(path.join(dir, f), 'utf8')));
   }
+  // Zero threads is legitimate for a region nobody pasted about, but it is far more often
+  // a workdir-naming mismatch (see researchDirs). Say so rather than silently ranking
+  // every vendor on Places data alone.
+  if (!threads.length) console.log('NOTE: 0 reddit threads found for richness ranking — if a launch run archived pastes for this region, the enrich workdir name may not match the launch one (see researchDirs in etype.mjs).');
   const redditScore = (name) => { const n = nameKey(name); return n.length < 5 ? 0 : threads.filter((t) => t.includes(n)).length; };
   const score = (v) => redditScore(v.name) * 3 + (v.google_place_id ? 1 : 0) + (v.website ? 1 : 0);
 
@@ -295,6 +323,8 @@ function cmdStatus() {
   const { perFile } = readWorkerRows(`${batch}-worker-`);
   const i = (n) => HEADERS.indexOf(n);
   const drafted = new Set(); let total = 0, malformed = 0, badVid = 0, badBot = 0, noPrice = 0, banned = 0, dashes = 0, noRegion = 0;
+  let tells = 0, research = 0;
+  const tellRows = [];
   for (const { file: f, rows, problems } of perFile) {
     malformed += problems.length;
     for (const r of rows) {
@@ -309,12 +339,19 @@ function cmdStatus() {
       const text = `${r[i('price_text')]} ${r[i('price_details')]} ${r[i('notes')]}`;
       if (BANNED.test(text)) banned++;
       if (EMDASH.test(text)) dashes++;
+      const t = text.match(PROCESS) || text.match(RESEARCH);
+      if (t) { tells++; if (tellRows.length < 8) tellRows.push(`${r[i('venue')]} ("${t[0]}")`); }
+      if (RESEARCH.test(text)) research++;
     }
     console.log(`  ${f}: ${rows.length} rows${problems.length ? ` | ${problems.length} unparseable JSON lines` : ''}`);
   }
   const missing = manifest.filter((m) => !drafted.has(`${m.vendor_id}|${m.bot}`));
   console.log(`\ndrafted ${drafted.size}/${manifest.length} entry slots | rows ${total} | malformed ${malformed} | bad vendor_id ${badVid} | bot mismatch ${badBot}`);
   console.log(`missing price fields ${noPrice} | banned phrases ${banned} | em-dashes ${dashes}${profile.serviceRegionRequired ? ` | missing service_region ${noRegion}` : ''}`);
+  console.log(`process-tells ${tells} | research-artifact narration ${research}`);
+  // Both are voice failures the upload gate HARD-FAILS on. Fix them here, before merge,
+  // not after. (Bullet-style notes are NOT a defect — see the note at the top.)
+  if (tellRows.length) console.log(`  tells e.g.: ${tellRows.join('; ')}`);
   if (missing.length) console.log(`MISSING SLOTS (SHORT/THIN-flagged ones are intentional): ${missing.map((m) => `${m.name} (${m.bot})`).join('; ')}`);
 }
 
@@ -390,9 +427,26 @@ async function cmdVerify() {
   if (error) { console.error('DB read failed:', error.message); process.exit(1); }
   const mine = (entries || []).filter((e) => batchVids.has(e.vendor_id));
   const byPair = new Map(mine.map((e) => [`${e.author_id}|${e.vendor_id}`, e]));
-  const { data: media } = mine.length
-    ? await supabase.from('recon_media').select('recon_entry_id, thumb_path').in('recon_entry_id', mine.map((e) => e.id))
-    : { data: [] };
+  // Read the media rows in CHUNKS, paginated, and CHECK THE ERROR. All three matter:
+  //  - one `.in()` over every entry id builds the whole UUID list into the query STRING;
+  //    at 484 entries that is a ~17KB URL and the request fails outright;
+  //  - the old code destructured `{ data: media }` with no error check, so that failure
+  //    silently yielded an empty media set;
+  //  - PostgREST also caps an unpaginated select at 1000 rows, and recon_media passed 1000
+  //    during the 2026-07-29 CO hotel run.
+  // Any of the three makes verify believe the photos it just wrote do not exist. That is
+  // not a cosmetic miscount: `--fix-gaps` below DELETES every gapped entry for upload to
+  // re-insert, so a bad read makes verify destroy and rebuild live, correctly-photographed
+  // entries on every pass and never converge. It reported exactly 35 gaps for the 35
+  // photo-bearing rows — the tell that it was seeing zero media, not partial media.
+  const media = [];
+  for (let i = 0; i < mine.length; i += 100) {
+    const ids = mine.slice(i, i + 100).map((e) => e.id);
+    const { data, error: mErr } = await selectAll(() =>
+      supabase.from('recon_media').select('recon_entry_id, thumb_path').order('id').in('recon_entry_id', ids));
+    if (mErr) { console.error(`recon_media read failed: ${mErr.message}`); process.exit(1); }
+    media.push(...(data || []));
+  }
   const mCount = new Map();
   for (const m of media || []) mCount.set(m.recon_entry_id, (mCount.get(m.recon_entry_id) || 0) + 1);
 
@@ -429,16 +483,33 @@ function cmdPhotosMap() {
   const csvName = req('csv');
   const screenDir = path.join(workdir, 'photos', 'screen');
   const keepers = {};
-  for (const f of fs.readdirSync(screenDir).filter((f) => /^keep-batch-.*\.json$/.test(f)).sort()) {
-    for (const [slug, arr] of Object.entries(JSON.parse(fs.readFileSync(path.join(screenDir, f), 'utf8')))) keepers[slug] = (arr || []).slice(0, profile.photoCap ?? 2);
+  // NOTE the anchored NN: `keep-batch-.*\.json` also matches sidecars like
+  // `keep-batch-01.raw.json`, so a backup left beside the real file silently wins the
+  // sort and gets read instead (cost a debugging cycle on 2026-07-29).
+  for (const f of fs.readdirSync(screenDir).filter((f) => /^keep-batch-\d+\.json$/.test(f)).sort()) {
+    for (const [slug, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(screenDir, f), 'utf8')))) {
+      // Screeners have emitted both shapes: a bare keeper array, and {keep:[...],drop:[...]}.
+      // Accept either rather than throwing an opaque "(arr || []).slice is not a function".
+      const arr = Array.isArray(v) ? v : (v && Array.isArray(v.keep) ? v.keep : []);
+      if (!Array.isArray(v) && !(v && Array.isArray(v.keep))) console.log(`  ! ${slug}: unrecognized screener shape, treated as zero keepers`);
+      keepers[slug] = arr.slice(0, profile.photoCap ?? 2);
+    }
   }
+  // Screeners occasionally name files that were never downloaded (2026-07-29: one claimed
+  // 5 keepers for a vendor that has exactly 1 photo on disk). A hallucinated filename is
+  // that screener's error, not a reason to block the whole map — DROP the phantom, report
+  // it, and keep the real keepers. Only a slug whose entire keeper list evaporates is
+  // worth a second look, and that just means the vendor ships photo-less.
   const missing = [];
-  for (const [slug, arr] of Object.entries(keepers)) for (const fn of arr) {
-    const full = path.join(workdir, 'photos', slug, fn);
-    if (!fs.existsSync(full)) missing.push(`${slug}/${fn}`);
-    if (!fs.existsSync(full.replace(/\.jpg$/, '_thumb.jpg'))) missing.push(`${slug}/${fn} thumb`);
+  for (const [slug, arr] of Object.entries(keepers)) {
+    keepers[slug] = arr.filter((fn) => {
+      const full = path.join(workdir, 'photos', slug, fn);
+      const ok = fs.existsSync(full) && fs.existsSync(full.replace(/\.jpg$/, '_thumb.jpg'));
+      if (!ok) missing.push(`${slug}/${fn}`);
+      return ok;
+    });
   }
-  if (missing.length) { console.error('missing keeper files: ' + missing.join(', ')); process.exit(1); }
+  if (missing.length) console.log(`  dropped ${missing.length} screener-named file(s) not on disk: ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? ', …' : ''}`);
 
   const csvPath = path.join(workdir, csvName);
   fs.copyFileSync(csvPath, csvPath.replace(/\.csv$/, '.prephotos.csv'));

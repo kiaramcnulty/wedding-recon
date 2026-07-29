@@ -232,3 +232,51 @@ const remaining = (still || []).map((r) => r.id);
 if (remaining.length) { console.error(`WARNING: ${remaining.length} still present after delete: ${remaining.join(', ')}`); process.exit(1); }
 console.log(`\nDELETED ${delIds.length} vendor(s) and all cascaded recon/media/saves.`);
 if (blocked.length) console.log(`(skipped ${blocked.length} blocked — override flags above if those were also intended.)`);
+
+// ── Propagate the removal back to the LAUNCH workdir ──────────────────────────
+// Deleting from the DB is only half the job: the launch CSV that seeded these rows still
+// lists them, so the next `launchvendors upload.mjs --apply` on that workdir re-inserts
+// every one. (2026-07-29, CO beauty: 5 wrong-type vendors removed here were still queued
+// as "TO INSERT: 5" by the launch dry-run afterwards.) Move them into that workdir's
+// pruned.csv, which is also what makes resolve.mjs's pruned-guard keep ignoring them.
+const deleted = vendors.filter((v) => delIds.includes(v.id));
+const norm = (s) => (s || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
+const byPid = new Set(deleted.map((v) => v.google_place_id).filter(Boolean));
+const byName = new Set(deleted.map((v) => `${norm(v.name)}|${norm(v.city)}`));
+let movedTotal = 0;
+for (const root of ['data/launchvendors', 'data/launchvenues']) {
+  if (!fs.existsSync(root)) continue;
+  for (const dir of fs.readdirSync(root)) {
+    for (const csvName of ['vendors.csv', 'venues.csv']) {
+      const p = `${root}/${dir}/${csvName}`;
+      if (!fs.existsSync(p)) continue;
+      const txt = fs.readFileSync(p, 'utf8');
+      const recs = []; let cur = '', q = false;
+      for (let i = 0; i < txt.length; i++) { const ch = txt[i]; if (ch === '"') q = !q; if (ch === '\n' && !q) { recs.push(cur); cur = ''; } else cur += ch; }
+      if (cur.trim()) recs.push(cur);
+      if (recs.length < 2) continue;
+      const split = (l) => { const o = []; let c = '', qq = false;
+        for (let i = 0; i < l.length; i++) { const ch = l[i];
+          if (qq) { if (ch === '"') { if (l[i + 1] === '"') { c += '"'; i++; } else qq = false; } else c += ch; }
+          else if (ch === '"') qq = true; else if (ch === ',') { o.push(c); c = ''; } else c += ch; } o.push(c); return o; };
+      const hdr = split(recs[0]);
+      const iN = hdr.indexOf('name'), iC = hdr.indexOf('city'), iP = hdr.indexOf('place_id');
+      if (iN < 0) continue;
+      const keep = [recs[0]], moved = [];
+      for (let i = 1; i < recs.length; i++) {
+        if (!recs[i].trim()) continue;
+        const f = split(recs[i]);
+        const hit = (iP >= 0 && f[iP] && byPid.has(f[iP])) || byName.has(`${norm(f[iN])}|${norm(iC >= 0 ? f[iC] : '')}`);
+        (hit ? moved : keep).push(recs[i]);
+      }
+      if (!moved.length) continue;
+      fs.writeFileSync(p, keep.join('\n'));
+      const pruned = `${root}/${dir}/pruned.csv`;
+      if (fs.existsSync(pruned)) fs.appendFileSync(pruned, '\n' + moved.join('\n'));
+      else fs.writeFileSync(pruned, [recs[0], ...moved].join('\n'));
+      movedTotal += moved.length;
+      console.log(`  launch workdir synced: moved ${moved.length} row(s) out of ${p} into pruned.csv`);
+    }
+  }
+}
+if (!movedTotal) console.log('  (no launch-workdir rows matched — nothing to sync)');

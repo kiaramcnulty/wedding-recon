@@ -19,6 +19,20 @@ if (!fs.existsSync(candFile)) { console.error(`missing ${candFile}`); process.ex
 const venues = readVenues(file);
 const seenPid = new Set(venues.map((v) => v.place_id).filter(Boolean));
 const knownNames = venues.map((v) => nameKey(v.name, profile));
+
+// Rows already REJECTED (junk name, wrong type, no wedding evidence, or a Phase-4 judgment
+// call) live in pruned.csv, not the working CSV. Without this guard a re-run of resolve
+// replays candidates.jsonl and cheerfully re-adds every one of them, silently undoing an
+// adjudication pass — measured 2026-07-29 (CO beauty): a single re-run resurrected 5
+// removed vendors and duplicated 4 rows that had been renamed in between.
+const prunedFile = path.join(workdir, 'pruned.csv');
+const prunedKeys = new Set(), prunedPids = new Set();
+if (fs.existsSync(prunedFile)) {
+  for (const r of readVenues(prunedFile)) {
+    if (r.name) prunedKeys.add(nameKey(r.name, profile));
+    if (r.place_id) prunedPids.add(r.place_id);
+  }
+}
 // Row lookups so a DEDUP HIT can still donate its research-sourced instagram/website to
 // the existing row (fills blanks only) — otherwise a pasted IG handle that collides with
 // a sweep row would be silently lost.
@@ -27,8 +41,9 @@ const byKey = new Map();
 for (let i = 0; i < venues.length; i++) if (!byKey.has(knownNames[i])) byKey.set(knownNames[i], venues[i]);
 
 const cands = fs.readFileSync(candFile, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
-let resolved = 0, approx = 0, nomatch = 0, dups = 0, researchSite = 0, donated = 0;
+let resolved = 0, approx = 0, nomatch = 0, dups = 0, researchSite = 0, donated = 0, revived = 0;
 const flagged = [];
+const revivedNames = [];
 
 const donate = (row, c, ig) => {
   if (!row) return;
@@ -42,6 +57,9 @@ const donate = (row, c, ig) => {
 for (const c of cands) {
   const key = nameKey(c.name, profile);
   const ig = profile.captureInstagram ? cleanInstagram(c.instagram) : '';
+  // Previously pruned by name — don't resurrect it. `--rescue` in adjudicate.mjs is the
+  // one supported way back out of pruned.csv, so a rejection survives any number of re-runs.
+  if (prunedKeys.has(key)) { revived++; if (revivedNames.length < 12) revivedNames.push(c.name); continue; }
   // Name-level dedup vs everything already in the file (exact, or containment when name is distinctive enough).
   const dupKey = knownNames.find((n) => n === key || (sigTokens(c.name).length >= 2 && (n.includes(key) || key.includes(n))));
   if (dupKey !== undefined) { dups++; donate(byKey.get(dupKey), c, ig); continue; }
@@ -53,6 +71,9 @@ for (const c of cands) {
   // Match guard: must share a significant name token AND sit in the right state.
   if (p && tokensOverlap(c.name, p.displayName?.text || '', profile.weak) && (p.formattedAddress || '').includes(state)) {
     if (seenPid.has(p.id)) { dups++; donate(byPid.get(p.id), c, ig); console.log(`  = "${c.name}" resolved to a place_id we already have — dropped as duplicate (ig/website donated if blank)`); continue; }
+    // Same guard as the name check, but on the RESOLVED place: a candidate can reach a
+    // pruned row under a different name (a rebrand, or two businesses sharing a listing).
+    if (prunedPids.has(p.id)) { revived++; if (revivedNames.length < 12) revivedNames.push(`${c.name} -> ${p.displayName?.text || p.id}`); continue; }
     const gName = p.displayName.text; // canonical Google name
     const gKey = nameKey(gName, profile);
     const { city, state: st, cleanAddress } = parseCityState(p.formattedAddress, state);
@@ -103,5 +124,9 @@ for (const c of cands) {
 }
 
 writeVenues(file, venues);
-console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known (${donated} donated ig/website to existing rows) | +${researchSite} using a research website | total ${venues.length}`);
+console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known (${donated} donated ig/website to existing rows) | +${researchSite} using a research website | ${revived} skipped as previously-pruned | total ${venues.length}`);
+if (revived) {
+  console.log(`  skipped (already in pruned.csv — rescue with: adjudicate.mjs ... --rescue "<name>" --apply):\n    ${revivedNames.join('\n    ')}`);
+  console.log(`  NOTE: adjudicate is TERMINAL — if you are re-running resolve after adjudicating, you are probably re-doing work. Resolve everything first, then adjudicate once.`);
+}
 if (flagged.length) { console.log('\nFLAGGED (adjudicate in Phase 4 — see adjudicate.mjs):'); for (const f of flagged) console.log('  ' + f); }

@@ -125,6 +125,19 @@ that file exactly as it processed reply lines.
   2026-08-31. Batch halves those.
 - **Cost estimate per 300-vendor run:** ~13 calls × ~14–18k in + ~4k out ≈ 400k in /
   120k out ⇒ **$1.00–1.50 batch** ($2–3 non-batch). RICH pass adds pennies.
+- **MEASURED (2026-07-29, CO hair & makeup, 187 vendors / 349 entries):** 264k in /
+  **324k out** ⇒ **$2.83**. Output is the driver and it scales with **entries, not
+  vendors** — ~1,200 output tokens per entry, so a run averaging ~1.9 entries/vendor
+  costs roughly double a 1-entry-per-vendor run of the same vendor count. Budget from
+  the entry count `pipeline.mjs batch` prints, not from the vendor count.
+  Two estimator bugs found and fixed in that run, both of which made `submit` under-report
+  by ~10x (and therefore made `--max-cost` nearly meaningless):
+  1. the vendor-block regex was `^=== \w+: `, which matches **zero** blocks for any type
+     whose label contains a space or punctuation (`HAIR & MAKEUP ARTIST`, `MUSIC ACT`,
+     `BRIDAL SHOP`, `HOTEL (GUEST ROOM BLOCKS)`) — it printed "~2 vendors" for 187;
+  2. expected output was `vendors × 350`, ignoring multi-entry vendors entirely.
+  Now: blocks are counted by `vendor_id=`, entries summed from `entries=N`, and expected
+  output is `entries × 1200`. Re-verified against that run: estimate $3.40 vs actual $2.83.
 - **Cheaper still, maybe:** Haiku 4.5 ($1/$5) would roughly third the cost — but voice
   quality is unproven for this task. A/B ONE call file (Haiku vs Sonnet) through the
   full validator before committing.
