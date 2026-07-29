@@ -319,7 +319,9 @@ tooltip: "Consistently recommended in wedding communities and reviews."
 >   the route below degrades to no vendor results (Areas group unaffected); until
 >   `0025` is, Add Recon loses only the place_id dedup.
 >   `0026` adds a **second tier** that fires only when the strict tier returns
->   nothing: `pg_trgm` `word_similarity` over **name** at 0.35, every token
+>   nothing: `pg_trgm` `strict_word_similarity` over **name** at 0.35 (`0027`;
+>   plain `word_similarity` matched mid-word extents and pulled "The Farmhouse
+>   Luxury Salon" into a search for "sanctaury"), every token
 >   required to clear it (tokens under 4 chars still literal), ordered by the
 >   weakest token's similarity, capped at 5 rows — so "sanctaury" finds
 >   "Sanctuary Golf Course" while "sweet pea events" (a business we don't have)
