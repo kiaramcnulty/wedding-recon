@@ -5,15 +5,15 @@
 -- Deliberately a SECOND TIER, not a loosening of the first. The strict
 -- token-AND match from `0019` runs unchanged and, whenever it finds anything,
 -- is the entire answer -- so no query that works today changes its results, and
--- typo tolerance can't push a real match down the list. The fuzzy tier fires
+-- typo tolerance cannot push a real match down the list. The fuzzy tier fires
 -- only when strict matching finds NOTHING, i.e. exactly the case where the user
 -- currently sees an empty dropdown and has no recourse.
 --
 -- Shape:
 --   * trigram similarity (pg_trgm `word_similarity`), NAME only -- addresses and
---     city names are noisy and a typo'd street name is a rare query.
---   * EVERY token must clear the threshold, mirroring the strict tier's AND
---     semantics. That's what keeps precision: "mountain view lodge" does not
+--     city names are noisy and a misspelled street name is a rare query.
+--   * EVERY token must clear the threshold, mirroring the AND semantics of the
+--     strict tier. That is what keeps precision: "mountain view lodge" does not
 --     match "Spruce Mountain Ranch" just because one token is close.
 --   * tokens under 4 characters must still match literally -- trigram scores on
 --     2-3 character tokens are noise ("dj", "co", "the").
@@ -24,10 +24,18 @@
 --     barn", "hair by jess", "copper room") return nothing rather than a wrong
 --     guess. Noise grows with directory size, so fuzzy rows are also capped at
 --     FUZZY_MAX and ordered best-first.
---   * ordered by the WEAKEST token's similarity (the binding constraint), so the
+--   * ordered by the similarity of the WEAKEST token (the binding constraint), so
 --     closest overall name comes first. `lib/search/vendors.ts` scores fuzzy
 --     rows below every literal match and relies on a stable sort to preserve
 --     this order.
+--
+-- NOTE: no apostrophes anywhere in the comments of this file -- keep it that way.
+-- The Supabase SQL editor tracks string literals without skipping `--` comments,
+-- so an apostrophe in a comment opens a phantom string. An odd number of them
+-- desyncs its lexer, it stops recognizing the dollar-quoted body boundary, and
+-- it splits the body at the semicolon inside it -- which the server then rejects
+-- with `42601: syntax error at or near "limit"`. `0025` survived on even parity;
+-- this file failed a hand-apply on 2026-07-29 with seven.
 --
 -- Return shape and signature are unchanged from `0025`, so this is a plain
 -- create-or-replace (no drop) and no application code has to change for it.
@@ -40,7 +48,7 @@
 create extension if not exists pg_trgm;
 
 -- Trigram index so the fuzzy tier stays cheap as the directory grows. Also
--- speeds up the strict tier's leading-wildcard `ilike` on name.
+-- speeds up the leading-wildcard `ilike` of the strict tier on name.
 create index if not exists vendors_name_trgm_idx
   on vendors using gin (name gin_trgm_ops);
 
@@ -165,7 +173,7 @@ as $$
     union all
     select * from fuzzy_hits
   )
-  -- Order explicitly rather than trusting UNION ALL to preserve the CTEs' order:
+  -- Order explicitly rather than trusting UNION ALL to preserve CTE order:
   -- strict rows first, then near-misses best-first. `sim` and `tier` are ordering
   -- columns only -- the return shape stays the nine columns above.
   select

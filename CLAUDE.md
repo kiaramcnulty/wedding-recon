@@ -129,6 +129,7 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - **Write idempotent:** `add column if not exists`; for constraints use `drop constraint if exists` then `add constraint` (Postgres has **no** "add constraint if not exists").
 - **One ALTER per constraint** — you cannot chain multiple `add constraint` clauses in a single `alter table` (syntax error).
 - **Not auto-applied** to the hosted DB — run new migrations by hand in the Supabase SQL editor.
+- **No apostrophes or `$$` in SQL comments** — the Supabase SQL editor splits a paste into statements with a lexer that tracks string literals but does **not** skip `--` comments. A `'` in a comment (`the tier's rule`, `typo'd`) opens a phantom string; an odd number of them desyncs it, it stops seeing the dollar-quoted function boundary, and it splits the body at the semicolon inside it — the server then rejects the fragment (`42601: syntax error at or near "limit"`). Cost a failed hand-apply of `0026` on 2026-07-29 (7 comment apostrophes; `0025` had 2 and survived on even parity). Write comments apostrophe-free — "does not" over "doesn't", "the rule of the strict tier" over "the strict tier's rule" — and name the delimiter "dollar-quoted body", never the literal token. `psql -f` is immune, so **local testing will not catch this**; the check is `grep -n "'" <file> | grep -- "--"`.
 
 ## Milestone status
 M0 foundation done; M1 (Auth) → M2 (Explore map) → M3 (Vendor page) → M4 (Add Recon) → M5 (Hub) → M6 (T&S) all built and functional. Current work is polish/edge-cases.
