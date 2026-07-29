@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { norm, sleep, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { norm, sleep, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
 import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
@@ -21,11 +21,11 @@ const limit = parseInt(argValue('limit') || '0', 10);
 
 const profile = etype();
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-const { data: all, error } = await supabase
+const { data: all, error } = await selectAll(() => supabase
   .from('vendors')
   .select(`id, name, city, region, website, google_place_id${profile.hasInstagram ? ', instagram' : ''}`)
   // Split types (music → dj|band) harvest across all their vendor_types in one run.
-  .in('vendor_type', profile.vendorTypes ?? [profile.vendorType]).eq('region', region);
+  .in('vendor_type', profile.vendorTypes ?? [profile.vendorType]).eq('region', region).order('name'));
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
 
 let targets = all;

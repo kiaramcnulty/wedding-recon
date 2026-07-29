@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { norm, argValue } from '../../launchvendors/scripts/lib.mjs';
+import { norm, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
 import { etype } from './etype.mjs';
 
 const workdir = process.argv[2];
@@ -18,17 +18,21 @@ for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) {
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const profile = etype();
-const { data: venues, error } = await supabase
+// selectAll: PostgREST caps an unpaginated read at 1000 rows, and would silently
+// return an arbitrary slice once a type+region grows past that. Needs .order() so
+// the pages are stable.
+const { data: venues, error } = await selectAll(() => supabase
   .from('vendors').select('id, name, city, website, google_place_id')
   // Split types (music → dj|band) select across all their vendor_types in one run.
-  .in('vendor_type', profile.vendorTypes ?? [profile.vendorType]).eq('region', region).order('name');
+  .in('vendor_type', profile.vendorTypes ?? [profile.vendorType]).eq('region', region).order('name'));
 if (error) { console.error('DB read failed:', error.message); process.exit(1); }
 
 const { data: botProfiles } = await supabase.from('profiles').select('id, username').eq('is_bot', true);
 const botIds = (botProfiles || []).map((b) => b.id);
-const { data: botEntries } = botIds.length
-  ? await supabase.from('recon_entries').select('vendor_id, author_id').in('author_id', botIds)
-  : { data: [] };
+const { data: botEntries, error: beErr } = botIds.length
+  ? await selectAll(() => supabase.from('recon_entries').select('vendor_id, author_id').order('id').in('author_id', botIds))
+  : { data: [], error: null };
+if (beErr) { console.error('DB read failed:', beErr.message); process.exit(1); }
 const entriesPerVendor = new Map(), entriesPerBot = new Map();
 for (const e of botEntries || []) {
   entriesPerVendor.set(e.vendor_id, (entriesPerVendor.get(e.vendor_id) || 0) + 1);
