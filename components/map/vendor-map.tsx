@@ -45,6 +45,50 @@ const pinLayerId = (t: VendorType) => `pins-${t}`;
 const CLUSTER_RADIUS = 50;
 const CLUSTER_MAX_ZOOM = 14;
 
+// Zoom at which pins start carrying their vendor's name. Deliberately pinned to
+// just past CLUSTER_MAX_ZOOM: above it no cluster bubbles survive, so every pin
+// on screen is a single vendor and a label can't be mistaken for a group's.
+// (It's also the zoom a vendor search flies to, so a searched pin arrives named.)
+const LABEL_MIN_ZOOM = CLUSTER_MAX_ZOOM + 1;
+
+// The pin whose preview card is open reads as "selected": bumped a little and
+// labelled at ANY zoom, so you can see which pin the card belongs to.
+const SELECTED_ICON_SCALE = 1.3;
+
+// Bottom strip of the map the open preview card sits over (card + the gap that
+// keeps our floating controls clear of the map attribution). A tapped pin landing
+// inside it gets panned up so the card never covers the pin it describes.
+const PREVIEW_SAFE_PX = 250;
+
+/**
+ * `text-field` for the pin layers: the vendor name from LABEL_MIN_ZOOM up, and
+ * below that only for the selected pin (zoom sits at the outermost level, which
+ * is what lets a layout property mix zoom with a per-feature lookup).
+ */
+function labelExpression(selectedId: string | null) {
+  const belowThreshold = selectedId
+    ? ["case", ["==", ["get", "id"], selectedId], ["get", "name"], ""]
+    : "";
+  return [
+    "step",
+    ["zoom"],
+    belowThreshold,
+    LABEL_MIN_ZOOM,
+    ["get", "name"],
+  ] as import("maplibre-gl").ExpressionSpecification;
+}
+
+/** `icon-size` for the pin layers: the selected pin renders slightly larger. */
+function iconSizeExpression(selectedId: string | null) {
+  if (!selectedId) return 1;
+  return [
+    "case",
+    ["==", ["get", "id"], selectedId],
+    SELECTED_ICON_SCALE,
+    1,
+  ] as import("maplibre-gl").ExpressionSpecification;
+}
+
 // Co-located type-clusters (e.g. venues + photographers downtown) would stack on
 // top of each other. Give each type a small fixed screen offset arranged on a
 // ring, so overlapping type-clusters splay into a tidy rosette instead of piling
@@ -174,6 +218,7 @@ function buildFeatureCollectionsByType(
       geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
       properties: {
         id: vendor.id,
+        name: vendor.name,
         icon: pinImageId(t, isApproximateLocation(vendor)),
       },
     });
@@ -193,6 +238,12 @@ export interface ClusterOpenPayload {
   zoom: number;
 }
 
+/** Emitted when an individual (non-cluster) vendor pin is tapped. */
+export interface VendorOpenPayload {
+  id: string;
+  vendorType: VendorType;
+}
+
 interface VendorMapProps {
   /** External position to fly to. Pass zoom to override the default (14). */
   flyToPosition?: { lng: number; lat: number; zoom?: number } | null;
@@ -203,6 +254,21 @@ interface VendorMapProps {
    * provided, a cluster tap opens this list instead of zooming in.
    */
   onClusterOpen?: (payload: ClusterOpenPayload) => void;
+  /**
+   * Called when a single vendor pin is tapped. When provided, the tap surfaces a
+   * preview (the caller's job) instead of navigating straight to the vendor page.
+   */
+  onVendorOpen?: (payload: VendorOpenPayload) => void;
+  /**
+   * Called on a tap that hits no pin and no cluster — i.e. empty map. Lets the
+   * caller dismiss an open preview the way Zillow does.
+   */
+  onBackgroundTap?: () => void;
+  /**
+   * The vendor whose preview is open. Its pin is enlarged and keeps its name
+   * label at any zoom, so the card is visibly tied to a pin.
+   */
+  selectedVendorId?: string | null;
   /**
    * Called after every map move settles, with the new center/zoom. The caller
    * persists it so returning to Explore — by any route: in-app back, browser/OS
@@ -226,6 +292,9 @@ export function VendorMap({
   flyToPosition,
   userPosition,
   onClusterOpen,
+  onVendorOpen,
+  onBackgroundTap,
+  selectedVendorId,
   onViewChange,
   initialView,
   selectedTypes,
@@ -233,8 +302,13 @@ export function VendorMap({
   const router = useRouter();
   // Latest onClusterOpen, callable from the run-once init effect's handlers.
   const onClusterOpenRef = useRef(onClusterOpen);
+  // Latest pin-tap / empty-map-tap handlers, same reason.
+  const onVendorOpenRef = useRef(onVendorOpen);
+  const onBackgroundTapRef = useRef(onBackgroundTap);
   // Latest onViewChange, same reason (init effect wires the moveend handler once).
   const onViewChangeRef = useRef(onViewChange);
+  // Latest selection, read by the init effect once the pin layers first exist.
+  const selectedVendorIdRef = useRef(selectedVendorId);
   // Captured once — the map reads center/zoom at init only.
   const initialViewRef = useRef(initialView);
   // Latest type filter, read by the init effect once the layers first exist.
@@ -264,8 +338,10 @@ export function VendorMap({
   // the latest callbacks (updating a ref during render is disallowed).
   useEffect(() => {
     onClusterOpenRef.current = onClusterOpen;
+    onVendorOpenRef.current = onVendorOpen;
+    onBackgroundTapRef.current = onBackgroundTap;
     onViewChangeRef.current = onViewChange;
-  }, [onClusterOpen, onViewChange]);
+  }, [onClusterOpen, onVendorOpen, onBackgroundTap, onViewChange]);
 
   /**
    * Query the RPC for the current bounds. Returns the vendor rows, or null when
@@ -387,6 +463,30 @@ export function VendorMap({
     applyTypeFilter();
   }, [selectedTypes, applyTypeFilter]);
 
+  /**
+   * Mark the vendor whose preview card is open: its pin is bumped up a size and
+   * labelled at any zoom. Both are layout expressions on the existing pin layers,
+   * so a selection change is two setLayoutProperty calls per type — no new
+   * layers, images, or sources. Reads from a ref for the same reason
+   * applyTypeFilter does (the run-once init effect calls it after adding layers).
+   */
+  const applySelection = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const sel = selectedVendorIdRef.current ?? null;
+    for (const t of VENDOR_TYPES) {
+      const layer = pinLayerId(t);
+      if (!map.getLayer(layer)) continue; // layers not added yet (still loading)
+      map.setLayoutProperty(layer, "icon-size", iconSizeExpression(sel));
+      map.setLayoutProperty(layer, "text-field", labelExpression(sel));
+    }
+  }, []);
+
+  useEffect(() => {
+    selectedVendorIdRef.current = selectedVendorId;
+    applySelection();
+  }, [selectedVendorId, applySelection]);
+
   // Initialize the map once on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -438,6 +538,11 @@ export function VendorMap({
         if (!mapRef.current) return; // unmounted mid-load
 
         // Individual vendor pins (added first so cluster bubbles sit on top).
+        // From LABEL_MIN_ZOOM up each pin also carries its vendor's name beneath
+        // it. Labels collide-drop (`text-optional` + no overlap) so a dense block
+        // shows as many names as fit and NEVER hides a pin: the icon ignores
+        // placement entirely, so only the text can be dropped.
+        const sel = selectedVendorIdRef.current ?? null;
         for (const t of VENDOR_TYPES) {
           map.addLayer({
             id: pinLayerId(t),
@@ -446,8 +551,29 @@ export function VendorMap({
             filter: ["!", ["has", "point_count"]],
             layout: {
               "icon-image": ["get", "icon"],
+              "icon-size": iconSizeExpression(sel),
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
+              "text-field": labelExpression(sel),
+              "text-font": ["Noto Sans Regular"],
+              "text-size": 11,
+              // Anchored top + offset in ems clears the 30px pin disc, and keeps
+              // clearing it if text-size is ever changed.
+              "text-anchor": "top",
+              "text-offset": [0, 1.7],
+              "text-max-width": 9,
+              "text-padding": 2,
+              "text-allow-overlap": false,
+              "text-ignore-placement": false,
+              "text-optional": true,
+            },
+            paint: {
+              // Dark text in a white casing — legible on the light basemap
+              // regardless of the app's own light/dark theme.
+              "text-color": "#1f2937",
+              "text-halo-color": "#ffffff",
+              "text-halo-width": 1.5,
+              "text-halo-blur": 0.5,
             },
           });
         }
@@ -533,8 +659,29 @@ export function VendorMap({
           });
 
           map.on("click", pins, (e) => {
-            const id = e.features?.[0]?.properties?.id;
-            if (typeof id === "string") router.push(`/vendor/${id}`);
+            const feature = e.features?.[0];
+            if (!feature) return;
+            const id = feature.properties?.id;
+            if (typeof id !== "string") return;
+
+            // No preview handler wired up → straight to the vendor page (the
+            // original behavior, kept for any other consumer of this map).
+            const onOpen = onVendorOpenRef.current;
+            if (!onOpen) {
+              router.push(`/vendor/${id}`);
+              return;
+            }
+
+            onOpen({ id, vendorType: t });
+
+            // The preview card covers the bottom of the map; if the tapped pin
+            // sits behind it, pan just enough to bring it back into view.
+            const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
+            const point = map.project([lng, lat]);
+            const safeBottom = map.getCanvas().clientHeight - PREVIEW_SAFE_PX;
+            if (point.y > safeBottom) {
+              map.panBy([0, point.y - safeBottom], { duration: 300 });
+            }
           });
 
           for (const layer of [clusters, pins]) {
@@ -546,6 +693,21 @@ export function VendorMap({
             });
           }
         }
+
+        // A tap that hits neither a pin nor a cluster is a tap on empty map —
+        // report it so an open preview can dismiss. Hidden layers (filtered-out
+        // types) render nothing, so they can't keep a preview alive.
+        map.on("click", (e) => {
+          const onTap = onBackgroundTapRef.current;
+          if (!onTap) return;
+          const layers = [
+            ...VENDOR_TYPES.map(pinLayerId),
+            ...VENDOR_TYPES.map(clusterLayerId),
+          ].filter((l) => map.getLayer(l));
+          if (map.queryRenderedFeatures(e.point, { layers }).length === 0) {
+            onTap();
+          }
+        });
 
         const vendors = await firstData;
         if (vendors) applyVendors(vendors);

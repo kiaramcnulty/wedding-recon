@@ -5,8 +5,13 @@ import { Search, Loader2, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { VendorMap, type ClusterOpenPayload } from "@/components/map/vendor-map";
+import {
+  VendorMap,
+  type ClusterOpenPayload,
+  type VendorOpenPayload,
+} from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
+import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import { VendorTypeFilter } from "@/components/map/vendor-type-filter";
 import { CATEGORIES, VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 import { BrandLockup } from "@/components/brand-lockup";
@@ -55,6 +60,9 @@ export default function ExplorePage() {
   // The open cluster list (null = closed). Opened on a cluster tap, or restored
   // when returning from a vendor page (?restore=1).
   const [cluster, setCluster] = useState<{ ids: string[]; vendorType: VendorType } | null>(null);
+  // The single vendor whose peek card is open (null = closed). Opened on a pin
+  // tap, restored on return from the vendor page (?restore=1) like the cluster.
+  const [pin, setPin] = useState<{ id: string; vendorType: VendorType } | null>(null);
   // Selected vendor-type filter (empty = show all). Starts empty so the first
   // client render matches the server; any persisted selection is restored after
   // mount (see below) to avoid a hydration mismatch on the chip states.
@@ -92,11 +100,35 @@ export default function ExplorePage() {
       );
       // Fresh cluster → open at the top (drop any saved feed scroll position).
       sessionStorage.removeItem("wr:clusterScroll");
+      // The two map previews are mutually exclusive; only one can be restored.
+      sessionStorage.removeItem("wr:pin");
     } catch {
       // sessionStorage unavailable (e.g. private mode) — the sheet still opens;
       // only reopen-on-back is lost.
     }
+    setPin(null);
     setCluster({ ids: payload.ids, vendorType: payload.vendorType });
+  }, []);
+
+  // A single pin tap peeks the vendor rather than navigating — persisted the same
+  // way the cluster is, so returning from the vendor page reopens the card.
+  const openPin = useCallback((payload: VendorOpenPayload) => {
+    try {
+      sessionStorage.setItem("wr:pin", JSON.stringify(payload));
+      sessionStorage.removeItem("wr:cluster");
+    } catch {
+      // sessionStorage unavailable — the card still opens.
+    }
+    setPin({ id: payload.id, vendorType: payload.vendorType });
+  }, []);
+
+  const closePin = useCallback(() => {
+    try {
+      sessionStorage.removeItem("wr:pin");
+    } catch {
+      // nothing persisted to clear
+    }
+    setPin(null);
   }, []);
 
   // Persist the map view on every settled move, so returning to Explore restores
@@ -152,29 +184,48 @@ export default function ExplorePage() {
     return () => clearTimeout(t);
   }, []);
 
-  // On a restore mount, reopen the cluster sheet from the saved payload. The
-  // setState is deferred a tick (setTimeout 0) — the documented pattern for
-  // updating state from an effect without tripping set-state-in-effect, and it
-  // also lands the portal post-hydration so it never diffs against server HTML.
+  // On a restore mount, reopen whichever preview was showing — the cluster sheet
+  // or a single pin's card — from its saved payload. The setState is deferred a
+  // tick (setTimeout 0) — the documented pattern for updating state from an
+  // effect without tripping set-state-in-effect, and it also lands the portal
+  // post-hydration so it never diffs against server HTML.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!new URLSearchParams(window.location.search).has("restore")) return;
-    let restored: { ids: string[]; vendorType: VendorType } | null = null;
+    let restoredCluster: { ids: string[]; vendorType: VendorType } | null = null;
+    let restoredPin: { id: string; vendorType: VendorType } | null = null;
     try {
       const raw = sessionStorage.getItem("wr:cluster");
       if (raw) {
         const d = JSON.parse(raw) as { ids?: string[]; vendorType?: VendorType };
         if (d.ids?.length && d.vendorType) {
-          restored = { ids: d.ids, vendorType: d.vendorType };
+          restoredCluster = { ids: d.ids, vendorType: d.vendorType };
+        }
+      }
+      const rawPin = sessionStorage.getItem("wr:pin");
+      if (rawPin) {
+        const d = JSON.parse(rawPin) as { id?: string; vendorType?: VendorType };
+        if (d.id && d.vendorType) {
+          restoredPin = { id: d.id, vendorType: d.vendorType };
         }
       }
     } catch {
       // ignore a malformed payload — the user just lands on the map
     }
-    // Drop the marker so later in-page navigation doesn't re-trigger a restore.
-    window.history.replaceState(null, "", "/explore");
-    if (!restored) return;
-    const t = setTimeout(() => setCluster(restored), 0);
+    if (!restoredCluster && !restoredPin) {
+      // Nothing to reopen — still drop the marker so a later in-page navigation
+      // doesn't re-trigger a restore.
+      window.history.replaceState(null, "", "/explore");
+      return;
+    }
+    const t = setTimeout(() => {
+      if (restoredCluster) setCluster(restoredCluster);
+      else setPin(restoredPin);
+      // Consumed together with the restore, NOT before it: in development React
+      // mounts twice, and the first pass's cleanup cancels this timeout. Dropping
+      // the marker up front would leave the second pass with nothing to restore.
+      window.history.replaceState(null, "", "/explore");
+    }, 0);
     return () => clearTimeout(t);
   }, []);
 
@@ -323,6 +374,9 @@ export default function ExplorePage() {
           flyToPosition={flyTo}
           userPosition={userPosition}
           onClusterOpen={openCluster}
+          onVendorOpen={openPin}
+          onBackgroundTap={closePin}
+          selectedVendorId={pin?.id ?? null}
           onViewChange={saveMapView}
           initialView={initialView}
           selectedTypes={selectedTypes}
@@ -470,8 +524,15 @@ export default function ExplorePage() {
       </div>
 
       {/* Bottom row over the map, lifted clear of the map attribution along
-          the bottom edge: quiet brand mark on the left, locate button right. */}
-      <div className="relative z-10 mt-auto flex items-end justify-between px-3 pb-9 pt-3">
+          the bottom edge: quiet brand mark on the left, locate button right.
+          With a pin preview open the card takes over that bottom clearance, so
+          the row tightens up and rides above it. */}
+      <div
+        className={cn(
+          "relative z-10 mt-auto flex items-end justify-between px-3 pt-3",
+          pin ? "pb-2" : "pb-9",
+        )}
+      >
         <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
           <BrandLockup size="sm" />
         </div>
@@ -489,6 +550,19 @@ export default function ExplorePage() {
           )}
         </button>
       </div>
+
+      {/* Single-pin peek card: floats over the bottom of the map (Zillow-style),
+          in the flow so it sits above the bottom nav and pushes nothing around.
+          Same bottom clearance as the row above, to clear the map attribution. */}
+      {pin && (
+        <div className="relative z-10 mx-auto w-full max-w-[480px] px-3 pb-9">
+          <VendorPinPreview
+            vendorId={pin.id}
+            vendorType={pin.vendorType}
+            onClose={closePin}
+          />
+        </div>
+      )}
     </div>
   );
 }
