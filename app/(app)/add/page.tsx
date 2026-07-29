@@ -718,8 +718,8 @@ function AddReconForm() {
           />
         </section>
 
-        {/* ── Service region (non-venue vendors only) ────────────────────── */}
-        {vendorType && vendorType !== "venue" && (
+        {/* ── Service region (non-venue, non-hotel vendors only) ──────────── */}
+        {vendorType && vendorType !== "venue" && vendorType !== "hotel" && (
           <section className="space-y-1.5">
             <Label htmlFor="service-region">Service region</Label>
             <Controller

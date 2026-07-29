@@ -13,7 +13,7 @@ import { searchTokens } from "./tokens";
  * copy of the relevance scorer. Same bug fixed twice, two places to drift.
  *
  * Matching now lives in exactly two coupled places: the `search_vendors` RPC
- * (SQL, migration `0024`) and this module (query guard + ranking). Change the
+ * (SQL, migration `0025`) and this module (query guard + ranking). Change the
  * rule here or there and both bars move together; per-surface presentation
  * (which fields render, how many rows, whether Google is blended in) stays in
  * the routes.
@@ -49,7 +49,7 @@ export interface VendorMatch {
   score: number;
 }
 
-/** The `search_vendors` RPC row shape (migration `0024`). */
+/** The `search_vendors` RPC row shape (migration `0025`). */
 interface SearchVendorsRow {
   id: string;
   name: string;
@@ -96,7 +96,7 @@ export function scoreVendorMatch(name: string, query: string): number {
  * Search the vendor directory by name, street address, or city.
  *
  * Backed by the `search_vendors` RPC (migrations `0018` → `0019` token-aware →
- * `0024` shared shape), which splits the query into tokens, drops stop words,
+ * `0025` shared shape), which splits the query into tokens, drops stop words,
  * and requires every remaining token to appear in name/address/city — so "the
  * sanctuary" resolves "Sanctuary Golf Course" (`lib/search/tokens.ts` mirrors
  * the stop-word list).
@@ -137,7 +137,7 @@ export async function searchVendors(
         vendorType: v.vendor_type,
         city: v.city,
         addressText: v.address_text,
-        // `undefined` (not null) means the pre-0024 RPC is still installed —
+        // `undefined` (not null) means the pre-0025 RPC is still installed —
         // normalize so callers only ever see a handle or null.
         googlePlaceId: v.google_place_id ?? null,
         source: v.source,

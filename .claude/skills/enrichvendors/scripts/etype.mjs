@@ -129,8 +129,8 @@ export const ETYPES = {
     key: 'hotel',
     vendorType: 'hotel',
     label: 'HOTEL (GUEST ROOM BLOCKS)',
-    headers: [...BASE_HEADERS, 'service_region'],
-    serviceRegionRequired: true,       // fixed property — its city/metro is the sourced fallback
+    headers: BASE_HEADERS,              // fixed property, not a service-area vendor — no service_region column
+    serviceRegionRequired: false,
     refs: refsFor('hotelblocks'),
     subpage: /(wedding|group|block|room|rate|reserv|book|meeting|event|faq|amenit|parking|shuttle|breakfast|accommodat|stay|about)/i,
     // Block economics, not nightly-rate marketing: the courtesy-vs-attrition distinction,
