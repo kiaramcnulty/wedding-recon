@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { searchTokens } from "@/lib/search/tokens";
+import { scoreVendorMatch, searchVendors } from "@/lib/search/vendors";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Cap on existing-vendor rows shown in the blended dropdown, so a broad query
+ * ("Denver") can't crowd Google predictions out of the 8 visible slots.
+ */
+const MAX_EXISTING = 6;
+
+/** Ranked vendor matches to consider — the extras still feed the place_id dedup. */
+const MAX_MATCHES = 24;
 
 export type SearchSuggestion =
   | {
@@ -28,44 +37,19 @@ interface PlaceDetails {
   website: string | null;
 }
 
-/** The vendor columns the autocomplete lookup selects. */
-interface DbVendorRow {
-  id: string;
-  name: string;
-  vendor_type: string;
-  city: string | null;
-  address_text: string | null;
-  google_place_id: string | null;
-  source: "google" | "user" | "seed";
-}
-
-/**
- * Lightweight name-match relevance so DB vendors and Google predictions can be
- * blended into one list independent of source (Google exposes no numeric score
- * to merge on). Runs in-memory on a handful of candidates, so it's effectively
- * free.
- */
-function scoreMatch(name: string, query: string): number {
-  const n = name.toLowerCase();
-  const q = query.toLowerCase().trim();
-  if (!q) return 0;
-  if (n === q) return 100;
-  if (n.startsWith(q)) return 80;
-  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (new RegExp(`\\b${escaped}`).test(n)) return 60;
-  if (n.includes(q)) return 40;
-  const tokens = q.split(/\s+/).filter(Boolean);
-  if (!tokens.length) return 0;
-  const matched = tokens.filter((t) => n.includes(t)).length;
-  return (matched / tokens.length) * 30;
-}
-
 /**
  * GET /api/places?q=<query>
  *   -> Blended autocomplete: existing Wedding Recon vendors (so people attach
  *      recon to a shared record instead of duplicating it) + Google Places
  *      predictions, deduped by google_place_id and sorted by name relevance.
  *      Returns SearchSuggestion[].
+ *
+ *      The vendor half runs through `lib/search/vendors.ts` — the same matcher
+ *      and scorer the Explore bar uses — so both search boxes find a vendor by
+ *      name, street address, or city, per-token rather than as one contiguous
+ *      string. Google predictions are scored with the same function (they carry
+ *      no numeric score of their own), which is what lets the two sources merge
+ *      into one ranked list.
  *
  * GET /api/places?placeId=<id>
  *   -> Google Place Details. Returns PlaceDetails | null.
@@ -82,26 +66,14 @@ export async function GET(req: NextRequest) {
     if (!query) return NextResponse.json([] as SearchSuggestion[]);
 
     // Existing community vendors and Google predictions, fetched in parallel so
-    // the added DB lookup doesn't extend the dropdown's latency.
-    //
-    // Match per-token (AND) rather than as one contiguous substring, so a
-    // leading article or reordered words still finds the vendor — "the
-    // sanctuary" resolves the row stored as "Sanctuary Golf Course". See
-    // lib/search/tokens.ts (and the search_vendors RPC, which mirrors this for
-    // the Explore bar).
+    // the vendor lookup doesn't extend the dropdown's latency. Keep the full
+    // ranked match set (not just the rows we'll show) so the place_id dedup below
+    // sees every vendor we already have — a Google twin of a vendor that ranked
+    // out of the visible rows would otherwise slip through as a duplicate. The
+    // helper no-ops on a too-short or punctuation-only query, and Google
+    // predictions still run either way.
     const supabase = await createClient();
-    const tokens = searchTokens(query);
-    let dbQuery = supabase
-      .from("vendors")
-      .select("id, name, vendor_type, city, address_text, google_place_id, source");
-    for (const tok of tokens) {
-      dbQuery = dbQuery.ilike("name", `%${tok}%`);
-    }
-    // No usable tokens (query was only punctuation/wildcards) → skip the DB
-    // lookup rather than fetching every vendor; Google predictions still run.
-    const dbPromise: PromiseLike<{ data: DbVendorRow[] | null }> = tokens.length
-      ? dbQuery.limit(8)
-      : Promise.resolve({ data: [] as DbVendorRow[] });
+    const vendorPromise = searchVendors(supabase, query, { limit: MAX_MATCHES });
 
     const googlePromise = apiKey
       ? fetch("https://places.googleapis.com/v1/places:autocomplete", {
@@ -114,23 +86,28 @@ export async function GET(req: NextRequest) {
         }).catch(() => null)
       : Promise.resolve(null);
 
-    const [dbResult, googleRes] = await Promise.all([dbPromise, googlePromise]);
+    const [vendorMatches, googleRes] = await Promise.all([
+      vendorPromise,
+      googlePromise,
+    ]);
 
-    // Existing vendors → suggestions.
-    const dbRows = dbResult.data ?? [];
-    const existing: SearchSuggestion[] = dbRows.map((v) => ({
-      kind: "existing",
-      vendorId: v.id as string,
-      vendorType: v.vendor_type as string,
-      source: v.source as "google" | "user" | "seed",
-      primaryText: v.name as string,
-      secondaryText:
-        (v.address_text as string | null) ?? (v.city as string | null) ?? "",
+    // Existing vendors → suggestions, keeping the score the matcher assigned
+    // (name matches rank above rows that only matched on address/city).
+    const existing = vendorMatches.slice(0, MAX_EXISTING).map((v) => ({
+      score: v.score,
+      s: {
+        kind: "existing",
+        vendorId: v.id,
+        vendorType: v.vendorType,
+        source: v.source,
+        primaryText: v.name,
+        secondaryText: v.addressText ?? v.city ?? "",
+      } as SearchSuggestion,
     }));
     // Collapse a Google prediction into the existing record when we already
     // have that exact business (matched by Google place_id).
     const knownPlaceIds = new Set(
-      dbRows.map((v) => v.google_place_id).filter(Boolean) as string[],
+      vendorMatches.map((v) => v.googlePlaceId).filter(Boolean) as string[],
     );
 
     // Google predictions (skip ones already represented by an existing vendor).
@@ -164,8 +141,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Blend by name relevance, independent of source.
-    const merged = [...existing, ...google]
-      .map((s) => ({ s, score: scoreMatch(s.primaryText, query) }))
+    const merged = [
+      ...existing,
+      ...google.map((s) => ({ s, score: scoreVendorMatch(s.primaryText, query) })),
+    ]
       .sort((a, b) => b.score - a.score)
       .slice(0, 8)
       .map((x) => x.s);
