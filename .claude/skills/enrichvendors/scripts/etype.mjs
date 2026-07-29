@@ -95,8 +95,8 @@ export const ETYPES = {
     key: 'dress',
     vendorType: 'dress',
     label: 'BRIDAL SHOP',
-    headers: [...BASE_HEADERS, 'service_region'],
-    serviceRegionRequired: true,       // most are storefronts — shop city/metro is a fine sourced fallback
+    headers: BASE_HEADERS,              // fixed storefront, not a service-area vendor — no service_region column
+    serviceRegionRequired: false,
     refs: refsFor('dress'),
     hasInstagram: true,                // vendors.instagram is pipeline-populated for this type (migration 0016)
     subpage: /(pric|appoint|book|designer|collection|gown|dress|bridal|bridesmaid|trunk|sample|about|faq|service)/i,

@@ -48,7 +48,6 @@ Beyond the standard docket, decide on:
 
 ## Enrichment handoff (recon guidelines)
 Archive into `intel` now; the enrichment pass consumes it:
-- **Where they serve** — becomes `service_region` on every recon entry, **required**; a storefront's city/metro is an acceptable sourced fallback ("Denver area").
 - **Designers/labels carried** — the single most-searched fact for this type; list the ones a source names.
 - **Price ranges — anecdotes are gold:** a real figure someone actually paid for their gown here outranks a posted "starting at". Capture published price bands too (sample rack vs. designer, trunk-show pricing), but never invent a number.
 - **Try-on process:** appointment required vs. walk-ins welcome, private-suite vs. open floor, appointment fee, how far out to book, sample-size range.

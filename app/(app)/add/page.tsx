@@ -62,6 +62,10 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+// Vendor types with a fixed location/storefront rather than a service area:
+// "Service region" doesn't mean anything for these, so the form never offers it.
+const NO_SERVICE_REGION_TYPES = new Set<VendorType>(["venue", "hotel", "dress"]);
+
 // ── Vendor state — managed outside react-hook-form since it comes from the
 //    PlacesCombobox component, not a plain input ─────────────────────────────
 
@@ -718,8 +722,8 @@ function AddReconForm() {
           />
         </section>
 
-        {/* ── Service region (non-venue, non-hotel vendors only) ──────────── */}
-        {vendorType && vendorType !== "venue" && vendorType !== "hotel" && (
+        {/* ── Service region (non-venue, non-hotel, non-dress vendors only) ── */}
+        {vendorType && !NO_SERVICE_REGION_TYPES.has(vendorType) && (
           <section className="space-y-1.5">
             <Label htmlFor="service-region">Service region</Label>
             <Controller

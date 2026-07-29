@@ -16,11 +16,9 @@ These are shops where a BRIDE buys or orders a WEDDING GOWN (most also carry bri
   A bridal-PARTY-only shop (bridesmaids/flower-girl, no bride gowns) is a soft judgment call:
   draft normally, flag `NOTDRESS:` and note it's party-only.
 
-## service_region — REQUIRED on every row
-- Where they serve, sourced: site copy, stated appointment area. Narrowest sourced wins.
-  **A storefront's city/metro is an acceptable sourced fallback** ("Denver area" from a Denver
-  address) — most bridal shops are storefronts, so this is the common case. Nothing at all →
-  the run's state. Never invent a narrow region; never blank (upload hard-fails).
+## service_region — do not include
+- Bridal shops are a fixed storefront, not a service-area vendor — omit this key entirely
+  (the type profile carries no `service_region` column for this type).
 
 ## What couples actually want captured
 - **Designers / labels carried** — the single most-searched fact for this type. Name the ones
