@@ -161,9 +161,7 @@ export async function createRecon(input: CreateReconInput) {
       recon_collected_year: input.collectedYear,
       price_text: input.priceText?.trim() || null,
       price_details: input.priceDetails?.trim() || null,
-      // Hotel blocks are a fixed property, not a service-area vendor — never persist
-      // this even if a stale client sends it (e.g. type resolved to hotel after entry).
-      service_region: input.vendorType === "hotel" ? null : input.serviceRegion?.trim() || null,
+      service_region: input.serviceRegion?.trim() || null,
       notes: input.notes?.trim() || null,
       status: "active",
     })
