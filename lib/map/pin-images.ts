@@ -17,15 +17,27 @@ import { CATEGORIES } from "@/lib/constants/categories";
 
 // Single pin: 30px visual inside a 36px box (3px margin = shadow room).
 const PIN_BOX = 36;
+// Selected pin: the same disc grown, plus a category-colored ring around it, in a
+// 52px box. Sized so the pin whose preview card is open is unmistakable among its
+// neighbours at a glance — a subtle scale-up wasn't readable enough.
+const SELECTED_BOX = 52;
 // Cluster disc: larger, 34px visual inside a 48px box.
 const CLUSTER_BOX = 48;
 // Render at 2× so icons stay crisp on retina screens; addImage told pixelRatio 2.
 const DPR = 2;
 
-/** Stable image id for a category + precision variant, e.g. "pin-venue-dashed". */
-export function pinImageId(vendorType: string, approximate: boolean): string {
+/**
+ * Stable image id for a category + precision variant, e.g. "pin-venue-dashed";
+ * `selected` picks the emphasized variant used for the pin whose preview is open
+ * ("pin-venue-dashed-selected").
+ */
+export function pinImageId(
+  vendorType: string,
+  approximate: boolean,
+  selected = false,
+): string {
   const type = vendorType in CATEGORIES ? vendorType : "other";
-  return `pin-${type}-${approximate ? "dashed" : "solid"}`;
+  return `pin-${type}-${approximate ? "dashed" : "solid"}${selected ? "-selected" : ""}`;
 }
 
 /** Stable image id for a category's cluster disc, e.g. "cluster-photos". */
@@ -41,6 +53,27 @@ function pinSvg(colorHex: string, iconSvg: string, dashed: boolean): string {
       dashed ? ' stroke-dasharray="3 3"' : ""
     } />
     <g transform="translate(11,11)">${iconSvg}</g>
+  </svg>`;
+}
+
+/**
+ * SVG for the SELECTED pin: the same disc grown, wrapped in a translucent
+ * category-colored ring, with a thicker white casing between them. Reads as
+ * "this is the one the card is about" without changing the pin's color language.
+ */
+function selectedPinSvg(
+  colorHex: string,
+  iconSvg: string,
+  dashed: boolean,
+): string {
+  const c = SELECTED_BOX / 2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SELECTED_BOX}" height="${SELECTED_BOX}" viewBox="0 0 ${SELECTED_BOX} ${SELECTED_BOX}">
+    <circle cx="${c}" cy="${c}" r="23" fill="${colorHex}" fill-opacity="0.18" />
+    <circle cx="${c}" cy="${c}" r="21" fill="none" stroke="${colorHex}" stroke-width="2.5" stroke-opacity="0.9" />
+    <circle cx="${c}" cy="${c}" r="18" fill="${colorHex}" stroke="#ffffff" stroke-width="3"${
+      dashed ? ' stroke-dasharray="4 3"' : ""
+    } />
+    <g transform="translate(${c - 9},${c - 9})">${iconSvg}</g>
   </svg>`;
 }
 
@@ -105,8 +138,30 @@ export async function registerPinImages(
         strokeWidth: 2.5,
       }),
     );
+    // The selected pin's disc is bigger, so its glyph is drawn bigger to match.
+    const selectedIconSvg = renderToStaticMarkup(
+      createElement(meta.icon, {
+        size: 18,
+        color: "#ffffff",
+        strokeWidth: 2.5,
+      }),
+    );
     jobs.push(add(pinImageId(type, false), pinSvg(meta.colorHex, iconSvg, false), PIN_BOX));
     jobs.push(add(pinImageId(type, true), pinSvg(meta.colorHex, iconSvg, true), PIN_BOX));
+    jobs.push(
+      add(
+        pinImageId(type, false, true),
+        selectedPinSvg(meta.colorHex, selectedIconSvg, false),
+        SELECTED_BOX,
+      ),
+    );
+    jobs.push(
+      add(
+        pinImageId(type, true, true),
+        selectedPinSvg(meta.colorHex, selectedIconSvg, true),
+        SELECTED_BOX,
+      ),
+    );
     jobs.push(add(clusterImageId(type), clusterSvg(meta.colorHex, iconSvg), CLUSTER_BOX));
   }
   await Promise.all(jobs);

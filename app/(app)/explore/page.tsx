@@ -523,46 +523,42 @@ export default function ExplorePage() {
         <VendorTypeFilter selected={selectedTypes} onChange={updateSelectedTypes} />
       </div>
 
-      {/* Bottom row over the map, lifted clear of the map attribution along
-          the bottom edge: quiet brand mark on the left, locate button right.
-          With a pin preview open the card takes over that bottom clearance, so
-          the row tightens up and rides above it. */}
-      <div
-        className={cn(
-          "relative z-10 mt-auto flex items-end justify-between px-3 pt-3",
-          pin ? "pb-2" : "pb-9",
+      {/* Bottom stack over the map: the single-pin peek card (Zillow-style) sits
+          on top of the control row, so the brand mark and locate button stay
+          reachable beneath it rather than being pushed above the card. In the
+          flow, so it sits above the bottom nav and pushes nothing around. */}
+      <div className="relative z-10 mt-auto">
+        {pin && (
+          <div className="mx-auto w-full max-w-[480px] px-3">
+            <VendorPinPreview
+              vendorId={pin.id}
+              vendorType={pin.vendorType}
+              onClose={closePin}
+            />
+          </div>
         )}
-      >
-        <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
-          <BrandLockup size="sm" />
-        </div>
-        <button
-          type="button"
-          onClick={handleLocate}
-          disabled={locating}
-          aria-label="Center map on my location"
-          className="flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
-        >
-          {locating ? (
-            <Loader2 size={20} className="animate-spin" aria-hidden />
-          ) : (
-            <Navigation size={20} aria-hidden />
-          )}
-        </button>
-      </div>
 
-      {/* Single-pin peek card: floats over the bottom of the map (Zillow-style),
-          in the flow so it sits above the bottom nav and pushes nothing around.
-          Same bottom clearance as the row above, to clear the map attribution. */}
-      {pin && (
-        <div className="relative z-10 mx-auto w-full max-w-[480px] px-3 pb-9">
-          <VendorPinPreview
-            vendorId={pin.id}
-            vendorType={pin.vendorType}
-            onClose={closePin}
-          />
+        {/* Control row, lifted clear of the map attribution along the bottom
+            edge: quiet brand mark on the left, locate button right. */}
+        <div className="flex items-end justify-between px-3 pb-9 pt-3">
+          <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
+            <BrandLockup size="sm" />
+          </div>
+          <button
+            type="button"
+            onClick={handleLocate}
+            disabled={locating}
+            aria-label="Center map on my location"
+            className="flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
+          >
+            {locating ? (
+              <Loader2 size={20} className="animate-spin" aria-hidden />
+            ) : (
+              <Navigation size={20} aria-hidden />
+            )}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

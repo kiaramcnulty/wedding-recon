@@ -51,42 +51,58 @@ const CLUSTER_MAX_ZOOM = 14;
 // (It's also the zoom a vendor search flies to, so a searched pin arrives named.)
 const LABEL_MIN_ZOOM = CLUSTER_MAX_ZOOM + 1;
 
-// The pin whose preview card is open reads as "selected": bumped a little and
-// labelled at ANY zoom, so you can see which pin the card belongs to.
-const SELECTED_ICON_SCALE = 1.3;
+// Bottom strip of the map the open preview card sits over (the card plus the
+// control row and attribution gap beneath it). A tapped pin landing inside it
+// gets panned up so the card never covers the pin it describes.
+const PREVIEW_SAFE_PX = 300;
 
-// Bottom strip of the map the open preview card sits over (card + the gap that
-// keeps our floating controls clear of the map attribution). A tapped pin landing
-// inside it gets panned up so the card never covers the pin it describes.
-const PREVIEW_SAFE_PX = 250;
+// Label sizes: the selected pin's name is set larger than its neighbours', and
+// offset further down to clear its bigger disc (offsets are in ems of text-size).
+const LABEL_SIZE = 11;
+const SELECTED_LABEL_SIZE = 13;
+const LABEL_OFFSET: [number, number] = [0, 1.7];
+const SELECTED_LABEL_OFFSET: [number, number] = [0, 2];
 
-/**
- * `text-field` for the pin layers: the vendor name from LABEL_MIN_ZOOM up, and
- * below that only for the selected pin (zoom sits at the outermost level, which
- * is what lets a layout property mix zoom with a per-feature lookup).
- */
-function labelExpression(selectedId: string | null) {
-  const belowThreshold = selectedId
-    ? ["case", ["==", ["get", "id"], selectedId], ["get", "name"], ""]
-    : "";
-  return [
-    "step",
-    ["zoom"],
-    belowThreshold,
-    LABEL_MIN_ZOOM,
-    ["get", "name"],
-  ] as import("maplibre-gl").ExpressionSpecification;
+type Expr = import("maplibre-gl").ExpressionSpecification;
+
+/** `["case", <feature is the selected vendor>, whenSelected, otherwise]`. */
+function whenSelected(selectedId: string, whenTrue: unknown, whenFalse: unknown) {
+  return ["case", ["==", ["get", "id"], selectedId], whenTrue, whenFalse] as Expr;
 }
 
-/** `icon-size` for the pin layers: the selected pin renders slightly larger. */
-function iconSizeExpression(selectedId: string | null) {
-  if (!selectedId) return 1;
-  return [
-    "case",
-    ["==", ["get", "id"], selectedId],
-    SELECTED_ICON_SCALE,
-    1,
-  ] as import("maplibre-gl").ExpressionSpecification;
+/**
+ * The layout properties that depend on which vendor's preview is open. The pin
+ * whose card is showing swaps to its emphasized image (bigger disc + a ring — see
+ * `pin-images.ts`) and gets a larger name label at ANY zoom, so it's obvious which
+ * pin the card belongs to. Every other pin keeps the plain treatment.
+ *
+ * `text-field` carries the zoom rule too: the name shows from LABEL_MIN_ZOOM up,
+ * and below that only for the selected pin. The zoom test sits at the OUTERMOST
+ * level, which is what lets a layout property mix zoom with a per-feature lookup.
+ */
+function selectionLayout(selectedId: string | null) {
+  return {
+    "icon-image": selectedId
+      ? whenSelected(selectedId, ["get", "iconSelected"], ["get", "icon"])
+      : (["get", "icon"] as Expr),
+    "text-field": [
+      "step",
+      ["zoom"],
+      selectedId ? whenSelected(selectedId, ["get", "name"], "") : "",
+      LABEL_MIN_ZOOM,
+      ["get", "name"],
+    ] as Expr,
+    "text-size": selectedId
+      ? whenSelected(selectedId, SELECTED_LABEL_SIZE, LABEL_SIZE)
+      : LABEL_SIZE,
+    "text-offset": selectedId
+      ? whenSelected(
+          selectedId,
+          ["literal", SELECTED_LABEL_OFFSET],
+          ["literal", LABEL_OFFSET],
+        )
+      : LABEL_OFFSET,
+  };
 }
 
 // Co-located type-clusters (e.g. venues + photographers downtown) would stack on
@@ -220,6 +236,8 @@ function buildFeatureCollectionsByType(
         id: vendor.id,
         name: vendor.name,
         icon: pinImageId(t, isApproximateLocation(vendor)),
+        // Emphasized variant, swapped in while this vendor's preview is open.
+        iconSelected: pinImageId(t, isApproximateLocation(vendor), true),
       },
     });
   }
@@ -473,12 +491,13 @@ export function VendorMap({
   const applySelection = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    const sel = selectedVendorIdRef.current ?? null;
+    const layout = selectionLayout(selectedVendorIdRef.current ?? null);
     for (const t of VENDOR_TYPES) {
       const layer = pinLayerId(t);
       if (!map.getLayer(layer)) continue; // layers not added yet (still loading)
-      map.setLayoutProperty(layer, "icon-size", iconSizeExpression(sel));
-      map.setLayoutProperty(layer, "text-field", labelExpression(sel));
+      for (const [prop, value] of Object.entries(layout)) {
+        map.setLayoutProperty(layer, prop, value);
+      }
     }
   }, []);
 
@@ -542,7 +561,6 @@ export function VendorMap({
         // it. Labels collide-drop (`text-optional` + no overlap) so a dense block
         // shows as many names as fit and NEVER hides a pin: the icon ignores
         // placement entirely, so only the text can be dropped.
-        const sel = selectedVendorIdRef.current ?? null;
         for (const t of VENDOR_TYPES) {
           map.addLayer({
             id: pinLayerId(t),
@@ -550,17 +568,15 @@ export function VendorMap({
             source: srcId(t),
             filter: ["!", ["has", "point_count"]],
             layout: {
-              "icon-image": ["get", "icon"],
-              "icon-size": iconSizeExpression(sel),
+              // icon-image / text-field / text-size / text-offset all depend on
+              // the current selection — see selectionLayout + applySelection.
+              ...selectionLayout(selectedVendorIdRef.current ?? null),
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
-              "text-field": labelExpression(sel),
               "text-font": ["Noto Sans Regular"],
-              "text-size": 11,
-              // Anchored top + offset in ems clears the 30px pin disc, and keeps
-              // clearing it if text-size is ever changed.
+              // Anchored top; the offsets are in ems of text-size, so a label
+              // keeps clearing its disc if either size is ever changed.
               "text-anchor": "top",
-              "text-offset": [0, 1.7],
               "text-max-width": 9,
               "text-padding": 2,
               "text-allow-overlap": false,
