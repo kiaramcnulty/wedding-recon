@@ -9,11 +9,22 @@ import {
   VendorMap,
   type ClusterOpenPayload,
   type VendorOpenPayload,
+  type VisibleVendorsPayload,
 } from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
+import {
+  VendorListSheet,
+  type VendorListEntry,
+} from "@/components/map/vendor-list-sheet";
+import { ScreenResultsPill } from "@/components/map/screen-results-pill";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import { VendorTypeFilter } from "@/components/map/vendor-type-filter";
-import { CATEGORIES, VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
+import {
+  CATEGORIES,
+  CATEGORY_PLURAL,
+  VENDOR_TYPES,
+  type VendorType,
+} from "@/lib/constants/categories";
 import { BrandLockup } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { cn } from "@/lib/utils";
@@ -48,6 +59,35 @@ const MAP_TILE_ORIGIN = (() => {
   }
 })();
 
+/** The open "results on screen" list — frozen at the moment it was opened. */
+interface ScreenList {
+  /** True on-screen count, which can exceed `entries` when the map caps the list. */
+  total: number;
+  entries: VendorListEntry[];
+}
+
+/**
+ * Title for the on-screen results feed. Names the category when the list is
+ * unambiguously one type — either the user filtered to exactly one, or every
+ * row in a complete (uncapped) list happens to share one — and stays generic
+ * otherwise. A capped list can't speak for the types it didn't include.
+ */
+function screenListHeading(
+  list: ScreenList,
+  selectedTypes: VendorType[],
+): string {
+  if (list.total === 1) return "1 result on screen";
+  const complete = list.entries.length === list.total;
+  const listTypes = new Set(list.entries.map((e) => e.vendorType));
+  const soleType =
+    selectedTypes.length === 1
+      ? selectedTypes[0]
+      : complete && listTypes.size === 1
+        ? [...listTypes][0]
+        : null;
+  return `${list.total} ${soleType ? CATEGORY_PLURAL[soleType] : "results"} on screen`;
+}
+
 export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
@@ -63,6 +103,16 @@ export default function ExplorePage() {
   // The single vendor whose peek card is open (null = closed). Opened on a pin
   // tap, restored on return from the vendor page (?restore=1) like the cluster.
   const [pin, setPin] = useState<{ id: string; vendorType: VendorType } | null>(null);
+  // Everything the map is currently showing, after the type filter — the live
+  // count behind the results pill, plus the rows its list opens on.
+  const [visible, setVisible] = useState<VisibleVendorsPayload>({
+    total: 0,
+    entries: [],
+  });
+  // The open "results on screen" list (null = closed). A frozen snapshot: the
+  // sheet is modal, so the map can't move underneath it, and a list that
+  // reshuffled mid-scroll would be unusable.
+  const [screenList, setScreenList] = useState<ScreenList | null>(null);
   // Selected vendor-type filter (empty = show all). Starts empty so the first
   // client render matches the server; any persisted selection is restored after
   // mount (see below) to avoid a hydration mismatch on the chip states.
@@ -100,14 +150,44 @@ export default function ExplorePage() {
       );
       // Fresh cluster → open at the top (drop any saved feed scroll position).
       sessionStorage.removeItem("wr:clusterScroll");
-      // The two map previews are mutually exclusive; only one can be restored.
+      // The map previews are mutually exclusive; only one can be restored.
       sessionStorage.removeItem("wr:pin");
+      sessionStorage.removeItem("wr:screen");
     } catch {
       // sessionStorage unavailable (e.g. private mode) — the sheet still opens;
       // only reopen-on-back is lost.
     }
     setPin(null);
+    setScreenList(null);
     setCluster({ ids: payload.ids, vendorType: payload.vendorType });
+  }, []);
+
+  // The results pill: freeze what's on screen right now and open it as a feed.
+  // Persisted like the cluster so the list survives a round trip to a vendor
+  // page — recomputing it on return would race the map's first fetch.
+  const openScreenList = useCallback(() => {
+    const list: ScreenList = { total: visible.total, entries: visible.entries };
+    if (list.entries.length === 0) return;
+    try {
+      sessionStorage.setItem("wr:screen", JSON.stringify(list));
+      sessionStorage.removeItem("wr:screenScroll");
+      sessionStorage.removeItem("wr:cluster");
+      sessionStorage.removeItem("wr:pin");
+    } catch {
+      // sessionStorage unavailable — the sheet still opens.
+    }
+    setPin(null);
+    setCluster(null);
+    setScreenList(list);
+  }, [visible]);
+
+  const closeScreenList = useCallback(() => {
+    try {
+      sessionStorage.removeItem("wr:screen");
+    } catch {
+      // nothing persisted to clear
+    }
+    setScreenList(null);
   }, []);
 
   // A single pin tap peeks the vendor rather than navigating — persisted the same
@@ -116,9 +196,11 @@ export default function ExplorePage() {
     try {
       sessionStorage.setItem("wr:pin", JSON.stringify(payload));
       sessionStorage.removeItem("wr:cluster");
+      sessionStorage.removeItem("wr:screen");
     } catch {
       // sessionStorage unavailable — the card still opens.
     }
+    setScreenList(null);
     setPin({ id: payload.id, vendorType: payload.vendorType });
   }, []);
 
@@ -184,16 +266,18 @@ export default function ExplorePage() {
     return () => clearTimeout(t);
   }, []);
 
-  // On a restore mount, reopen whichever preview was showing — the cluster sheet
-  // or a single pin's card — from its saved payload. The setState is deferred a
-  // tick (setTimeout 0) — the documented pattern for updating state from an
-  // effect without tripping set-state-in-effect, and it also lands the portal
-  // post-hydration so it never diffs against server HTML.
+  // On a restore mount, reopen whichever preview was showing — the cluster
+  // sheet, the on-screen results list, or a single pin's card — from its saved
+  // payload. The setState is deferred a tick (setTimeout 0) — the documented
+  // pattern for updating state from an effect without tripping
+  // set-state-in-effect, and it also lands the portal post-hydration so it never
+  // diffs against server HTML.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!new URLSearchParams(window.location.search).has("restore")) return;
     let restoredCluster: { ids: string[]; vendorType: VendorType } | null = null;
     let restoredPin: { id: string; vendorType: VendorType } | null = null;
+    let restoredScreen: ScreenList | null = null;
     try {
       const raw = sessionStorage.getItem("wr:cluster");
       if (raw) {
@@ -209,10 +293,17 @@ export default function ExplorePage() {
           restoredPin = { id: d.id, vendorType: d.vendorType };
         }
       }
+      const rawScreen = sessionStorage.getItem("wr:screen");
+      if (rawScreen) {
+        const d = JSON.parse(rawScreen) as Partial<ScreenList>;
+        if (d.entries?.length && typeof d.total === "number") {
+          restoredScreen = { total: d.total, entries: d.entries };
+        }
+      }
     } catch {
       // ignore a malformed payload — the user just lands on the map
     }
-    if (!restoredCluster && !restoredPin) {
+    if (!restoredCluster && !restoredPin && !restoredScreen) {
       // Nothing to reopen — still drop the marker so a later in-page navigation
       // doesn't re-trigger a restore.
       window.history.replaceState(null, "", "/explore");
@@ -220,6 +311,7 @@ export default function ExplorePage() {
     }
     const t = setTimeout(() => {
       if (restoredCluster) setCluster(restoredCluster);
+      else if (restoredScreen) setScreenList(restoredScreen);
       else setPin(restoredPin);
       // Consumed together with the restore, NOT before it: in development React
       // mounts twice, and the first pass's cleanup cancels this timeout. Dropping
@@ -380,6 +472,7 @@ export default function ExplorePage() {
           onViewChange={saveMapView}
           initialView={initialView}
           selectedTypes={selectedTypes}
+          onVisibleVendorsChange={setVisible}
         />
       </div>
 
@@ -389,6 +482,22 @@ export default function ExplorePage() {
           ids={cluster.ids}
           vendorType={cluster.vendorType}
           onClose={() => setCluster(null)}
+        />
+      )}
+
+      {/* Everything on screen, as one feed (portals to <body>; opens on the
+          results pill). Same sheet as the cluster feed, but mixed-type. */}
+      {screenList && (
+        <VendorListSheet
+          entries={screenList.entries}
+          heading={screenListHeading(screenList, selectedTypes)}
+          scrollKey="wr:screenScroll"
+          footnote={
+            screenList.entries.length < screenList.total
+              ? `Showing the ${screenList.entries.length} closest to the center of the map. Zoom in to see the rest.`
+              : undefined
+          }
+          onClose={closeScreenList}
         />
       )}
 
@@ -521,6 +630,17 @@ export default function ExplorePage() {
           in the same floating column. Doubles as the map's pin-color legend. */}
       <div className="relative z-10 mx-auto w-full max-w-[520px] px-3 pt-2">
         <VendorTypeFilter selected={selectedTypes} onChange={updateSelectedTypes} />
+      </div>
+
+      {/* Live count of what the map is showing, and the way into the full list.
+          The row is click-through (only the pill itself takes taps) so it can't
+          steal a pin tap from the map band behind it. */}
+      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] justify-center px-3 pt-2">
+        <ScreenResultsPill
+          total={visible.total}
+          onClick={openScreenList}
+          className="pointer-events-auto"
+        />
       </div>
 
       {/* Bottom stack over the map: the single-pin peek card (Zillow-style) sits
