@@ -6,14 +6,18 @@ was costing the *app*, and the app really is nearly free. The bill is the
 `/launchvendors` + `/enrichvendors` pipelines, which did not exist when that line
 was written.
 
+Figures below are reconciled against the actual July invoice, not estimated.
+
 Two things to internalize:
 
 1. **Google retired the universal $200/month Maps credit in March 2025.** There is
    no longer a cushion that quietly absorbs a few thousand calls. Each SKU now has
-   its own small free monthly allowance and bills from the first call past it.
-2. **Seeding a vendor type is a capital expense, not a running cost.** Launching +
-   enriching one type over one metro costs roughly **$13–30**. Five new types in a
-   month is the whole bill. Steady-state app traffic is a rounding error.
+   its own small free monthly allowance — **1,000 calls** at the Enterprise tiers
+   these pipelines live on — and bills from the first call past it.
+2. **Seeding a vendor type is a capital expense, not a running cost**, and its price
+   depends on what else ran that month. One type-launch fits inside the free
+   allowance and costs **$0**; each additional type in the same month costs about
+   **$29**. Steady-state app traffic is genuinely free — measurably, not roughly.
 
 ## The SKUs we actually touch
 
@@ -41,35 +45,56 @@ Two consequences worth noting, because neither is obvious from reading the code:
 - `reviews` is **Enterprise + Atmosphere**, the most expensive Place Details tier.
   Both `wedcheck` and the enrich `harvest` live there.
 
-## Cost of one type-launch over a metro
+## The actual July 2026 bill
 
-Assumes statewide query + region + ~10 anchors, ~300 rows surviving the sweep.
+Five type build-outs (dress, planner, hair & makeup, hotel blocks, DJ/band split),
+grouped by SKU:
 
-| Step | Calls | SKU | Cost |
-| --- | --- | --- | --- |
-| `scout` sweep | ~36 | Text Search Ent. | ~$1.25 |
-| `scout` website fallback | ~100–240 | Details Ent. | $2–5 |
-| `wedcheck` reviews | ~50–150 | Details Ent.+Atmos. | $1.25–3.75 |
-| `resolve` per candidate | ~50–150 | Text Search Ent. | $2–5 |
-| `upload` late-resolve + centroids | ~50–150 | Text Search Ent. | $2–5 |
-| **Launch subtotal** | | | **$8–20** |
-| `enrich` harvest (1/vendor) | ~200–400 | Details Ent.+Atmos. | $5–10 |
-| **Per type, all-in** | | | **$13–30** |
+| SKU | Calls | Free | Billed | Cost |
+| --- | ---: | ---: | ---: | ---: |
+| Place Details Enterprise + Atmosphere | 2,970 | 1,000 | 1,970 | **$49.25** |
+| Text Search Enterprise | 1,652 | 1,000 | 652 | **$22.82** |
+| Place Details Enterprise | 249 | 1,000 | 0 | $0.00 |
+| Place Details Photos | 485 | 5,000 | 0 | $0.00 |
+| Place Details Essentials (IDs only) | 273 | 10,000 | 0 | $0.00 |
+| Text Search Pro | 196 | 5,000 | 0 | $0.00 |
+| Autocomplete Requests | 10 | 10,000 | 0 | $0.00 |
+| | | | | **$72.07** |
 
-July added dress, planner, hair & makeup, hotel blocks, and the DJ/band split —
-five type build-outs. $65–150 expected; $76 observed. That is the bill.
+Three things this settles:
 
-App-side, for contrast: `/api/vendor-photo` is one Details Essentials + one Place
-Photos call per vendor per 30 days on first view (CDN-cached after), and
-autocomplete is debounced and sits inside a 10,000-call free tier. Even browsing
-every seeded vendor in a month is single-digit dollars.
+**Two SKUs are the entire bill**, and `reviews` alone is 68% of it. Everything else
+sits inside its free allowance with room to spare.
 
-## Confirming against the real bill
+**The app costs exactly nothing.** 485 photo fetches, 273 photo-reference lookups, 10
+autocomplete calls — all free. The `/api/vendor-photo` caching works. Add Recon search
+is barely used. No app-side change is warranted, now or at 10x the traffic.
 
-The estimates above are derived from the code, not from billing data. To check:
-**Billing → Reports → Group by: SKU**, filtered to the Maps Platform project. The
-prediction is that Text Search Enterprise and the two Enterprise Details SKUs
-dominate, and that Photos/Autocomplete/Essentials are negligible.
+**The website fallback is vindicated.** `websiteWithFallback` fired 249 times all month
+and cost $0, while the reviews call it helps avoid fired 2,970 times at $25/1k. Deferring
+it out of `scout` — the fix this document originally proposed — would have traded a free
+call for a paid one. Leave it alone.
+
+(A stray 196 Text Search calls billed at **Pro**, not Enterprise, despite our mask always
+requesting `websiteUri`. Best guess: zero-result searches, which return no billable
+Enterprise field — roughly 11% of all searches, consistent with `resolve` probing names
+that do not exist. Unconfirmed, and free either way.)
+
+## The scheduling lever
+
+Per type-launch, from the actuals above: ~594 Enterprise+Atmosphere, ~370 Text Search,
+~50 Details Enterprise. Every one of those is **under the 1,000-call free allowance**.
+
+> **One vendor type per calendar month costs $0. The July bill is almost entirely the
+> consequence of batching five into one month.**
+
+At full price — i.e. once the month's free tier is gone — a type costs about **$29**. So
+the cost of a type-launch is not fixed: it is $0 for the first one in a month and ~$29 for
+each one after. Spreading a multi-type build-out across months is the single largest lever
+available, and it costs nothing but patience.
+
+If several types genuinely have to ship together, budget ~$29 each beyond the first and
+run them at the start of a month so a re-run lands in the same free window.
 
 ## What was done about it
 

@@ -25,11 +25,15 @@ Put the three values into `.env.local` (see below).
 
 ### Budget alert + quota caps (do this once)
 
-Running the app costs close to nothing. Running `/launchvendors` + `/enrichvendors` for one
-vendor type over one metro costs roughly **$13–30**, and Google retired the universal
-$200/month Maps credit in March 2025 — the Enterprise SKUs these pipelines use get only
-**1,000 free calls a month each**. A July 2026 build-out of five vendor types billed $76.
-See `docs/google-places-cost.md` for the full breakdown.
+Running the app is free — measurably so: the whole of July 2026 billed **$0.00** for
+app traffic. The pipelines are what spend. Google retired the universal $200/month Maps
+credit in March 2025, and the Enterprise SKUs `/launchvendors` + `/enrichvendors` use get
+only **1,000 free calls a month each**.
+
+One type-launch fits inside that allowance and costs **$0**. Each *additional* type in the
+same calendar month costs about **$29**. A July 2026 build-out of five types in one month
+billed $72 for exactly that reason — so **spread multi-type build-outs across months** if
+nothing forces them together. See `docs/google-places-cost.md`.
 
 **A budget alert notifies; it does not stop anything.** It is evaluated on a delay and
 never blocks a request, so a looping script can spend well past it. Quota caps are the
