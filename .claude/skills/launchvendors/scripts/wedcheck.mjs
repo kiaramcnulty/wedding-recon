@@ -17,11 +17,12 @@
 // wedding-scoped. Idempotent — flagged/pruned rows are not re-fetched or resurrected.
 // usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/wedcheck.mjs <workdir> [--type music]
 import path from 'node:path';
-import { readVenues, writeVenues, appendPruned, placeDetails, sleep, typeProfile } from './lib.mjs';
+import { readVenues, writeVenues, appendPruned, placeDetails, sleep, typeProfile, initPlacesCache, placesSpendReport } from './lib.mjs';
 
 const workdir = process.argv[2];
 if (!workdir || workdir.startsWith('--')) { console.error('usage: wedcheck.mjs <workdir> [--type <type>]'); process.exit(1); }
 const profile = typeProfile();
+initPlacesCache(workdir);   // reuse Places responses across re-runs — see lib.mjs
 if (!profile.intent) { console.log(`wedcheck(${profile.key}): no intent config for this type — nothing to do`); process.exit(0); }
 
 const file = path.join(workdir, profile.csv);
@@ -145,3 +146,4 @@ if (flagged.length) {
   console.log('\nFLAGGED (site exists but unreadable — adjudicate these in Phase 4):');
   for (const v of flagged) console.log(`  ${v.name} (${v.city || '?'}) | ${v.website}`);
 }
+console.log(placesSpendReport());

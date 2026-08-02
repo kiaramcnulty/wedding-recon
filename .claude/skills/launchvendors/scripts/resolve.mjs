@@ -3,7 +3,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/resolve.mjs <workdir> --state CO [--region "Denver, CO"] [--type photographer]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, nameKey, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, centroidLookup, cleanWebsite, cleanInstagram, sleep, argValue, typeProfile } from './lib.mjs';
+import { readVenues, writeVenues, nameKey, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, centroidLookup, cleanWebsite, cleanInstagram, sleep, argValue, typeProfile, initPlacesCache, placesSpendReport } from './lib.mjs';
 
 const workdir = process.argv[2];
 const state = argValue('state');
@@ -11,6 +11,7 @@ const region = argValue('region');   // "City, ST" — centroid of last resort w
 if (!workdir || workdir.startsWith('--') || !state) { console.error('usage: resolve.mjs <workdir> --state CO [--region "Denver, CO"] [--type photographer]'); process.exit(1); }
 if (!process.env.GOOGLE_PLACES_API_KEY) { console.error('GOOGLE_PLACES_API_KEY missing — run with --env-file=.env.local from the repo root'); process.exit(1); }
 const profile = typeProfile();
+initPlacesCache(workdir);   // reuse Places responses across re-runs — see lib.mjs
 
 const file = path.join(workdir, profile.csv);
 const candFile = path.join(workdir, 'candidates.jsonl');
@@ -130,3 +131,4 @@ if (revived) {
   console.log(`  NOTE: adjudicate is TERMINAL — if you are re-running resolve after adjudicating, you are probably re-doing work. Resolve everything first, then adjudicate once.`);
 }
 if (flagged.length) { console.log('\nFLAGGED (adjudicate in Phase 4 — see adjudicate.mjs):'); for (const f of flagged) console.log('  ' + f); }
+console.log(placesSpendReport());

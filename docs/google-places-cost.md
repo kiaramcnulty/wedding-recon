@@ -71,26 +71,63 @@ The estimates above are derived from the code, not from billing data. To check:
 prediction is that Text Search Enterprise and the two Enterprise Details SKUs
 dominate, and that Photos/Autocomplete/Essentials are negligible.
 
-## Reducing it
+## What was done about it
 
-Ranked by savings per unit of effort.
+**The on-disk response cache** (`initPlacesCache()` in `launchvendors/scripts/lib.mjs`)
+memoizes every Text Search and Place Details response in `<workdir>/places-cache.jsonl`,
+keyed by exactly what was asked for (query + pageToken, or place_id + field mask). It is
+append-only, so an interrupted run banks what it learned, and it carries the same 30-day
+TTL as the `google_photos` cache in `lib/google-photos.ts`. Only successful responses are
+cached — an error has to be retried, not memoized.
 
-1. **Set a budget alert and per-SKU quota caps** (console, no code). Quotas are the
-   only real stop — a runaway loop in a pipeline script can spend faster than a
-   budget alert can notify. Cap the three Enterprise SKUs near expected run volume.
-2. **Cache Places responses to disk per workdir.** These pipelines get re-run
-   constantly during development, and every re-run re-pays in full. A `place_id →
-   response` JSON cache in the workdir would make iteration free. Biggest practical
-   saver, because it targets repeated runs rather than the first one.
-3. **Stop geocoding city centroids through Text Search.** `centroidLookup()` spends
-   a $35/1k Enterprise search to turn "Boulder, CO" into a lat/lng. A static table
-   of anchor-city coordinates costs nothing and never drifts; the Geocoding API
-   ($5/1k, 10k free) is the fallback if a table is too rigid.
-4. **Defer `websiteWithFallback` out of `scout`.** It spends an Enterprise Details
-   call per swept row for a nice-to-have field — including for the many rows that
-   `wedcheck`, the name guards, and `adjudicate` later prune. `backfill-websites.mjs`
-   already does this job standalone; running it *after* pruning, over survivors only,
-   should roughly halve launch-side Details spend.
+This is the big one, because it targets the *repeat* runs rather than the first: re-sweeping
+after widening the anchors, re-resolving after a paste, re-running wedcheck after a profile
+tweak. All of it is now free. `PLACES_CACHE=off` disables it.
 
-`wedcheck` is already well-tuned — the free same-host subpage probe runs before the
-paid reviews call specifically so a hit avoids it. No change needed there.
+**Persistent city centroids** (`launchvendors/centroids.json`, committed). A town's centre
+does not move, and the same anchors recur across every vendor type and every re-run, so
+paying a $35/1k Enterprise search to re-learn where Boulder is — once per type, per run —
+was pure waste. Resolved once, reused forever, reviewable in a diff. It self-populates;
+no new API and no console setup needed.
+
+**Harvest is resumable** (`enrichvendors/scripts/harvest.mjs`). Its Places call carries
+`reviews`, so it bills at the priciest SKU we touch, once per vendor. It had no resume, so
+re-running it to pick up newly-seeded vendors, a widened subpage regex, or a crashed run
+re-paid for the entire region. A vendor whose `harvest.json` already holds a clean Google
+block is now skipped; one whose block carries an `err` still retries, since a *failed*
+$25/1k call is worth repeating and a successful one is not. `--refresh` forces.
+
+**Every run reports its own spend.** `placesSpendReport()` tallies calls by SKU, prices
+them, and prints the total plus what the cache saved. Cost stops being invisible until the
+invoice arrives:
+
+```
+places: $4.31 across 187 billed calls
+  Text Search Enterprise                    98 calls  $3.43
+  Place Details Enterprise                  44 calls  $0.88
+  (cache hits)                             213 calls  $6.12 saved
+```
+
+Counted, not invoiced — the per-SKU free allowance is consumed across every run in the
+calendar month, so read these as the marginal cost of this run once the month's free tier
+is gone.
+
+## What was deliberately NOT changed
+
+**`websiteWithFallback` stays in `scout`.** The first pass of this analysis proposed
+deferring it to `backfill-websites.mjs` so it only ran over rows that survive pruning.
+That is wrong, and the reason is worth recording: `wedcheck` crawls `v.website` for free
+before it falls back to the paid reviews call. Removing the website from the sweep would
+push those rows onto Enterprise+Atmosphere ($25/1k) instead of Enterprise ($20/1k) — more
+expensive, *and* the website is lost. The fallback pays for itself.
+
+**The sweep field mask keeps `places.websiteUri`**, for the reason in the table note above.
+
+**`wedcheck` is already well-tuned.** The free same-host subpage probe runs before the paid
+reviews call specifically so a hit avoids it.
+
+## Still worth doing by hand
+
+**Set a budget alert and per-SKU quota caps in the Cloud console** — see
+`SETUP.md` §3. Quotas are the only true stop; a runaway loop spends faster than a budget
+alert can notify, because alerts are evaluated on a delay and never block a request.

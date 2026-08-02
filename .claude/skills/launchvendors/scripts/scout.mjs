@@ -2,7 +2,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/scout.mjs <workdir> --region "Denver, CO" [--type photographer] [--statewide Colorado] [--anchors "Boulder, CO;Golden, CO"]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, appendPruned, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile, wrongTypeByName } from './lib.mjs';
+import { readVenues, writeVenues, appendPruned, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile, wrongTypeByName, initPlacesCache, placesSpendReport } from './lib.mjs';
 
 const workdir = process.argv[2];
 const region = argValue('region');
@@ -12,6 +12,7 @@ if (!workdir || workdir.startsWith('--') || !region) {
   process.exit(1);
 }
 const profile = typeProfile();
+initPlacesCache(workdir);   // reuse Places responses across re-runs — see lib.mjs
 const state = (region.match(/\b([A-Z]{2})\b/) || [])[1];
 if (!state) { console.error('--region must include a 2-letter state, e.g. "Denver, CO"'); process.exit(1); }
 if (!process.env.GOOGLE_PLACES_API_KEY) { console.error('GOOGLE_PLACES_API_KEY missing — run with --env-file=.env.local from the repo root'); process.exit(1); }
@@ -74,3 +75,4 @@ writeVenues(file, venues);
 appendPruned(workdir, junk);
 console.log(`scout(${profile.key}): ${queries.length} queries | +${added} new | ${dup} repeat | ${offState} out-of-state | ${junk.length} junk-name pruned | total ${venues.length} rows -> ${file}`);
 if (junk.length) console.log(`  pruned by name (see pruned.csv): ${junk.map((v) => v.name).join('; ')}`);
+console.log(placesSpendReport());
