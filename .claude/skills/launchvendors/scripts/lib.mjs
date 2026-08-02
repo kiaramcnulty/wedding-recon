@@ -1,5 +1,7 @@
 // Shared helpers for the /launchvendors pipeline. Node built-ins only.
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // `subtype` carries a per-row vendor-type refinement for types that split one sweep across
 // several vendor_types (music → 'dj' | 'band'). Blank for every other type — appended LAST
@@ -427,7 +429,120 @@ export function parseCityState(address, fallbackState) {
   return { city, state, cleanAddress: parts.join(', ') };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Places billing: SKU accounting + an on-disk response cache
+//
+// Google retired the universal $200/month Maps credit in March 2025. Each SKU now
+// gets its own small free monthly allowance (1,000 calls at the Enterprise tiers we
+// use) and bills from the first call past it, so a pipeline that re-runs a few times
+// during a launch is real money. See docs/google-places-cost.md.
+//
+// A call bills at the HIGHEST tier any field in its mask belongs to — one Enterprise
+// field upgrades the whole call. Rates are USD per 1,000 calls (US, 2026).
+// ─────────────────────────────────────────────────────────────────────────────
+const SKU_RATES = {
+  'Text Search Enterprise': 35,
+  'Place Details Essentials': 5,
+  'Place Details Pro': 17,
+  'Place Details Enterprise': 20,
+  'Place Details Enterprise+Atmosphere': 25,
+};
+
+// Fields that pull a Place Details call up into a pricier tier. Checked most-expensive
+// first, since the highest matching tier is the one billed.
+const ATMOSPHERE_FIELDS = /\b(reviews|editorialSummary|generativeSummary|reviewSummary|neighborhoodSummary|payment|parkingOptions|outdoorSeating|dineIn|delivery|curbsidePickup|reservable|restroom|serves|goodFor|allowsDogs|menuForChildren|fuelOptions|evCharge)/i;
+const ENTERPRISE_FIELDS = /\b(websiteUri|rating|userRatingCount|priceLevel|priceRange|OpeningHours|PhoneNumber|transitStation)/i;
+const PRO_FIELDS = /\b(displayName|primaryType|businessStatus|googleMapsUri|googleMapsLinks|iconMaskBaseUri|iconBackgroundColor|accessibilityOptions|subDestinations|containingPlaces|pureServiceAreaBusiness|utcOffsetMinutes)/i;
+
+/** The Place Details SKU a field mask bills at (highest tier any field belongs to). */
+export function detailsSku(fields) {
+  const f = fields || '';
+  if (ATMOSPHERE_FIELDS.test(f)) return 'Place Details Enterprise+Atmosphere';
+  if (ENTERPRISE_FIELDS.test(f)) return 'Place Details Enterprise';
+  if (PRO_FIELDS.test(f)) return 'Place Details Pro';
+  return 'Place Details Essentials';
+}
+
+const spend = { billed: new Map(), cacheHits: 0, cacheSaved: 0 };
+const bill = (sku) => spend.billed.set(sku, (spend.billed.get(sku) ?? 0) + 1);
+
+/**
+ * Per-run Places spend, as counted (not as invoiced — Google's per-SKU free allowance is
+ * consumed across every run in the calendar month, so treat these as the marginal cost of
+ * THIS run once the month's free tier is gone).
+ */
+export function placesSpendReport() {
+  const lines = [];
+  let total = 0;
+  for (const [sku, n] of [...spend.billed].sort((a, b) => b[1] * SKU_RATES[b[0]] - a[1] * SKU_RATES[a[0]])) {
+    const cost = (n * SKU_RATES[sku]) / 1000;
+    total += cost;
+    lines.push(`  ${sku.padEnd(38)} ${String(n).padStart(5)} calls  $${cost.toFixed(2)}`);
+  }
+  if (!lines.length && !spend.cacheHits) return 'places: no API calls this run';
+  const head = `places: $${total.toFixed(2)} across ${[...spend.billed.values()].reduce((a, b) => a + b, 0)} billed calls`;
+  const saved = spend.cacheHits
+    ? `\n  ${'(cache hits)'.padEnd(38)} ${String(spend.cacheHits).padStart(5)} calls  $${(spend.cacheSaved / 1000).toFixed(2)} saved`
+    : '';
+  return `${head}\n${lines.join('\n')}${saved}`;
+}
+
+// ── On-disk response cache ───────────────────────────────────────────────────
+// These pipelines get re-run constantly during a launch — re-sweep after widening the
+// anchors, re-resolve after a paste, re-run wedcheck after a profile tweak — and every
+// re-run used to re-pay in full. Responses are keyed by exactly what was asked for
+// (query+pageToken, or place_id+field mask) and appended to a JSONL in the workdir, so
+// a crash mid-run loses nothing and the next run starts warm.
+//
+// 30-day TTL, matching the google_photos cache in lib/google-photos.ts and Google's
+// caching allowance. Off unless a script calls initPlacesCache() — backfill-websites
+// runs against the DB with no workdir and simply doesn't cache.
+const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+let cacheFile = null;
+const cacheMap = new Map();
+
+/** Point the Places cache at `<workdir>/places-cache.jsonl` and load what's there. */
+export function initPlacesCache(workdir) {
+  if (!workdir || process.env.PLACES_CACHE === 'off') return;
+  fs.mkdirSync(workdir, { recursive: true });
+  cacheFile = path.join(workdir, 'places-cache.jsonl');
+  if (!fs.existsSync(cacheFile)) return;
+  const now = Date.now();
+  for (const line of fs.readFileSync(cacheFile, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const e = JSON.parse(line);
+      if (now - e.at < CACHE_TTL_MS) cacheMap.set(e.k, e.v);   // later lines win — append-only
+    } catch { /* skip a torn line from an interrupted write */ }
+  }
+}
+
+function cacheGet(key, sku) {
+  if (!cacheFile || !cacheMap.has(key)) return null;
+  spend.cacheHits++;
+  spend.cacheSaved += SKU_RATES[sku] ?? 0;
+  return cacheMap.get(key);
+}
+
+function cacheSet(key, value) {
+  if (!cacheFile) return;
+  cacheMap.set(key, value);
+  fs.appendFileSync(cacheFile, JSON.stringify({ k: key, v: value, at: Date.now() }) + '\n');
+}
+
+/**
+ * Text Search (New). The field mask carries `places.websiteUri`, an ENTERPRISE field, so
+ * every call bills at Text Search Enterprise ($35/1k) rather than Pro ($32/1k). That is
+ * deliberate and much the cheaper side of the trade: one call returns up to 20 places, so
+ * carrying the website here costs +$3 per 1,000 CALLS instead of +$20 per 1,000 PLACES to
+ * fetch it one at a time through Place Details. Do not "optimize" it out.
+ */
 export async function placesSearch(query, pageToken) {
+  const SKU = 'Text Search Enterprise';
+  const key = `search ${query} ${pageToken || ''}`;
+  const hit = cacheGet(key, SKU);
+  if (hit) return hit;
+
   const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     headers: {
@@ -438,19 +553,35 @@ export async function placesSearch(query, pageToken) {
     body: JSON.stringify(pageToken ? { textQuery: query, pageToken } : { textQuery: query }),
   });
   if (!res.ok) throw new Error(`Places API ${res.status}: ${await res.text()}`);
-  return res.json();
+  bill(SKU);
+  const data = await res.json();
+  // Only successes are cached — an error must be retried, not memoized. `nextPageToken` is
+  // short-lived at Google, but a cached page is served whole so it is never re-redeemed.
+  cacheSet(key, data);
+  return data;
 }
 
 /**
  * Place Details (New) lookup by place_id. Field mask omits the `places.` prefix (single
  * place, not a search array). Used to recover fields Text Search leaves empty.
+ *
+ * Ask for the NARROWEST mask that answers the question — the tier is set by the priciest
+ * field present, so adding `rating` to an id-only lookup quadruples it. See detailsSku().
  */
 export async function placeDetails(placeId, fields = 'id,displayName,formattedAddress,location,websiteUri') {
+  const SKU = detailsSku(fields);
+  const key = `details ${placeId} ${fields}`;
+  const hit = cacheGet(key, SKU);
+  if (hit) return hit;
+
   const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
     headers: { 'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY, 'X-Goog-FieldMask': fields },
   });
   if (!res.ok) throw new Error(`Place Details ${res.status}: ${await res.text()}`);
-  return res.json();
+  bill(SKU);
+  const data = await res.json();
+  cacheSet(key, data);
+  return data;
 }
 
 /**
@@ -478,14 +609,40 @@ export async function websiteWithFallback(placeId, searchWebsite) {
  * sit in `state`. Returns { label, city, lat, lng } or null; costs one Places call per
  * label actually tried.
  */
+// City centroids resolved by past runs, committed to the repo. A town's centre does not
+// move, and the same anchors recur across every vendor type and every re-run — so paying
+// Text Search Enterprise ($35/1k) to re-learn where Boulder is, once per type per run, was
+// pure waste. Resolved once, reused forever, and reviewable in a diff.
+const CENTROIDS_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'centroids.json');
+let centroids = null;
+
+function loadCentroids() {
+  if (centroids) return centroids;
+  try { centroids = JSON.parse(fs.readFileSync(CENTROIDS_FILE, 'utf8')); }
+  catch { centroids = {}; }
+  return centroids;
+}
+
+const centroidKey = (label, state) => `${norm(label)}|${(state || '').toLowerCase()}`;
+
 export async function centroidLookup(labels, state) {
+  const table = loadCentroids();
   for (const label of labels) {
     if (!label || !label.trim()) continue;
+    const key = centroidKey(label, state);
+
+    const known = table[key];
+    if (known) return { label, city: label.split(',')[0].trim(), lat: known.lat, lng: known.lng };
+
     try {
       const d = await placesSearch(label);
       await sleep(120);
       const g = d.places?.[0];
       if (g?.location && (!state || (g.formattedAddress || '').includes(state))) {
+        table[key] = { lat: g.location.latitude, lng: g.location.longitude, label };
+        // Written immediately so an interrupted run still banks what it learned.
+        try { fs.writeFileSync(CENTROIDS_FILE, JSON.stringify(table, null, 2) + '\n'); }
+        catch { /* read-only checkout: still return the hit, just do not memoize it */ }
         return { label, city: label.split(',')[0].trim(), lat: g.location.latitude, lng: g.location.longitude };
       }
     } catch { /* try the next label */ }

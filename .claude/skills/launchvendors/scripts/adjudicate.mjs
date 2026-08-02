@@ -24,7 +24,7 @@
 //        --remove "Some Portrait Studio" --remove "Corporate Catering Co" --rescue "Vouched Florist" --subtype "Mile High Sound=dj" --apply
 import path from 'node:path';
 import fs from 'node:fs';
-import { readVenues, writeVenues, appendPruned, norm, centroidLookup, argValue, typeProfile } from './lib.mjs';
+import { readVenues, writeVenues, appendPruned, norm, centroidLookup, argValue, typeProfile, initPlacesCache, placesSpendReport } from './lib.mjs';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -33,6 +33,7 @@ if (!workdir || workdir.startsWith('--')) {
   process.exit(1);
 }
 const profile = typeProfile();
+initPlacesCache(workdir);   // reuse Places responses across re-runs — see lib.mjs
 const region = argValue('region');
 
 // Repeatable flags: --remove "A" --remove "B" (and --remove-file / --rescue-file, one key per line).
@@ -170,3 +171,4 @@ appendPruned(workdir, dropped);
 console.log(`adjudicate(${profile.key}) --apply: ${kept.length} kept | ${dropped.length} removed → pruned.csv | ${rescued} rescued | ${retyped} retyped | ${centroided} centroid-filled | ${cleared} flags cleared${stillNoPin ? ` | ${stillNoPin} still without a pin (uploads, no map pin)` : ''}`);
 if (dropped.length) { console.log('\nREMOVED (judgment):'); for (const v of dropped) console.log(`  ${v.name} (${v.city || '?'})`); }
 if (rescued) { console.log('\nRESCUED:'); for (const v of rescues) console.log(`  ${v.name} (${v.city || '?'})`); }
+console.log(placesSpendReport());

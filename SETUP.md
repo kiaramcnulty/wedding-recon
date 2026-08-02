@@ -16,11 +16,55 @@ Create a private repo named `wedding-recon` (empty). The local project will push
 
 Put the three values into `.env.local` (see below).
 
-## 3. Google Cloud — Places API (only gates Add Recon search)
+## 3. Google Cloud — Places API (Add Recon search + the seeding pipelines)
 1. New Google Cloud project → enable **Places API (New)**.
-2. ⚠️ Google requires a **billing account with a credit card** even for the free tier. Expected spend ~$0 at our volume, but the card is mandatory.
+2. ⚠️ Google requires a **billing account with a credit card** even for the free tier.
 3. Create an **API key**. Under **API restrictions**, restrict it to **Places API (New)** — *not* the legacy "Places API". Restricting to the wrong one (or leaving "Places API (New)" disabled) causes a 403 `API_KEY_SERVICE_BLOCKED` and the business search silently falls back to manual entry. Keep the key secret (used server-side, so leave **Application restrictions** at "None" or IP-based — an HTTP-referrer restriction would block the server call).
 4. Put it in `.env.local` as `GOOGLE_PLACES_API_KEY`.
+5. **Set the spend guardrails below before running a launch.** Not optional.
+
+### Budget alert + quota caps (do this once)
+
+Running the app is free — measurably so: the whole of July 2026 billed **$0.00** for
+app traffic. The pipelines are what spend. Google retired the universal $200/month Maps
+credit in March 2025, and the Enterprise SKUs `/launchvendors` + `/enrichvendors` use get
+only **1,000 free calls a month each**.
+
+One type-launch fits inside that allowance and costs **$0**. Each *additional* type in the
+same calendar month costs about **$29**. A July 2026 build-out of five types in one month
+billed $72 for exactly that reason — so **spread multi-type build-outs across months** if
+nothing forces them together. See `docs/google-places-cost.md`.
+
+**A budget alert notifies; it does not stop anything.** It is evaluated on a delay and
+never blocks a request, so a looping script can spend well past it. Quota caps are the
+actual brake. Set both.
+
+**Budget alert** — Cloud console → **Billing → Budgets & alerts → Create budget**:
+- Scope to the Maps project only, so an alert means *this*.
+- Monthly amount: whatever a month with no launch should cost — **$10** is a sane floor.
+- Thresholds at 50 / 90 / 100%, and tick **actual** spend (not forecasted).
+- Add your email under *Manage notifications*.
+
+**Quota caps** (the real stop) — **APIs & Services → Places API (New) → Quotas & System
+Limits**. Filter to `Requests per minute` and set a per-minute ceiling on each SKU below.
+Per-minute is the useful lever: it bounds a runaway loop within a minute or two while
+leaving plenty of headroom for a legitimate run, which is paced by `sleep()` calls anyway.
+
+| Quota | Suggested cap | Why |
+| --- | --- | --- |
+| Text Search Enterprise | 100/min | Sweeps are throttled to well under this |
+| Place Details Enterprise + Atmosphere | 100/min | The $25/1k SKU — cap it tightest |
+| Place Details Enterprise | 100/min | Website fallback |
+| Place Photos | 60/min | App traffic only; a spike here means abuse |
+| Autocomplete Requests | 120/min | Debounced per user |
+
+If a run legitimately hits a cap it fails loudly with a 429 and you raise it deliberately —
+which is the entire point. Re-run after raising: the pipelines cache their Places responses
+per workdir, so nothing already fetched is paid for twice.
+
+**Then watch the actual numbers.** Every pipeline run prints a per-SKU spend report when it
+finishes. To reconcile against the invoice: **Billing → Reports → Group by: SKU**, filtered
+to this project.
 
 ## 4. Vercel (deploy — can wait)
 Free account → connect GitHub → import the repo. Add the same env vars from `.env.local` in the Vercel project settings. Hobby tier is fine for a non-revenue app.
