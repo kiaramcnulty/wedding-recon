@@ -45,11 +45,17 @@ const pinLayerId = (t: VendorType) => `pins-${t}`;
 const CLUSTER_RADIUS = 50;
 const CLUSTER_MAX_ZOOM = 14;
 
-// Zoom at which pins start carrying their vendor's name. Deliberately pinned to
-// just past CLUSTER_MAX_ZOOM: above it no cluster bubbles survive, so every pin
-// on screen is a single vendor and a label can't be mistaken for a group's.
-// (It's also the zoom a vendor search flies to, so a searched pin arrives named.)
-const LABEL_MIN_ZOOM = CLUSTER_MAX_ZOOM + 1;
+// Zoom at which pins start carrying their vendor's name. Set BELOW
+// CLUSTER_MAX_ZOOM so names appear earlier on the way in, while cluster bubbles
+// are still around. That's safe because the pin layer is filtered to
+// unclustered points (`["!", ["has", "point_count"]]`), so anything wearing a
+// label is a single vendor either way — a label can never be mistaken for a
+// group's. What it costs is density: at these zooms the survivors are the
+// isolated pins between clusters, and `text-optional` + no-overlap collide-drops
+// the rest, so a crowded area quietly shows fewer names rather than a mess.
+// Still at/below the zoom a vendor search flies to, so a searched pin arrives
+// named.
+const LABEL_MIN_ZOOM = 13;
 
 // Bottom strip of the map the open preview card sits over (the card plus the
 // control row and attribution gap beneath it). A tapped pin landing inside it
