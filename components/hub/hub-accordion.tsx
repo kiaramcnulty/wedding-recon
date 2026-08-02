@@ -1,5 +1,9 @@
+"use client";
+
+import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, PlusCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, Pencil, PlusCircle } from "lucide-react";
 
 import {
   Accordion,
@@ -7,20 +11,46 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  VendorPreviewCard,
+  useVendorPreviews,
+} from "@/components/map/vendor-preview-card";
 import { CATEGORIES, VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
+import { cn } from "@/lib/utils";
 import { type Vendor } from "@/lib/types";
 
 interface VendorWithRecon extends Vendor {
-  hasRecon: boolean;
+  /** This viewer's own recon entry for the vendor, or null if they have none. */
+  myReconId: string | null;
 }
 
 interface HubAccordionProps {
   vendors: VendorWithRecon[];
 }
 
+const HUB_RETURN = encodeURIComponent("/hub");
+
+/**
+ * Styling for the card's trailing action link.
+ *
+ * Two non-obvious bits, both verified in the browser:
+ * - `cn()` is required, not cosmetic. buttonVariants() alone emits both the
+ *   base `border-transparent` and the outline variant's `border-border`; they
+ *   have equal specificity, so the stylesheet order decides and the border
+ *   comes out invisible. tailwind-merge inside cn() drops the loser.
+ * - `no-underline!` needs the important flag: AccordionContent styles every
+ *   descendant anchor with `[&_a]:underline`, which out-specifies a plain
+ *   utility.
+ */
+const actionLinkClass = cn(
+  buttonVariants({ variant: "outline", size: "sm" }),
+  "gap-1 no-underline!",
+);
+
 export function HubAccordion({ vendors }: HubAccordionProps) {
+  const router = useRouter();
+
   // Group vendors by type, preserving VENDOR_TYPES order.
   const grouped = VENDOR_TYPES.reduce<Record<VendorType, VendorWithRecon[]>>(
     (acc, type) => {
@@ -37,6 +67,16 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
 
   // Default-open the first section.
   const defaultOpen = activeSections.length > 0 ? [activeSections[0]] : [];
+
+  // One fetch for every card on the page (the same hook the map feeds use), so
+  // collapsed sections are already populated when opened rather than each
+  // section firing its own query.
+  const ids = React.useMemo(() => vendors.map((v) => v.id), [vendors]);
+  const items = useVendorPreviews(ids);
+  const itemById = React.useMemo(
+    () => new Map((items ?? []).map((i) => [i.id, i])),
+    [items],
+  );
 
   return (
     <Accordion
@@ -84,59 +124,76 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
 
             <AccordionContent className="px-0 pb-0">
               <ul className="flex flex-col gap-2 px-4 pb-3 pt-1">
-                {sectionVendors.map((vendor) => (
-                  <li
-                    key={vendor.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border bg-card shadow-sm transition-colors hover:bg-muted/40"
-                  >
-                    <Link
-                      href={`/vendor/${vendor.id}?from=${encodeURIComponent("/hub")}`}
-                      className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-l-xl p-3"
-                    >
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {vendor.name}
-                      </p>
-                      {vendor.city && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          {vendor.city}
-                          {vendor.region ? `, ${vendor.region}` : ""}
-                        </p>
-                      )}
-                    </Link>
-
-                    <div className="shrink-0 pr-3">
-                      {vendor.hasRecon ? (
-                        <Badge
-                          className="gap-1 border-transparent"
-                          style={{
-                            backgroundColor: "#E1F5EE",
-                            color: "#085041",
-                          }}
-                        >
-                          <CheckCircle2 className="size-3" />
-                          Recon added
-                        </Badge>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1"
-                          render={
-                            <Link href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${encodeURIComponent("/hub")}`}>
-                              <PlusCircle className="size-3.5" />
-                              Add Recon
-                            </Link>
+                {sectionVendors.map((vendor) => {
+                  const item = itemById.get(vendor.id);
+                  return (
+                    <li key={vendor.id}>
+                      {item ? (
+                        <VendorPreviewCard
+                          item={item}
+                          vendorType={vendor.vendor_type}
+                          // Redundant here: the card already sits inside this
+                          // category's accordion section.
+                          showCategoryPill={false}
+                          onOpen={() =>
+                            router.push(
+                              `/vendor/${vendor.id}?from=${HUB_RETURN}`,
+                            )
+                          }
+                          action={
+                            vendor.myReconId ? (
+                              <Link
+                                href={`/recon/${vendor.myReconId}/edit?from=${HUB_RETURN}`}
+                                aria-label={`Edit your recon for ${vendor.name}`}
+                                className={actionLinkClass}
+                              >
+                                <Pencil className="size-3.5" />
+                                Edit
+                              </Link>
+                            ) : (
+                              <Link
+                                href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${HUB_RETURN}`}
+                                aria-label={`Add recon for ${vendor.name}`}
+                                className={actionLinkClass}
+                              >
+                                <PlusCircle className="size-3.5" />
+                                Add
+                              </Link>
+                            )
                           }
                         />
+                      ) : (
+                        <HubCardSkeleton name={vendor.name} />
                       )}
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             </AccordionContent>
           </AccordionItem>
         );
       })}
     </Accordion>
+  );
+}
+
+/**
+ * Placeholder while previews load. Shows the vendor name (already known from
+ * the server render) so the list reads as real content rather than a bare
+ * shimmer, and matches the card's height so nothing jumps on arrival.
+ */
+function HubCardSkeleton({ name }: { name: string }) {
+  return (
+    <div className="flex items-stretch gap-3 overflow-hidden rounded-xl border bg-card p-2">
+      <div className="flex size-24 shrink-0 items-center justify-center rounded-lg bg-muted">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+        <span className="block truncate font-heading text-sm font-semibold">
+          {name}
+        </span>
+        <span className="text-xs text-muted-foreground">Loading recon…</span>
+      </div>
+    </div>
   );
 }

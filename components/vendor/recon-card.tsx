@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { Pencil } from "lucide-react";
+
 import { RECON_TYPE_LABELS } from "@/lib/constants/categories";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +21,29 @@ interface ReconCardProps {
   entry: ReconEntryWithDetails;
   /** True when the entry was authored by the current viewer. */
   isMine?: boolean;
+}
+
+/**
+ * "My recon · Edit" — one control on your own entry, so the badge that marks it
+ * yours is also the way into editing it. Replaces the report button there
+ * (reporting your own entry was never meaningful).
+ */
+function MyReconEditLink({ entry }: { entry: ReconEntryWithDetails }) {
+  return (
+    <Link
+      href={`/recon/${entry.id}/edit?from=${encodeURIComponent(`/vendor/${entry.vendor_id}`)}`}
+      aria-label="Edit your recon"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+      style={{ backgroundColor: "#E1F5EE", color: "#085041" }}
+    >
+      My recon
+      <span aria-hidden className="opacity-40">
+        |
+      </span>
+      Edit
+      <Pencil className="size-3" />
+    </Link>
+  );
 }
 
 function getInitials(username: string): string {
@@ -83,14 +109,7 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
           <span className="text-sm font-medium truncate">
             {entry.author.username}
           </span>
-          {isMine && (
-            <Badge
-              className="shrink-0 border-transparent"
-              style={{ backgroundColor: "#E1F5EE", color: "#085041" }}
-            >
-              My recon
-            </Badge>
-          )}
+          {isMine && <MyReconEditLink entry={entry} />}
           <Badge variant="secondary" className="shrink-0">
             {typeLabel}
           </Badge>
@@ -101,7 +120,9 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
           )}
         </div>
         <CardAction>
-          <ReportButton reconEntryId={entry.id} />
+          {/* Your own entry gets the edit control above instead — there is
+              nothing to report on yourself. */}
+          {!isMine && <ReportButton reconEntryId={entry.id} />}
         </CardAction>
       </CardHeader>
 

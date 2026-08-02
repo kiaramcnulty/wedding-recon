@@ -131,3 +131,19 @@ export const RECON_TYPE_LABELS: Record<ReconType, string> = {
   virtual: "Virtual call",
   in_person: "In person",
 };
+
+/**
+ * Whether a vendor type uses the recon "service region" field. Venues and hotel
+ * blocks are both a fixed property in one place rather than a service-area
+ * vendor, so the field never applies to them — the Add/Edit forms hide it and
+ * the update action writes null (see migration 0024, which did that cleanup for
+ * hotels).
+ *
+ * Lives here, not in the form module, so Server Actions can call it too — a
+ * "use client" module cannot be invoked from the server.
+ */
+export function usesServiceRegion(
+  vendorType: VendorType | undefined,
+): vendorType is VendorType {
+  return !!vendorType && vendorType !== "venue" && vendorType !== "hotel";
+}

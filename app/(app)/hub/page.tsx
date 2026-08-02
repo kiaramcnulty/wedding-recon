@@ -34,15 +34,22 @@ export default async function HubPage() {
     return Array.isArray(v) ? (v as Vendor[]) : [v as Vendor];
   });
 
-  // Fetch vendor_ids for which this user has authored recon entries.
+  // Fetch this user's own recon entries, so each card can link straight to its
+  // edit page. Removed entries are excluded — a moderator takedown should not
+  // resurface as an editable row (flagged stays editable). Migration 0028
+  // guarantees at most one non-removed entry per vendor, so a flat map is safe.
   const { data: reconRows } = await supabase
     .from("recon_entries")
-    .select("vendor_id")
-    .eq("author_id", user.id);
+    .select("id, vendor_id")
+    .eq("author_id", user.id)
+    .neq("status", "removed");
 
-  const authoredVendorIds = new Set<string>(
-    (reconRows ?? []).map((r) => r.vendor_id),
-  );
+  const myReconByVendor = new Map<string, string>();
+  for (const r of reconRows ?? []) {
+    myReconByVendor.set(r.vendor_id as string, r.id as string);
+  }
+
+  const authoredVendorIds = new Set<string>(myReconByVendor.keys());
 
   // Find authored vendor_ids not already in savedVendors.
   const savedVendorIds = new Set(savedVendors.map((v) => v.id));
@@ -63,10 +70,11 @@ export default async function HubPage() {
   // Merge into a deduplicated vendor list.
   const allVendors: Vendor[] = [...savedVendors, ...extraVendors];
 
-  // Attach hasRecon flag.
+  // Attach this viewer's own recon entry id (null when they have none), which
+  // decides whether the card shows an edit pencil or an add button.
   const vendorsWithRecon = allVendors.map((v) => ({
     ...v,
-    hasRecon: authoredVendorIds.has(v.id),
+    myReconId: myReconByVendor.get(v.id) ?? null,
   }));
 
   const isEmpty = vendorsWithRecon.length === 0;
