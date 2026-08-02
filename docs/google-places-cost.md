@@ -151,6 +151,42 @@ expensive, *and* the website is lost. The fallback pays for itself.
 **`wedcheck` is already well-tuned.** The free same-host subpage probe runs before the paid
 reviews call specifically so a hit avoids it.
 
+## Adjacent cost surfaces (checked 2026-08, all clear)
+
+Raised alongside the Places audit, measured, and found fine. Recorded so they do not
+get re-litigated from guesswork — the storage number in particular was predicted to be
+near its limit and was not close.
+
+**Supabase (Free Plan)** — storage **0.245 / 1 GB**, database **0.046 / 0.5 GB**, egress
+**0.036 / 5 GB** per cycle at 2 MAU. Photo uploads from the enrich pass cost about
+**0.027 GB per type-launch**, so Denver's nine types account for the whole 0.245 GB and
+there is room for roughly three more metros of that size before storage is the binding
+constraint. Note the Free Plan does **not** bill overages — exceeding a quota restricts
+the project rather than charging for it, so the failure mode is an outage, not a bill.
+
+The two limits move for different reasons, which is what to watch:
+
+- **Storage grows with vendors** (~0.027 GB per type-launch) and is the slow one.
+- **Egress grows with users** — ~18 MB per active user per cycle, implying a ceiling
+  around 275 MAU. That is the first Supabase limit real traffic would reach, well
+  before storage. If it ever gets close, the lever is the vendor-page carousel, which
+  serves full-size 1600px images where `recon-card` already uses thumbnails.
+  `Cached Egress` currently reads 0 GB, so nothing is being served from Supabase's CDN
+  yet either — worth revisiting only if egress becomes the constraint.
+
+This view was filtered to a single project; Supabase bills and quotas at the
+**organization** level, so re-check with the project filter on *All Projects* before
+treating these as the true quota position.
+
+**Anthropic Batch API** — already self-limiting: `draft.mjs` estimates before submitting,
+gates on `--max-cost` (default $12), and `collect` prints actuals. ~$1–1.50 per 300-vendor
+run. No action.
+
+**Vercel (Hobby)** — 100 GB/month bandwidth; `/api/vendor-photo` bytes count against it on
+a CDN miss. Scales with traffic, not vendor count, and traffic is currently ~2 MAU.
+
+**OpenFreeMap tiles** — free, no key, no quota, no exposure.
+
 ## Still worth doing by hand
 
 **Set a budget alert and per-SKU quota caps in the Cloud console** — see
