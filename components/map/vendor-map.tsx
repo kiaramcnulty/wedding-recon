@@ -55,7 +55,7 @@ const CLUSTER_MAX_ZOOM = 14;
 // the rest, so a crowded area quietly shows fewer names rather than a mess.
 // Still at/below the zoom a vendor search flies to, so a searched pin arrives
 // named.
-const LABEL_MIN_ZOOM = 13;
+const LABEL_MIN_ZOOM = 12;
 
 // Bottom strip of the map the open preview card sits over (the card plus the
 // control row and attribution gap beneath it). A tapped pin landing inside it
