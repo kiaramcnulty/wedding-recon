@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Pencil, PlusCircle } from "lucide-react";
+import { Loader2, PlusCircle } from "lucide-react";
 
 import {
   Accordion,
@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
 import { type Vendor } from "@/lib/types";
 
 interface VendorWithRecon extends Vendor {
-  /** This viewer's own recon entry for the vendor, or null if they have none. */
-  myReconId: string | null;
+  /** True when this viewer has their own (non-removed) recon on the vendor. */
+  hasRecon: boolean;
 }
 
 interface HubAccordionProps {
@@ -140,17 +140,11 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
                               `/vendor/${vendor.id}?from=${HUB_RETURN}`,
                             )
                           }
+                          // Only "Add" lives on the card. Editing happens on
+                          // the recon entry itself (vendor page), so a vendor
+                          // you have already reconned gets no card action.
                           action={
-                            vendor.myReconId ? (
-                              <Link
-                                href={`/recon/${vendor.myReconId}/edit?from=${HUB_RETURN}`}
-                                aria-label={`Edit your recon for ${vendor.name}`}
-                                className={actionLinkClass}
-                              >
-                                <Pencil className="size-3.5" />
-                                Edit
-                              </Link>
-                            ) : (
+                            vendor.hasRecon ? undefined : (
                               <Link
                                 href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${HUB_RETURN}`}
                                 aria-label={`Add recon for ${vendor.name}`}

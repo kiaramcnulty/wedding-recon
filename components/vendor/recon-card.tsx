@@ -102,11 +102,13 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
   return (
     <Card className={cn(isMine && "border-primary/40 bg-primary/[0.05]")}>
       <CardHeader>
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Wraps rather than truncates: the username is the person's identity,
+            so the tags move to a second line before the name gets cut off. */}
+        <div className="flex flex-wrap items-center gap-2">
           <Avatar size="sm">
             <AvatarFallback>{getInitials(entry.author.username)}</AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium truncate">
+          <span className="text-sm font-medium break-words">
             {entry.author.username}
           </span>
           {isMine && <MyReconEditLink entry={entry} />}
@@ -119,11 +121,14 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
             </Badge>
           )}
         </div>
-        <CardAction>
-          {/* Your own entry gets the edit control above instead — there is
-              nothing to report on yourself. */}
-          {!isMine && <ReportButton reconEntryId={entry.id} />}
-        </CardAction>
+        {/* Only rendered for other people's entries — there is nothing to
+            report on yourself, and omitting the slot entirely (rather than
+            leaving it empty) lets the header use the full card width. */}
+        {!isMine && (
+          <CardAction>
+            <ReportButton reconEntryId={entry.id} />
+          </CardAction>
+        )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-2">
