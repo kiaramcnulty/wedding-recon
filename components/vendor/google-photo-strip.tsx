@@ -20,10 +20,13 @@ interface GooglePhotoStripProps {
 export function GooglePhotoStrip({ vendorId, count, credit }: GooglePhotoStripProps) {
   if (count <= 0) return null;
 
-  const photos = Array.from({ length: count }, (_, i) => {
-    const url = `/api/vendor-photo/${vendorId}?i=${i}`;
-    return { thumb: url, full: url };
-  });
+  // Strip tiles are 200x150 CSS, so w=600 covers a 3x screen; the 1200px
+  // variant is fetched only when a photo is opened in the lightbox. Both are
+  // CDN-cached separately, and the full size is never on the page's baseline.
+  const photos = Array.from({ length: count }, (_, i) => ({
+    thumb: `/api/vendor-photo/${vendorId}?i=${i}&w=600`,
+    full: `/api/vendor-photo/${vendorId}?i=${i}&w=1200`,
+  }));
 
   return (
     <div>

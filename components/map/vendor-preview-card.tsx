@@ -152,7 +152,10 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         const candidates: string[] = [];
         const hasGoogle =
           (v.google_photos?.length ?? 0) > 0 || !!v.google_place_id;
-        if (hasGoogle) candidates.push(`/api/vendor-photo/${id}?i=0`);
+        // w=300 sizes this for the 96px card slot (3x DPR). Without it the
+        // route serves its 1200px default — ~17x the pixels actually drawn,
+        // multiplied by every card in a Hub or map feed.
+        if (hasGoogle) candidates.push(`/api/vendor-photo/${id}?i=0&w=300`);
         const rt = reconThumb.get(id);
         if (rt) candidates.push(rt);
         return [

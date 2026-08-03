@@ -10,9 +10,22 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-// One representative size for both the strip thumbnail (CSS-scaled) and the
-// lightbox, so each photo is a single billed Google fetch, not two.
-const MAX_W = 1200;
+/**
+ * Allowlisted render widths, picked to match the surfaces that use them:
+ *   300  — card thumbnails (96 CSS px at up to 3x DPR): hub + map preview cards
+ *   600  — the vendor-page photo strip (200x150 CSS at 3x)
+ *  1200  — the full-screen lightbox
+ *
+ * An allowlist rather than a free-form number so the CDN cache-key space stays
+ * small and a caller cannot mint unlimited distinct (billed) Google fetches.
+ * Defaults to 1200, so a caller that omits `w` behaves exactly as before.
+ *
+ * This deliberately trades a little Google spend for a lot of bytes: a photo
+ * viewed at both sizes is billed roughly twice per *month* (the 30-day CDN TTL
+ * absorbs the rest), while a card stops shipping ~17x the pixels it renders.
+ */
+const WIDTHS: readonly number[] = [300, 600, 1200];
+const DEFAULT_W = 1200;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Per-IP cap on *function invocations*. CDN hits never reach here, so this only
@@ -48,6 +61,12 @@ export async function GET(
   const i = Number(req.nextUrl.searchParams.get("i") ?? "0");
   if (!Number.isInteger(i) || i < 0 || i > 2) return empty(404);
 
+  // Same reasoning as `i`: reject anything off the allowlist rather than
+  // clamping, so a junk width can't alias onto a valid photo's cache entry.
+  const rawW = req.nextUrl.searchParams.get("w");
+  const w = rawW === null ? DEFAULT_W : Number(rawW);
+  if (!WIDTHS.includes(w)) return empty(404);
+
   // Throttle before any DB read or Google call, keyed on client IP.
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -76,12 +95,12 @@ export async function GET(
   let ref = photos[i];
   if (!ref) return empty(404);
 
-  let result = await fetchPhotoBytes(ref.name, key);
+  let result = await fetchPhotoBytes(ref.name, key, w);
   if (result === "rotated") {
     // Genuine rotation (Google 404/403 on the media name) — re-resolve once.
     photos = await refreshVendorGooglePhotos(vendor.id, vendor.google_place_id);
     ref = photos[i];
-    result = ref ? await fetchPhotoBytes(ref.name, key) : "transient";
+    result = ref ? await fetchPhotoBytes(ref.name, key, w) : "transient";
   }
   if (result === "rotated" || result === "transient") return empty(404, 60);
 
@@ -110,11 +129,12 @@ function empty(status: number, cacheSeconds = 300) {
 async function fetchPhotoBytes(
   name: string,
   key: string,
+  maxWidth: number,
 ): Promise<{ buf: ArrayBuffer; contentType: string } | "rotated" | "transient"> {
   if (!isValidPhotoName(name)) return "transient";
   try {
     const res = await fetch(
-      `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${MAX_W}`,
+      `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${maxWidth}`,
       { headers: { "X-Goog-Api-Key": key }, cache: "no-store" },
     );
     if (!res.ok) {
