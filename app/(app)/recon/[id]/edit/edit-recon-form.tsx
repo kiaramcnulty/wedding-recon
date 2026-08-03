@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -19,6 +19,43 @@ import { PlacesCombobox } from "@/components/add/places-combobox";
 import { BrandFooter } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { updateRecon } from "./actions";
+
+/**
+ * Back out of the edit form.
+ *
+ * Must go through real history rather than pushing `fallback`. The vendor page
+ * this returns to carries its own `from` (…/vendor/X?from=/explore), and only
+ * a genuine back step lands on *that* entry. Pushing a bare /vendor/X instead
+ * appended a fresh entry with no `from`, whose own back button then called
+ * router.back() straight into this page — the edit/vendor bounce loop.
+ * `cameFromApp` is the deterministic signal, not a history heuristic: the only
+ * in-app route here is the vendor page's edit link, which always sets `from`.
+ * Without it this was a cold arrival (bookmarked or shared edit URL), so there
+ * is nothing meaningful to step back to and we `replace` — pushing would leave
+ * a dead entry that walks the user right back into the form.
+ */
+function EditBackButton({
+  cameFromApp,
+  fallback,
+}: {
+  cameFromApp: boolean;
+  fallback: string;
+}) {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      aria-label="Go back"
+      onClick={() => {
+        if (cameFromApp && window.history.length > 1) router.back();
+        else router.replace(fallback);
+      }}
+      className="-ml-1 flex items-center justify-center rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <ChevronLeft className="size-5" />
+    </button>
+  );
+}
 
 interface EditReconFormProps {
   reconId: string;
@@ -60,6 +97,9 @@ export function EditReconForm({
       // action reads it from the row rather than trusting the client.
       await updateRecon({
         reconId,
+        // Return to the vendor page the user came from, with its own `from`
+        // intact, so back still reaches Explore/Hub after saving.
+        returnTo: backHref ?? undefined,
         reconType: values.reconType,
         collectedMonth: values.collectedMonth,
         collectedYear: values.collectedYear,
@@ -84,9 +124,7 @@ export function EditReconForm({
     <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
       {/* Header */}
       <header className="flex items-center gap-2 border-b px-4 py-3">
-        <Link href={backTo} aria-label="Go back">
-          <ChevronLeft className="size-5 text-muted-foreground" />
-        </Link>
+        <EditBackButton cameFromApp={!!backHref} fallback={backTo} />
         <h1 className="text-base font-semibold">Edit recon</h1>
         <ProfileMenu className="ml-auto shrink-0" />
       </header>

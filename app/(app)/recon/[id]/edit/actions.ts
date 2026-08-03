@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { usesServiceRegion } from "@/lib/constants/categories";
@@ -8,6 +8,12 @@ import type { ReconType, VendorType } from "@/lib/constants/categories";
 
 export interface UpdateReconInput {
   reconId: string;
+  /**
+   * Where to land after saving — the originating vendor page URL, carrying its
+   * own `from`. Validated as an internal path below (never trusted as-is).
+   * Falls back to the plain vendor page.
+   */
+  returnTo?: string;
   reconType: ReconType;
   collectedMonth: number;
   collectedYear: number;
@@ -87,5 +93,12 @@ export async function updateRecon(input: UpdateReconInput) {
   revalidatePath(`/vendor/${entry.vendor_id}`);
   revalidatePath("/hub");
 
-  redirect(`/vendor/${entry.vendor_id}`);
+  // Internal paths only — a caller-supplied target is an open-redirect vector.
+  const target =
+    input.returnTo?.startsWith("/") && !input.returnTo.startsWith("//")
+      ? input.returnTo
+      : `/vendor/${entry.vendor_id}`;
+
+  // `replace`, not push: a saved form should not be reachable by pressing back.
+  redirect(target, RedirectType.replace);
 }

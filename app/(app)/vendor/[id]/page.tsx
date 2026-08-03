@@ -336,6 +336,15 @@ export default async function VendorPage({
             key={entry.id}
             entry={entry}
             isMine={!!userId && entry.author_id === userId}
+            // This page's own URL *including* its return path, so the edit
+            // page can send the user back to a vendor page that still knows
+            // where it came from. Dropping the `from` here is what used to
+            // strand people bouncing between edit and vendor.
+            returnTo={
+              backHref
+                ? `/vendor/${id}?from=${encodeURIComponent(backHref)}`
+                : `/vendor/${id}`
+            }
           />
         ))}
       </div>

@@ -21,6 +21,11 @@ interface ReconCardProps {
   entry: ReconEntryWithDetails;
   /** True when the entry was authored by the current viewer. */
   isMine?: boolean;
+  /**
+   * Where "back" from the edit page should lead — the host vendor page's own
+   * URL, carrying its `from` so the return chain survives the round trip.
+   */
+  returnTo?: string;
 }
 
 /**
@@ -28,10 +33,16 @@ interface ReconCardProps {
  * yours is also the way into editing it. Replaces the report button there
  * (reporting your own entry was never meaningful).
  */
-function MyReconEditLink({ entry }: { entry: ReconEntryWithDetails }) {
+function MyReconEditLink({
+  entry,
+  returnTo,
+}: {
+  entry: ReconEntryWithDetails;
+  returnTo?: string;
+}) {
   return (
     <Link
-      href={`/recon/${entry.id}/edit?from=${encodeURIComponent(`/vendor/${entry.vendor_id}`)}`}
+      href={`/recon/${entry.id}/edit?from=${encodeURIComponent(returnTo ?? `/vendor/${entry.vendor_id}`)}`}
       aria-label="Edit your recon"
       // The badge stays badge-sized (~20px tall) but its TOUCH area is grown to
       // ~44px with a transparent ::after — at 20px it was routinely missed on a
@@ -59,7 +70,11 @@ function getInitials(username: string): string {
     .join("") || username.slice(0, 2).toUpperCase();
 }
 
-export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
+export async function ReconCard({
+  entry,
+  isMine = false,
+  returnTo,
+}: ReconCardProps) {
   const supabase = await createClient();
 
   const photos = entry.media.map((m) => ({
@@ -115,7 +130,7 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
           <span className="text-sm font-medium break-words">
             {entry.author.username}
           </span>
-          {isMine && <MyReconEditLink entry={entry} />}
+          {isMine && <MyReconEditLink entry={entry} returnTo={returnTo} />}
           <Badge variant="secondary" className="shrink-0">
             {typeLabel}
           </Badge>
