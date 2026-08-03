@@ -33,7 +33,11 @@ function MyReconEditLink({ entry }: { entry: ReconEntryWithDetails }) {
     <Link
       href={`/recon/${entry.id}/edit?from=${encodeURIComponent(`/vendor/${entry.vendor_id}`)}`}
       aria-label="Edit your recon"
-      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+      // The badge stays badge-sized (~20px tall) but its TOUCH area is grown to
+      // ~44px with a transparent ::after — at 20px it was routinely missed on a
+      // phone, which reads as a dead button. Vertical-only so it never reaches
+      // a neighbouring control; the pill is already ~110px wide.
+      className="relative inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 after:absolute after:inset-x-0 after:-inset-y-3.5 after:content-['']"
       style={{ backgroundColor: "#E1F5EE", color: "#085041" }}
     >
       My recon
