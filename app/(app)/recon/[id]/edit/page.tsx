@@ -30,11 +30,13 @@ export default async function EditReconPage({
       : null;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Local JWT verify rather than an Auth-server round trip (see hub/page.tsx).
+  // This only gates *rendering* the form — the write path in actions.ts still
+  // uses getUser(), and RLS enforces ownership at the database either way.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims.sub;
 
-  if (!user) {
+  if (!userId) {
     redirect(`/login?from=${encodeURIComponent(`/recon/${id}/edit`)}`);
   }
 
@@ -49,7 +51,7 @@ export default async function EditReconPage({
   // 404 rather than 403 on someone else's entry — no reason to confirm it
   // exists. A removed entry is a moderator takedown, so it stays uneditable.
   if (error || !entry) notFound();
-  if (entry.author_id !== user.id) notFound();
+  if (entry.author_id !== userId) notFound();
   if (entry.status === "removed") notFound();
 
   // Supabase types an embedded row as object-or-single-item-array.

@@ -11,11 +11,14 @@ import { ProfileMenu } from "@/components/profile-menu";
 export default async function HubPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifies the JWT locally against the project's asymmetric
+  // signing keys; getUser() was a network round trip to the Auth server in
+  // front of everything else on the page. Writes still use getUser() — this is
+  // a read path, and RLS re-validates the token at the database regardless.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims.sub;
 
-  if (!user) {
+  if (!userId) {
     redirect("/login");
   }
 
@@ -29,11 +32,11 @@ export default async function HubPage() {
   //               still has (flagged still counts). Editing lives on the recon
   //               entry itself on the vendor page, not on these cards.
   const [savedRes, reconRes] = await Promise.all([
-    supabase.from("saved_vendors").select("vendor:vendors(*)").eq("user_id", user.id),
+    supabase.from("saved_vendors").select("vendor:vendors(*)").eq("user_id", userId),
     supabase
       .from("recon_entries")
       .select("vendor_id")
-      .eq("author_id", user.id)
+      .eq("author_id", userId)
       .neq("status", "removed"),
   ]);
 
