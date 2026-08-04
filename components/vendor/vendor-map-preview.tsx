@@ -54,33 +54,21 @@ export function VendorMapPreview({
   const containerRef = React.useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = React.useRef<any>(null);
-  // MapLibre is ~200KB of JS plus tile requests. The preview usually sits below
-  // the fold on a phone, so nothing loads until it is actually approached.
-  const [inView, setInView] = React.useState(false);
 
+  // Initialize on mount, matching vendor-map.tsx — the pattern that is proven in
+  // production on Explore.
+  //
+  // This was briefly gated behind an IntersectionObserver to avoid loading
+  // MapLibre for a page nobody scrolls. It shipped broken: the observer fires an
+  // initial callback with `isIntersecting: false` for an element below the fold,
+  // and the map only ever started on a LATER truthy callback, which did not
+  // reliably arrive — so the preview stayed an empty grey box (reported on a
+  // hotel page, 2026-08-04; reproduced headless). The laziness was worth very
+  // little anyway: on a venue page the map sits about one screen down and nearly
+  // every viewer reaches it. The dynamic `import()` below is where the real win
+  // was and it stays — MapLibre is still its own chunk, out of the initial
+  // bundle, exactly as on Explore.
   React.useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    // No IntersectionObserver (or a jsdom-style environment) — just load it.
-    if (typeof IntersectionObserver === "undefined") {
-      const t = setTimeout(() => setInView(true), 0);
-      return () => clearTimeout(t);
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  React.useEffect(() => {
-    if (!inView) return;
     if (typeof window === "undefined") return;
     if (!containerRef.current) return;
     if (mapRef.current) return; // already initialized
@@ -120,6 +108,17 @@ export function VendorMapPreview({
       // Stands in for the drop shadow the rasterized pins get on canvas.
       if (!halo) el.style.filter = "drop-shadow(0 1px 3px rgba(0,0,0,0.35))";
       new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+
+      // MapLibre measures the container once at construction and does not watch
+      // it, so a map built before its box has settled keeps a 0-size canvas
+      // forever. Cheap insurance.
+      map.on("load", () => map.resize());
+      // Without this a failed style is silent: the canvas stays transparent, the
+      // attribution renders empty (so invisible), and the result is an empty box
+      // with no clue why — which is exactly how the bug above presented.
+      map.on("error", (e: { error?: Error }) => {
+        console.error("[VendorMapPreview] map error:", e.error?.message ?? e);
+      });
     })();
 
     return () => {
@@ -129,7 +128,7 @@ export function VendorMapPreview({
         mapRef.current = null;
       }
     };
-  }, [inView, lng, lat, vendorType, approximate]);
+  }, [lng, lat, vendorType, approximate]);
 
   // Where a tap goes: the same Google Maps overlay the header address opens, so
   // there is one "see this location properly" destination on the page. The
