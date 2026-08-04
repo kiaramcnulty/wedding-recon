@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, PlusCircle } from "lucide-react";
+import { Loader2, MapPin, PlusCircle } from "lucide-react";
 
 import {
   Accordion,
@@ -17,6 +17,7 @@ import {
   useVendorPreviews,
 } from "@/components/map/vendor-preview-card";
 import { CATEGORIES, VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
+import { formatVendorLocality } from "@/lib/vendor-locality";
 import { cn } from "@/lib/utils";
 import { type Vendor } from "@/lib/types";
 
@@ -157,7 +158,10 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
                           }
                         />
                       ) : (
-                        <HubCardSkeleton name={vendor.name} />
+                        <HubCardSkeleton
+                          name={vendor.name}
+                          locality={formatVendorLocality(vendor)}
+                        />
                       )}
                     </li>
                   );
@@ -172,11 +176,18 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
 }
 
 /**
- * Placeholder while previews load. Shows the vendor name (already known from
- * the server render) so the list reads as real content rather than a bare
- * shimmer, and matches the card's height so nothing jumps on arrival.
+ * Placeholder while previews load. Shows the vendor name and locality (both
+ * already known from the server render) so the list reads as real content
+ * rather than a bare shimmer, and lands on the same line count as the loaded
+ * card so nothing jumps on arrival.
  */
-function HubCardSkeleton({ name }: { name: string }) {
+function HubCardSkeleton({
+  name,
+  locality,
+}: {
+  name: string;
+  locality: string | null;
+}) {
   return (
     <div className="flex items-stretch gap-3 overflow-hidden rounded-xl border bg-card p-2">
       <div className="flex size-24 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -186,6 +197,12 @@ function HubCardSkeleton({ name }: { name: string }) {
         <span className="block truncate font-heading text-sm font-semibold">
           {name}
         </span>
+        {locality && (
+          <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="size-3 shrink-0" />
+            <span className="truncate">{locality}</span>
+          </span>
+        )}
         <span className="text-xs text-muted-foreground">Loading recon…</span>
       </div>
     </div>
