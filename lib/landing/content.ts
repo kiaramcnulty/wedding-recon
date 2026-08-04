@@ -43,14 +43,15 @@ export const META = {
   /**
    * The blue headline in Google results and the browser tab.
    * Google truncates around 60 characters — front-load the important words.
-   * Current length is 74, so the tail is likely cut in search results.
+   * Current length is 88, so search results cut it after "…prices and intel, fr".
    */
   title:
     "Wedding Recon — Colorado wedding vendor prices and intel, from real couples' experiences",
   /**
    * The grey paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
-   * Current length is ~199, so the tail is likely cut.
+   * Current length is 302, so search results cut it around "…vendor feedba".
+   * The planning-hub and free-to-use points fall outside what is displayed.
    */
   description:
     "See what Colorado couples were actually quoted for 10+ wedding vendor types: venues, catering, photography, florists and music. Explore local vendor feedback and intel from couples who went through it. Then keep your own quotes and notes in one planning hub. Free, no account needed to explore vendors.",
@@ -92,6 +93,15 @@ export const HERO = {
  * rather than a venue, and the page badges it "Example".
  */
 export const EXAMPLE_RECON = {
+  /**
+   * Restored after being dropped in an edit (it is referenced by
+   * hero-visual.tsx, so removing it breaks the build). It is also the only
+   * thing on the page marking this card as illustrative: the price, the
+   * package tier and the catering note below are invented, and an unlabelled
+   * invented quote reads as a real recon entry. If the badge should go, remove
+   * the element from hero-visual.tsx deliberately rather than the string here.
+   */
+  badge: "Example",
   category: "Venue",
   place: "Boulder County",
   price: "$8,400",
