@@ -49,6 +49,13 @@
 }
 
 :root {
+  /* app/layout.tsx loads Geist onto --font-geist-sans, but Tailwind's font-sans
+     utility reads --font-sans, which used to be supplied by the
+     `shadcn/tailwind.css` import above. The shadcn package no longer ships that
+     file, so the variable resolved to nothing and every surface in the app fell
+     back to the browser default serif (Times New Roman). Point it at the font
+     the app actually loads. */
+  --font-sans: var(--font-geist-sans);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
