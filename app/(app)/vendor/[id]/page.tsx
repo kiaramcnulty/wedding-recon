@@ -133,11 +133,13 @@ export default async function VendorPage({
 
   const userId = claimsRes.data?.claims.sub ?? null;
 
-  // A venue or a hotel block IS a property at an address, so its pin is the
-  // fact and it gets a map preview. Every other type is a service-region vendor
-  // whose pin marks a base they travel out from — mapping that at street zoom
-  // would assert a precision the row does not have, so they get their service
-  // area in words instead. Same split the Explore map draws with the halo.
+  // A fixed-location vendor (a venue, a hotel, a bridal shop) IS a property at
+  // an address, so its pin is the fact and it gets a map preview. A
+  // service-region vendor's pin marks a base they travel out from — mapping
+  // that at street zoom would assert a precision the row does not have, so they
+  // get their service area in words instead. Same split the Explore map draws
+  // with the halo, and the same list that gates the Add Recon form field:
+  // `FIXED_LOCATION_TYPES` in lib/constants/categories.ts.
   const fixedLocation = !usesServiceRegion(vendor.vendor_type as VendorType);
 
   // Stage 2 — all need stage-1 results. The "does the viewer already have
@@ -342,11 +344,10 @@ export default async function VendorPage({
         </div>
       )}
 
-      {/* Where it is. A fixed-location vendor (venue / hotel block) gets the
-          pin on a real map; a service-region vendor gets its service area in
-          words, since its pin is only a base. Sits below the photos so they
-          stay the hero, and above the recon so "where" is settled before
-          "what people found out". */}
+      {/* Where it is. A fixed-location vendor gets the pin on a real map; a
+          service-region vendor gets its service area in words, since its pin is
+          only a base. Sits below the photos so they stay the hero, and above
+          the recon so "where" is settled before "what people found out". */}
       {fixedLocation && coords && (
         <div className="mt-4">
           <VendorMapPreview

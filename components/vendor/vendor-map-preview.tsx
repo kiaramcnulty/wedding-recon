@@ -9,12 +9,13 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 /**
  * A small, non-interactive map of one vendor's pin — the Zillow / Google-Maps
- * place-sheet pattern. Shown ONLY for fixed-location vendor types (venues and
- * hotel blocks, i.e. `!usesServiceRegion`): those are a property at an address,
- * so the point is the fact. A service-region vendor is deliberately given no map
- * here, because their pin is a base they travel out from, and rendering it at
- * street zoom would assert a precision the row does not have. That is the same
- * distinction the Explore map draws with the service-area halo.
+ * place-sheet pattern. Shown ONLY for fixed-location vendor types
+ * (`!usesServiceRegion` — venues, hotels, bridal shops): those are a property at
+ * an address you go to, so the point is the fact. A service-region vendor is
+ * deliberately given no map here, because their pin is a base they travel out
+ * from, and rendering it at street zoom would assert a precision the row does
+ * not have. Same distinction the Explore map draws with the service-area halo,
+ * and the same list that gates the Add Recon service-region field.
  *
  * Costs nothing extra: MapLibre GL is already a dependency and the tiles are the
  * free OpenFreeMap ones Explore uses. Deliberately NOT Google Static Maps, which

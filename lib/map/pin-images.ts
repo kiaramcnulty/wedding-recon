@@ -40,18 +40,20 @@ const CLUSTER_R = 17;
 
 // --- Service-area halo -----------------------------------------------------
 //
-// A service-region vendor (`usesServiceRegion`: everything except venues and
-// hotel blocks) is not *at* its pin the way a venue is — the point is their base
-// and they travel to you, and for the home-based ones it is often only a city
-// centroid. So those pins get a soft radial glow spilling out of the disc: light
-// reaching into the surrounding area, which is the fact the pin is trying to
-// convey.
+// A service-region vendor is not *at* its pin the way a venue is — the point is
+// their base and they travel to you, and for the home-based ones it is often
+// only a city centroid. So those pins get a soft radial glow spilling out of the
+// disc: light reaching into the surrounding area, which is the fact the pin is
+// trying to convey.
+//
+// Which categories those are comes from `usesServiceRegion` — the same list that
+// decides whether Add Recon asks for a service region. Never re-derive it here.
 //
 // Deliberately edgeless. The other two pin signals are hard-edged and must stay
 // separable at a glance — a DASHED disc outline means "approximate address" and
 // a crisp ring means "this pin's card is open". A gradient that never resolves
 // into a border cannot be mistaken for either, and it also survives a map where
-// most pins carry it (only 2 of 12 categories are fixed-location, so the halo is
+// most pins carry it (only 3 of 12 categories are fixed-location, so the halo is
 // texture as much as it is a badge — hence the low peak alpha).
 //
 // Because the halo is a pure function of vendor_type, it is baked into the same

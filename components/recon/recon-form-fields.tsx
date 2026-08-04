@@ -273,7 +273,7 @@ export function ReconFormFields({
         />
       </section>
 
-      {/* ── Service region (non-venue, non-hotel vendors only) ──────────── */}
+      {/* ── Service region (service-area vendor types only) ─────────────── */}
       {usesServiceRegion(vendorType) && (
         <section className="space-y-1.5">
           <Label htmlFor="service-region">Service region</Label>
