@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { BrandLockup } from "@/components/brand-lockup";
 import { buttonVariants } from "@/components/ui/button";
+import { HEADER } from "@/lib/landing/content";
 import { APP_HREF, LANDING_HREF } from "@/lib/landing/nav";
 import { cn } from "@/lib/utils";
 
@@ -27,13 +28,13 @@ export function LandingHeader() {
             href="#how-it-works"
             className="hidden px-1 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline"
           >
-            How it works
+            {HEADER.howItWorks}
           </Link>
           <Link
             href="#faq"
             className="hidden px-1 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline"
           >
-            FAQ
+            {HEADER.faq}
           </Link>
           <Link
             href={APP_HREF}
@@ -42,7 +43,7 @@ export function LandingHeader() {
               "h-9 bg-brand px-4 text-white hover:bg-brand/90",
             )}
           >
-            Open the app
+            {HEADER.cta}
           </Link>
         </nav>
       </div>

@@ -1,4 +1,5 @@
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
+import { EXAMPLE_RECON } from "@/lib/landing/content";
 import { cn } from "@/lib/utils";
 
 /**
@@ -95,31 +96,32 @@ export function HeroVisual({ className }: { className?: string }) {
               color: CATEGORIES.venue.textHex,
             }}
           >
-            Venue
+            {EXAMPLE_RECON.category}
           </span>
-          <span className="text-xs text-muted-foreground">Boulder County</span>
+          <span className="text-xs text-muted-foreground">
+            {EXAMPLE_RECON.place}
+          </span>
           <span className="ml-auto rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Example
+            {EXAMPLE_RECON.badge}
           </span>
         </div>
 
         <p className="mt-3 font-heading text-2xl font-semibold leading-none">
-          $8,400
+          {EXAMPLE_RECON.price}
           <span className="ml-2 align-middle text-xs font-normal text-muted-foreground">
-            site fee · Saturday in September
+            {EXAMPLE_RECON.priceDetail}
           </span>
         </p>
 
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Ceremony site, chairs and the bridal suite are included. The bar
-          minimum is separate — about $3.5k for 120 guests.
+          {EXAMPLE_RECON.notes}
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3 text-[11px] text-muted-foreground">
           <span className="rounded-full bg-muted px-2 py-0.5 font-medium">
-            In person
+            {EXAMPLE_RECON.reconType}
           </span>
-          <span>Collected Jun 2026</span>
+          <span>{EXAMPLE_RECON.collected}</span>
         </div>
       </div>
     </div>

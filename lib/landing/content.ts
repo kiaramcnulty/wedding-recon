@@ -11,20 +11,71 @@ import {
 import type { VendorType } from "@/lib/constants/categories";
 
 /**
- * All landing-page copy, in one file.
+ * ============================================================================
+ * EVERY WORD ON THE LANDING PAGE LIVES IN THIS FILE.
+ * ============================================================================
  *
- * The page components are layout only — every user-visible sentence lives here
- * so wording can be revised without reading JSX. Two consumers depend on the
- * shape: FAQ_ITEMS renders the accordion *and* the FAQPage JSON-LD (which is
- * why `answer` stays a plain string — structured data can't carry markup), and
- * COVERAGE_AREAS is both the chip row and the page's Colorado body text.
+ * The components under `components/landing/` and `app/page.tsx` are layout
+ * only — they contain no sentences of their own. To reword the page, edit the
+ * strings below and nothing else.
+ *
+ * Editing rules, all of which the build or a search engine will enforce:
+ *
+ * 1. Keep the quotes and the trailing commas. Text goes between the quotes.
+ * 2. Use a typographic apostrophe (it is / does not) or escape a straight one
+ *    (\'). An unescaped ' inside a '...' string breaks the build.
+ * 3. FAQ `answer` must stay PLAIN TEXT with no markup — the same string is
+ *    emitted as FAQPage structured data for Google, and a mismatch between the
+ *    visible answer and the structured one is a policy violation. Use the
+ *    optional `link` field if an answer needs a link.
+ * 4. Nothing here may name a real vendor or attach a price to one. EXAMPLE_RECON
+ *    is deliberately anonymous and badged "Example" on the page.
+ * 5. Length guides where they matter are noted inline (META especially).
+ *
+ * Run `npm run build` after editing to catch a stray quote or comma.
  */
 
-/** The region the product is positioned around. Soft-launch market: Denver, CO. */
-export const MARKET = "Colorado";
+/* -------------------------------------------------------------------------- */
+/* Search engine + social preview                                             */
+/* -------------------------------------------------------------------------- */
+
+export const META = {
+  /**
+   * The blue headline in Google results and the browser tab.
+   * Google truncates around 60 characters — front-load the important words.
+   * Current length is 74, so the tail is likely cut in search results.
+   */
+  title:
+    "Wedding Recon — Colorado wedding vendor prices, from the couples who asked",
+  /**
+   * The grey paragraph under the headline in Google results, and the preview
+   * text when the link is shared. Google shows roughly 155 characters.
+   * Current length is ~199, so the tail is likely cut.
+   */
+  description:
+    "See what Colorado couples were actually quoted for wedding venues, catering, photography, flowers and music — then keep your own quotes and notes in one planning hub. Free, no account needed to browse.",
+  /** Shorter title used for link previews (iMessage, X, Facebook). */
+  socialTitle: "Wedding Recon — real Colorado wedding vendor prices",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Header                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const HEADER = {
+  howItWorks: "How it works",
+  faq: "FAQ",
+  cta: "Open the app",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Hero — the first screen                                                    */
+/* -------------------------------------------------------------------------- */
 
 export const HERO = {
+  /** Small green pill above the headline. */
   eyebrow: "Colorado wedding vendors",
+  /** The one <h1> on the page. Keep it short enough to sit on two lines. */
   heading: "Real prices from real Colorado weddings.",
   subheading:
     "Wedding Recon is where engaged couples pool the quotes, notes, and photos they collect while vendor shopping — so you can find out what a venue costs before you drive out for the tour.",
@@ -34,15 +85,31 @@ export const HERO = {
 } as const;
 
 /**
- * The dictionary gloss under the "why" section. Lifted from how the product
- * actually talks about itself — the word "recon" is doing real work and is
- * worth defining once, plainly.
+ * The sample recon entry floating over the hero illustration.
+ *
+ * Intentionally anonymous. Naming a real business next to an invented quote
+ * would be a fabricated review of someone's livelihood, so this stays a county
+ * rather than a venue, and the page badges it "Example".
  */
-export const RECON_GLOSS = {
-  word: "re·con",
-  partOfSpeech: "noun",
-  definition:
-    "Everything you learn touring venues, sitting through tastings, and prying a number out of a florist. Usually seen by exactly one couple.",
+export const EXAMPLE_RECON = {
+  badge: "Example",
+  category: "Venue",
+  place: "Boulder County",
+  price: "$8,400",
+  priceDetail: "site fee · Saturday in September",
+  notes:
+    "Ceremony site, chairs and the bridal suite are included. The bar minimum is separate — about $3.5k for 120 guests.",
+  reconType: "In person",
+  collected: "Collected Jun 2026",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Why this exists                                                            */
+/* -------------------------------------------------------------------------- */
+
+export const WHY_SECTION = {
+  eyebrow: "Why this exists",
+  heading: "Planning a wedding means paying for the same research over and over.",
 } as const;
 
 export interface ValueProp {
@@ -51,7 +118,7 @@ export interface ValueProp {
   body: string;
 }
 
-/** Why the product exists — the three problems, straight from the spec. */
+/** The three problems, drawn from the product spec. */
 export const VALUE_PROPS: ValueProp[] = [
   {
     icon: Banknote,
@@ -69,6 +136,25 @@ export const VALUE_PROPS: ValueProp[] = [
     body: "Quotes end up in your inbox, notes in your phone, venue photos in a camera roll you never scroll back through. Your Planning Hub keeps saved vendors and everything you have learned in one list, sorted by category.",
   },
 ];
+
+/** The dictionary-style definition box at the end of the section. */
+export const RECON_GLOSS = {
+  word: "re·con",
+  partOfSpeech: "noun",
+  definition:
+    "Everything you learn touring venues, sitting through tastings, and prying a number out of a florist. Usually seen by exactly one couple.",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* How it works                                                               */
+/* -------------------------------------------------------------------------- */
+
+export const HOW_SECTION = {
+  eyebrow: "How it works",
+  heading: "Three things, on your phone, for free.",
+  /** Prefix for the numbered label above each step ("Step 1", "Step 2"…). */
+  stepLabel: "Step",
+} as const;
 
 export interface HowItWorksStep {
   icon: LucideIcon;
@@ -94,13 +180,54 @@ export const HOW_IT_WORKS: HowItWorksStep[] = [
   },
 ];
 
+/* -------------------------------------------------------------------------- */
+/* Category grid                                                              */
+/* -------------------------------------------------------------------------- */
+
+export const CATEGORIES_SECTION = {
+  eyebrow: "What you can look up",
+  heading: "Every vendor a Colorado wedding needs.",
+  intro:
+    "Pick a category to open the map filtered to it. Colours and icons are the same ones you will see on the pins.",
+} as const;
+
 /**
- * Colorado towns couples search in. Front Range first (where the directory is
- * deepest), then the mountain towns people travel to for a wedding.
+ * Names for the category tiles. The grid renders CATEGORY_PLURAL from
+ * `lib/constants/categories.ts` by default — the noun that counts vendors reads
+ * better in a list, and searches better, than the UI label ("photographers"
+ * over "Photos").
  *
- * Framed on the page as where couples are looking, NOT as a coverage promise —
- * the directory grows by category and by run, and overclaiming a town we have
- * three pins in is the fastest way to lose someone on their first search.
+ * Only add an entry here to override one. These two are overridden because the
+ * plural loses its meaning with no map around it: "hotels" drops the room-block
+ * distinction that defines the category, and "vendors" reads like a peer of the
+ * specific categories beside it rather than the catch-all it is.
+ */
+export const CATEGORY_GRID_LABEL: Partial<Record<VendorType, string>> = {
+  hotel: "Hotel blocks",
+  other: "Everything else",
+};
+
+/* -------------------------------------------------------------------------- */
+/* Colorado coverage                                                          */
+/* -------------------------------------------------------------------------- */
+
+export const COLORADO_SECTION = {
+  eyebrow: "Where we cover",
+  heading: "Colorado first, on purpose.",
+  body: [
+    "A vendor directory is only useful where it is dense. One state covered properly beats fifty covered thinly, so Wedding Recon starts on the Front Range — Denver, Boulder, Colorado Springs, Fort Collins and the towns between them — and reaches out to the mountain venues couples travel for.",
+    "Coverage grows as couples add recon. If the vendor you are looking at is not on the map yet, you can add them in a few taps, quote and all.",
+  ],
+} as const;
+
+/**
+ * The chip row of Colorado towns. Front Range first, then the mountain towns
+ * people travel to for a wedding.
+ *
+ * Presented on the page as where couples are searching, NOT as a coverage
+ * promise — the directory grows one category and one run at a time, and naming
+ * a town with three pins in it is the fastest way to lose someone on their
+ * first search. Add or remove freely; the row wraps to fit.
  */
 export const COVERAGE_AREAS = [
   "Denver",
@@ -123,32 +250,23 @@ export const COVERAGE_AREAS = [
   "Steamboat Springs",
 ] as const;
 
-export const COLORADO_SECTION = {
-  heading: "Colorado first, on purpose.",
-  body: [
-    "A vendor directory is only useful where it is dense. One state covered properly beats fifty covered thinly, so Wedding Recon starts on the Front Range — Denver, Boulder, Colorado Springs, Fort Collins and the towns between them — and reaches out to the mountain venues couples travel for.",
-    "Coverage grows as couples add recon. If the vendor you are looking at is not on the map yet, you can add them in a few taps, quote and all.",
-  ],
-} as const;
+/* -------------------------------------------------------------------------- */
+/* FAQ                                                                        */
+/* -------------------------------------------------------------------------- */
 
-/**
- * Names for the category grid. It renders CATEGORY_PLURAL by default — the noun
- * that counts vendors reads better in a list, and searches better, than the UI
- * label ("photographers" over "Photos"). These two are overridden because the
- * plural loses its meaning with no map around it: "hotels" drops the room-block
- * distinction that defines the category, and "vendors" reads like a peer of the
- * specific categories beside it rather than the catch-all it is.
- */
-export const CATEGORY_GRID_LABEL: Partial<Record<VendorType, string>> = {
-  hotel: "Hotel blocks",
-  other: "Everything else",
-};
+export const FAQ_SECTION = {
+  eyebrow: "Questions",
+  heading: "Before you start clicking around.",
+  /** The line under the accordion, before the mailto link. */
+  footerPrompt: "Something else on your mind?",
+  footerLinkLabel: "Email the person who built this",
+} as const;
 
 export interface FaqItem {
   question: string;
-  /** Plain text — this string is also emitted as FAQPage structured data. */
+  /** PLAIN TEXT ONLY — also emitted as FAQPage structured data. See rule 3. */
   answer: string;
-  /** Optional trailing link, rendered after the answer and omitted from JSON-LD. */
+  /** Optional link rendered after the answer; omitted from structured data. */
   link?: { href: string; label: string };
 }
 
@@ -191,10 +309,33 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
 ];
 
+/* -------------------------------------------------------------------------- */
+/* Closing call to action                                                     */
+/* -------------------------------------------------------------------------- */
+
 export const CLOSING_CTA = {
   heading: "Start with the map.",
   body: "See who is near your date's hometown, read what other couples paid, and keep the rest of your search in one place.",
   cta: "Explore Colorado vendors",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Footer                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const FOOTER = {
+  blurb:
+    "A community directory of Colorado wedding vendors, built on the price quotes and notes couples share with each other.",
+  productHeading: "Product",
+  aboutHeading: "About",
+  exploreLabel: "Explore the map",
+  addReconLabel: "Add recon",
+  hubLabel: "Planning Hub",
+  termsLabel: "Terms & disclaimer",
+  contactLabel: "Contact",
+  /** Appears after "© <year> Wedding Recon." at the very bottom. */
+  disclaimer:
+    "Recon entries are personal experiences shared by couples, not verified facts — always confirm pricing and details with the vendor.",
 } as const;
 
 export const CONTACT_EMAIL = "kiaramcnulty@gmail.com";

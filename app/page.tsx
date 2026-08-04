@@ -12,31 +12,32 @@ import {
   CATEGORY_PLURAL,
 } from "@/lib/constants/categories";
 import {
+  CATEGORIES_SECTION,
   CATEGORY_GRID_LABEL,
   CLOSING_CTA,
   COLORADO_SECTION,
   CONTACT_EMAIL,
   COVERAGE_AREAS,
   FAQ_ITEMS,
+  FAQ_SECTION,
   HERO,
   HOW_IT_WORKS,
+  HOW_SECTION,
+  META,
   RECON_GLOSS,
   VALUE_PROPS,
+  WHY_SECTION,
 } from "@/lib/landing/content";
 import { APP_HREF } from "@/lib/landing/nav";
 import { SITE_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
-const DESCRIPTION =
-  "See what Colorado couples were actually quoted for wedding venues, catering, photography, flowers and music — then keep your own quotes and notes in one planning hub. Free, no account needed to browse.";
+const DESCRIPTION = META.description;
 
 export const metadata: Metadata = {
   // `absolute` bypasses the root layout's "%s · Wedding Recon" template, which
   // would otherwise append the brand to a title that already opens with it.
-  title: {
-    absolute:
-      "Wedding Recon — Colorado wedding vendor prices, from the couples who asked",
-  },
+  title: { absolute: META.title },
   description: DESCRIPTION,
   // Query variants of `/` (?ref=app, campaign tags) must not split ranking
   // signals across URLs.
@@ -45,12 +46,12 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     siteName: "Wedding Recon",
-    title: "Wedding Recon — real Colorado wedding vendor prices",
+    title: META.socialTitle,
     description: DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Wedding Recon — real Colorado wedding vendor prices",
+    title: META.socialTitle,
     description: DESCRIPTION,
   },
 };
@@ -197,8 +198,8 @@ export default function LandingPage() {
         {/* Why it exists                                                     */}
         {/* ---------------------------------------------------------------- */}
         <Section className="border-y bg-muted/30">
-          <SectionHeading eyebrow="Why this exists">
-            Planning a wedding means paying for the same research over and over.
+          <SectionHeading eyebrow={WHY_SECTION.eyebrow}>
+            {WHY_SECTION.heading}
           </SectionHeading>
 
           <div className="mt-10 grid gap-8 sm:grid-cols-3 sm:gap-7">
@@ -234,8 +235,8 @@ export default function LandingPage() {
         {/* How it works                                                      */}
         {/* ---------------------------------------------------------------- */}
         <Section id="how-it-works">
-          <SectionHeading eyebrow="How it works">
-            Three things, on your phone, for free.
+          <SectionHeading eyebrow={HOW_SECTION.eyebrow}>
+            {HOW_SECTION.heading}
           </SectionHeading>
 
           <ol className="mt-10 grid gap-8 sm:grid-cols-3 sm:gap-7">
@@ -246,7 +247,7 @@ export default function LandingPage() {
                     <Icon className="size-5" aria-hidden />
                   </span>
                   <span className="font-heading text-sm font-semibold text-muted-foreground">
-                    Step {i + 1}
+                    {HOW_SECTION.stepLabel} {i + 1}
                   </span>
                 </div>
                 <h3 className="mt-4 font-heading text-base font-semibold">
@@ -264,12 +265,11 @@ export default function LandingPage() {
         {/* Categories — each tile deep-links Explore to that filter          */}
         {/* ---------------------------------------------------------------- */}
         <Section className="border-y bg-muted/30">
-          <SectionHeading eyebrow="What you can look up">
-            Every vendor a Colorado wedding needs.
+          <SectionHeading eyebrow={CATEGORIES_SECTION.eyebrow}>
+            {CATEGORIES_SECTION.heading}
           </SectionHeading>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Pick a category to open the map filtered to it. Colours and icons
-            are the same ones you will see on the pins.
+            {CATEGORIES_SECTION.intro}
           </p>
 
           <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -300,7 +300,7 @@ export default function LandingPage() {
         <Section>
           <div className="grid gap-10 md:grid-cols-[1fr_1fr] md:items-start md:gap-14">
             <div>
-              <SectionHeading eyebrow="Where we cover">
+              <SectionHeading eyebrow={COLORADO_SECTION.eyebrow}>
                 {COLORADO_SECTION.heading}
               </SectionHeading>
               {COLORADO_SECTION.body.map((paragraph) => (
@@ -330,19 +330,19 @@ export default function LandingPage() {
         {/* FAQ                                                               */}
         {/* ---------------------------------------------------------------- */}
         <Section id="faq" className="border-y bg-muted/30">
-          <SectionHeading eyebrow="Questions">
-            Before you start clicking around.
+          <SectionHeading eyebrow={FAQ_SECTION.eyebrow}>
+            {FAQ_SECTION.heading}
           </SectionHeading>
           <div className="mt-8">
             <LandingFaq />
           </div>
           <p className="mt-6 text-sm text-muted-foreground">
-            Something else on your mind?{" "}
+            {FAQ_SECTION.footerPrompt}{" "}
             <a
               href={`mailto:${CONTACT_EMAIL}`}
               className="font-medium text-brand-ink underline underline-offset-2"
             >
-              Email the person who built this
+              {FAQ_SECTION.footerLinkLabel}
             </a>
             .
           </p>

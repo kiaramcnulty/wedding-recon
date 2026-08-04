@@ -1,13 +1,13 @@
 import Link from "next/link";
 
 import { BrandLockup } from "@/components/brand-lockup";
-import { CONTACT_EMAIL } from "@/lib/landing/content";
+import { CONTACT_EMAIL, FOOTER } from "@/lib/landing/content";
 import { APP_HREF } from "@/lib/landing/nav";
 
 const PRODUCT_LINKS = [
-  { href: APP_HREF, label: "Explore the map" },
-  { href: "/add", label: "Add recon" },
-  { href: "/hub", label: "Planning Hub" },
+  { href: APP_HREF, label: FOOTER.exploreLabel },
+  { href: "/add", label: FOOTER.addReconLabel },
+  { href: "/hub", label: FOOTER.hubLabel },
 ] as const;
 
 export function LandingFooter() {
@@ -17,15 +17,14 @@ export function LandingFooter() {
         <div className="max-w-xs space-y-3">
           <BrandLockup size="md" showDomain />
           <p className="text-sm leading-relaxed text-muted-foreground">
-            A community directory of Colorado wedding vendors, built on the
-            price quotes and notes couples share with each other.
+            {FOOTER.blurb}
           </p>
         </div>
 
         <div className="flex gap-12 sm:gap-16">
           <div className="space-y-2.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Product
+              {FOOTER.productHeading}
             </p>
             <ul className="space-y-2 text-sm">
               {PRODUCT_LINKS.map((link) => (
@@ -43,7 +42,7 @@ export function LandingFooter() {
 
           <div className="space-y-2.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              About
+              {FOOTER.aboutHeading}
             </p>
             <ul className="space-y-2 text-sm">
               <li>
@@ -51,7 +50,7 @@ export function LandingFooter() {
                   href="/terms"
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Terms &amp; disclaimer
+                  {FOOTER.termsLabel}
                 </Link>
               </li>
               <li>
@@ -59,7 +58,7 @@ export function LandingFooter() {
                   href={`mailto:${CONTACT_EMAIL}`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Contact
+                  {FOOTER.contactLabel}
                 </a>
               </li>
             </ul>
@@ -69,9 +68,7 @@ export function LandingFooter() {
 
       <div className="border-t px-5 py-5">
         <p className="mx-auto w-full max-w-5xl text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Wedding Recon. Recon entries are personal
-          experiences shared by couples, not verified facts — always confirm
-          pricing and details with the vendor.
+          © {new Date().getFullYear()} Wedding Recon. {FOOTER.disclaimer}
         </p>
       </div>
     </footer>
