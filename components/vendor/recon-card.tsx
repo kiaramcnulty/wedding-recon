@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { Pencil } from "lucide-react";
+
 import { RECON_TYPE_LABELS } from "@/lib/constants/categories";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +21,44 @@ interface ReconCardProps {
   entry: ReconEntryWithDetails;
   /** True when the entry was authored by the current viewer. */
   isMine?: boolean;
+  /**
+   * Where "back" from the edit page should lead — the host vendor page's own
+   * URL, carrying its `from` so the return chain survives the round trip.
+   */
+  returnTo?: string;
+}
+
+/**
+ * "My recon · Edit" — one control on your own entry, so the badge that marks it
+ * yours is also the way into editing it. Replaces the report button there
+ * (reporting your own entry was never meaningful).
+ */
+function MyReconEditLink({
+  entry,
+  returnTo,
+}: {
+  entry: ReconEntryWithDetails;
+  returnTo?: string;
+}) {
+  return (
+    <Link
+      href={`/recon/${entry.id}/edit?from=${encodeURIComponent(returnTo ?? `/vendor/${entry.vendor_id}`)}`}
+      aria-label="Edit your recon"
+      // The badge stays badge-sized (~20px tall) but its TOUCH area is grown to
+      // ~44px with a transparent ::after — at 20px it was routinely missed on a
+      // phone, which reads as a dead button. Vertical-only so it never reaches
+      // a neighbouring control; the pill is already ~110px wide.
+      className="relative inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 after:absolute after:inset-x-0 after:-inset-y-3.5 after:content-['']"
+      style={{ backgroundColor: "#E1F5EE", color: "#085041" }}
+    >
+      My recon
+      <span aria-hidden className="opacity-40">
+        |
+      </span>
+      Edit
+      <Pencil className="size-3" />
+    </Link>
+  );
 }
 
 function getInitials(username: string): string {
@@ -29,7 +70,11 @@ function getInitials(username: string): string {
     .join("") || username.slice(0, 2).toUpperCase();
 }
 
-export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
+export async function ReconCard({
+  entry,
+  isMine = false,
+  returnTo,
+}: ReconCardProps) {
   const supabase = await createClient();
 
   const photos = entry.media.map((m) => ({
@@ -76,21 +121,16 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
   return (
     <Card className={cn(isMine && "border-primary/40 bg-primary/[0.05]")}>
       <CardHeader>
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Wraps rather than truncates: the username is the person's identity,
+            so the tags move to a second line before the name gets cut off. */}
+        <div className="flex flex-wrap items-center gap-2">
           <Avatar size="sm">
             <AvatarFallback>{getInitials(entry.author.username)}</AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium truncate">
+          <span className="text-sm font-medium break-words">
             {entry.author.username}
           </span>
-          {isMine && (
-            <Badge
-              className="shrink-0 border-transparent"
-              style={{ backgroundColor: "#E1F5EE", color: "#085041" }}
-            >
-              My recon
-            </Badge>
-          )}
+          {isMine && <MyReconEditLink entry={entry} returnTo={returnTo} />}
           <Badge variant="secondary" className="shrink-0">
             {typeLabel}
           </Badge>
@@ -100,9 +140,14 @@ export async function ReconCard({ entry, isMine = false }: ReconCardProps) {
             </Badge>
           )}
         </div>
-        <CardAction>
-          <ReportButton reconEntryId={entry.id} />
-        </CardAction>
+        {/* Only rendered for other people's entries — there is nothing to
+            report on yourself, and omitting the slot entirely (rather than
+            leaving it empty) lets the header use the full card width. */}
+        {!isMine && (
+          <CardAction>
+            <ReportButton reconEntryId={entry.id} />
+          </CardAction>
+        )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-2">

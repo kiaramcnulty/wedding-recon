@@ -41,12 +41,9 @@ LODGING and the economics of the block — not the wedding day, not event space.
   own vocabulary. That an entry's source material was hard to gather is invisible to the
   reader and must stay that way.
 
-## service_region — REQUIRED on every row
-- The area its guests are staying for, sourced: the property's city/metro is the normal
-  answer and an acceptable sourced fallback ("Denver area" from a Denver address). If the
-  dossier ties it to a particular wedding corridor ("Boulder / Flatirons", "downtown, walk
-  to Union Station"), prefer that narrower sourced region. Nothing at all → the run's state.
-  Never invent; never blank (upload hard-fails).
+## service_region — do not include
+- Hotels are a fixed property in one place, not a service-area vendor — omit this key
+  entirely (the type profile carries no `service_region` column for this type).
 
 ## What couples actually want captured
 - **Block type — lead with it when the dossier has it.** A **courtesy block** (rooms held,

@@ -16,11 +16,14 @@ These are shops where a BRIDE buys or orders a WEDDING GOWN (most also carry bri
   A bridal-PARTY-only shop (bridesmaids/flower-girl, no bride gowns) is a soft judgment call:
   draft normally, flag `NOTDRESS:` and note it's party-only.
 
-## service_region — REQUIRED on every row
-- Where they serve, sourced: site copy, stated appointment area. Narrowest sourced wins.
-  **A storefront's city/metro is an acceptable sourced fallback** ("Denver area" from a Denver
-  address) — most bridal shops are storefronts, so this is the common case. Nothing at all →
-  the run's state. Never invent a narrow region; never blank (upload hard-fails).
+## service_region — NOT USED for this type
+- Bridal shops are storefronts: the couple goes to them and returns for fittings, so there is
+  no area being served. **Do not emit a `service_region` key** — the column is absent from this
+  type's CSV and `upload.mjs` writes null regardless (Kiara, 2026-08-04). This used to be
+  required, filled with the shop's own city as a "fallback", which was the tell that it never
+  applied; migration `0030` nulled out the rows already written. Same rule as venues and hotels.
+- Where the shop IS still matters — it just belongs in the address, not a service region. If the
+  shop is worth a trip from elsewhere in the state, say so in the notes as a fact about the shop.
 
 ## What couples actually want captured
 - **Designers / labels carried** — the single most-searched fact for this type. Name the ones

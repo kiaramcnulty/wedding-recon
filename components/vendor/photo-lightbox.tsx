@@ -10,6 +10,13 @@ export interface LightboxPhoto {
   thumb: string;
   /** Full-size variant, fetched only when the photo is opened. */
   full: string;
+  /**
+   * Optional corner chip naming the photo's source, e.g. "Google". Deliberately
+   * a plain string rather than a ReactNode: these arrays are built in the vendor
+   * page (a Server Component) and handed to a client one, so keeping the field
+   * serializable avoids a needless client boundary.
+   */
+  badge?: string;
 }
 
 interface PhotoLightboxProps {
@@ -67,7 +74,10 @@ export function PhotoLightbox({
               type="button"
               onClick={() => setOpenIdx(i)}
               aria-label={`Open ${alt.toLowerCase()} ${i + 1}`}
-              className={cn("block shrink-0 cursor-zoom-in overflow-hidden", tileClassName)}
+              className={cn(
+                "relative block shrink-0 cursor-zoom-in overflow-hidden",
+                tileClassName,
+              )}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -82,6 +92,14 @@ export function PhotoLightbox({
                 }
                 className="h-full w-full object-cover"
               />
+              {p.badge && (
+                // Names the source per-tile, which is what lets photos of
+                // different provenance share one strip without the credit
+                // beneath it appearing to cover all of them.
+                <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white backdrop-blur-[2px]">
+                  {p.badge}
+                </span>
+              )}
             </button>
           ),
         )}

@@ -9,7 +9,10 @@ model, and a phased plan concrete enough for an agent to execute phase by phase.
   sourced negatives into free-text recon) is **complete** (PR #34, 2026-07-23).
 - The vendor-find slice of the unified search bar (§7 Phase A, "Shipped early") is
   **in production** — vendor name/address search + fly-to-pin on select, backed by
-  the `search_vendors` RPC (migration `0018`).
+  the `search_vendors` RPC (migration `0018`, token-aware in `0019`). Since
+  `0025` + `lib/search/vendors.ts` that RPC is the **single** vendor matcher: the
+  Add Recon business box searches through it too, so both bars match and rank
+  identically and the Phase 2 FTS swap upgrades both at once.
 
 All other sections remain unbuilt.
 
@@ -299,21 +302,49 @@ tooltip: "Consistently recommended in wedding communities and reviews."
 > `vendors` — didn't need the discovery stack, so a lightweight slice of this
 > phase now runs in production:
 > - `search_vendors` RPC (**migration `0018`**, ilike form; **migration `0019`**
->   makes it token-aware): matches `vendors` on **name + `address_text` +
->   `city`** and returns each hit's `lng`/`lat` flattened from the PostGIS
->   geography (same `st_x/st_y` trick as `vendors_in_bbox`), so the client can
->   fly to the pin. `0019` splits the query into tokens, drops stop words, and
->   requires **every** token to appear (AND) — so a leading article or reordered
->   words still matches ("the sanctuary" → "Sanctuary Golf Course"), without
->   loosening into fuzzy/typo territory (stop-word list mirrored in
->   `lib/search/tokens.ts`, which `/api/places` uses for the same fix).
->   Idempotent; **must be hand-applied in the Supabase SQL editor** like every
->   migration here — until it is, the route below degrades to no vendor results
->   (Areas group unaffected).
-> - `app/api/vendor-search/route.ts` — vendor-only autocomplete over that RPC,
->   ranked by the same name-relevance score as `/api/places`. No Google Places
->   call (Explore searches *our* directory; area nav stays with `/api/geocode`),
->   no `vendor_discovery`/FTS dependency.
+>   makes it token-aware; **migration `0025`** makes it the shared matcher;
+>   **migration `0026`** adds typo tolerance):
+>   matches `vendors` on **name + `address_text` + `city`** and returns each
+>   hit's `lng`/`lat` flattened from the PostGIS geography (same `st_x/st_y`
+>   trick as `vendors_in_bbox`), so the client can fly to the pin. `0019` splits
+>   the query into tokens, drops stop words, and requires **every** token to
+>   appear (AND) — so a leading article or reordered words still matches ("the
+>   sanctuary" → "Sanctuary Golf Course") — strictly, no fuzzy matching in this
+>   tier (stop-word list mirrored in `lib/search/tokens.ts`). `0025` adds
+>   `google_place_id` to the return and drops the `location is not null` filter
+>   (`lng`/`lat` nullable) so **the Add Recon box can call the same function**;
+>   it's a `drop function` + `create`, since a changed return shape can't go
+>   through `create or replace`. Idempotent; **must be hand-applied in the
+>   Supabase SQL editor** like every migration here — until `0018`/`0019` are,
+>   the route below degrades to no vendor results (Areas group unaffected); until
+>   `0025` is, Add Recon loses only the place_id dedup.
+>   `0026` adds a **second tier** that fires only when the strict tier returns
+>   nothing: `pg_trgm` `strict_word_similarity` over **name** at 0.35 (`0027`;
+>   plain `word_similarity` matched mid-word extents and pulled "The Farmhouse
+>   Luxury Salon" into a search for "sanctaury"), every token
+>   required to clear it (tokens under 4 chars still literal), ordered by the
+>   weakest token's similarity, capped at 5 rows — so "sanctaury" finds
+>   "Sanctuary Golf Course" while "sweet pea events" (a business we don't have)
+>   stays empty rather than guessing. Strict results are never reordered or
+>   diluted by it, and near-misses are flagged `fuzzy` and scored below every
+>   literal match, so a "did you mean" can't outrank what the user typed. The
+>   all-tokens-must-clear rule is what holds precision ("mountain view lodge"
+>   does not match "Spruce Mountain Ranch"). Plain `create or replace` — shape
+>   unchanged from `0025`, so no app code depends on it landing.
+>   Phase 2's FTS body should keep this tier (or fold it into `ts_rank`); the
+>   earlier "no fuzzy/typo" stance was about the strict tier, not a ban on a
+>   fallback.
+> - `app/api/vendor-search/route.ts` — vendor-only autocomplete over that RPC.
+>   No Google Places call (Explore searches *our* directory; area nav stays with
+>   `/api/geocode`), no `vendor_discovery`/FTS dependency.
+> - `lib/search/vendors.ts` (2026-07-29) — **the one vendor matcher**, shared by
+>   the Explore bar and the Add Recon box. Add Recon used to build its own
+>   per-token `ilike` chain over **name only**, with its own copy of the
+>   relevance scorer, so the same query behaved differently in the two boxes and
+>   every search fix had to land twice. Matching now lives only in the RPC and
+>   this module (query guard, RPC call, ranking); routes keep presentation
+>   (row count, fields, `requireCoords`, whether Google is blended). Phase 2's
+>   FTS swap therefore upgrades both bars at once.
 > - Explore bar fetches `/api/geocode` and `/api/vendor-search` in parallel and
 >   renders two groups — **Vendors** (category icon + name + address line) and
 >   **Areas**. Tap area → flyTo (unchanged); **tap vendor → flyTo its pin at zoom

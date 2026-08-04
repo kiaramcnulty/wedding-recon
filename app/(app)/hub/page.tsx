@@ -11,37 +11,45 @@ import { ProfileMenu } from "@/components/profile-menu";
 export default async function HubPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifies the JWT locally against the project's asymmetric
+  // signing keys; getUser() was a network round trip to the Auth server in
+  // front of everything else on the page. Writes still use getUser() — this is
+  // a read path, and RLS re-validates the token at the database regardless.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims.sub;
 
-  if (!user) {
+  if (!userId) {
     redirect("/login");
   }
 
-  // Fetch saved vendors (joined to vendor rows).
-  const { data: savedRows } = await supabase
-    .from("saved_vendors")
-    .select("vendor:vendors(*)")
-    .eq("user_id", user.id);
+  // These two are independent, so they go out together — run serially they
+  // stacked two full Supabase round trips onto every Hub render.
+  //
+  //   savedRows — the user's saved vendors, joined to their vendor rows.
+  //   reconRows — vendors they have already reconned, which decides whether a
+  //               card shows the "Add" button. Removed entries are excluded so
+  //               a moderator takedown does not resurface as recon the user
+  //               still has (flagged still counts). Editing lives on the recon
+  //               entry itself on the vendor page, not on these cards.
+  const [savedRes, reconRes] = await Promise.all([
+    supabase.from("saved_vendors").select("vendor:vendors(*)").eq("user_id", userId),
+    supabase
+      .from("recon_entries")
+      .select("vendor_id")
+      .eq("author_id", userId)
+      .neq("status", "removed"),
+  ]);
 
-  // Extract vendors from saved_vendors join result. Supabase returns the
-  // nested object as either an object or a single-item array depending on
-  // the RLS/schema setup — coerce safely.
-  const savedVendors: Vendor[] = (savedRows ?? []).flatMap((row) => {
+  // Supabase returns the nested object as either an object or a single-item
+  // array depending on the RLS/schema setup — coerce safely.
+  const savedVendors: Vendor[] = (savedRes.data ?? []).flatMap((row) => {
     const v = row.vendor;
     if (!v) return [];
     return Array.isArray(v) ? (v as Vendor[]) : [v as Vendor];
   });
 
-  // Fetch vendor_ids for which this user has authored recon entries.
-  const { data: reconRows } = await supabase
-    .from("recon_entries")
-    .select("vendor_id")
-    .eq("author_id", user.id);
-
   const authoredVendorIds = new Set<string>(
-    (reconRows ?? []).map((r) => r.vendor_id),
+    (reconRes.data ?? []).map((r) => r.vendor_id),
   );
 
   // Find authored vendor_ids not already in savedVendors.

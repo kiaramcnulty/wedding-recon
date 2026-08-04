@@ -71,6 +71,15 @@ const RESEARCH = new RegExp([
   /\b(couldn'?t|could not|can'?t|cannot) (access|reach|open|read) (the |their )?(site|page|website)\b/,
   /\bsite is (a )?dead link\b|\bper (their|the) (site|listing) copy\b/,
 ].map((r) => r.source).join('|'), 'i');
+// Literal line-break ESCAPES (backslash + n) where a real break was meant. Workers emit
+// one JSON object per row and the draft contract asks for `notes` on one logical line, so
+// a worker wanting a break between bullets writes the escape instead. readWorkerRows below
+// strips only REAL newlines, so it survives into the CSV and, before 2026-08-04, into the
+// DB — where the vendor card printed it as visible text mid-sentence.
+// Unlike the three regexes above this is NOT a gate: upload.mjs repairs it at insert
+// (unescapeBreaks) rather than failing, because the fix is unambiguous. It is counted here
+// so a batch that produces a lot of them is visible at the cheap pre-check.
+const ESCAPES = /\\{1,2}[rnt]/;
 // NO bullet-style check, deliberately — matches upload.mjs, see the note there. A
 // NOTESTYLE regex briefly flagged bullet-opening notes as scratchpad dumps; Kiara reversed
 // that on 2026-07-29: "the bullets are okay and encouraged, the variety is good." Mixed
@@ -350,7 +359,7 @@ function cmdStatus() {
   const { perFile } = readWorkerRows(`${batch}-worker-`);
   const i = (n) => HEADERS.indexOf(n);
   const drafted = new Set(); let total = 0, malformed = 0, badVid = 0, badBot = 0, noPrice = 0, banned = 0, dashes = 0, noRegion = 0;
-  let tells = 0, research = 0;
+  let tells = 0, research = 0, escapes = 0;
   const tellRows = [];
   for (const { file: f, rows, problems } of perFile) {
     malformed += problems.length;
@@ -369,13 +378,14 @@ function cmdStatus() {
       const t = text.match(PROCESS) || text.match(RESEARCH);
       if (t) { tells++; if (tellRows.length < 8) tellRows.push(`${r[i('venue')]} ("${t[0]}")`); }
       if (RESEARCH.test(text)) research++;
+      if (ESCAPES.test(text)) escapes++;
     }
     console.log(`  ${f}: ${rows.length} rows${problems.length ? ` | ${problems.length} unparseable JSON lines` : ''}`);
   }
   const missing = manifest.filter((m) => !drafted.has(`${m.vendor_id}|${m.bot}`));
   console.log(`\ndrafted ${drafted.size}/${manifest.length} entry slots | rows ${total} | malformed ${malformed} | bad vendor_id ${badVid} | bot mismatch ${badBot}`);
   console.log(`missing price fields ${noPrice} | banned phrases ${banned} | em-dashes ${dashes}${profile.serviceRegionRequired ? ` | missing service_region ${noRegion}` : ''}`);
-  console.log(`process-tells ${tells} | research-artifact narration ${research}`);
+  console.log(`process-tells ${tells} | research-artifact narration ${research} | literal line-break escapes ${escapes}${escapes ? ' (repaired at insert, not a gate)' : ''}`);
   // Both are voice failures the upload gate HARD-FAILS on. Fix them here, before merge,
   // not after. (Bullet-style notes are NOT a defect — see the note at the top.)
   if (tellRows.length) console.log(`  tells e.g.: ${tellRows.join('; ')}`);

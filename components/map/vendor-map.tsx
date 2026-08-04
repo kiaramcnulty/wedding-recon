@@ -11,6 +11,7 @@ import {
   pinImageId,
   clusterImageId,
 } from "@/lib/map/pin-images";
+import { isApproximateLocation } from "@/lib/map/vendor-location";
 
 // MapLibre is browser-only; import deferred to effects.
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -45,6 +46,80 @@ const pinLayerId = (t: VendorType) => `pins-${t}`;
 const CLUSTER_RADIUS = 50;
 const CLUSTER_MAX_ZOOM = 14;
 
+// Zoom at which pins start carrying their vendor's name. Set BELOW
+// CLUSTER_MAX_ZOOM so names appear earlier on the way in, while cluster bubbles
+// are still around. That's safe because the pin layer is filtered to
+// unclustered points (`["!", ["has", "point_count"]]`), so anything wearing a
+// label is a single vendor either way — a label can never be mistaken for a
+// group's. What it costs is density: at these zooms the survivors are the
+// isolated pins between clusters, and `text-optional` + no-overlap collide-drops
+// the rest, so a crowded area quietly shows fewer names rather than a mess.
+// Still at/below the zoom a vendor search flies to, so a searched pin arrives
+// named.
+const LABEL_MIN_ZOOM = 12;
+
+// Bottom strip of the map the open preview card sits over (the card plus the
+// control row and attribution gap beneath it). A tapped pin landing inside it
+// gets panned up so the card never covers the pin it describes.
+const PREVIEW_SAFE_PX = 300;
+
+// How many on-screen vendors the map hands to the "see all results" list. The
+// full count is always reported (the pill must not lie), but the id list is
+// capped: the list sheet's preview fetch puts every id in one PostgREST `in.()`
+// filter, and a few thousand uuids would blow past the URL limit long before the
+// feed became browsable. The nearest-to-center rows are kept, so zooming out
+// past the cap degrades to "the closest N" rather than an arbitrary subset.
+const MAX_VISIBLE_ENTRIES = 200;
+
+// Label sizes: the selected pin's name is set larger than its neighbours', and
+// offset further down to clear its bigger disc (offsets are in ems of text-size).
+const LABEL_SIZE = 11;
+const SELECTED_LABEL_SIZE = 13;
+const LABEL_OFFSET: [number, number] = [0, 1.7];
+const SELECTED_LABEL_OFFSET: [number, number] = [0, 2];
+
+type Expr = import("maplibre-gl").ExpressionSpecification;
+
+/** `["case", <feature is the selected vendor>, whenSelected, otherwise]`. */
+function whenSelected(selectedId: string, whenTrue: unknown, whenFalse: unknown) {
+  return ["case", ["==", ["get", "id"], selectedId], whenTrue, whenFalse] as Expr;
+}
+
+/**
+ * The layout properties that depend on which vendor's preview is open. The pin
+ * whose card is showing swaps to its emphasized image (bigger disc + a ring — see
+ * `pin-images.ts`) and gets a larger name label at ANY zoom, so it's obvious which
+ * pin the card belongs to. Every other pin keeps the plain treatment.
+ *
+ * `text-field` carries the zoom rule too: the name shows from LABEL_MIN_ZOOM up,
+ * and below that only for the selected pin. The zoom test sits at the OUTERMOST
+ * level, which is what lets a layout property mix zoom with a per-feature lookup.
+ */
+function selectionLayout(selectedId: string | null) {
+  return {
+    "icon-image": selectedId
+      ? whenSelected(selectedId, ["get", "iconSelected"], ["get", "icon"])
+      : (["get", "icon"] as Expr),
+    "text-field": [
+      "step",
+      ["zoom"],
+      selectedId ? whenSelected(selectedId, ["get", "name"], "") : "",
+      LABEL_MIN_ZOOM,
+      ["get", "name"],
+    ] as Expr,
+    "text-size": selectedId
+      ? whenSelected(selectedId, SELECTED_LABEL_SIZE, LABEL_SIZE)
+      : LABEL_SIZE,
+    "text-offset": selectedId
+      ? whenSelected(
+          selectedId,
+          ["literal", SELECTED_LABEL_OFFSET],
+          ["literal", LABEL_OFFSET],
+        )
+      : LABEL_OFFSET,
+  };
+}
+
 // Co-located type-clusters (e.g. venues + photographers downtown) would stack on
 // top of each other. Give each type a small fixed screen offset arranged on a
 // ring, so overlapping type-clusters splay into a tidy rosette instead of piling
@@ -77,22 +152,9 @@ function bucketType(vendorType: string): VendorType {
     : "other";
 }
 
-/**
- * Heuristic: does this vendor's pin sit on an *approximate* (city/region
- * centroid) location rather than a precise street address?
- *
- * Google-sourced vendors carry rooftop-precise coordinates. For user/seed
- * vendors we treat the absence of a street/building number in the address as
- * "approximate" — a city or region geocode (e.g. "Denver, Colorado") has no
- * house number, whereas a real address does. This is intentionally a front-end
- * heuristic so it works on existing rows; if we later capture geocode precision
- * at save time (Nominatim bbox / addresstype), swap this for that field.
- */
-function isApproximateLocation(vendor: Vendor): boolean {
-  if (vendor.source === "google" || vendor.google_place_id) return false;
-  const addr = (vendor.address_text ?? "").trim();
-  return !/\d/.test(addr);
-}
+// The approximate-location heuristic that drives the dashed pin outline lives in
+// lib/map/vendor-location.ts — the vendor page's mini-map draws the same pin and
+// has to reach the same verdict.
 
 // Deterministic "fan out" for pins that share an (approximate) coordinate.
 // Identical centroids never separate under plain clustering, so we scatter a
@@ -150,14 +212,15 @@ function resolveDisplayPositions(
 }
 
 /**
- * Bucket vendors into one GeoJSON FeatureCollection per type. Positions are
- * resolved globally (so cross-type co-located pins still separate) then split by
- * type for the per-type clustered sources.
+ * Bucket vendors into one GeoJSON FeatureCollection per type, using the
+ * already-resolved display positions (resolved globally, so cross-type
+ * co-located pins still separate) split by type for the per-type clustered
+ * sources.
  */
 function buildFeatureCollectionsByType(
   vendors: Vendor[],
+  positions: Map<string, { lng: number; lat: number }>,
 ): Record<VendorType, GeoJSON.FeatureCollection> {
-  const positions = resolveDisplayPositions(vendors);
   const byType = Object.fromEntries(
     VENDOR_TYPES.map((t) => [
       t,
@@ -174,7 +237,10 @@ function buildFeatureCollectionsByType(
       geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
       properties: {
         id: vendor.id,
+        name: vendor.name,
         icon: pinImageId(t, isApproximateLocation(vendor)),
+        // Emphasized variant, swapped in while this vendor's preview is open.
+        iconSelected: pinImageId(t, isApproximateLocation(vendor), true),
       },
     });
   }
@@ -193,6 +259,28 @@ export interface ClusterOpenPayload {
   zoom: number;
 }
 
+/** Emitted when an individual (non-cluster) vendor pin is tapped. */
+export interface VendorOpenPayload {
+  id: string;
+  vendorType: VendorType;
+}
+
+/** One vendor currently inside the viewport, in the "see all results" list. */
+export interface VisibleVendor {
+  id: string;
+  vendorType: VendorType;
+}
+
+/**
+ * What's on screen right now, after the type filter: the true `total`, and the
+ * (capped, nearest-center-first) rows a list can actually render. `total` drives
+ * the results pill; `entries` is what the list sheet opens on.
+ */
+export interface VisibleVendorsPayload {
+  total: number;
+  entries: VisibleVendor[];
+}
+
 interface VendorMapProps {
   /** External position to fly to. Pass zoom to override the default (14). */
   flyToPosition?: { lng: number; lat: number; zoom?: number } | null;
@@ -203,6 +291,21 @@ interface VendorMapProps {
    * provided, a cluster tap opens this list instead of zooming in.
    */
   onClusterOpen?: (payload: ClusterOpenPayload) => void;
+  /**
+   * Called when a single vendor pin is tapped. When provided, the tap surfaces a
+   * preview (the caller's job) instead of navigating straight to the vendor page.
+   */
+  onVendorOpen?: (payload: VendorOpenPayload) => void;
+  /**
+   * Called on a tap that hits no pin and no cluster — i.e. empty map. Lets the
+   * caller dismiss an open preview the way Zillow does.
+   */
+  onBackgroundTap?: () => void;
+  /**
+   * The vendor whose preview is open. Its pin is enlarged and keeps its name
+   * label at any zoom, so the card is visibly tied to a pin.
+   */
+  selectedVendorId?: string | null;
   /**
    * Called after every map move settles, with the new center/zoom. The caller
    * persists it so returning to Explore — by any route: in-app back, browser/OS
@@ -220,21 +323,38 @@ interface VendorMapProps {
    * source + layers.
    */
   selectedTypes?: VendorType[];
+  /**
+   * Called whenever the set of vendors inside the viewport changes — on every
+   * settled move, after new rows land, and when the type filter changes. Drives
+   * the "see all N results on screen" pill and the list it opens.
+   */
+  onVisibleVendorsChange?: (payload: VisibleVendorsPayload) => void;
 }
 
 export function VendorMap({
   flyToPosition,
   userPosition,
   onClusterOpen,
+  onVendorOpen,
+  onBackgroundTap,
+  selectedVendorId,
   onViewChange,
   initialView,
   selectedTypes,
+  onVisibleVendorsChange,
 }: VendorMapProps) {
   const router = useRouter();
   // Latest onClusterOpen, callable from the run-once init effect's handlers.
   const onClusterOpenRef = useRef(onClusterOpen);
+  // Latest pin-tap / empty-map-tap handlers, same reason.
+  const onVendorOpenRef = useRef(onVendorOpen);
+  const onBackgroundTapRef = useRef(onBackgroundTap);
   // Latest onViewChange, same reason (init effect wires the moveend handler once).
   const onViewChangeRef = useRef(onViewChange);
+  // Latest on-screen-vendors handler, same reason.
+  const onVisibleVendorsChangeRef = useRef(onVisibleVendorsChange);
+  // Latest selection, read by the init effect once the pin layers first exist.
+  const selectedVendorIdRef = useRef(selectedVendorId);
   // Captured once — the map reads center/zoom at init only.
   const initialViewRef = useRef(initialView);
   // Latest type filter, read by the init effect once the layers first exist.
@@ -245,6 +365,16 @@ export function VendorMap({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userMarkerRef = useRef<any>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Rows from the last applied fetch plus their resolved display positions —
+  // kept so "what's on screen" can be answered from memory on every move, with
+  // no refetch and no dependence on what MapLibre happens to have rasterized.
+  const vendorsRef = useRef<Vendor[]>([]);
+  const positionsRef = useRef<Map<string, { lng: number; lat: number }>>(
+    new Map(),
+  );
+  // Identity of the last emitted visible set, so an idle pan that changes
+  // nothing doesn't push a new array (and a re-render) at the page.
+  const lastVisibleKeyRef = useRef<string | null>(null);
   // Area covered by the last *complete* fetch. When the viewport stays inside
   // it, the pins on the map are already correct — skip the refetch.
   const coverageRef = useRef<{
@@ -264,8 +394,17 @@ export function VendorMap({
   // the latest callbacks (updating a ref during render is disallowed).
   useEffect(() => {
     onClusterOpenRef.current = onClusterOpen;
+    onVendorOpenRef.current = onVendorOpen;
+    onBackgroundTapRef.current = onBackgroundTap;
     onViewChangeRef.current = onViewChange;
-  }, [onClusterOpen, onViewChange]);
+    onVisibleVendorsChangeRef.current = onVisibleVendorsChange;
+  }, [
+    onClusterOpen,
+    onVendorOpen,
+    onBackgroundTap,
+    onViewChange,
+    onVisibleVendorsChange,
+  ]);
 
   /**
    * Query the RPC for the current bounds. Returns the vendor rows, or null when
@@ -329,15 +468,75 @@ export function VendorMap({
     return vendors;
   }, [supabase]);
 
-  /** Push vendor rows into the per-type clustered sources. */
-  const applyVendors = useCallback((vendors: Vendor[]) => {
+  /**
+   * Report every vendor currently inside the viewport, after the type filter —
+   * the pill's count and the list it opens.
+   *
+   * Answered from the rows we already hold (`vendorsRef`) against the map's
+   * current bounds, using each pin's *display* position, so what's counted is
+   * exactly what's drawn (fanned-out pins included). Deliberately NOT
+   * `queryRenderedFeatures`: that answers "what's rasterized", which collapses
+   * clusters and misses pins just outside the painted tiles.
+   *
+   * Reads everything from refs, so it's stable enough for the run-once init
+   * effect to call from its own handlers.
+   */
+  const reportVisibleVendors = useCallback(() => {
     const map = mapRef.current;
-    if (!map) return;
-    const byType = buildFeatureCollectionsByType(vendors);
-    for (const t of VENDOR_TYPES) {
-      map.getSource(srcId(t))?.setData(byType[t]);
+    const notify = onVisibleVendorsChangeRef.current;
+    if (!map || !notify) return;
+
+    const bounds = map.getBounds();
+    const center = map.getCenter();
+    const cosLat = Math.cos((center.lat * Math.PI) / 180);
+    const sel = selectedTypesRef.current ?? [];
+    const showAll = sel.length === 0;
+
+    const inView: { id: string; vendorType: VendorType; d: number }[] = [];
+    for (const v of vendorsRef.current) {
+      const vendorType = bucketType(v.vendor_type);
+      if (!showAll && !sel.includes(vendorType)) continue;
+      const pos = positionsRef.current.get(v.id);
+      if (!pos) continue; // no coordinates — never drawn, so never "on screen"
+      if (!bounds.contains([pos.lng, pos.lat])) continue;
+      // Squared distance from center, longitude scaled to match latitude at this
+      // latitude. Only used for ordering, so no need for a real geodesic.
+      const dx = (pos.lng - center.lng) * cosLat;
+      const dy = pos.lat - center.lat;
+      inView.push({ id: v.id, vendorType, d: dx * dx + dy * dy });
     }
+
+    // Nearest the center first: the closest rows are the ones the user is
+    // looking at, and they're the ones kept when the list hits its cap.
+    inView.sort((a, b) => a.d - b.d);
+    const entries: VisibleVendor[] = inView
+      .slice(0, MAX_VISIBLE_ENTRIES)
+      .map(({ id, vendorType }) => ({ id, vendorType }));
+
+    const key = `${inView.length}|${entries.map((e) => e.id).join(",")}`;
+    if (key === lastVisibleKeyRef.current) return; // nothing changed
+    lastVisibleKeyRef.current = key;
+    notify({ total: inView.length, entries });
   }, []);
+
+  /** Push vendor rows into the per-type clustered sources. */
+  const applyVendors = useCallback(
+    (vendors: Vendor[]) => {
+      const map = mapRef.current;
+      if (!map) return;
+      const positions = resolveDisplayPositions(vendors);
+      const byType = buildFeatureCollectionsByType(vendors, positions);
+      for (const t of VENDOR_TYPES) {
+        map.getSource(srcId(t))?.setData(byType[t]);
+      }
+      // Retain the rows behind the pins so the on-screen list can be recomputed
+      // on any move without going back to the network.
+      vendorsRef.current = vendors;
+      positionsRef.current = positions;
+      reportVisibleVendors();
+    },
+    [reportVisibleVendors],
+  );
 
   const refreshMarkers = useCallback(async () => {
     const vendors = await fetchVendors();
@@ -385,7 +584,34 @@ export function VendorMap({
   useEffect(() => {
     selectedTypesRef.current = selectedTypes;
     applyTypeFilter();
-  }, [selectedTypes, applyTypeFilter]);
+    // The filter changes what's on screen, so the results pill/list move with it.
+    reportVisibleVendors();
+  }, [selectedTypes, applyTypeFilter, reportVisibleVendors]);
+
+  /**
+   * Mark the vendor whose preview card is open: its pin is bumped up a size and
+   * labelled at any zoom. Both are layout expressions on the existing pin layers,
+   * so a selection change is two setLayoutProperty calls per type — no new
+   * layers, images, or sources. Reads from a ref for the same reason
+   * applyTypeFilter does (the run-once init effect calls it after adding layers).
+   */
+  const applySelection = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const layout = selectionLayout(selectedVendorIdRef.current ?? null);
+    for (const t of VENDOR_TYPES) {
+      const layer = pinLayerId(t);
+      if (!map.getLayer(layer)) continue; // layers not added yet (still loading)
+      for (const [prop, value] of Object.entries(layout)) {
+        map.setLayoutProperty(layer, prop, value);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    selectedVendorIdRef.current = selectedVendorId;
+    applySelection();
+  }, [selectedVendorId, applySelection]);
 
   // Initialize the map once on mount.
   useEffect(() => {
@@ -438,6 +664,10 @@ export function VendorMap({
         if (!mapRef.current) return; // unmounted mid-load
 
         // Individual vendor pins (added first so cluster bubbles sit on top).
+        // From LABEL_MIN_ZOOM up each pin also carries its vendor's name beneath
+        // it. Labels collide-drop (`text-optional` + no overlap) so a dense block
+        // shows as many names as fit and NEVER hides a pin: the icon ignores
+        // placement entirely, so only the text can be dropped.
         for (const t of VENDOR_TYPES) {
           map.addLayer({
             id: pinLayerId(t),
@@ -445,9 +675,28 @@ export function VendorMap({
             source: srcId(t),
             filter: ["!", ["has", "point_count"]],
             layout: {
-              "icon-image": ["get", "icon"],
+              // icon-image / text-field / text-size / text-offset all depend on
+              // the current selection — see selectionLayout + applySelection.
+              ...selectionLayout(selectedVendorIdRef.current ?? null),
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
+              "text-font": ["Noto Sans Regular"],
+              // Anchored top; the offsets are in ems of text-size, so a label
+              // keeps clearing its disc if either size is ever changed.
+              "text-anchor": "top",
+              "text-max-width": 9,
+              "text-padding": 2,
+              "text-allow-overlap": false,
+              "text-ignore-placement": false,
+              "text-optional": true,
+            },
+            paint: {
+              // Dark text in a white casing — legible on the light basemap
+              // regardless of the app's own light/dark theme.
+              "text-color": "#1f2937",
+              "text-halo-color": "#ffffff",
+              "text-halo-width": 1.5,
+              "text-halo-blur": 0.5,
             },
           });
         }
@@ -533,8 +782,29 @@ export function VendorMap({
           });
 
           map.on("click", pins, (e) => {
-            const id = e.features?.[0]?.properties?.id;
-            if (typeof id === "string") router.push(`/vendor/${id}`);
+            const feature = e.features?.[0];
+            if (!feature) return;
+            const id = feature.properties?.id;
+            if (typeof id !== "string") return;
+
+            // No preview handler wired up → straight to the vendor page (the
+            // original behavior, kept for any other consumer of this map).
+            const onOpen = onVendorOpenRef.current;
+            if (!onOpen) {
+              router.push(`/vendor/${id}`);
+              return;
+            }
+
+            onOpen({ id, vendorType: t });
+
+            // The preview card covers the bottom of the map; if the tapped pin
+            // sits behind it, pan just enough to bring it back into view.
+            const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
+            const point = map.project([lng, lat]);
+            const safeBottom = map.getCanvas().clientHeight - PREVIEW_SAFE_PX;
+            if (point.y > safeBottom) {
+              map.panBy([0, point.y - safeBottom], { duration: 300 });
+            }
           });
 
           for (const layer of [clusters, pins]) {
@@ -547,6 +817,21 @@ export function VendorMap({
           }
         }
 
+        // A tap that hits neither a pin nor a cluster is a tap on empty map —
+        // report it so an open preview can dismiss. Hidden layers (filtered-out
+        // types) render nothing, so they can't keep a preview alive.
+        map.on("click", (e) => {
+          const onTap = onBackgroundTapRef.current;
+          if (!onTap) return;
+          const layers = [
+            ...VENDOR_TYPES.map(pinLayerId),
+            ...VENDOR_TYPES.map(clusterLayerId),
+          ].filter((l) => map.getLayer(l));
+          if (map.queryRenderedFeatures(e.point, { layers }).length === 0) {
+            onTap();
+          }
+        });
+
         const vendors = await firstData;
         if (vendors) applyVendors(vendors);
         setLoading(false); // first load done — reveal the map
@@ -558,6 +843,10 @@ export function VendorMap({
         // view so the page can persist it for restore-on-return.
         map.on("moveend", () => {
           scheduleRefresh();
+          // Recount immediately off the rows already in hand, rather than
+          // waiting on the (debounced, often cache-hit) refetch — the pill has
+          // to track the viewport as it moves.
+          reportVisibleVendors();
           const c = map.getCenter();
           onViewChangeRef.current?.({
             center: [c.lng, c.lat],

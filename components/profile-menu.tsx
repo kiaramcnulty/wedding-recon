@@ -56,24 +56,27 @@ export function ProfileMenu({ className }: { className?: string }) {
     let active = true;
     (async () => {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // getClaims() verifies the JWT locally (the project uses asymmetric
+      // signing keys), where getUser() was a network round trip to the Auth
+      // server — paid on every page this menu renders on, which is nearly all
+      // of them, and serially in front of the profile query below.
+      const { data: claimsData } = await supabase.auth.getClaims();
       if (!active) return;
-      if (!user) {
+      const claims = claimsData?.claims;
+      if (!claims?.sub) {
         setAuth({ status: "guest" });
         return;
       }
       const { data: profile } = await supabase
         .from("profiles")
         .select("username")
-        .eq("id", user.id)
+        .eq("id", claims.sub)
         .maybeSingle();
       if (!active) return;
       setAuth({
         status: "user",
         username: profile?.username ?? "You",
-        email: user.email ?? "",
+        email: typeof claims.email === "string" ? claims.email : "",
       });
     })();
     return () => {

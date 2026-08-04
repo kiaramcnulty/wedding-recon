@@ -5,10 +5,26 @@ import { Search, Loader2, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { VendorMap, type ClusterOpenPayload } from "@/components/map/vendor-map";
+import {
+  VendorMap,
+  type ClusterOpenPayload,
+  type VendorOpenPayload,
+  type VisibleVendorsPayload,
+} from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
+import {
+  VendorListSheet,
+  type VendorListEntry,
+} from "@/components/map/vendor-list-sheet";
+import { ScreenResultsPill } from "@/components/map/screen-results-pill";
+import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import { VendorTypeFilter } from "@/components/map/vendor-type-filter";
-import { CATEGORIES, VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
+import {
+  CATEGORIES,
+  CATEGORY_PLURAL,
+  VENDOR_TYPES,
+  type VendorType,
+} from "@/lib/constants/categories";
 import { BrandLockup } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { cn } from "@/lib/utils";
@@ -43,6 +59,35 @@ const MAP_TILE_ORIGIN = (() => {
   }
 })();
 
+/** The open "results on screen" list — frozen at the moment it was opened. */
+interface ScreenList {
+  /** True on-screen count, which can exceed `entries` when the map caps the list. */
+  total: number;
+  entries: VendorListEntry[];
+}
+
+/**
+ * Title for the on-screen results feed. Names the category when the list is
+ * unambiguously one type — either the user filtered to exactly one, or every
+ * row in a complete (uncapped) list happens to share one — and stays generic
+ * otherwise. A capped list can't speak for the types it didn't include.
+ */
+function screenListHeading(
+  list: ScreenList,
+  selectedTypes: VendorType[],
+): string {
+  if (list.total === 1) return "1 result on screen";
+  const complete = list.entries.length === list.total;
+  const listTypes = new Set(list.entries.map((e) => e.vendorType));
+  const soleType =
+    selectedTypes.length === 1
+      ? selectedTypes[0]
+      : complete && listTypes.size === 1
+        ? [...listTypes][0]
+        : null;
+  return `${list.total} ${soleType ? CATEGORY_PLURAL[soleType] : "results"} on screen`;
+}
+
 export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
@@ -55,6 +100,19 @@ export default function ExplorePage() {
   // The open cluster list (null = closed). Opened on a cluster tap, or restored
   // when returning from a vendor page (?restore=1).
   const [cluster, setCluster] = useState<{ ids: string[]; vendorType: VendorType } | null>(null);
+  // The single vendor whose peek card is open (null = closed). Opened on a pin
+  // tap, restored on return from the vendor page (?restore=1) like the cluster.
+  const [pin, setPin] = useState<{ id: string; vendorType: VendorType } | null>(null);
+  // Everything the map is currently showing, after the type filter — the live
+  // count behind the results pill, plus the rows its list opens on.
+  const [visible, setVisible] = useState<VisibleVendorsPayload>({
+    total: 0,
+    entries: [],
+  });
+  // The open "results on screen" list (null = closed). A frozen snapshot: the
+  // sheet is modal, so the map can't move underneath it, and a list that
+  // reshuffled mid-scroll would be unusable.
+  const [screenList, setScreenList] = useState<ScreenList | null>(null);
   // Selected vendor-type filter (empty = show all). Starts empty so the first
   // client render matches the server; any persisted selection is restored after
   // mount (see below) to avoid a hydration mismatch on the chip states.
@@ -92,11 +150,67 @@ export default function ExplorePage() {
       );
       // Fresh cluster → open at the top (drop any saved feed scroll position).
       sessionStorage.removeItem("wr:clusterScroll");
+      // The map previews are mutually exclusive; only one can be restored.
+      sessionStorage.removeItem("wr:pin");
+      sessionStorage.removeItem("wr:screen");
     } catch {
       // sessionStorage unavailable (e.g. private mode) — the sheet still opens;
       // only reopen-on-back is lost.
     }
+    setPin(null);
+    setScreenList(null);
     setCluster({ ids: payload.ids, vendorType: payload.vendorType });
+  }, []);
+
+  // The results pill: freeze what's on screen right now and open it as a feed.
+  // Persisted like the cluster so the list survives a round trip to a vendor
+  // page — recomputing it on return would race the map's first fetch.
+  const openScreenList = useCallback(() => {
+    const list: ScreenList = { total: visible.total, entries: visible.entries };
+    if (list.entries.length === 0) return;
+    try {
+      sessionStorage.setItem("wr:screen", JSON.stringify(list));
+      sessionStorage.removeItem("wr:screenScroll");
+      sessionStorage.removeItem("wr:cluster");
+      sessionStorage.removeItem("wr:pin");
+    } catch {
+      // sessionStorage unavailable — the sheet still opens.
+    }
+    setPin(null);
+    setCluster(null);
+    setScreenList(list);
+  }, [visible]);
+
+  const closeScreenList = useCallback(() => {
+    try {
+      sessionStorage.removeItem("wr:screen");
+    } catch {
+      // nothing persisted to clear
+    }
+    setScreenList(null);
+  }, []);
+
+  // A single pin tap peeks the vendor rather than navigating — persisted the same
+  // way the cluster is, so returning from the vendor page reopens the card.
+  const openPin = useCallback((payload: VendorOpenPayload) => {
+    try {
+      sessionStorage.setItem("wr:pin", JSON.stringify(payload));
+      sessionStorage.removeItem("wr:cluster");
+      sessionStorage.removeItem("wr:screen");
+    } catch {
+      // sessionStorage unavailable — the card still opens.
+    }
+    setScreenList(null);
+    setPin({ id: payload.id, vendorType: payload.vendorType });
+  }, []);
+
+  const closePin = useCallback(() => {
+    try {
+      sessionStorage.removeItem("wr:pin");
+    } catch {
+      // nothing persisted to clear
+    }
+    setPin(null);
   }, []);
 
   // Persist the map view on every settled move, so returning to Explore restores
@@ -152,29 +266,58 @@ export default function ExplorePage() {
     return () => clearTimeout(t);
   }, []);
 
-  // On a restore mount, reopen the cluster sheet from the saved payload. The
-  // setState is deferred a tick (setTimeout 0) — the documented pattern for
-  // updating state from an effect without tripping set-state-in-effect, and it
-  // also lands the portal post-hydration so it never diffs against server HTML.
+  // On a restore mount, reopen whichever preview was showing — the cluster
+  // sheet, the on-screen results list, or a single pin's card — from its saved
+  // payload. The setState is deferred a tick (setTimeout 0) — the documented
+  // pattern for updating state from an effect without tripping
+  // set-state-in-effect, and it also lands the portal post-hydration so it never
+  // diffs against server HTML.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!new URLSearchParams(window.location.search).has("restore")) return;
-    let restored: { ids: string[]; vendorType: VendorType } | null = null;
+    let restoredCluster: { ids: string[]; vendorType: VendorType } | null = null;
+    let restoredPin: { id: string; vendorType: VendorType } | null = null;
+    let restoredScreen: ScreenList | null = null;
     try {
       const raw = sessionStorage.getItem("wr:cluster");
       if (raw) {
         const d = JSON.parse(raw) as { ids?: string[]; vendorType?: VendorType };
         if (d.ids?.length && d.vendorType) {
-          restored = { ids: d.ids, vendorType: d.vendorType };
+          restoredCluster = { ids: d.ids, vendorType: d.vendorType };
+        }
+      }
+      const rawPin = sessionStorage.getItem("wr:pin");
+      if (rawPin) {
+        const d = JSON.parse(rawPin) as { id?: string; vendorType?: VendorType };
+        if (d.id && d.vendorType) {
+          restoredPin = { id: d.id, vendorType: d.vendorType };
+        }
+      }
+      const rawScreen = sessionStorage.getItem("wr:screen");
+      if (rawScreen) {
+        const d = JSON.parse(rawScreen) as Partial<ScreenList>;
+        if (d.entries?.length && typeof d.total === "number") {
+          restoredScreen = { total: d.total, entries: d.entries };
         }
       }
     } catch {
       // ignore a malformed payload — the user just lands on the map
     }
-    // Drop the marker so later in-page navigation doesn't re-trigger a restore.
-    window.history.replaceState(null, "", "/explore");
-    if (!restored) return;
-    const t = setTimeout(() => setCluster(restored), 0);
+    if (!restoredCluster && !restoredPin && !restoredScreen) {
+      // Nothing to reopen — still drop the marker so a later in-page navigation
+      // doesn't re-trigger a restore.
+      window.history.replaceState(null, "", "/explore");
+      return;
+    }
+    const t = setTimeout(() => {
+      if (restoredCluster) setCluster(restoredCluster);
+      else if (restoredScreen) setScreenList(restoredScreen);
+      else setPin(restoredPin);
+      // Consumed together with the restore, NOT before it: in development React
+      // mounts twice, and the first pass's cleanup cancels this timeout. Dropping
+      // the marker up front would leave the second pass with nothing to restore.
+      window.history.replaceState(null, "", "/explore");
+    }, 0);
     return () => clearTimeout(t);
   }, []);
 
@@ -323,9 +466,13 @@ export default function ExplorePage() {
           flyToPosition={flyTo}
           userPosition={userPosition}
           onClusterOpen={openCluster}
+          onVendorOpen={openPin}
+          onBackgroundTap={closePin}
+          selectedVendorId={pin?.id ?? null}
           onViewChange={saveMapView}
           initialView={initialView}
           selectedTypes={selectedTypes}
+          onVisibleVendorsChange={setVisible}
         />
       </div>
 
@@ -335,6 +482,22 @@ export default function ExplorePage() {
           ids={cluster.ids}
           vendorType={cluster.vendorType}
           onClose={() => setCluster(null)}
+        />
+      )}
+
+      {/* Everything on screen, as one feed (portals to <body>; opens on the
+          results pill). Same sheet as the cluster feed, but mixed-type. */}
+      {screenList && (
+        <VendorListSheet
+          entries={screenList.entries}
+          heading={screenListHeading(screenList, selectedTypes)}
+          scrollKey="wr:screenScroll"
+          footnote={
+            screenList.entries.length < screenList.total
+              ? `Showing the ${screenList.entries.length} closest to the center of the map. Zoom in to see the rest.`
+              : undefined
+          }
+          onClose={closeScreenList}
         />
       )}
 
@@ -469,25 +632,52 @@ export default function ExplorePage() {
         <VendorTypeFilter selected={selectedTypes} onChange={updateSelectedTypes} />
       </div>
 
-      {/* Bottom row over the map, lifted clear of the map attribution along
-          the bottom edge: quiet brand mark on the left, locate button right. */}
-      <div className="relative z-10 mt-auto flex items-end justify-between px-3 pb-9 pt-3">
-        <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
-          <BrandLockup size="sm" />
+      {/* Live count of what the map is showing, and the way into the full list.
+          The row is click-through (only the pill itself takes taps) so it can't
+          steal a pin tap from the map band behind it. */}
+      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] justify-center px-3 pt-2">
+        <ScreenResultsPill
+          total={visible.total}
+          onClick={openScreenList}
+          className="pointer-events-auto"
+        />
+      </div>
+
+      {/* Bottom stack over the map: the single-pin peek card (Zillow-style) sits
+          on top of the control row, so the brand mark and locate button stay
+          reachable beneath it rather than being pushed above the card. In the
+          flow, so it sits above the bottom nav and pushes nothing around. */}
+      <div className="relative z-10 mt-auto">
+        {pin && (
+          <div className="mx-auto w-full max-w-[480px] px-3">
+            <VendorPinPreview
+              vendorId={pin.id}
+              vendorType={pin.vendorType}
+              onClose={closePin}
+            />
+          </div>
+        )}
+
+        {/* Control row, lifted clear of the map attribution along the bottom
+            edge: quiet brand mark on the left, locate button right. */}
+        <div className="flex items-end justify-between px-3 pb-9 pt-3">
+          <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
+            <BrandLockup size="sm" />
+          </div>
+          <button
+            type="button"
+            onClick={handleLocate}
+            disabled={locating}
+            aria-label="Center map on my location"
+            className="flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
+          >
+            {locating ? (
+              <Loader2 size={20} className="animate-spin" aria-hidden />
+            ) : (
+              <Navigation size={20} aria-hidden />
+            )}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleLocate}
-          disabled={locating}
-          aria-label="Center map on my location"
-          className="flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
-        >
-          {locating ? (
-            <Loader2 size={20} className="animate-spin" aria-hidden />
-          ) : (
-            <Navigation size={20} aria-hidden />
-          )}
-        </button>
       </div>
     </div>
   );

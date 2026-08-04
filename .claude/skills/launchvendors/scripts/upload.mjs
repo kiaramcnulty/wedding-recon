@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { readVenues, writeVenues, nameKey, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep, typeProfile, selectAll } from './lib.mjs';
+import { readVenues, writeVenues, nameKey, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep, typeProfile, selectAll, initPlacesCache, placesSpendReport } from './lib.mjs';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -13,6 +13,7 @@ for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'GOOGL
   if (!process.env[k]) { console.error(`${k} missing — run with --env-file=.env.local from the repo root`); process.exit(1); }
 }
 const profile = typeProfile();
+initPlacesCache(workdir);   // reuse Places responses across re-runs — see lib.mjs
 // A type may fan one sweep across several vendor_types (music → dj|band). typeScope is the
 // set of vendor_types this run owns — used for dedup scoping and the final verify. Single-
 // type runs (venue, photos, …) keep the original one-element scope, unchanged behavior.
@@ -220,3 +221,4 @@ const verify = [
 ];
 console.log(verify.join('\n'));
 fs.writeFileSync(path.join(workdir, 'upload-report.txt'), lines.join('\n') + verify.join('\n') + '\n');
+console.log(placesSpendReport());

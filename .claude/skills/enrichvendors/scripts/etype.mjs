@@ -95,8 +95,12 @@ export const ETYPES = {
     key: 'dress',
     vendorType: 'dress',
     label: 'BRIDAL SHOP',
-    headers: [...BASE_HEADERS, 'service_region'],
-    serviceRegionRequired: true,       // most are storefronts — shop city/metro is a fine sourced fallback
+    headers: BASE_HEADERS,              // storefront you visit, not a service-area vendor — no service_region column
+    // Was `true` with the shop city/metro as a fallback, which is the tell that
+    // the field never applied: a bridal shop does not travel to the couple.
+    // App-side `usesServiceRegion` now excludes dress and migration 0030 nulled
+    // the rows this had already written (Kiara, 2026-08-04).
+    serviceRegionRequired: false,
     refs: refsFor('dress'),
     hasInstagram: true,                // vendors.instagram is pipeline-populated for this type (migration 0016)
     subpage: /(pric|appoint|book|designer|collection|gown|dress|bridal|bridesmaid|trunk|sample|about|faq|service)/i,
@@ -129,8 +133,8 @@ export const ETYPES = {
     key: 'hotel',
     vendorType: 'hotel',
     label: 'HOTEL (GUEST ROOM BLOCKS)',
-    headers: [...BASE_HEADERS, 'service_region'],
-    serviceRegionRequired: true,       // fixed property — its city/metro is the sourced fallback
+    headers: BASE_HEADERS,              // fixed property, not a service-area vendor — no service_region column
+    serviceRegionRequired: false,
     refs: refsFor('hotelblocks'),
     subpage: /(wedding|group|block|room|rate|reserv|book|meeting|event|faq|amenit|parking|shuttle|breakfast|accommodat|stay|about)/i,
     // Block economics, not nightly-rate marketing: the courtesy-vs-attrition distinction,

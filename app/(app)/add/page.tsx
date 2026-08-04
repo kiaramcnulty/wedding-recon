@@ -2,18 +2,16 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
 import { Mail } from "lucide-react";
 
-import { ALL_VENDOR_TYPES, CATEGORIES, CATEGORY_LIST, RECON_TYPES, RECON_TYPE_LABELS, VENDOR_TYPES } from "@/lib/constants/categories";
+import { VENDOR_TYPES } from "@/lib/constants/categories";
 import type { VendorType, ReconType } from "@/lib/constants/categories";
-import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
   clearReconDraft,
@@ -26,8 +24,12 @@ import {
 } from "@/lib/recon-draft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  ReconFormFields,
+  reconFormSchema,
+  type ReconFormValues,
+} from "@/components/recon/recon-form-fields";
 import { PlacesCombobox } from "@/components/add/places-combobox";
 import type {
   PlaceSelection,
@@ -40,27 +42,10 @@ import { ProfileMenu } from "@/components/profile-menu";
 import { createRecon } from "./actions";
 import { uploadReconImages } from "@/lib/recon-upload";
 
-// ── Zod schema ────────────────────────────────────────────────────────────────
+// ── Form schema + fields are shared with Edit Recon ──────────────────────────
+// (components/recon/recon-form-fields.tsx)
 
-const schema = z.object({
-  // Derived from the single source of truth so new/retired types never drift.
-  // ALL_VENDOR_TYPES (not VENDOR_TYPES) so an existing vendor whose canonical
-  // type is a legacy value still validates when its chip is locked read-only.
-  vendorType: z.enum(ALL_VENDOR_TYPES, {
-    error: "Please choose a type of vendor",
-  }),
-  reconType: z.enum(["online", "virtual", "in_person"], {
-    error: "Please choose a type of recon",
-  }),
-  collectedMonth: z.number().int().min(1).max(12),
-  collectedYear: z.number().int().min(2000),
-  priceText: z.string().optional(),
-  priceDetails: z.string().optional(),
-  serviceRegion: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof schema>;
+type FormValues = ReconFormValues;
 
 // ── Vendor state — managed outside react-hook-form since it comes from the
 //    PlacesCombobox component, not a plain input ─────────────────────────────
@@ -156,7 +141,7 @@ function AddReconForm() {
     watch,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(reconFormSchema),
     defaultValues: {
       ...(preVendorType ? { vendorType: preVendorType } : {}),
       collectedMonth: currentMonth,
@@ -522,236 +507,14 @@ function AddReconForm() {
           )}
         </section>
 
-        {/* ── Type of vendor chips ────────────────────────────────────── */}
-        <section className="space-y-2">
-          <Label>Type of vendor</Label>
-          <Controller
-            control={control}
-            name="vendorType"
-            render={({ field }) => {
-              // Locked, read-only display for an existing vendor. Resolve via
-              // CATEGORIES (not CATEGORY_LIST) so a legacy type still renders.
-              if (lockVendorType) {
-                const cat = field.value ? CATEGORIES[field.value] : undefined;
-                if (!cat) return <></>;
-                const Icon = cat.icon;
-                return (
-                  <div
-                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium"
-                    style={{
-                      backgroundColor: cat.lightHex,
-                      color: cat.textHex,
-                      borderColor: cat.colorHex + "44",
-                    }}
-                  >
-                    <Icon className="size-3.5" style={{ color: cat.colorHex }} />
-                    {cat.label}
-                  </div>
-                );
-              }
-
-              return (
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Type of vendor">
-                  {CATEGORY_LIST.map((cat) => {
-                    const Icon = cat.icon;
-                    const isActive = field.value === cat.type;
-                    return (
-                      <button
-                        key={cat.type}
-                        type="button"
-                        role="radio"
-                        aria-checked={isActive}
-                        onClick={() => field.onChange(cat.type)}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
-                          isActive
-                            ? "border-transparent shadow-sm"
-                            : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/40 hover:text-foreground"
-                        )}
-                        style={
-                          isActive
-                            ? {
-                                backgroundColor: cat.lightHex,
-                                color: cat.textHex,
-                                borderColor: cat.colorHex + "44",
-                              }
-                            : undefined
-                        }
-                      >
-                        <Icon
-                          className="size-3.5"
-                          style={isActive ? { color: cat.colorHex } : undefined}
-                        />
-                        {cat.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            }}
-          />
-          {!lockVendorType && errors.vendorType && (
-            <p className="text-xs text-destructive">{errors.vendorType.message}</p>
-          )}
-        </section>
-
-        {/* ── Type of recon segmented control ──────────────────────────── */}
-        <section className="space-y-2">
-          <Label>Type of recon</Label>
-          <Controller
-            control={control}
-            name="reconType"
-            render={({ field }) => (
-              <div
-                role="group"
-                aria-label="Type of recon"
-                className="flex overflow-hidden rounded-lg border border-border bg-muted/30"
-              >
-                {RECON_TYPES.map((rt, idx) => {
-                  const isActive = field.value === rt;
-                  return (
-                    <button
-                      key={rt}
-                      type="button"
-                      role="radio"
-                      aria-checked={isActive}
-                      onClick={() => field.onChange(rt)}
-                      className={cn(
-                        "flex flex-1 items-center justify-center px-2 py-2 text-xs font-medium transition-colors",
-                        idx > 0 && "border-l border-border",
-                        isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                      )}
-                    >
-                      {RECON_TYPE_LABELS[rt]}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          />
-          {errors.reconType && (
-            <p className="text-xs text-destructive">{errors.reconType.message}</p>
-          )}
-        </section>
-
-        {/* ── Recon collected at (month & year) ──────────────────────────── */}
-        <section className="space-y-2">
-          <Label>Recon collected at</Label>
-          <div className="flex gap-2">
-            {/* Month dropdown */}
-            <Controller
-              control={control}
-              name="collectedMonth"
-              render={({ field }) => (
-                <select
-                  value={field.value}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  onBlur={field.onBlur}
-                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => (
-                    <option key={month} value={month}>
-                      {new Date(2000, month - 1).toLocaleString("default", {
-                        month: "long",
-                      })}
-                    </option>
-                  ))}
-                </select>
-              )}
-            />
-            {/* Year dropdown */}
-            <Controller
-              control={control}
-              name="collectedYear"
-              render={({ field }) => (
-                <select
-                  value={field.value}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  onBlur={field.onBlur}
-                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {Array.from({ length: currentYear - 2000 + 1 }, (_, i) => 2000 + i)
-                    .reverse()
-                    .map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                </select>
-              )}
-            />
-          </div>
-        </section>
-
-        {/* ── Price quote ───────────────────────────────────────────────── */}
-        <section className="space-y-1.5">
-          <Label htmlFor="price-text">Price quote</Label>
-          <Controller
-            control={control}
-            name="priceText"
-            render={({ field }) => (
-              <Input
-                id="price-text"
-                placeholder="e.g. $5,000–$8,000 or $150/head"
-                {...field}
-              />
-            )}
-          />
-        </section>
-
-        {/* ── Price details ─────────────────────────────────────────────── */}
-        <section className="space-y-1.5">
-          <Label htmlFor="price-details">Price details</Label>
-          <Controller
-            control={control}
-            name="priceDetails"
-            render={({ field }) => (
-              <Textarea
-                id="price-details"
-                placeholder="What's included, minimums, service fees…"
-                rows={2}
-                {...field}
-              />
-            )}
-          />
-        </section>
-
-        {/* ── Service region (non-venue vendors only) ────────────────────── */}
-        {vendorType && vendorType !== "venue" && (
-          <section className="space-y-1.5">
-            <Label htmlFor="service-region">Service region</Label>
-            <Controller
-              control={control}
-              name="serviceRegion"
-              render={({ field }) => (
-                <Input
-                  id="service-region"
-                  placeholder="e.g. NYC metro or Western Colorado"
-                  {...field}
-                />
-              )}
-            />
-          </section>
-        )}
-
-        {/* ── Recon notes ───────────────────────────────────────────────── */}
-        <section className="space-y-1.5">
-          <Label htmlFor="notes">Notes</Label>
-          <Controller
-            control={control}
-            name="notes"
-            render={({ field }) => (
-              <Textarea
-                id="notes"
-                placeholder="Vibe, availability, any red flags…"
-                rows={3}
-                {...field}
-              />
-            )}
-          />
-        </section>
+        {/* ── Shared recon fields (type → notes) ─────────────────────────── */}
+        <ReconFormFields
+          control={control}
+          errors={errors}
+          lockVendorType={lockVendorType}
+          vendorType={vendorType}
+          currentYear={currentYear}
+        />
 
         {/* ── Photos ────────────────────────────────────────────────────── */}
         <section className="space-y-2">

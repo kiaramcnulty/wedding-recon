@@ -131,3 +131,36 @@ export const RECON_TYPE_LABELS: Record<ReconType, string> = {
   virtual: "Virtual call",
   in_person: "In person",
 };
+
+/**
+ * Vendor types that do NOT use the recon "service region" field: you go to
+ * them, they never travel to you, so there is no area for them to serve.
+ *
+ * - `venue` / `hotel` — a fixed property in one place.
+ * - `dress` — a bridal boutique is a storefront you book an appointment at and
+ *   return to for fittings (Kiara, 2026-08-04). Before this it was only
+ *   excluded implicitly by not being a venue, so the field was being filled
+ *   with the shop's own city; migration `0030` nulls those out, the way `0024`
+ *   did for hotels.
+ *
+ * Florists are deliberately NOT here: they have a shop, but the arrangements
+ * are delivered and installed at the venue, so how far they will drive — and
+ * the delivery/setup fee attached to it — is a real number the couple shops on.
+ */
+const FIXED_LOCATION_TYPES: readonly VendorType[] = ["venue", "hotel", "dress"];
+
+/**
+ * Whether a vendor type uses the recon "service region" field. This is the
+ * single list behind all of it: the Add/Edit forms hide the field, the update
+ * action writes null, the Explore pins get their service-area halo, and the
+ * vendor page shows a map preview instead. Change `FIXED_LOCATION_TYPES` and
+ * every one of those moves together.
+ *
+ * Lives here, not in the form module, so Server Actions can call it too — a
+ * "use client" module cannot be invoked from the server.
+ */
+export function usesServiceRegion(
+  vendorType: VendorType | undefined,
+): vendorType is VendorType {
+  return !!vendorType && !FIXED_LOCATION_TYPES.includes(vendorType);
+}

@@ -2,11 +2,17 @@
 // details (rating + up to 5 reviews) and crawl the venue website (homepage +
 // pricing/wedding subpages) for text, image URLs, and PDF links.
 // Writes research/<slug>/harvest.json under the workdir. Read-only against Supabase.
-// usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/harvest.mjs <workdir> --region CO [--type photographer] [--venues "Name 1;Name 2"] [--limit N]
+//
+// RESUMABLE: a venue whose harvest.json already holds a clean Google block is skipped.
+// The Places call here carries `reviews`, which bills at Place Details
+// Enterprise+Atmosphere ($25/1k, only 1,000 free a month) — the priciest SKU we touch, and
+// one per venue. Re-running harvest to pick up newly-seeded venues, a widened subpage
+// regex, or a crashed run used to re-pay for the whole region. Use --refresh to force.
+// usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/harvest.mjs <workdir> --region CO [--type photographer] [--venues "Name 1;Name 2"] [--limit N] [--refresh]
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { norm, sleep, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
+import { norm, sleep, argValue, selectAll, placesSpendReport, placeDetails as libPlaceDetails } from '../../launchvendors/scripts/lib.mjs';
 import { etype } from './etype.mjs';
 import { pdfText, looksLikeText } from './pdf-text.mjs';
 
@@ -20,6 +26,7 @@ const region = argValue('region') || 'CO';
 const wanted = (argValue('venues') || '').split(';').map((s) => s.trim()).filter(Boolean);
 const limit = parseInt(argValue('limit') || '0', 10);
 const sitesOnly = process.argv.includes('--sites-only');
+const REFRESH = process.argv.includes('--refresh');   // re-fetch venues that already have a clean dossier
 
 const profile = etype();
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -137,19 +144,16 @@ function extractImages(html, base) {
   return [...imgs].filter((u) => /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !/logo|icon|favicon|sprite|badge|avatar|arrow|\.svg/i.test(u));
 }
 
+// Billed at Place Details Enterprise+Atmosphere ($25/1k) because of `reviews` — every
+// other field here rides along free, so the mask is as wide as it is useful. Routed
+// through lib.mjs's placeDetails so the run reports what it spent.
+const DETAILS_MASK = 'id,displayName,rating,userRatingCount,editorialSummary,websiteUri,reviews';
+
 async function placeDetails(pid) {
   // try/catch: a transient DNS/network blip must fail THIS venue, not kill the run
-  let res;
-  try {
-    res = await fetch(`https://places.googleapis.com/v1/places/${pid}`, {
-      headers: {
-        'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY,
-        'X-Goog-FieldMask': 'id,displayName,rating,userRatingCount,editorialSummary,websiteUri,reviews',
-      },
-    });
-  } catch (e) { return { err: e.cause?.code || e.message || 'fetch failed' }; }
-  if (!res.ok) return { err: `Places ${res.status}` };
-  const d = await res.json();
+  let d;
+  try { d = await libPlaceDetails(pid, DETAILS_MASK); }
+  catch (e) { return { err: e.cause?.code || e.message || 'fetch failed' }; }
   return {
     rating: d.rating, ratingCount: d.userRatingCount,
     summary: d.editorialSummary?.text,
@@ -166,7 +170,23 @@ async function placeDetails(pid) {
 const SUBPAGE = profile.subpage;
 
 fs.mkdirSync(path.join(workdir, 'research'), { recursive: true });
-let ok = 0, failed = 0;
+/**
+ * True when this venue was already harvested cleanly and must not be re-fetched.
+ *
+ * "Cleanly" deliberately excludes a venue whose Google block carries an `err` — a failed
+ * $25/1k call is worth retrying, a successful one is not. A venue with no place_id has no
+ * Google block to judge, so an existing dossier is enough. `--refresh` overrides.
+ */
+function alreadyHarvested(v, dir) {
+  if (REFRESH) return false;
+  try {
+    const prev = JSON.parse(fs.readFileSync(path.join(dir, 'harvest.json'), 'utf8'));
+    if (!v.google_place_id) return true;
+    return !!prev.google && !prev.google.err;
+  } catch { return false; }
+}
+
+let ok = 0, failed = 0, skipped = 0;
 
 // Vendors are harvested CONCURRENTLY. Sequentially this is ~10s each, which is ~6 hours
 // for a full multi-type region and effectively rules out re-crawling an existing market.
@@ -178,6 +198,7 @@ const CONCURRENCY = Math.max(1, parseInt(argValue('concurrency') || '6', 10));
 async function harvestOne(v) {
   const dir = path.join(workdir, 'research', slug(v.name));
   fs.mkdirSync(dir, { recursive: true });
+  if (alreadyHarvested(v, dir)) { skipped++; return; }   // `return`, not `continue`: this is a function body now
   const out = { vendor_id: v.id, name: v.name, city: v.city, website: v.website, place_id: v.google_place_id, instagram: v.instagram || undefined, fetched_at: new Date().toISOString() };
 
   // --sites-only re-crawls websites WITHOUT re-billing Google Places. Use it when the
@@ -273,4 +294,5 @@ await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
     try { await harvestOne(v); } catch (e) { failed++; console.log(`${v.name} — ERROR ${e.message}`); }
   }
 }));
-console.log(`\nharvested ${targets.length} vendors (${ok} ok, ${failed} failed) → ${path.join(workdir, 'research')}/<slug>/harvest.json`);
+console.log(`\nharvested ${ok + failed} vendors (${ok} ok, ${failed} failed)${skipped ? ` | ${skipped} already on file (--refresh to re-fetch)` : ''} → ${path.join(workdir, 'research')}/<slug>/harvest.json`);
+console.log(placesSpendReport());
