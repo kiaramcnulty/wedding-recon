@@ -52,8 +52,9 @@ export const META = {
   /**
    * The grey paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
-   * Current length is 302, so search results cut it around "…vendor feedba".
-   * The planning-hub and free-to-use points fall outside what is displayed.
+   * Current length is 230, cut after "…Keep your own quotes". The vendor-type
+   * list now lands inside the visible window; the planning hub and the
+   * free-to-use line still fall outside it.
    */
   description:
     "See quotes and intel from real Colorado couples for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Keep your own quotes and notes in one planning hub. Free, no account needed to explore vendors.",
