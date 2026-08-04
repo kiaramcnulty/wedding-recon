@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { X, Loader2 } from "lucide-react";
 import { type VendorType } from "@/lib/constants/categories";
 import {
@@ -49,7 +48,6 @@ export function VendorListSheet({
   footnote,
   onClose,
 }: VendorListSheetProps) {
-  const router = useRouter();
   const sheetRef = React.useRef<HTMLDivElement>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -170,9 +168,13 @@ export function VendorListSheet({
     }
   }, [items, scrollKey]);
 
-  function openVendor(id: string) {
-    // Remember where we are in the feed so returning here (?restore=1) lands in
-    // roughly the same spot instead of back at the top.
+  // `from` returns the back button here: /explore?restore=1 reopens this sheet.
+  // (The map view restores independently on any return — see explore/page.tsx.)
+  const vendorHref = (id: string) =>
+    `/vendor/${id}?from=${encodeURIComponent("/explore?restore=1")}`;
+
+  /** Remember where we are in the feed so returning here lands in the same spot. */
+  function rememberScroll() {
     try {
       if (scrollRef.current) {
         sessionStorage.setItem(scrollKey, String(scrollRef.current.scrollTop));
@@ -180,9 +182,6 @@ export function VendorListSheet({
     } catch {
       // sessionStorage unavailable — back will just land at the top
     }
-    // `from` returns the back button here: /explore?restore=1 reopens this sheet.
-    // (The map view restores independently on any return — see explore/page.tsx.)
-    router.push(`/vendor/${id}?from=${encodeURIComponent("/explore?restore=1")}`);
   }
 
   return createPortal(
@@ -248,7 +247,8 @@ export function VendorListSheet({
                     <VendorPreviewCard
                       item={item}
                       vendorType={typeById.get(item.id) ?? "other"}
-                      onOpen={() => openVendor(item.id)}
+                      href={vendorHref(item.id)}
+                      onNavigate={rememberScroll}
                     />
                   </li>
                 ))}
