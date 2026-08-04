@@ -15,7 +15,7 @@
 //              (first entry per vendor only — the same photo never appears on two entries)
 //
 // usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> <cmd> [flags]
-//   batch:      --region ST --roster <path> --size N --batch <id> [--per-call 25]
+//   batch:      --region ST --roster <path> --size N --batch <id> [--per-call 25] [--only "Name A;Name B"] [--exclude "..."] [--supplemental]
 //               [--mode api|harness]  api (DEFAULT): call files carry a no-tools delivery
 //               override (JSON lines in the response body + a final {"_flags": ...} line)
 //               and go to the Batch API via draft.mjs. harness: plain call files for
@@ -167,6 +167,23 @@ async function cmdBatch() {
   const { data: allRecon, error: rErr } = await selectAll(() => supabase.from('recon_entries').select('id, vendor_id').order('id'));
   if (rErr) { console.error('DB read failed:', rErr.message); process.exit(1); }
   const hasRecon = new Set((allRecon || []).map((e) => e.vendor_id));
+  // --supplemental: keep vendors that ALREADY have recon, to add ONE further entry
+  // carrying newly-found intel (e.g. reddit passages matched after the original run).
+  // Default behaviour stays "no recon of any kind" — the right rule for a fresh region,
+  // but it makes topping up an enriched region impossible without this escape hatch.
+  const supplemental = process.argv.includes('--supplemental');
+  // Which bot already wrote for which vendor: a bot must never get two entries on the
+  // same vendor (upload validates this), and a supplemental run is exactly where that
+  // would otherwise happen, since bot assignment below is a roster round-robin that
+  // knows nothing about what is already published.
+  const { data: authored } = await selectAll(() => supabase
+    .from('recon_entries').select('vendor_id, author_id, profiles!inner(username)').order('id'));
+  const botsOnVendor = new Map();
+  for (const r of (authored || [])) {
+    const u = r.profiles?.username; if (!u) continue;
+    if (!botsOnVendor.has(r.vendor_id)) botsOnVendor.set(r.vendor_id, new Set());
+    botsOnVendor.get(r.vendor_id).add(u);
+  }
 
   // reddit mentions (same signal as roster.mjs) for ordering
   const threads = [];
@@ -183,7 +200,12 @@ async function cmdBatch() {
   const score = (v) => redditScore(v.name) * 3 + (v.google_place_id ? 1 : 0) + (v.website ? 1 : 0);
 
   const excluded = new Set((argValue('exclude') || '').split(';').map((s) => norm(s)).filter(Boolean));
-  const pool = venues.filter((v) => !hasRecon.has(v.id) && !excluded.has(norm(v.name)))
+  // --only restricts the batch to named vendors. Selection is otherwise region-wide over
+  // everything unreconned, which is right for a fresh region but wrong for a targeted run
+  // (adding a handful of newly-seeded vendors, or re-drafting a specific set) — without
+  // it the batch pulls in unrelated vendors and then fails on their missing dossiers.
+  const only = new Set((argValue('only') || '').split(';').map((s) => norm(s)).filter(Boolean));
+  const pool = venues.filter((v) => (supplemental ? hasRecon.has(v.id) : !hasRecon.has(v.id)) && !excluded.has(norm(v.name)) && (!only.size || only.has(norm(v.name))))
     .sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
   const seen = new Set(); const uniq = [];
   for (const v of pool) { const k = norm(v.name); if (seen.has(k)) continue; seen.add(k); uniq.push(v); } // same-named twins defer
@@ -257,7 +279,9 @@ async function cmdBatch() {
   picked.forEach((v, i) => {
     const call = Math.floor(i / perCall) + 1;
     const dossierText = fs.readFileSync(path.join(workdir, 'research', slugOf(v.name), 'dossier.md'), 'utf8');
-    const n = Math.min(entryCountFor(dossierText), roster.length);
+    // A supplemental run adds exactly ONE entry — it is topping up, not re-enriching.
+    const n = supplemental ? 1 : Math.min(entryCountFor(dossierText), roster.length);
+    const taken = botsOnVendor.get(v.id) || new Set();
     // Distinct collected-dates per sibling entry: the 18-month hash space collides ~1-in-18,
     // and two "independent" couples sharing month AND anecdotes reads as one author
     // (caught live in the 2026-07 toy run). Re-derive with a nudged seed until unique.
@@ -266,7 +290,10 @@ async function cmdBatch() {
       let d = dateFor(`${v.id}#${e}`), nudge = 0;
       while (usedDates.has(`${d.month}/${d.year}`)) d = dateFor(`${v.id}#${e}~${++nudge}`);
       usedDates.add(`${d.month}/${d.year}`);
-      manifest.push({ name: v.name, vendor_id: v.id, slug: slugOf(v.name), city: v.city, bot: roster[(botPtr + e) % roster.length].key, month: d.month, year: d.year, entry: e + 1, entries: n, call });
+      // Advance past any bot that already authored for this vendor.
+      let bi = (botPtr + e) % roster.length, guard = 0;
+      while (taken.has(roster[bi].username) && guard++ < roster.length) bi = (bi + 1) % roster.length;
+      manifest.push({ name: v.name, vendor_id: v.id, slug: slugOf(v.name), city: v.city, bot: roster[bi].key, month: d.month, year: d.year, entry: e + 1, entries: n, call });
     }
     botPtr = (botPtr + n) % roster.length;
   });
