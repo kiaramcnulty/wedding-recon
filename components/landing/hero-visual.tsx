@@ -10,9 +10,12 @@ import { cn } from "@/lib/utils";
  * costs no bytes, and picks its pin colors straight out of CATEGORIES, so the
  * marketing page can never drift from the palette on the real map.
  *
- * The example card carries no vendor name and is badged "Example" on purpose:
- * an invented quote attached to a real business would be a fabricated review of
- * someone's livelihood, which is exactly the thing this product must not do.
+ * The example card carries no vendor name on purpose: an invented quote
+ * attached to a real business would be a fabricated review of someone's
+ * livelihood, which is exactly the thing this product must not do. It used to
+ * also carry an "Example" badge; that was dropped (Kiara, 2026-08-04) as
+ * redundant with the standard reading of a hero mockup. The anonymity is what
+ * the rule actually rests on, so keep the place generic - a county, not a venue.
  */
 
 /** Pins scattered over the panel, positioned in percentages of the panel box. */
@@ -101,16 +104,17 @@ export function HeroVisual({ className }: { className?: string }) {
           <span className="text-xs text-muted-foreground">
             {EXAMPLE_RECON.place}
           </span>
-          <span className="ml-auto rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            {EXAMPLE_RECON.badge}
-          </span>
         </div>
 
+        {/* Detail sits on its own line rather than inline beside the price.
+            Inline only reads well while it is short: a longer one wraps under
+            the figure and orphans its last word, which a copy edit shouldn't
+            be able to cause. */}
         <p className="mt-3 font-heading text-2xl font-semibold leading-none">
           {EXAMPLE_RECON.price}
-          <span className="ml-2 align-middle text-xs font-normal text-muted-foreground">
-            {EXAMPLE_RECON.priceDetail}
-          </span>
+        </p>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {EXAMPLE_RECON.priceDetail}
         </p>
 
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">

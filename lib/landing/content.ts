@@ -16,21 +16,25 @@ import type { VendorType } from "@/lib/constants/categories";
  * ============================================================================
  *
  * The components under `components/landing/` and `app/page.tsx` are layout
- * only — they contain no sentences of their own. To reword the page, edit the
+ * only - they contain no sentences of their own. To reword the page, edit the
  * strings below and nothing else.
  *
- * Editing rules, all of which the build or a search engine will enforce:
+ * Editing rules:
  *
  * 1. Keep the quotes and the trailing commas. Text goes between the quotes.
  * 2. Use a typographic apostrophe (it is / does not) or escape a straight one
  *    (\'). An unescaped ' inside a '...' string breaks the build.
- * 3. FAQ `answer` must stay PLAIN TEXT with no markup — the same string is
+ * 3. NO EM DASHES in copy. Use a spaced hyphen ( - ) for a sentence break
+ *    (Kiara, 2026-08-04). Same house style the enrich pipeline enforces on
+ *    recon text, where upload.mjs hard-fails an em dash outright.
+ * 4. FAQ `answer` must stay PLAIN TEXT with no markup - the same string is
  *    emitted as FAQPage structured data for Google, and a mismatch between the
  *    visible answer and the structured one is a policy violation. Use the
  *    optional `link` field if an answer needs a link.
- * 4. Nothing here may name a real vendor or attach a price to one. EXAMPLE_RECON
- *    is deliberately anonymous and badged "Example" on the page.
- * 5. Length guides where they matter are noted inline (META especially).
+ * 5. Nothing here may name a real vendor or attach a price to one. The figures
+ *    in EXAMPLE_RECON are invented and the card no longer carries an "Example"
+ *    badge, so its anonymity is the only thing keeping it honest.
+ * 6. Length guides where they matter are noted inline (META especially).
  *
  * Run `npm run build` after editing to catch a stray quote or comma.
  */
@@ -46,7 +50,7 @@ export const META = {
    * Current length is 88, so search results cut it after "…prices and intel, fr".
    */
   title:
-    "Wedding Recon — Colorado wedding vendor prices and intel, from real couples' experiences",
+    "Wedding Recon - Colorado wedding vendor prices and intel, from real couples' experiences",
   /**
    * The grey paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
@@ -56,7 +60,7 @@ export const META = {
   description:
     "See what Colorado couples were actually quoted for 10+ wedding vendor types: venues, catering, photography, florists and music. Explore local vendor feedback and intel from couples who went through it. Then keep your own quotes and notes in one planning hub. Free, no account needed to explore vendors.",
   /** Shorter title used for link previews (iMessage, X, Facebook). */
-  socialTitle: "Wedding Recon — real Colorado wedding vendor prices and intel",
+  socialTitle: "Wedding Recon - real Colorado wedding vendor prices and intel",
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -88,26 +92,19 @@ export const HERO = {
 /**
  * The sample recon entry floating over the hero illustration.
  *
- * Intentionally anonymous. Naming a real business next to an invented quote
- * would be a fabricated review of someone's livelihood, so this stays a county
- * rather than a venue, and the page badges it "Example".
+ * Intentionally anonymous, and that anonymity is the whole safeguard: every
+ * number here is invented, so `place` must stay a region ("Boulder County")
+ * and never a business a reader could go and check. There is no "Example"
+ * badge on the card any more (dropped 2026-08-04 as redundant), which leaves
+ * nothing else marking the figures as illustrative.
  */
 export const EXAMPLE_RECON = {
-  /**
-   * Restored after being dropped in an edit (it is referenced by
-   * hero-visual.tsx, so removing it breaks the build). It is also the only
-   * thing on the page marking this card as illustrative: the price, the
-   * package tier and the catering note below are invented, and an unlabelled
-   * invented quote reads as a real recon entry. If the badge should go, remove
-   * the element from hero-visual.tsx deliberately rather than the string here.
-   */
-  badge: "Example",
   category: "Venue",
   place: "Boulder County",
   price: "$8,400",
   priceDetail: "site fee · Saturday in September · DIY package tier",
   notes:
-    "Ceremony site, chairs and the bridal suite are included. The bar minimum is separate — about $3.5k for 120 guests. Outside catering is allowed.",
+    "Ceremony site, chairs and the bridal suite are included. The bar minimum is separate - about $3.5k for 120 guests. Outside catering is allowed.",
   reconType: "In person",
   collected: "Collected Jun 2026",
 } as const;
@@ -137,7 +134,7 @@ export const VALUE_PROPS: ValueProp[] = [
   {
     icon: MessagesSquare,
     title: "The best tip comes from someone who just did this",
-    body: "Couples book their band, their photographer, their caterer on a friend's say-so — because a friend who planned a wedding here last summer knows things no listing does. Not everyone has that friend. This is that conversation, written down and kept.",
+    body: "Couples book their band, their photographer, their caterer on a friend's say-so - because a friend who planned a wedding here last summer knows things no listing does. Not everyone has that friend. This is that conversation, written down and kept.",
   },
   {
     icon: Bookmark,
@@ -180,12 +177,12 @@ export const HOW_IT_WORKS: HowItWorksStep[] = [
   {
     icon: ScrollText,
     title: "Read the recon",
-    body: "Every vendor page collects entries from couples: the price quoted, the details behind it, notes on how it actually went, and photos. Each one is tagged by how it was gathered — online research, a call, or an in-person visit — and dated, so you can tell fresh intel from a number that has since moved.",
+    body: "Every vendor page collects entries from couples: the price quoted, the details behind it, notes on how it actually went, and photos. Each one is tagged by how it was gathered - online research, a call, or an in-person visit - and dated, so you can tell fresh intel from a number that has since moved.",
   },
   {
     icon: NotebookPen,
     title: "Add your own",
-    body: "Save vendors you are considering to your Planning Hub, then log your own recon as you tour, taste, and negotiate. It keeps your search straight while you are in it — and it is what the next couple will be reading.",
+    body: "Save vendors you are considering to your Planning Hub, then log your own recon as you tour, taste, and negotiate. It keeps your search straight while you are in it - and it is what the next couple will be reading.",
   },
 ];
 
@@ -224,7 +221,7 @@ export const COLORADO_SECTION = {
   eyebrow: "Where we cover",
   heading: "Colorado first, on purpose.",
   body: [
-    "A vendor directory is only useful where it is dense. One state covered properly beats fifty covered thinly, so Wedding Recon starts on the Front Range — Denver, Boulder, Colorado Springs, Fort Collins and the towns between them — and reaches out to the mountain venues couples travel for.",
+    "A vendor directory is only useful where it is dense. One state covered properly beats fifty covered thinly, so Wedding Recon starts on the Front Range - Denver, Boulder, Colorado Springs, Fort Collins and the towns between them - and reaches out to the mountain venues couples travel for.",
     "Coverage grows as couples add recon. If the vendor you are looking at is not on the map yet, you can add them in a few taps, quote and all.",
   ],
 } as const;
@@ -288,18 +285,18 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Do I need an account to look around?",
     answer:
-      "No. The map and every vendor page are public, and a link a friend sends you opens without signing up. An account is only needed to save vendors to your Planning Hub or post recon — and it is a magic link to your email, with no password to invent.",
+      "No. The map and every vendor page are public, and a link a friend sends you opens without signing up. An account is only needed to save vendors to your Planning Hub or post recon - and it is a magic link to your email, with no password to invent.",
   },
   {
     question: "Where do the prices come from?",
     answer:
-      "From other couples. Each entry records what one couple was quoted, when they collected it, and how — online research, a call, or an in-person visit. Prices move with the date, the season, the guest count, and the package, so treat a recon entry as a starting range and confirm the details with the vendor directly.",
+      "From other couples. Each entry records what one couple was quoted, when they collected it, and how - online research, a call, or an in-person visit. Prices move with the date, the season, the guest count, and the package, so treat a recon entry as a starting range and confirm the details with the vendor directly.",
     link: { href: "/terms", label: "Read the full disclaimer" },
   },
   {
     question: "Which parts of Colorado are covered?",
     answer:
-      "The Front Range is deepest — Denver, Boulder, Colorado Springs, Fort Collins and the surrounding towns — alongside the mountain venues couples travel to. Any vendor missing from the map can be added by anyone, so coverage follows wherever couples are actually searching.",
+      "The Front Range is deepest - Denver, Boulder, Colorado Springs, Fort Collins and the surrounding towns - alongside the mountain venues couples travel to. Any vendor missing from the map can be added by anyone, so coverage follows wherever couples are actually searching.",
   },
   {
     question: "Can vendors pay to appear, or to change what is written about them?",
@@ -309,12 +306,12 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What kinds of vendors are on here?",
     answer:
-      "Venues, catering, photographers, florists, DJs, live music, bridal shops, hair and makeup, planners, and hotel room blocks — plus an open category for everything a wedding turns out to need.",
+      "Venues, catering, photographers, florists, DJs, live music, bridal shops, hair and makeup, planners, and hotel room blocks - plus an open category for everything a wedding turns out to need.",
   },
   {
     question: "Is what I save private?",
     answer:
-      "Your Planning Hub is yours alone — nobody else sees which vendors you have saved or what you are weighing up. Recon entries you post are public, shown under the anonymous username you pick when you sign up, never your email or your real name.",
+      "Your Planning Hub is yours alone - nobody else sees which vendors you have saved or what you are weighing up. Recon entries you post are public, shown under the anonymous username you pick when you sign up, never your email or your real name.",
   },
 ];
 
@@ -344,7 +341,7 @@ export const FOOTER = {
   contactLabel: "Contact",
   /** Appears after "© <year> Wedding Recon." at the very bottom. */
   disclaimer:
-    "Recon entries are personal experiences shared by couples, not verified facts — always confirm pricing and details with the vendor.",
+    "Recon entries are personal experiences shared by couples, not verified facts - always confirm pricing and details with the vendor.",
 } as const;
 
 export const CONTACT_EMAIL = "kiaramcnulty@gmail.com";
