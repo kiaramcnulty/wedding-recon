@@ -46,16 +46,16 @@ export const META = {
    * Current length is 74, so the tail is likely cut in search results.
    */
   title:
-    "Wedding Recon — Colorado wedding vendor prices, from the couples who asked",
+    "Wedding Recon — Colorado wedding vendor prices and intel, from real couples' experiences",
   /**
    * The grey paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
    * Current length is ~199, so the tail is likely cut.
    */
   description:
-    "See what Colorado couples were actually quoted for wedding venues, catering, photography, flowers and music — then keep your own quotes and notes in one planning hub. Free, no account needed to browse.",
+    "See what Colorado couples were actually quoted for 10+ wedding vendor types: venues, catering, photography, florists and music. Explore local vendor feedback and intel from couples who went through it. Then keep your own quotes and notes in one planning hub. Free, no account needed to explore vendors.",
   /** Shorter title used for link previews (iMessage, X, Facebook). */
-  socialTitle: "Wedding Recon — real Colorado wedding vendor prices",
+  socialTitle: "Wedding Recon — real Colorado wedding vendor prices and intel",
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -65,7 +65,7 @@ export const META = {
 export const HEADER = {
   howItWorks: "How it works",
   faq: "FAQ",
-  cta: "Open the app",
+  cta: "Explore the site",
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -76,12 +76,12 @@ export const HERO = {
   /** Small green pill above the headline. */
   eyebrow: "Colorado wedding vendors",
   /** The one <h1> on the page. Keep it short enough to sit on two lines. */
-  heading: "Real prices from real Colorado weddings.",
+  heading: "Real prices & intel from real Colorado weddings.",
   subheading:
-    "Wedding Recon is where engaged couples pool the quotes, notes, and photos they collect while vendor shopping — so you can find out what a venue costs before you drive out for the tour.",
+    "Wedding Recon is a community of couples sharing their firsthand quotes, intel and experiences with wedding vendors. So you can find great-fit, in-budget vendors for your perfect day.",
   primaryCta: "Explore Colorado vendors",
   secondaryCta: "See how it works",
-  reassurance: "Free to use. No account needed to browse.",
+  reassurance: "Free to use. No account needed to explore vendors.",
 } as const;
 
 /**
@@ -92,13 +92,12 @@ export const HERO = {
  * rather than a venue, and the page badges it "Example".
  */
 export const EXAMPLE_RECON = {
-  badge: "Example",
   category: "Venue",
   place: "Boulder County",
   price: "$8,400",
-  priceDetail: "site fee · Saturday in September",
+  priceDetail: "site fee · Saturday in September · DIY package tier",
   notes:
-    "Ceremony site, chairs and the bridal suite are included. The bar minimum is separate — about $3.5k for 120 guests.",
+    "Ceremony site, chairs and the bridal suite are included. The bar minimum is separate — about $3.5k for 120 guests. Outside catering is allowed.",
   reconType: "In person",
   collected: "Collected Jun 2026",
 } as const;
@@ -109,7 +108,7 @@ export const EXAMPLE_RECON = {
 
 export const WHY_SECTION = {
   eyebrow: "Why this exists",
-  heading: "Planning a wedding means paying for the same research over and over.",
+  heading: "Planning a wedding means paying - in time and money - for the same research as other couples, over and over.",
 } as const;
 
 export interface ValueProp {
@@ -165,8 +164,8 @@ export interface HowItWorksStep {
 export const HOW_IT_WORKS: HowItWorksStep[] = [
   {
     icon: Map,
-    title: "Explore the map",
-    body: "Pan around Colorado and see who is out there. Pins are colour-coded by category, so a cluster of venues near your date's hometown reads at a glance. Tap a pin for a peek, tap the card to open the vendor.",
+    title: "Explore local vendors",
+    body: "Pan around Colorado and see what's out there. Filter by vendor type and type-specific filters (example: wedding venues under $10k with a mountain backdrop).",
   },
   {
     icon: ScrollText,
