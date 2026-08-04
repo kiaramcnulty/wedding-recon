@@ -58,7 +58,7 @@ export const META = {
    * The planning-hub and free-to-use points fall outside what is displayed.
    */
   description:
-    "See what Colorado couples were actually quoted for 10+ wedding vendor types: venues, catering, photography, florists and music. Explore local vendor feedback and intel from couples who went through it. Then keep your own quotes and notes in one planning hub. Free, no account needed to explore vendors.",
+    "See quotes and intel from real Colorado couples for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Keep your own quotes and notes in one planning hub. Free, no account needed to explore vendors.",
   /** Shorter title used for link previews (iMessage, X, Facebook). */
   socialTitle: "Wedding Recon - real Colorado wedding vendor prices and intel",
 } as const;
