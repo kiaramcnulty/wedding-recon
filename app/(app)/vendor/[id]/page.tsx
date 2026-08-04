@@ -6,10 +6,17 @@ import {
   PlusCircle,
   ExternalLink as ExternalLinkIcon,
   Globe,
+  Waypoints,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getVendorGooglePhotos } from "@/lib/google-photos";
-import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
+import {
+  CATEGORIES,
+  usesServiceRegion,
+  type VendorType,
+} from "@/lib/constants/categories";
+import { isApproximateLocation } from "@/lib/map/vendor-location";
+import { VendorMapPreview } from "@/components/vendor/vendor-map-preview";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { PhotoCarousel } from "@/components/vendor/photo-carousel";
 import { GooglePhotoStrip } from "@/components/vendor/google-photo-strip";
@@ -126,11 +133,18 @@ export default async function VendorPage({
 
   const userId = claimsRes.data?.claims.sub ?? null;
 
-  // Stage 2 — both need stage-1 results. The "does the viewer already have
+  // A venue or a hotel block IS a property at an address, so its pin is the
+  // fact and it gets a map preview. Every other type is a service-region vendor
+  // whose pin marks a base they travel out from — mapping that at street zoom
+  // would assert a precision the row does not have, so they get their service
+  // area in words instead. Same split the Explore map draws with the halo.
+  const fixedLocation = !usesServiceRegion(vendor.vendor_type as VendorType);
+
+  // Stage 2 — all need stage-1 results. The "does the viewer already have
   // recon here" check must stay a separate query (it counts `flagged` entries,
   // which the active-only list above does not include). getVendorGooglePhotos
   // only touches the network on a cache miss, so it's usually free.
-  const [existingRes, googlePhotos] = await Promise.all([
+  const [existingRes, googlePhotos, coordsRes] = await Promise.all([
     userId
       ? supabase
           .from("recon_entries")
@@ -142,8 +156,16 @@ export default async function VendorPage({
           .maybeSingle()
       : Promise.resolve({ data: null }),
     getVendorGooglePhotos(vendor),
+    // vendors.location is PostGIS geography, which PostgREST hands back as hex
+    // EWKB — the RPC (migration 0029) is what flattens it to lng/lat. Errors
+    // are swallowed by design: until that migration is hand-applied the call
+    // fails, `data` is null, and the page renders exactly as it did before.
+    fixedLocation
+      ? supabase.rpc("vendor_location", { p_id: id }).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   const userHasRecon = !!existingRes.data;
+  const coords = coordsRes.data as { lng: number; lat: number } | null;
 
   // Distinct author names for the "Photos via Google" caption.
   const googleCredit =
@@ -176,6 +198,20 @@ export default async function VendorPage({
         .getPublicUrl(m.storage_path).data.publicUrl,
     })),
   );
+
+  // Service areas as reported by the recon on this vendor, deduped. Shown in
+  // place of the map for service-region types — it explains why there is no pin
+  // here, and it is real data rather than decoration, so it renders only when
+  // someone has actually filled the field in.
+  const serviceRegions = fixedLocation
+    ? []
+    : [
+        ...new Set(
+          entries
+            .map((e) => e.service_region?.trim())
+            .filter((r): r is string => !!r),
+        ),
+      ].slice(0, 3);
 
   const category = CATEGORIES[vendor.vendor_type as VendorType];
   const CategoryIcon = category?.icon ?? MapPin;
@@ -303,6 +339,39 @@ export default async function VendorPage({
       {photos.length > 0 && (
         <div className="mt-4">
           <PhotoCarousel photos={photos} />
+        </div>
+      )}
+
+      {/* Where it is. A fixed-location vendor (venue / hotel block) gets the
+          pin on a real map; a service-region vendor gets its service area in
+          words, since its pin is only a base. Sits below the photos so they
+          stay the hero, and above the recon so "where" is settled before
+          "what people found out". */}
+      {fixedLocation && coords && (
+        <div className="mt-4">
+          <VendorMapPreview
+            lng={coords.lng}
+            lat={coords.lat}
+            vendorType={vendor.vendor_type}
+            approximate={isApproximateLocation(vendor)}
+            name={vendor.name}
+            addressText={addressParts || null}
+            googlePlaceId={vendor.google_place_id}
+          />
+        </div>
+      )}
+
+      {serviceRegions.length > 0 && (
+        <div className="mt-4 px-4">
+          <div className="flex items-start gap-2 rounded-xl border bg-muted/40 px-3 py-2.5 text-sm">
+            <Waypoints className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="font-medium">Service area</p>
+              <p className="line-clamp-2 text-muted-foreground">
+                {serviceRegions.join(" · ")}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

@@ -11,6 +11,7 @@ import {
   pinImageId,
   clusterImageId,
 } from "@/lib/map/pin-images";
+import { isApproximateLocation } from "@/lib/map/vendor-location";
 
 // MapLibre is browser-only; import deferred to effects.
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -151,22 +152,9 @@ function bucketType(vendorType: string): VendorType {
     : "other";
 }
 
-/**
- * Heuristic: does this vendor's pin sit on an *approximate* (city/region
- * centroid) location rather than a precise street address?
- *
- * Google-sourced vendors carry rooftop-precise coordinates. For user/seed
- * vendors we treat the absence of a street/building number in the address as
- * "approximate" — a city or region geocode (e.g. "Denver, Colorado") has no
- * house number, whereas a real address does. This is intentionally a front-end
- * heuristic so it works on existing rows; if we later capture geocode precision
- * at save time (Nominatim bbox / addresstype), swap this for that field.
- */
-function isApproximateLocation(vendor: Vendor): boolean {
-  if (vendor.source === "google" || vendor.google_place_id) return false;
-  const addr = (vendor.address_text ?? "").trim();
-  return !/\d/.test(addr);
-}
+// The approximate-location heuristic that drives the dashed pin outline lives in
+// lib/map/vendor-location.ts — the vendor page's mini-map draws the same pin and
+// has to reach the same verdict.
 
 // Deterministic "fan out" for pins that share an (approximate) coordinate.
 // Identical centroids never separate under plain clustering, so we scatter a

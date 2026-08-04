@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
+import { formatVendorLocality } from "@/lib/vendor-locality";
 import { cn } from "@/lib/utils";
 
 /**
@@ -29,6 +31,8 @@ export interface ReconSlide {
 export interface VendorPreview {
   id: string;
   name: string;
+  /** "City, ST" subtitle under the name; null when the row has no usable place. */
+  locality: string | null;
   reconCount: number;
   /**
    * Ordered image candidates: Google photo first, then a recon thumbnail. Tried
@@ -45,6 +49,9 @@ interface VendorLite {
   name: string;
   google_photos: unknown[] | null;
   google_place_id: string | null;
+  city: string | null;
+  region: string | null;
+  address_text: string | null;
 }
 interface ReconRow {
   vendor_id: string;
@@ -81,7 +88,11 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
       const [vendorsRes, reconRes, claimsRes] = await Promise.all([
         supabase
           .from("vendors")
-          .select("id, name, google_photos, google_place_id")
+          // city/region/address_text feed the "City, ST" subtitle — three small
+          // text columns on rows already being fetched, so no extra round trip.
+          .select(
+            "id, name, google_photos, google_place_id, city, region, address_text",
+          )
           .in("id", idList),
         supabase
           .from("recon_entries")
@@ -162,6 +173,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
           {
             id,
             name: v.name,
+            locality: formatVendorLocality(v),
             reconCount: counts.get(id) ?? 0,
             photoCandidates: candidates,
             slides: slidesByVendor.get(id) ?? [],
@@ -245,6 +257,15 @@ export function VendorPreviewCard({
             <span className="block truncate font-heading text-sm font-semibold">
               {item.name}
             </span>
+            {/* "City, ST" of the address behind the pin — shown for every
+                vendor type, including the service-region ones whose pin marks
+                a base rather than where the work happens. */}
+            {item.locality && (
+              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                <MapPin className="size-3 shrink-0" />
+                <span className="truncate">{item.locality}</span>
+              </span>
+            )}
             <span className="text-xs text-muted-foreground">
               {reconLabel(item.reconCount)}
             </span>
