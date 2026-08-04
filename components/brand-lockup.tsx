@@ -1,5 +1,8 @@
+import Link from "next/link";
+
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/brand-mark";
+import { LANDING_HREF } from "@/lib/landing/nav";
 
 export const BRAND_NAME = "Wedding Recon";
 export const BRAND_DOMAIN = "weddingrecon.com";
@@ -71,6 +74,11 @@ export function BrandLockup({
 /**
  * A quiet brand footer for the bottom of scrollable content pages (hub, vendor,
  * add, terms). Muted icon + wordmark + tagline, centered — present but not loud.
+ *
+ * The lockup links to the landing page, which is the product's way back out to
+ * the marketing site. It must use LANDING_HREF, not `/`: anyone reading this
+ * footer has the visit cookie set by definition, so a bare `/` would be
+ * redirected straight back to Explore by the first-visit gate.
  */
 export function BrandFooter({ className }: { className?: string }) {
   return (
@@ -80,7 +88,13 @@ export function BrandFooter({ className }: { className?: string }) {
         className,
       )}
     >
-      <BrandLockup orientation="vertical" size="sm" showTagline muted />
+      <Link
+        href={LANDING_HREF}
+        aria-label="About Wedding Recon"
+        className="no-underline! transition-opacity hover:opacity-80"
+      >
+        <BrandLockup orientation="vertical" size="sm" showTagline muted />
+      </Link>
     </footer>
   );
 }

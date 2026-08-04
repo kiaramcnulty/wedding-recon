@@ -5,6 +5,10 @@ import { NextResponse, type NextRequest } from "next/server";
  * Refreshes the Supabase auth session on each request and keeps cookies in sync.
  * Call from the root middleware. Does NOT gate routes — public vendor pages and
  * shared deeplinks must remain readable without an account.
+ *
+ * Returns the verified claims alongside the response so a caller can tell
+ * signed-in from anonymous without paying for a second auth call (the
+ * first-visit gate uses it to skip the landing page for account holders).
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -33,7 +37,7 @@ export async function updateSession(request: NextRequest) {
   // Verify the JWT (locally when the project uses asymmetric signing keys) and
   // refresh the session when it's near expiry. Replaces getUser(), which made
   // a network round trip to Supabase Auth on every navigation.
-  await supabase.auth.getClaims();
+  const { data } = await supabase.auth.getClaims();
 
-  return response;
+  return { response, claims: data?.claims ?? null };
 }
