@@ -73,8 +73,21 @@ const RESEARCH = new RegExp([
 // vendor page renders them with whitespace-pre-line, so this is a supported format that
 // displays correctly. Do not re-add the check.
 const EMDASH = /[—–]/; // no em/en dashes anywhere in entry text — real users type hyphens
+// Literal line-break ESCAPES (backslash + n) rather than real newlines. Workers hand back
+// one JSON object per row and the draft contract asks for `notes` on one logical line, so
+// a worker wanting a break between bullets writes the escape. Nothing upstream undoes it:
+// pipeline.mjs strips only REAL newlines, csvEsc sees nothing to quote, and debullet()
+// below keys off WHITESPACE before a bullet — which an escape is not, so it never fires.
+// It reached the DB verbatim and the vendor card, which renders whitespace-pre-line,
+// printed "on shoots\n-she's described as" as literal text (reported 2026-08-04; the rows
+// already written are repaired by migration 0031).
+// This is REPAIRED, not rejected: the row is otherwise fine and the fix is unambiguous,
+// so failing the whole upload over it would be pure friction. The count is reported below
+// so a run that produces a lot of them is still visible.
+const ESCAPES = /\\{1,2}[rnt]/;
 const errors = [];
 const perBot = new Map(), perBotVenue = new Set();
+let escaped = 0;
 for (const [i, r] of recons.entries()) {
   const at = `row ${i + 2} (${r.venue})`;
   if (!r.vendor_id) errors.push(`${at}: missing vendor_id`);
@@ -91,6 +104,7 @@ for (const [i, r] of recons.entries()) {
   const artifact = text.match(RESEARCH);
   if (artifact) errors.push(`${at}: research-artifact narration "${artifact[0]}" — say what's true of the VENDOR ("they don't post pricing"), not what the source material looked like`);
   if (EMDASH.test(text)) errors.push(`${at}: em/en dash in entry text — use a comma, period, or hyphen`);
+  if (ESCAPES.test(text)) escaped++;
   const m = parseInt(r.month, 10), y = parseInt(r.year, 10);
   if (!(m >= 1 && m <= 12)) errors.push(`${at}: bad month "${r.month}"`);
   if (!(y >= 2000 && y <= 2100)) errors.push(`${at}: bad year "${r.year}"`);
@@ -143,6 +157,7 @@ console.log(`upload ${APPLY ? 'APPLY' : 'DRY RUN'} — ${recons.length} rows, ${
 for (const [b, n] of perBot) console.log(`  ${b}: ${n} entries`);
 const photoCount = toInsert.reduce((n, r) => n + (r.photos ? r.photos.split(';').filter(Boolean).length : 0), 0);
 console.log(`  photos to upload: ${photoCount} (x2 with thumbs)`);
+if (escaped) console.log(`  literal line-break escapes repaired at insert: ${escaped} rows (see ESCAPES above)`);
 if (!APPLY) { console.log('\nDRY RUN — nothing written. Re-run with --apply after user confirmation.'); process.exit(0); }
 
 // ── Apply ─────────────────────────────────────────────────────────────────────
@@ -154,10 +169,22 @@ function backdate(month, year) {
   return new Date(start + Math.random() * Math.max(end - start, 1)).toISOString();
 }
 
+// Turn the literal ESCAPES flagged by ESCAPES above into the real characters they stand
+// for. Runs on all three prose columns, not just notes: price_details renders
+// whitespace-pre-line too, and in price_text a real newline collapses to a space in HTML,
+// which is the right outcome for a one-line headline. The CR+LF pair is collapsed first
+// so it yields ONE newline; {1,2} covers the doubly-escaped form.
+const unescapeBreaks = (t) => (t || '')
+  .replace(/\\{1,2}r\\{1,2}n/g, '\n')
+  .replace(/\\{1,2}[rn]/g, '\n')
+  .replace(/\\{1,2}t/g, ' ');
+
 // CSV notes are one physical line (serialization contract); the app renders notes with
 // whitespace-pre-line, so bullet boundaries become REAL newlines here at insert:
 // glued bullets ('-beau is...') and spaced label bullets (' - Style:').
-const debullet = (t) => (t || '').replace(/\s+(?=-[A-Za-z])/g, '\n').replace(/ - (?=[A-Z0-9])/g, '\n- ');
+// Unescaping runs FIRST so the char preceding a bullet is real whitespace — otherwise the
+// `\s+` below is looking at the "n" of an escape and the bullet never becomes a line.
+const debullet = (t) => unescapeBreaks(t).replace(/\s+(?=-[A-Za-z])/g, '\n').replace(/ - (?=[A-Z0-9])/g, '\n- ');
 
 let inserted = 0, media = 0;
 for (const r of toInsert) {
@@ -168,8 +195,8 @@ for (const r of toInsert) {
     recon_type: r.recon_type,
     recon_collected_month: parseInt(r.month, 10),
     recon_collected_year: parseInt(r.year, 10),
-    price_text: r.price_text || null,
-    price_details: r.price_details || null,
+    price_text: unescapeBreaks(r.price_text) || null,
+    price_details: unescapeBreaks(r.price_details) || null,
     notes: debullet(r.notes) || null,
     service_region: profile.serviceRegionRequired ? (r.service_region || null) : null,
     status: 'active',
