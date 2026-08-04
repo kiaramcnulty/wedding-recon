@@ -109,10 +109,20 @@ export function VendorMapPreview({
       if (!halo) el.style.filter = "drop-shadow(0 1px 3px rgba(0,0,0,0.35))";
       new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
 
-      // MapLibre measures the container once at construction and does not watch
-      // it, so a map built before its box has settled keeps a 0-size canvas
-      // forever. Cheap insurance.
-      map.on("load", () => map.resize());
+      map.on("load", () => {
+        // MapLibre measures the container once at construction and does not
+        // watch it, so a map built before its box has settled keeps a 0-size
+        // canvas forever. Cheap insurance.
+        map.resize();
+        // A compact AttributionControl starts EXPANDED (`-show`), which is fine
+        // on Explore's full-screen map but eats 44px of this 174px one. Collapse
+        // it to the "i"; the credit is still one tap away, which is exactly what
+        // the compact affordance is for. Removing the class rather than
+        // overriding the CSS keeps the toggle working.
+        containerRef.current
+          ?.querySelector(".maplibregl-ctrl-attrib")
+          ?.classList.remove("maplibregl-compact-show");
+      });
       // Without this a failed style is silent: the canvas stays transparent, the
       // attribution renders empty (so invisible), and the result is an empty box
       // with no clue why — which is exactly how the bug above presented.
@@ -145,11 +155,25 @@ export function VendorMapPreview({
         className={
           // The attribution corner is lifted over the tap overlay; without it
           // the link swallows the credit toggle.
+          //
+          // The map container inside is sized `h-full w-full`, NOT
+          // `absolute inset-0`. MapLibre stamps `.maplibregl-map` onto whatever
+          // element you hand it, and its stylesheet declares that class
+          // `position: relative` — the same specificity as Tailwind's
+          // `absolute`, and maplibre-gl.css loads after Tailwind's utilities, so
+          // it wins. The container then stops being positioned, `inset-0` no
+          // longer sizes it, and since every child MapLibre adds is itself
+          // absolute, it collapses to ZERO height: canvas, marker and
+          // attribution all present in the DOM and all invisible. That was the
+          // blank preview reported 2026-08-04. An explicit height sidesteps the
+          // whole collision, which is why vendor-map.tsx never hit it.
           "relative h-44 w-full overflow-hidden rounded-xl border bg-muted " +
           "[&_.maplibregl-ctrl-bottom-right]:z-[2]"
         }
       >
-        <div ref={containerRef} className="absolute inset-0" aria-hidden />
+        {/* Sized with h-full/w-full, NOT `absolute inset-0` — see the note on
+            the wrapper. */}
+        <div ref={containerRef} className="h-full w-full" aria-hidden />
 
         <ExternalLink
           href={href}
