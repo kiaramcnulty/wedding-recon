@@ -1,10 +1,8 @@
 import {
   Banknote,
   Bookmark,
-  Map,
+  Layers,
   MessagesSquare,
-  NotebookPen,
-  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -116,73 +114,83 @@ export const EXAMPLE_RECON = {
 export const WHY_SECTION = {
   eyebrow: "Why this exists",
   heading: "Planning a wedding means paying - in time and money - for the same research as other couples, over and over.",
+  intro:
+    "Here is what that cost real couples in Colorado, and what Wedding Recon does about each one.",
+  /** Screen-reader label for the carousel, and the hint under it. */
+  carouselLabel: "What Wedding Recon gives you",
+  carouselHint: "Swipe or use the arrows",
 } as const;
 
 export interface ValueProp {
   icon: LucideIcon;
+  /** What the product does about the problem in the quote. */
   title: string;
-  body: string;
+  quote: Quote;
 }
 
-/** The three problems, drawn from the product spec. */
+export interface Quote {
+  /** Verbatim. Do not paraphrase a real person. */
+  text: string;
+  name: string;
+  /** Wedding year and town, shown under the name. */
+  context: string;
+}
+
+/**
+ * The carousel that carries both "why this exists" and "how it works".
+ *
+ * Every quote is a real thing a real couple said, reproduced verbatim - these
+ * are attributed testimonials, not illustrative copy, so the wording is not
+ * ours to tidy. If a quote is ever cut for length, cut whole sentences from the
+ * end rather than editing inside one, and never add words.
+ *
+ * Two more quotes are on file and unused, kept here so they are not lost:
+ *
+ *   Danielle, married 2024 in Boulder - "The florist was super nice and
+ *   responsive ahead of time, but on the day-of, the arrangements were nothing
+ *   like what we had discussed in the consult. They were objectively beautiful
+ *   but contained flowers I specifically asked not to have."
+ *
+ * Danielle is a straight swap for Julia below (both illustrate reviews), or a
+ * fifth card. Julia was picked so that no two cards lean on the same vendor
+ * type: florist, hotel, music, planning.
+ */
 export const VALUE_PROPS: ValueProp[] = [
   {
     icon: Banknote,
-    title: "Nobody publishes a price",
-    body: "Most venues will not quote you until you have filled in an inquiry form and driven out for a tour. That is hours per vendor before you learn whether they were ever in your budget. Recon entries carry the number someone was actually given, and the fine print underneath it.",
+    title: "Real pricing, rarely available online",
+    quote: {
+      text: "This would have saved me so much time and heartache... all the florists I was referred to had minimum spend of over $20k. I would have never bothered going to their site in the first place",
+      name: "Erika",
+      context: "married 2025, South Denver",
+    },
+  },
+  {
+    icon: Layers,
+    title: "Details and intel specific to each vendor type",
+    quote: {
+      text: "For out of town guests, hotels were super hard and confusing to understand the cost of block rates",
+      name: "Emily",
+      context: "married 2026, Breckenridge",
+    },
   },
   {
     icon: MessagesSquare,
-    title: "The best tip comes from someone who just did this",
-    body: "Couples book their band, their photographer, their caterer on a friend's say-so - because a friend who planned a wedding here last summer knows things no listing does. Not everyone has that friend. This is that conversation, written down and kept.",
+    title: "Reviews from real vendor experiences",
+    quote: {
+      text: "The singer/DJ showed up late and didn't play any of the songs on our request list. The whole night was amazing but this was kind of crazy. And stressful.",
+      name: "Julia",
+      context: "married 2025, Buena Vista",
+    },
   },
   {
     icon: Bookmark,
-    title: "Your own research deserves better than a group chat",
-    body: "Quotes end up in your inbox, notes in your phone, venue photos in a camera roll you never scroll back through. Your Planning Hub keeps saved vendors and everything you have learned in one list, sorted by category.",
-  },
-];
-
-/** The dictionary-style definition box at the end of the section. */
-export const RECON_GLOSS = {
-  word: "re·con",
-  partOfSpeech: "noun",
-  definition:
-    "Everything you learn touring venues, sitting through tastings, and prying a number out of a florist. Usually seen by exactly one couple.",
-} as const;
-
-/* -------------------------------------------------------------------------- */
-/* How it works                                                               */
-/* -------------------------------------------------------------------------- */
-
-export const HOW_SECTION = {
-  eyebrow: "How it works",
-  heading: "Three things, on your phone, for free.",
-  /** Prefix for the numbered label above each step ("Step 1", "Step 2"…). */
-  stepLabel: "Step",
-} as const;
-
-export interface HowItWorksStep {
-  icon: LucideIcon;
-  title: string;
-  body: string;
-}
-
-export const HOW_IT_WORKS: HowItWorksStep[] = [
-  {
-    icon: Map,
-    title: "Explore local vendors",
-    body: "Pan around Colorado and see what's out there. Filter by vendor type and type-specific filters (example: wedding venues under $10k with a mountain backdrop).",
-  },
-  {
-    icon: ScrollText,
-    title: "Read the recon",
-    body: "Every vendor page collects entries from couples: the price quoted, the details behind it, notes on how it actually went, and photos. Each one is tagged by how it was gathered - online research, a call, or an in-person visit - and dated, so you can tell fresh intel from a number that has since moved.",
-  },
-  {
-    icon: NotebookPen,
-    title: "Add your own",
-    body: "Save vendors you are considering to your Planning Hub, then log your own recon as you tour, taste, and negotiate. It keeps your search straight while you are in it - and it is what the next couple will be reading.",
+    title: "A central hub to track and share vendor candidates",
+    quote: {
+      text: "Ours was such a mess. We had pages and pages of spreadsheets",
+      name: "Wyatt",
+      context: "married 2024, Colorado Springs",
+    },
   },
 ];
 
@@ -320,6 +328,13 @@ export const FAQ_ITEMS: FaqItem[] = [
 /* -------------------------------------------------------------------------- */
 
 export const CLOSING_CTA = {
+  /** The sixth quote on file. Praise for the product rather than a problem, so
+      it sits here rather than on a carousel card. Safe to delete. */
+  quote: {
+    text: "I needed a photographer. Wedding planning is so much work! So this is seriously so helpful",
+    name: "Cassie",
+    context: "wedding 2027, Larkspur",
+  },
   heading: "Start with the map.",
   body: "See who is near your date's hometown, read what other couples paid, and keep the rest of your search in one place.",
   cta: "Explore Colorado vendors",

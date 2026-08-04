@@ -6,6 +6,8 @@ import { HeroVisual } from "@/components/landing/hero-visual";
 import { LandingFaq } from "@/components/landing/landing-faq";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingHeader } from "@/components/landing/landing-header";
+import { ValueCard } from "@/components/landing/value-card";
+import { ValueCarousel } from "@/components/landing/value-carousel";
 import { buttonVariants } from "@/components/ui/button";
 import {
   CATEGORY_LIST,
@@ -21,10 +23,7 @@ import {
   FAQ_ITEMS,
   FAQ_SECTION,
   HERO,
-  HOW_IT_WORKS,
-  HOW_SECTION,
   META,
-  RECON_GLOSS,
   VALUE_PROPS,
   WHY_SECTION,
 } from "@/lib/landing/content";
@@ -195,70 +194,32 @@ export default function LandingPage() {
         </section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Why it exists                                                     */}
+        {/* Why it exists + what you get. Keeps the `how-it-works` id: the    */}
+        {/* header nav and the hero's secondary CTA both anchor to it, and    */}
+        {/* this section absorbed that content when the separate step-by-step */}
+        {/* block was removed.                                                */}
         {/* ---------------------------------------------------------------- */}
-        <Section className="border-y bg-muted/30">
+        <Section id="how-it-works" className="border-y bg-muted/30">
           <SectionHeading eyebrow={WHY_SECTION.eyebrow}>
             {WHY_SECTION.heading}
           </SectionHeading>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            {WHY_SECTION.intro}
+          </p>
 
-          <div className="mt-10 grid gap-8 sm:grid-cols-3 sm:gap-7">
-            {VALUE_PROPS.map(({ icon: Icon, title, body }) => (
-              <div key={title}>
-                <span className="flex size-10 items-center justify-center rounded-xl bg-brand-soft text-brand-ink">
-                  <Icon className="size-5" aria-hidden />
-                </span>
-                <h3 className="mt-4 font-heading text-base font-semibold">
-                  {title}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {body}
-                </p>
-              </div>
+          {/* Cards are rendered here, on the server, and handed to the client
+              shell as children — `icon` is a component, and a function cannot
+              cross the server/client boundary. */}
+          <ValueCarousel
+            slideLabels={VALUE_PROPS.map((prop) => prop.title)}
+            label={WHY_SECTION.carouselLabel}
+            hint={WHY_SECTION.carouselHint}
+            className="mt-8"
+          >
+            {VALUE_PROPS.map((prop) => (
+              <ValueCard key={prop.title} {...prop} />
             ))}
-          </div>
-
-          <div className="mt-10 rounded-2xl border border-brand/20 bg-background px-5 py-5 sm:px-7">
-            <p className="font-heading text-lg font-semibold">
-              {RECON_GLOSS.word}
-              <span className="ml-2 text-sm font-normal italic text-muted-foreground">
-                {RECON_GLOSS.partOfSpeech}
-              </span>
-            </p>
-            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              {RECON_GLOSS.definition}
-            </p>
-          </div>
-        </Section>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* How it works                                                      */}
-        {/* ---------------------------------------------------------------- */}
-        <Section id="how-it-works">
-          <SectionHeading eyebrow={HOW_SECTION.eyebrow}>
-            {HOW_SECTION.heading}
-          </SectionHeading>
-
-          <ol className="mt-10 grid gap-8 sm:grid-cols-3 sm:gap-7">
-            {HOW_IT_WORKS.map(({ icon: Icon, title, body }, i) => (
-              <li key={title}>
-                <div className="flex items-center gap-3">
-                  <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white">
-                    <Icon className="size-5" aria-hidden />
-                  </span>
-                  <span className="font-heading text-sm font-semibold text-muted-foreground">
-                    {HOW_SECTION.stepLabel} {i + 1}
-                  </span>
-                </div>
-                <h3 className="mt-4 font-heading text-base font-semibold">
-                  {title}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {body}
-                </p>
-              </li>
-            ))}
-          </ol>
+          </ValueCarousel>
         </Section>
 
         {/* ---------------------------------------------------------------- */}
@@ -369,6 +330,18 @@ export default function LandingPage() {
               {CLOSING_CTA.cta}
               <ArrowRight className="size-4" aria-hidden />
             </Link>
+
+            {/* The sixth quote on file. It is praise for the product rather
+                than a problem statement, so it closes the page instead of
+                sitting on a carousel card. */}
+            <figure className="mx-auto mt-10 max-w-lg border-t border-white/25 pt-6">
+              <blockquote className="text-sm italic leading-relaxed text-white/90">
+                {CLOSING_CTA.quote.text}
+              </blockquote>
+              <figcaption className="mt-2 text-xs text-white/70">
+                {CLOSING_CTA.quote.name} · {CLOSING_CTA.quote.context}
+              </figcaption>
+            </figure>
           </div>
         </Section>
       </main>
