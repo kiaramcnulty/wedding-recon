@@ -145,6 +145,13 @@ export interface Quote {
  * ours to tidy. If a quote is ever cut for length, cut whole sentences from the
  * end rather than editing inside one, and never add words.
  *
+ * All six people confirmed they are happy to be quoted publicly under a first
+ * name, wedding year and town (Kiara, 2026-08-04). That consent covers the
+ * wording as it stands here; a NEW quote, or a new attribution, needs its own.
+ * Note none of them names a vendor, which is what keeps an unflattering
+ * experience a personal account rather than a claim about a named business -
+ * keep it that way.
+ *
  * Two more quotes are on file and unused, kept here so they are not lost:
  *
  *   Danielle, married 2024 in Boulder - "The florist was super nice and
