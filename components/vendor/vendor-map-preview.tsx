@@ -167,7 +167,9 @@ export function VendorMapPreview({
           // attribution all present in the DOM and all invisible. That was the
           // blank preview reported 2026-08-04. An explicit height sidesteps the
           // whole collision, which is why vendor-map.tsx never hit it.
-          "relative h-44 w-full overflow-hidden rounded-xl border bg-muted " +
+          // h-32, not taller: this is an orienting glance, and the page's job is
+          // to get the reader to the recon.
+          "relative h-32 w-full overflow-hidden rounded-xl border bg-muted " +
           "[&_.maplibregl-ctrl-bottom-right]:z-[2]"
         }
       >

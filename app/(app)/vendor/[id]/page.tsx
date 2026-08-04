@@ -18,8 +18,7 @@ import {
 import { isApproximateLocation } from "@/lib/map/vendor-location";
 import { VendorMapPreview } from "@/components/vendor/vendor-map-preview";
 import type { ReconEntryWithDetails } from "@/lib/types";
-import { PhotoCarousel } from "@/components/vendor/photo-carousel";
-import { GooglePhotoStrip } from "@/components/vendor/google-photo-strip";
+import { VendorPhotos } from "@/components/vendor/vendor-photos";
 import { ReconCard } from "@/components/vendor/recon-card";
 import { SaveButton } from "@/components/vendor/save-button";
 import { ShareButton } from "@/components/vendor/share-button";
@@ -326,21 +325,17 @@ export default async function VendorPage({
         </div>
       </div>
 
-      {/* Google Places photos (venue-level; references cached, bytes proxied) */}
-      {googlePhotos.length > 0 && (
+      {/* All photos in ONE strip — recon first, then Google (badged per tile,
+          bytes proxied from cached references). Two stacked strips plus the map
+          used to fill the whole first screen before any recon was reachable. */}
+      {(photos.length > 0 || googlePhotos.length > 0) && (
         <div className="mt-4">
-          <GooglePhotoStrip
+          <VendorPhotos
             vendorId={vendor.id}
-            count={googlePhotos.length}
-            credit={googleCredit}
+            googleCount={googlePhotos.length}
+            googleCredit={googleCredit}
+            reconPhotos={photos}
           />
-        </div>
-      )}
-
-      {/* Recon photo carousel */}
-      {photos.length > 0 && (
-        <div className="mt-4">
-          <PhotoCarousel photos={photos} />
         </div>
       )}
 
