@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
@@ -199,14 +201,28 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
 export function VendorPreviewCard({
   item,
   vendorType,
-  onOpen,
+  href,
+  onNavigate,
   showCategoryPill = true,
   action,
   className,
 }: {
   item: VendorPreview;
   vendorType: VendorType;
-  onOpen: () => void;
+  /**
+   * The vendor page this card opens, including any `from` return path.
+   *
+   * A real href, not an onClick — that is what makes it a `<Link>`, and the
+   * Link is what gets `/vendor/[id]`'s `loading.tsx` prefetched. As a button
+   * calling router.push, Next did not know the route had a loading boundary
+   * until the whole RSC response arrived, so a tap sat there doing visibly
+   * nothing (~800ms locally, and longer on a phone where the card photos are
+   * competing for bandwidth — which is what made it look like the card was not
+   * clickable until its photo loaded). Same lesson as /recon/[id]/edit.
+   */
+  href: string;
+  /** Side effect to run before navigating (e.g. saving feed scroll position). */
+  onNavigate?: () => void;
   /** Hidden in the Hub, where cards already sit under a category accordion. */
   showCategoryPill?: boolean;
   /**
@@ -217,12 +233,19 @@ export function VendorPreviewCard({
   action?: React.ReactNode;
   className?: string;
 }) {
+  const router = useRouter();
   const category = CATEGORIES[vendorType];
   const CategoryIcon = category.icon;
 
+  /** Same destination as the Link, for the carousel below it. */
+  const go = () => {
+    onNavigate?.();
+    router.push(href);
+  };
+
   return (
-    // The scrollable carousel can't live inside a <button>, so the card is a
-    // div: button row on top, swipeable previews below.
+    // The scrollable carousel can't live inside the main control, so the card is
+    // a div: link row on top, swipeable previews below.
     <div
       className={cn(
         "overflow-hidden rounded-xl border bg-card transition-colors hover:bg-muted/40",
@@ -230,10 +253,14 @@ export function VendorPreviewCard({
       )}
     >
       <div className="flex items-stretch">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="flex min-w-0 flex-1 items-stretch gap-3 p-2 text-left"
+        <Link
+          href={href}
+          onClick={onNavigate}
+          // `no-underline!` is required, not cosmetic: in the Hub this card sits
+          // inside AccordionContent, which underlines every descendant anchor
+          // with `[&_a]:underline` — a selector that out-specifies a plain
+          // utility. Same gotcha as the Hub's "Add" action link.
+          className="flex min-w-0 flex-1 items-stretch gap-3 p-2 text-left no-underline!"
         >
           <VendorPreviewPhoto
             candidates={item.photoCandidates}
@@ -270,13 +297,13 @@ export function VendorPreviewCard({
               {reconLabel(item.reconCount)}
             </span>
           </div>
-        </button>
+        </Link>
         {action && (
           <div className="flex shrink-0 items-center pr-2 pl-1">{action}</div>
         )}
       </div>
       {item.slides.length > 0 && (
-        <ReconPreviewCarousel slides={item.slides} onOpen={onOpen} />
+        <ReconPreviewCarousel slides={item.slides} onOpen={go} />
       )}
     </div>
   );

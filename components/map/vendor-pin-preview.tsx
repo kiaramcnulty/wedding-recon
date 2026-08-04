@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { X, Loader2 } from "lucide-react";
 import { type VendorType } from "@/lib/constants/categories";
 import {
@@ -30,7 +29,6 @@ export function VendorPinPreview({
   vendorType,
   onClose,
 }: VendorPinPreviewProps) {
-  const router = useRouter();
   const items = useVendorPreviews([vendorId]);
   const item = items?.[0] ?? null;
   const cardRef = React.useRef<HTMLDivElement>(null);
@@ -137,11 +135,7 @@ export function VendorPinPreview({
           item={item}
           vendorType={vendorType}
           // `from` returns the back button to the map with this peek reopened.
-          onOpen={() =>
-            router.push(
-              `/vendor/${item.id}?from=${encodeURIComponent("/explore?restore=1")}`,
-            )
-          }
+          href={`/vendor/${item.id}?from=${encodeURIComponent("/explore?restore=1")}`}
           className="shadow-xl"
         />
       )}

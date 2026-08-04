@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Loader2, MapPin, PlusCircle } from "lucide-react";
 
 import {
@@ -50,8 +49,6 @@ const actionLinkClass = cn(
 );
 
 export function HubAccordion({ vendors }: HubAccordionProps) {
-  const router = useRouter();
-
   // Group vendors by type, preserving VENDOR_TYPES order.
   const grouped = VENDOR_TYPES.reduce<Record<VendorType, VendorWithRecon[]>>(
     (acc, type) => {
@@ -136,11 +133,7 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
                           // Redundant here: the card already sits inside this
                           // category's accordion section.
                           showCategoryPill={false}
-                          onOpen={() =>
-                            router.push(
-                              `/vendor/${vendor.id}?from=${HUB_RETURN}`,
-                            )
-                          }
+                          href={`/vendor/${vendor.id}?from=${HUB_RETURN}`}
                           // Only "Add" lives on the card. Editing happens on
                           // the recon entry itself (vendor page), so a vendor
                           // you have already reconned gets no card action.
