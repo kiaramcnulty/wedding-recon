@@ -40,6 +40,79 @@ node --env-file=.env.local .claude/skills/enrichvendors/scripts/harvest.mjs <wor
 node .claude/skills/enrichvendors/scripts/dossier.mjs <workdir> --type <type>
 ```
 
+### Harvest is tuned for the Explore FILTER attributes, not just prose (2026-08-01)
+
+The filters need specific, structured facts (capacity, price + its basis, catering policy,
+lodging, service style). Three things in the harvest exist to serve that, and they should
+be kept working when this code is touched:
+
+- **PDF rate cards are fetched and read** (`pdf-text.mjs`, dependency-free). Vendors very
+  often publish pricing ONLY as a PDF. The harvest used to record the link and stop,
+  which put a hole in the corpus exactly where pricing lives — measured at **112/679 CO
+  venues with an unfetched PDF, 24 explicitly pricing-named**. Salida SteamPlant read as
+  "no pricing published" while its own site served a wedding rate card; reading it yields
+  `$4,000-$6,500` **and** `Max Guest Count 180` **and** a getting-ready room.
+- **Subpages and PDFs are RANKED by filter relevance** before the crawl budget is spent
+  (`filterScore` in `harvest.mjs`), so a pricing/capacity/FAQ page beats whatever the nav
+  listed first. Previously it was first-N-found.
+- **The dossier keeps bare table cells.** PDF rate cards are tables: the price extracts as
+  its own short line (`$6500`). The old 20-char floor dropped precisely those headline
+  numbers. Short lines are now kept when they carry a 3+ digit figure or a capacity
+  phrase, capped at 12 per vendor so a fee schedule ($3 corkage, $15 easel) can't dominate
+  — and cheap fees are excluded on purpose, since they make convincing false price floors.
+
+**A HEAD preflight runs before every PDF download**, and the limiter is TIME, not size.
+Image streams are skipped by dictionary inspection before inflating, so parse cost is no
+longer size-driven — a 48MB brochure parses in 0.03s. The size cap (40MB) only bounds
+memory; the 45s download deadline is the real budget, so a large-but-fast PDF is read
+while a large-and-slow one is cut off (the same 48MB file took **168s** to download).
+Don't reintroduce a tight size cap "for speed" — measure the download, not the bytes.
+**And do not filter PDFs to those with a promising filename**: Squarespace and Wix serve
+them under opaque hashes (`8ecfd3_c33011dc….pdf`), and one such file held San Sophia
+Overlook's rates. Rank by name, never exclude by it.
+
+Expect little from the very large ones regardless: PDFs are big *because* they're
+image-heavy, so they skew toward scans and photo lookbooks. Mount Vernon's 48MB "FAQ" is a
+scan whose text layer is `H B B B B G B G G G` — the language guard correctly rejects it.
+
+**The dossier carries a `## filter facts` block, so no future market needs a backfill.**
+The pricing pass answers "what does it cost"; for a long time it was the whole dossier,
+which meant a crawl could contain "outside catering allowed" or "sleeps up to 40" and the
+dossier would silently drop it. Measured on 345 CO venues, indoor/outdoor appeared in 28%
+of RAW crawled text but only 7% of dossiers; lodging 37% vs 17%; alcohol policy 18% vs 2%.
+`FILTER_FACT` in `dossier.mjs` now mines those lines for every type in one shared pattern —
+keep it shared, because carrying a few irrelevant lines is far cheaper than dropping a
+real one, and a dropped fact is invisible downstream (it just looks like the vendor never
+said it). Re-running `dossier.mjs` over an existing region is free and picks these up.
+
+**`--sites-only` re-crawls websites without re-billing Google Places**, preserving the
+existing reviews/rating from `harvest.json`. Use it for a filter-attribute pass over an
+already-harvested region — site crawling costs time, not money. This is the ONLY sane way
+to re-crawl at scale; a plain re-run re-issues a paid Places call per vendor for data you
+already have.
+
+**Some attributes need the crawl, not the compression.** Catering policy sits in ~8% of
+raw crawled venue text and moved only 1%→2% from better mining, because the old harvest
+fetched the first 5 subpages it found and FAQ/policy pages were often never fetched. That
+is what `filterScore` ranking fixes on a fresh crawl — mining can only recover what was
+downloaded.
+
+**Extraction fails honestly, and that distinction is load-bearing.** A scan, a CID-font
+disagreement, or a mis-decode yields nothing rather than a guess, and `dossier.mjs` labels
+it `UNREADABLE ... treat as unknown, NOT as "no pricing published"` — a draft that reads an
+unread rate card as "they don't publish pricing" is a factual error. Three guards enforce
+this, and all three exist because a real file defeated the previous one:
+
+- **Never merge conflicting `ToUnicode` maps.** In SteamPlant's file glyph 23 meant `0` in
+  one font and `4` in another; a naive merge silently rewrites digits in a price list.
+- **Language check** (`readsAsEnglish`) — the decisive test. A wrong glyph map still emits
+  letter-shaped tokens: Telluride's PDF gave 1,059 words of 4+ letters and **zero**
+  instances of "the"/"and"/"for". Real prose is dense with function words.
+- **Money-shape check** (`moneyLooksSane`) — for the narrower case where prose decodes but
+  digits (often a separate subset font) do not. Judge only `$`-followed-by-digit tokens:
+  counting `$` in leftover binary once condemned a perfectly good file, and a lost space
+  ("$3,000wedding") is a formatting artifact, not corruption.
+
 Once per region+type (fixed cost): the **region pricing pass** — one Sonnet subagent WebSearches `<region> <vendor type> prices/packages`, fetches ~5 multi-vendor sources, saves per-vendor digests to `research/pricing-web-<domain>.txt`, replies one line. **Same pass, negative-signal sweep (harvest only — this feeds free-text recon notes; there is no user-facing "watch-outs" surface):** for the region's top ~20 vendors by Google review count (`ratingCount` in each vendor's `harvest.json`), also run complaint-flavored `"<vendor>" reddit` searches (problems / disappointed / overpriced / avoid) and save those digests as `pricing-web-*.txt` too. The review corpus skews positive (Places returns only 5 "most relevant"; sites and listicles are promotional), so this sweep is where the sourced warts come from — `dossier.mjs` lifts the negative fragments into each vendor's internal `## watch-outs` block, and the draft rules require carrying at least one into an entry's `notes`. Launch-time research intel (candidates.jsonl `intel` fields) can be script-converted into a `research/pricing-web-launchintel.txt` digest — dossiers pick up any `pricing-web-*.txt` automatically. And whenever the reddit archive changed: `roster.mjs --type <type> --slices` (or the thread-digest subagent for messy threads) so per-vendor `reddit-slice.txt` excerpts exist. Re-run `dossier.mjs` after either.
 
 ## Cloud/web runs — the split workflow
