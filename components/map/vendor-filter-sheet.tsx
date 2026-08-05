@@ -6,6 +6,7 @@ import { X, SlidersHorizontal, ChevronDown } from "lucide-react";
 import {
   CATEGORIES,
   CATEGORY_PLURAL,
+  VENDOR_TYPES,
   type CategoryMeta,
   type VendorType,
 } from "@/lib/constants/categories";
@@ -251,9 +252,9 @@ function RangeControl({
 /* ------------------------------------------------------------------- sheet */
 
 /**
- * The filter groups for ONE vendor type. Split out so the sheet can stack a
- * section per selected type: filters are type-scoped, but that scopes which
- * filters apply to a vendor, not how many types you may filter at once.
+ * The filter groups for ONE vendor type — whichever category tab is focused.
+ * Filters are type-scoped, so only the focused type's controls are on screen;
+ * the others keep their state and are one tap away.
  */
 function TypeSection({
   vendorType,
@@ -262,9 +263,6 @@ function TypeSection({
   dateContext,
   onChange,
   onDateContextChange,
-  collapsible,
-  open,
-  onToggleOpen,
 }: {
   vendorType: VendorType;
   vendors: Vendor[];
@@ -272,9 +270,6 @@ function TypeSection({
   dateContext: DateContext;
   onChange: (next: FilterState) => void;
   onDateContextChange: (next: DateContext) => void;
-  collapsible: boolean;
-  open: boolean;
-  onToggleOpen: () => void;
 }) {
   const meta = CATEGORIES[vendorType];
   const defs = filtersForType(vendorType);
@@ -321,40 +316,21 @@ function TypeSection({
   };
 
   const header = (
-    <div className="flex items-center gap-2">
-      <meta.icon className="size-4 shrink-0" style={{ color: meta.colorHex }} />
+    <div className="mb-3 flex items-center gap-2">
       <h3 className="text-[14px] font-semibold capitalize">
         {CATEGORY_PLURAL[vendorType]}
       </h3>
       {activeCount > 0 && (
-        <span
-          className="rounded-full px-1.5 text-[11px] font-medium text-white"
-          style={{ backgroundColor: meta.colorHex }}
-        >
-          {activeCount}
-        </span>
-      )}
-      {activeCount > 0 && (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
             onChange({});
             onDateContextChange({});
           }}
           className="text-[12px] text-muted-foreground underline underline-offset-2"
         >
-          Clear
+          Clear {CATEGORY_PLURAL[vendorType]}
         </button>
-      )}
-      {collapsible && (
-        <ChevronDown
-          className={cn(
-            "ml-auto size-4 shrink-0 text-muted-foreground transition-transform",
-            open && "rotate-180",
-          )}
-          aria-hidden
-        />
       )}
     </div>
   );
@@ -469,32 +445,33 @@ function TypeSection({
     </div>
   );
 
-  if (!collapsible) {
-    return (
-      <div>
-        <div className="mb-3">{header}</div>
-        {groups}
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-xl border border-border">
-      <button
-        type="button"
-        onClick={onToggleOpen}
-        aria-expanded={open}
-        className="w-full px-3 py-2.5 text-left"
-      >
-        {header}
-      </button>
-      {open && <div className="border-t border-border px-3 py-3">{groups}</div>}
+    <div>
+      {header}
+      {groups}
     </div>
   );
 }
 
+/**
+ * ONE sheet for the whole filtering decision: which categories to show, and how
+ * to narrow each of them.
+ *
+ * It replaced a two-sheet flow — pick categories in one, close it, open a
+ * separate Filters sheet, scroll to find each category's section. That made a
+ * single decision feel like an errand (Kiara, 2026-08-05).
+ *
+ * The category chips do two jobs at once, which is the only subtle part. They
+ * choose which types appear on the map (multi-select, changes results) AND which
+ * type's filters are on screen (single, navigation). A plain tab bar conflates
+ * those, so the rule is: tapping a chip always SELECTS and FOCUSES it, and a
+ * selected chip carries an explicit clear button to remove it. Tapping is
+ * therefore always additive and safe — there is no "tap again to remove" gesture
+ * that could silently discard the filters you just set.
+ */
 export function VendorFilterSheet({
-  vendorTypes,
+  selectedTypes,
+  onSelectedTypesChange,
   vendors,
   visibleTotal,
   visiblePartial,
@@ -505,8 +482,8 @@ export function VendorFilterSheet({
   onClearAll,
   onClose,
 }: {
-  /** Every selected category. One section each. */
-  vendorTypes: VendorType[];
+  selectedTypes: VendorType[];
+  onSelectedTypesChange: (next: VendorType[]) => void;
   /**
    * Rows the map holds. Used ONLY to rescale histograms, never to count:
    * it spans the padded fetch box, which reaches well beyond the viewport.
@@ -515,8 +492,7 @@ export function VendorFilterSheet({
   /**
    * On-screen totals, straight from the map. The footer counts these rather
    * than counting `vendors` itself, so the sheet and the results pill can never
-   * disagree - they are literally the same numbers. Counting the fetched rows
-   * instead reported "55 matches" next to a pill saying "93 on screen".
+   * disagree - they are literally the same numbers.
    */
   visibleTotal: number;
   visiblePartial: number;
@@ -528,11 +504,8 @@ export function VendorFilterSheet({
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  // With several categories chosen the sections collapse, so the sheet opens on
-  // a scannable list of categories rather than a wall of every filter at once.
-  // The first is open because with one category that IS the whole sheet.
-  const [openType, setOpenType] = useState<VendorType | null>(
-    vendorTypes[0] ?? null,
+  const [focused, setFocused] = useState<VendorType | null>(
+    selectedTypes[0] ?? null,
   );
 
   useEffect(() => {
@@ -551,13 +524,26 @@ export function VendorFilterSheet({
     };
   }, [onClose]);
 
-  const filterable = vendorTypes.filter((t) => filtersForType(t).length > 0);
-  const multi = filterable.length > 1;
   const matched = Math.max(0, visibleTotal - visiblePartial);
-  const totalActive = filterable.reduce(
+  const totalActive = selectedTypes.reduce(
     (n, t) => n + Object.keys(states[t] ?? {}).length,
     0,
   );
+
+  // Focus follows selection: the focused type must always be one that is
+  // actually shown, or the panel would be editing filters for a hidden category.
+  const focusedType =
+    focused && selectedTypes.includes(focused) ? focused : (selectedTypes[0] ?? null);
+
+  const select = (t: VendorType) => {
+    if (!selectedTypes.includes(t)) onSelectedTypesChange([...selectedTypes, t]);
+    setFocused(t);
+  };
+
+  const deselect = (t: VendorType) => {
+    onSelectedTypesChange(selectedTypes.filter((x) => x !== t));
+    if (focused === t) setFocused(null);
+  };
 
   const body = (
     <div className="fixed inset-0 z-[70] flex flex-col justify-end">
@@ -567,16 +553,16 @@ export function VendorFilterSheet({
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[85vh] flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl">
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
-          <h2 className="text-[15px] font-semibold">Filters</h2>
+      <div className="relative flex max-h-[88vh] flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl">
+        <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-3">
+          <h2 className="text-[15px] font-semibold">Show me</h2>
           {totalActive > 0 && (
             <button
               type="button"
               onClick={onClearAll}
               className="text-[13px] text-muted-foreground underline underline-offset-2"
             >
-              Clear all
+              Clear filters
             </button>
           )}
           <button
@@ -589,23 +575,118 @@ export function VendorFilterSheet({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <div className="flex flex-col gap-3">
-            {filterable.map((t) => (
-              <TypeSection
+        {/* Category tabs. Wrapping rather than a horizontal scroller so every
+            category — and the pin colour legend — stays visible at a glance;
+            inside a sheet the rows are affordable in a way they were not on the
+            map. */}
+        <div
+          role="group"
+          aria-label="Vendor categories"
+          className="flex shrink-0 flex-wrap gap-1.5 border-b border-border px-4 pb-3"
+        >
+          <button
+            type="button"
+            aria-pressed={selectedTypes.length === 0}
+            onClick={() => {
+              onSelectedTypesChange([]);
+              setFocused(null);
+            }}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-[13px] transition-colors",
+              selectedTypes.length === 0
+                ? "border-foreground bg-foreground font-medium text-background"
+                : "border-border bg-background hover:bg-muted",
+            )}
+          >
+            All
+          </button>
+
+          {VENDOR_TYPES.map((t) => {
+            const m = CATEGORIES[t];
+            const on = selectedTypes.includes(t);
+            const isFocused = on && focusedType === t;
+            const count = Object.keys(states[t] ?? {}).length;
+            const Icon = m.icon;
+            return (
+              <span
                 key={t}
-                vendorType={t}
+                style={
+                  on
+                    ? { backgroundColor: m.colorHex, borderColor: m.colorHex }
+                    : { borderColor: `${m.colorHex}40` }
+                }
+                className={cn(
+                  "inline-flex items-center rounded-full border text-[13px] transition-colors",
+                  on ? "text-white" : "bg-background",
+                  // Two states have to stay separable here: which categories are
+                  // ON THE MAP (filled) and which one's filters are ON SCREEN
+                  // (ringed). Without an explicit ring colour Tailwind inherits
+                  // currentColor, which on a filled chip is white on white and
+                  // vanishes. A foreground ring reads on every category hue.
+                  isFocused &&
+                    "ring-2 ring-foreground ring-offset-2 ring-offset-background",
+                  // A selected but unfocused tab is dimmed, so the focused one
+                  // is obvious even where the ring is clipped by scrolling.
+                  on && !isFocused && "opacity-70",
+                )}
+              >
+                <button
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => select(t)}
+                  style={on ? undefined : { color: m.textHex }}
+                  className={cn(
+                    "flex items-center gap-1.5 py-1.5 pl-3",
+                    on ? "pr-1.5 font-medium" : "pr-3",
+                  )}
+                >
+                  <Icon className="size-3.5 shrink-0" aria-hidden />
+                  {m.label}
+                  {count > 0 && (
+                    <span className="rounded-full bg-white/25 px-1.5 text-[11px]">
+                      {count}
+                    </span>
+                  )}
+                </button>
+                {on && (
+                  <button
+                    type="button"
+                    onClick={() => deselect(t)}
+                    aria-label={`Remove ${m.label}`}
+                    className="mr-1 rounded-full p-1 hover:bg-white/20"
+                  >
+                    <X className="size-3" aria-hidden />
+                  </button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {focusedType ? (
+            filtersForType(focusedType).length > 0 ? (
+              <TypeSection
+                key={focusedType}
+                vendorType={focusedType}
                 vendors={vendors}
-                state={states[t] ?? {}}
-                dateContext={dateContexts[t] ?? {}}
-                onChange={(next) => onChangeType(t, next)}
-                onDateContextChange={(next) => onDateContextChange(t, next)}
-                collapsible={multi}
-                open={!multi || openType === t}
-                onToggleOpen={() => setOpenType(openType === t ? null : t)}
+                state={states[focusedType] ?? {}}
+                dateContext={dateContexts[focusedType] ?? {}}
+                onChange={(next) => onChangeType(focusedType, next)}
+                onDateContextChange={(next) =>
+                  onDateContextChange(focusedType, next)
+                }
               />
-            ))}
-          </div>
+            ) : (
+              <p className="py-6 text-center text-[13px] text-muted-foreground">
+                No detail filters for {CATEGORY_PLURAL[focusedType]} yet.
+              </p>
+            )
+          ) : (
+            <p className="py-8 text-center text-[13px] text-muted-foreground">
+              Showing every category. Pick one above to narrow it down.
+            </p>
+          )}
         </div>
 
         <div className="shrink-0 border-t border-border px-4 py-3">
@@ -653,63 +734,66 @@ function priceForContext(
 
 /* ----------------------------------------------------------------- trigger */
 
+/**
+ * The single Explore control. It summarizes the whole filter state — which
+ * categories, how many detail filters — and opens the one sheet that edits all
+ * of it. There used to be two controls here (a category chip and a separate
+ * Filters button) for what is really one decision.
+ */
 export function FilterButton({
-  vendorTypes,
+  selectedTypes,
   activeCount,
   onClick,
   className,
 }: {
-  vendorTypes: VendorType[];
+  selectedTypes: VendorType[];
   activeCount: number;
   onClick: () => void;
   className?: string;
 }) {
-  const filterable = vendorTypes.filter((t) => filtersForType(t).length > 0);
-  // Nothing to filter until at least one category is chosen: with "All" showing
-  // every type, a sheet of ten collapsed sections is a worse starting point than
-  // asking which category you are shopping for. Hidden rather than disabled,
-  // since a permanently dead control in a one-row bar reads as broken.
-  if (filterable.length === 0) return null;
-
-  // Tint by the single chosen category; stay neutral across several, where no
-  // one hue is honest.
-  const meta = filterable.length === 1 ? CATEGORIES[filterable[0]] : null;
-  const on = activeCount > 0;
+  // Tint by the single chosen category; stay neutral for "All" or several,
+  // where no one hue is honest.
+  const meta = selectedTypes.length === 1 ? CATEGORIES[selectedTypes[0]] : null;
+  const Icon = meta?.icon ?? SlidersHorizontal;
+  const label =
+    selectedTypes.length === 0
+      ? "All vendors"
+      : selectedTypes.length === 1
+        ? meta!.label
+        : `${selectedTypes.length} categories`;
 
   return (
     <button
       type="button"
       onClick={onClick}
-      style={
-        meta
-          ? on
-            ? { backgroundColor: meta.colorHex, borderColor: meta.colorHex }
-            : { borderColor: `${meta.colorHex}59`, color: meta.textHex }
-          : undefined
-      }
       className={cn(
         "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] shadow-sm transition-colors",
-        on
-          ? meta
-            ? "font-medium text-white"
-            : "border-foreground bg-foreground font-medium text-background"
-          : "bg-background/95 backdrop-blur",
-        !meta && !on && "border-border",
+        meta
+          ? "font-medium text-white"
+          : selectedTypes.length > 0
+            ? "border-foreground bg-foreground font-medium text-background"
+            : "border-border bg-background/95 backdrop-blur",
         className,
       )}
+      style={
+        meta
+          ? { backgroundColor: meta.colorHex, borderColor: meta.colorHex }
+          : undefined
+      }
     >
-      <SlidersHorizontal className="size-3.5" aria-hidden />
-      Filters
-      {on && (
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      {label}
+      {activeCount > 0 && (
         <span
           className={cn(
             "rounded-full px-1.5 text-[11px]",
-            meta ? "bg-white/25" : "bg-background/25",
+            meta || selectedTypes.length > 0 ? "bg-white/25" : "bg-foreground/10",
           )}
         >
           {activeCount}
         </span>
       )}
+      <ChevronDown className="size-3.5 shrink-0 opacity-70" aria-hidden />
     </button>
   );
 }

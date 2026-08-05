@@ -18,7 +18,6 @@ import {
 } from "@/components/map/vendor-list-sheet";
 import { ScreenResultsPill } from "@/components/map/screen-results-pill";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
-import { CategoryPicker } from "@/components/map/category-picker";
 import {
   VendorFilterSheet,
   FilterButton,
@@ -688,13 +687,8 @@ export default function ExplorePage() {
           Click-through except for the controls themselves, so it cannot steal a
           pin tap from the map underneath. */}
       <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] items-center gap-2 px-3 pt-2">
-        <CategoryPicker
-          selected={selectedTypes}
-          onChange={updateSelectedTypes}
-          className="pointer-events-auto"
-        />
         <FilterButton
-          vendorTypes={selectedTypes}
+          selectedTypes={selectedTypes}
           activeCount={activeFilterCount}
           onClick={() => setFilterSheetOpen(true)}
           className="pointer-events-auto"
@@ -707,9 +701,10 @@ export default function ExplorePage() {
         />
       </div>
 
-      {filterSheetOpen && selectedTypes.length > 0 && (
+      {filterSheetOpen && (
         <VendorFilterSheet
-          vendorTypes={selectedTypes}
+          selectedTypes={selectedTypes}
+          onSelectedTypesChange={updateSelectedTypes}
           vendors={mapVendors}
           visibleTotal={visible.total}
           visiblePartial={visible.partial}
