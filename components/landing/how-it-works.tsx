@@ -22,10 +22,18 @@ const TICK_MS = 50;
  *   timer is. WCAG 2.2.2 (Pause, Stop, Hide) requires a control for anything
  *   moving unprompted past five seconds, and this runs indefinitely - hence the
  *   explicit pause button too.
- * - Choosing a step stops the timer for good. Someone who has taken control is
- *   reading at their own pace; resuming would fight them.
+ * - Choosing a step jumps to it and keeps playing. It used to stop the timer
+ *   for good, on the theory that someone who has taken control wants to read at
+ *   their own pace - but that reads as broken (reported 2026-08-04, "stuck on
+ *   step 3"): the deck simply dies with no obvious cause. Pause is the control
+ *   for stopping; picking a step is navigation.
+ * - Keyboard focus pauses it, so a reader tabbing through the step buttons is
+ *   not racing the clock. Hover does NOT - it used to, and that was the other
+ *   half of the same report: the panel is the width of the section and sits
+ *   under where a desktop reader's cursor naturally rests, so it froze for
+ *   anyone who left the mouse alone. Hover-pause is for small controls, not for
+ *   something that fills the viewport.
  * - `prefers-reduced-motion: reduce` means it never starts.
- * - Hover and keyboard focus pause it, and leaving resumes.
  *
  * Every step's text is in the HTML whichever is showing, so a crawler reads all
  * three; inactive ones are aria-hidden so a screen reader is not read three
@@ -35,8 +43,13 @@ export function HowItWorks({ className }: { className?: string }) {
   const [active, setActive] = useState(0);
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const takenOver = useRef(false);
+  const [focused, setFocused] = useState(false);
+  // Progress lives in a ref as well as state: the interval needs to read and
+  // advance it without re-subscribing every tick, and the advance must happen
+  // in the timer callback rather than inside a setState updater. Updaters have
+  // to be pure - React may run one more than once - so calling setActive from
+  // inside setProgress was a latent double-advance.
+  const progressRef = useRef(0);
 
   // Start only if the visitor has not asked for reduced motion. Deferred a tick
   // to satisfy react-hooks/set-state-in-effect.
@@ -47,31 +60,29 @@ export function HowItWorks({ className }: { className?: string }) {
   }, []);
 
   useEffect(() => {
-    if (!playing || hovered) return;
+    if (!playing || focused) return;
     const id = setInterval(() => {
-      setProgress((p) => {
-        const next = p + TICK_MS / STEP_MS;
-        if (next < 1) return next;
+      progressRef.current += TICK_MS / STEP_MS;
+      if (progressRef.current >= 1) {
+        progressRef.current = 0;
         setActive((a) => (a + 1) % HOW_STEPS.length);
-        return 0;
-      });
+      }
+      setProgress(progressRef.current);
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [playing, hovered]);
+  }, [playing, focused]);
 
+  /** Jump to a step and keep going. Pause is the control for stopping. */
   const selectStep = useCallback((index: number) => {
-    takenOver.current = true;
-    setPlaying(false);
+    progressRef.current = 0;
     setProgress(0);
     setActive(index);
   }, []);
 
   const togglePlaying = useCallback(() => {
-    setPlaying((p) => {
-      if (p) takenOver.current = true;
-      return !p;
-    });
+    progressRef.current = 0;
     setProgress(0);
+    setPlaying((p) => !p);
   }, []);
 
   return (
@@ -80,10 +91,15 @@ export function HowItWorks({ className }: { className?: string }) {
         "relative mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-brand/20 bg-brand-soft/50 shadow-sm",
         className,
       )}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocusCapture={() => setHovered(true)}
-      onBlurCapture={() => setHovered(false)}
+      // Only KEYBOARD focus pauses. A mouse click focuses the button too, so
+      // testing plain focus froze the deck the moment anyone picked a step or
+      // pressed Play - the same "stuck on step 3" symptom, one layer down.
+      // :focus-visible is exactly the keyboard-vs-pointer distinction.
+      onFocusCapture={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.matches?.(":focus-visible")) setFocused(true);
+      }}
+      onBlurCapture={() => setFocused(false)}
     >
       {/* Progress bars, doubling as the step picker. */}
       <div className="absolute inset-x-0 top-0 z-20 flex gap-1.5 p-3">
