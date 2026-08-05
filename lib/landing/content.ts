@@ -48,7 +48,7 @@ export const META = {
    * Current length is 88, so search results cut it after "…prices and intel, fr".
    */
   title:
-    "Wedding Recon - Colorado wedding vendor prices and intel, from real couples' experiences",
+    "Wedding Recon - Colorado wedding vendor intel from couples",
   /**
    * The grey paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
@@ -57,7 +57,7 @@ export const META = {
    * free-to-use line still fall outside it.
    */
   description:
-    "See quotes and intel from real Colorado couples for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Keep your own quotes and notes in one planning hub. Free, no account needed to explore vendors.",
+    "See quotes and insights from real Colorado brides for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Manage and share your own quotes and notes in one central planning hub. Free, no account needed to explore vendors.",
   /** Shorter title used for link previews (iMessage, X, Facebook). */
   socialTitle: "Wedding Recon - real Colorado wedding vendor prices and intel",
 } as const;
@@ -69,7 +69,7 @@ export const META = {
 export const HEADER = {
   howItWorks: "How it works",
   faq: "FAQ",
-  cta: "Explore the site",
+  cta: "Explore vendors",
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -82,7 +82,7 @@ export const HERO = {
   /** The one <h1> on the page. Keep it short enough to sit on two lines. */
   heading: "Real prices & intel from real Colorado weddings.",
   subheading:
-    "Wedding Recon is a community of couples sharing their firsthand quotes, intel and experiences with wedding vendors. So you can find great-fit, in-budget vendors for your perfect day.",
+    "Wedding Recon is a community of couples sharing their firsthand quotes, intel and experiences with florists, hotel blocks, photographers and more. So you can find great-fit, in-budget vendors for your perfect day.",
   primaryCta: "Explore Colorado vendors",
   secondaryCta: "See how it works",
   reassurance: "Free to use. No account needed to explore vendors.",
@@ -101,9 +101,9 @@ export const EXAMPLE_RECON = {
   category: "Venue",
   place: "Boulder County",
   price: "$8,400",
-  priceDetail: "site fee · Saturday in September · DIY package tier",
+  priceDetail: "price for Saturday in September · we did DIY package tier, price can range up to $12k",
   notes:
-    "Ceremony site, chairs and the bridal suite are included. The bar minimum is separate - about $3.5k for 120 guests. Outside catering is allowed.",
+    "Ceremony site, chairs and the bridal suite are included. The bar minimum is separate, that costs about $3.5k for 120 guests. Outside catering is allowed, which we are doing.",
   reconType: "In person",
   collected: "Collected Jun 2026",
 } as const;
@@ -234,7 +234,7 @@ export const CATEGORY_GRID_LABEL: Partial<Record<VendorType, string>> = {
 /* -------------------------------------------------------------------------- */
 
 export const COLORADO_SECTION = {
-  eyebrow: "Where we cover",
+  eyebrow: "1,200+ Colorado wedding vendors",
   heading: "Colorado first, on purpose.",
   body: [
     "A vendor directory is only useful where it is dense. One state covered properly beats fifty covered thinly, so Wedding Recon starts on the Front Range - Denver, Boulder, Colorado Springs, Fort Collins and the towns between them - and reaches out to the mountain venues couples travel for.",
@@ -270,6 +270,7 @@ export const COVERAGE_AREAS = [
   "Breckenridge",
   "Vail",
   "Steamboat Springs",
+  "and more"
 ] as const;
 
 /* -------------------------------------------------------------------------- */
@@ -278,10 +279,10 @@ export const COVERAGE_AREAS = [
 
 export const FAQ_SECTION = {
   eyebrow: "Questions",
-  heading: "Before you start clicking around.",
+  heading: "Before you get started",
   /** The line under the accordion, before the mailto link. */
-  footerPrompt: "Something else on your mind?",
-  footerLinkLabel: "Email the person who built this",
+  footerPrompt: "Other questions or feedback?",
+  footerLinkLabel: "Email Kiara, the founder",
 } as const;
 
 export interface FaqItem {
@@ -296,10 +297,10 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Is Wedding Recon free?",
     answer:
-      "Yes. Browsing, saving vendors, and posting your own recon are all free. There are no ads, no listing fees charged to vendors, and no commission on anything you book.",
+      "Yes. Browsing, saving vendors, and posting your own recon are all free, there's no cost at all to use the site. This is simply a community-focused project.",
   },
   {
-    question: "Do I need an account to look around?",
+    question: "Do I need an account to use?",
     answer:
       "No. The map and every vendor page are public, and a link a friend sends you opens without signing up. An account is only needed to save vendors to your Planning Hub or post recon - and it is a magic link to your email, with no password to invent.",
   },
@@ -341,10 +342,10 @@ export const CLOSING_CTA = {
   quote: {
     text: "I needed a photographer. Wedding planning is so much work! So this is seriously so helpful",
     name: "Cassie",
-    context: "wedding 2027, Larkspur",
+    context: "2027 wedding, Larkspur",
   },
   heading: "Start with the map.",
-  body: "See who is near your date's hometown, read what other couples paid, and keep the rest of your search in one place.",
+  body: "See what vendors are near your target region and filter by your criteria. Read what other couples paid and how the vendor did. Save your favorites to narrow down your search.",
   cta: "Explore Colorado vendors",
 } as const;
 
@@ -354,7 +355,7 @@ export const CLOSING_CTA = {
 
 export const FOOTER = {
   blurb:
-    "A community directory of Colorado wedding vendors, built on the price quotes and notes couples share with each other.",
+    "A community space for Colorado wedding vendor intel, built on quotes and real experiences from couples who went through it.",
   productHeading: "Product",
   aboutHeading: "About",
   exploreLabel: "Explore the map",
