@@ -19,6 +19,12 @@ import {
 } from "@/lib/constants/vendor-filters";
 import HISTOGRAMS from "@/lib/constants/filter-histograms.json";
 import type { Vendor } from "@/lib/types";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -335,114 +341,167 @@ function TypeSection({
     </div>
   );
 
+  /** A short summary of what a group has selected, shown on its closed row. */
+  const summarize = (def: FilterDef): string | null => {
+    const v = state[def.key];
+    if (v == null) return null;
+    if (def.kind === "bool") return v === true ? "Yes" : null;
+    if (def.kind === "multi") {
+      const picked = v as string[];
+      if (!picked.length) return null;
+      const labels = picked.map(
+        (x) => def.options?.find((o) => o.value === x)?.label ?? x,
+      );
+      return labels.length <= 2
+        ? labels.join(", ")
+        : `${labels[0]} +${labels.length - 1}`;
+    }
+    const r = v as { min?: number; max?: number };
+    if (r.min == null && r.max == null) return null;
+    const h = hist[def.lo ?? def.key];
+    const lo = r.min ?? h?.min ?? 0;
+    const hi = r.max ?? h?.max ?? 0;
+    return `${fmt(def, lo)} – ${fmt(def, hi)}`;
+  };
+
   const groups = (
-    <div className="flex flex-col gap-5">
+    <Accordion
+      defaultValue={defs.length ? [defs[0].key] : []}
+      multiple
+      className="divide-y divide-border"
+    >
       {defs.map((def) => {
         const h = hist[def.lo ?? def.key];
         const isPriceWithDate =
           def.rescaledBy === "date_context" && vendorType === "venue";
+        const summary = summarize(def);
 
         return (
-          <section key={def.key}>
-            <div className="mb-2 flex items-baseline gap-2">
-              <h4 className="text-[13px] font-semibold">{def.label}</h4>
-              {def.rare && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Rare
-                </span>
+          <AccordionItem key={def.key} value={def.key} className="border-none">
+            <AccordionTrigger
+              className="py-3 hover:no-underline"
+              style={{ color: meta.textHex }}
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="font-semibold">{def.label}</span>
+                {def.rare && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                    Rare
+                  </span>
+                )}
+                {summary && (
+                  <span
+                    className="truncate rounded-full px-1.5 py-0.5 text-[11px] font-medium"
+                    style={{
+                      backgroundColor: meta.lightHex,
+                      color: meta.textHex,
+                    }}
+                  >
+                    {summary}
+                  </span>
+                )}
+              </span>
+            </AccordionTrigger>
+
+            <AccordionContent className="pb-4">
+              {def.hint && (
+                <p className="mb-2 text-[12px] text-muted-foreground">{def.hint}</p>
               )}
-            </div>
-            {def.hint && (
-              <p className="mb-2 text-[12px] text-muted-foreground">{def.hint}</p>
-            )}
 
-            {def.kind === "multi" && (
-              <ChipGroup
-                def={def}
-                meta={meta}
-                value={(state[def.key] as string[]) ?? []}
-                onChange={(v) => set(def.key, v)}
-              />
-            )}
-
-            {def.kind === "bool" && (
-              <Chip
-                on={state[def.key] === true}
-                meta={meta}
-                onClick={() => set(def.key, state[def.key] === true ? null : true)}
-              >
-                {def.label}
-              </Chip>
-            )}
-
-            {def.kind === "range" && h && (
-              <div className={cn(def.rescaledBy && "rounded-xl border border-border p-3")}>
-                {/* The rescale control lives INSIDE the price card so the two
-                    read as one thing (Kiara, 2026-08-05). */}
-                {isPriceWithDate && (
-                  <div className="mb-3 flex flex-col gap-2 border-b border-border pb-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {SEASONS.map((se) => (
-                        <Chip
-                          key={se.value}
-                          size="sm"
-                          meta={meta}
-                          on={dateContext.season === se.value}
-                          onClick={() =>
-                            onDateContextChange({
-                              ...dateContext,
-                              season:
-                                dateContext.season === se.value ? undefined : se.value,
-                            })
-                          }
-                        >
-                          {se.label} · {se.months}
-                        </Chip>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {DAY_TYPES.map((d) => (
-                        <Chip
-                          key={d.value}
-                          size="sm"
-                          meta={meta}
-                          on={dateContext.day === d.value}
-                          onClick={() =>
-                            onDateContextChange({
-                              ...dateContext,
-                              day: dateContext.day === d.value ? undefined : d.value,
-                            })
-                          }
-                        >
-                          {d.label}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <RangeControl
+              {def.kind === "multi" && (
+                <ChipGroup
                   def={def}
-                  hist={h}
-                  value={state[def.key] as { min?: number; max?: number }}
-                  accent={meta.colorHex}
+                  meta={meta}
+                  value={(state[def.key] as string[]) ?? []}
                   onChange={(v) => set(def.key, v)}
-                  scaled={rescaledCounts(def)}
                 />
+              )}
 
-                {def.unit === "usd" && vendorType === "venue" && def.key === "price" && (
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    Venues quoting per person are shown at{" "}
-                    {VENUE_PRICE_ASSUMPTIONS.guests} guests, per hour at{" "}
-                    {VENUE_PRICE_ASSUMPTIONS.hours} hours.
-                  </p>
-                )}
-              </div>
-            )}
-          </section>
+              {def.kind === "bool" && (
+                <Chip
+                  on={state[def.key] === true}
+                  meta={meta}
+                  onClick={() => set(def.key, state[def.key] === true ? null : true)}
+                >
+                  {def.label}
+                </Chip>
+              )}
+
+              {def.kind === "range" && h && (
+                <div>
+                  {/* The rescale control sits directly above the histogram it
+                      rescales, inside the same group, so the two read as one
+                      thing (Kiara, 2026-08-05). */}
+                  {isPriceWithDate && (
+                    <div className="mb-3 flex flex-col gap-2 border-b border-border pb-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {SEASONS.map((se) => (
+                          <Chip
+                            key={se.value}
+                            size="sm"
+                            meta={meta}
+                            on={dateContext.season === se.value}
+                            onClick={() =>
+                              onDateContextChange({
+                                ...dateContext,
+                                season:
+                                  dateContext.season === se.value
+                                    ? undefined
+                                    : se.value,
+                              })
+                            }
+                          >
+                            {se.label} · {se.months}
+                          </Chip>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {DAY_TYPES.map((d) => (
+                          <Chip
+                            key={d.value}
+                            size="sm"
+                            meta={meta}
+                            on={dateContext.day === d.value}
+                            onClick={() =>
+                              onDateContextChange({
+                                ...dateContext,
+                                day:
+                                  dateContext.day === d.value ? undefined : d.value,
+                              })
+                            }
+                          >
+                            {d.label}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <RangeControl
+                    def={def}
+                    hist={h}
+                    value={state[def.key] as { min?: number; max?: number }}
+                    accent={meta.colorHex}
+                    onChange={(v) => set(def.key, v)}
+                    scaled={rescaledCounts(def)}
+                  />
+
+                  {def.unit === "usd" &&
+                    vendorType === "venue" &&
+                    def.key === "price" && (
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        Venues quoting per person are shown at{" "}
+                        {VENUE_PRICE_ASSUMPTIONS.guests} guests, per hour at{" "}
+                        {VENUE_PRICE_ASSUMPTIONS.hours} hours.
+                      </p>
+                    )}
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
         );
       })}
-    </div>
+    </Accordion>
   );
 
   return (
@@ -553,7 +612,14 @@ export function VendorFilterSheet({
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[88vh] flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl">
+      {/* A FIXED height, not max-height. With max-height the sheet resized every
+          time its contents changed — picking a category grew it from a stub to
+          nearly full screen, and collapsing an accordion group shrank it again,
+          so the whole panel lurched under the thumb. A fixed box scrolls
+          internally instead and never moves (Kiara, 2026-08-05). Height is set
+          so the map stays visible above it: this is a filter over the map, not
+          a page of its own. */}
+      <div className="relative flex h-[68vh] flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl">
         <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-3">
           <h2 className="text-[15px] font-semibold">Show me</h2>
           {totalActive > 0 && (
