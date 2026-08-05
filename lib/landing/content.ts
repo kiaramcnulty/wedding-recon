@@ -1,11 +1,3 @@
-import {
-  Banknote,
-  Bookmark,
-  Layers,
-  MessagesSquare,
-  type LucideIcon,
-} from "lucide-react";
-
 import type { VendorType } from "@/lib/constants/categories";
 
 /**
@@ -57,7 +49,7 @@ export const META = {
    * line fall outside it.
    */
   description:
-    "See quotes and insights from real Colorado brides for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Manage and share your own quotes and notes in one central planning hub. Free, no account needed to explore vendors.",
+    "See quotes and insights from real Colorado couples for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Manage and share your own quotes and notes in one central planning hub. Free, no account needed to explore vendors.",
   /** Shorter title used for link previews (iMessage, X, Facebook). */
   socialTitle: "Wedding Recon - real Colorado wedding vendor prices and intel",
 } as const;
@@ -109,25 +101,60 @@ export const EXAMPLE_RECON = {
 } as const;
 
 /* -------------------------------------------------------------------------- */
-/* Why this exists                                                            */
+/* How it works - the three steps, shown as an auto-advancing stepper          */
 /* -------------------------------------------------------------------------- */
 
-export const WHY_SECTION = {
-  eyebrow: "Why this exists",
-  heading: "Planning a wedding means paying - in time and money - for the same research as other couples, over and over.",
-  intro:
-    "Here is what that cost real couples in Colorado, and what Wedding Recon does about each one.",
-  /** Screen-reader label for the carousel, and the hint under it. */
-  carouselLabel: "What Wedding Recon gives you",
-  carouselHint: "Swipe or use the arrows",
+/**
+ * Which in-app visual a step or a solution row shows. The visuals are stylised
+ * mock-ups drawn in code (components/landing/app-visual.tsx), not screenshots:
+ * they stay sharp at any size, cost no bytes, take their colours straight from
+ * CATEGORIES so they cannot drift from the real map, and - the reason that
+ * matters most - they invent no vendor names or prices attached to one.
+ *
+ * SWAP POINT: to use real screenshots instead, replace the switch in
+ * app-visual.tsx with an <img>. Capture them from a session that has DB
+ * credentials, and check what is on screen before shipping it - a screenshot
+ * reads as authoritative in a way an illustration does not.
+ */
+export type AppVisual = "map" | "filters" | "intel" | "reviews" | "hub";
+
+export const HOW_SECTION = {
+  eyebrow: "How it works",
+  heading: "Three steps, on your phone, for free.",
 } as const;
 
-export interface ValueProp {
-  icon: LucideIcon;
-  /** What the product does about the problem in the quote. */
+export interface HowStep {
   title: string;
-  quote: Quote;
+  body: string;
+  visual: AppVisual;
 }
+
+export const HOW_STEPS: HowStep[] = [
+  {
+    title: "Explore vendors in your wedding region",
+    body: "Open the map where you are getting married and filter by the criteria that actually decide it for you.",
+    visual: "map",
+  },
+  {
+    title: "See real quotes, advice and feedback",
+    body: "Open a vendor to read what couples were quoted, what the fine print covered, and how the day itself went.",
+    visual: "reviews",
+  },
+  {
+    title: "Save your favourites",
+    body: "Keep every candidate in one hub, sorted by category, with your own notes and quotes alongside.",
+    visual: "hub",
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Problem -> solution rows                                                    */
+/* -------------------------------------------------------------------------- */
+
+export const PROBLEMS_SECTION = {
+  eyebrow: "Why this exists",
+  heading: "Four things that are broken about choosing a wedding vendor.",
+} as const;
 
 export interface Quote {
   /** Verbatim. Do not paraphrase a real person. */
@@ -137,141 +164,205 @@ export interface Quote {
   context: string;
 }
 
+export interface ProblemSolution {
+  /** What is broken about vendor selection today. */
+  problem: string;
+  quote: Quote;
+  /** What Wedding Recon does about it. */
+  solution: string;
+  solutionBody: string;
+  visual: AppVisual;
+}
+
 /**
- * The carousel that carries both "why this exists" and "how it works".
+ * The spine of the page: four things that are wrong with picking wedding
+ * vendors, each in a real couple's words, each answered by something the
+ * product does.
  *
  * Every quote is a real thing a real couple said, reproduced verbatim - these
  * are attributed testimonials, not illustrative copy, so the wording is not
- * ours to tidy. If a quote is ever cut for length, cut whole sentences from the
- * end rather than editing inside one, and never add words.
+ * ours to tidy. If one is ever cut for length, cut whole sentences from the end
+ * rather than editing inside one, and never add words.
  *
  * All six people confirmed they are happy to be quoted publicly under a first
  * name, wedding year and town (Kiara, 2026-08-04). That consent covers the
- * wording as it stands here; a NEW quote, or a new attribution, needs its own.
- * Note none of them names a vendor, which is what keeps an unflattering
- * experience a personal account rather than a claim about a named business -
- * keep it that way.
+ * wording as it stands; a NEW quote, or a new attribution, needs its own. Note
+ * none of them names a vendor, which is what keeps an unflattering experience a
+ * personal account rather than a claim about a named business - keep it so.
  *
- * Two more quotes are on file and unused, kept here so they are not lost:
+ * A seventh quote is on file and unused, kept here so it is not lost:
  *
  *   Danielle, married 2024 in Boulder - "The florist was super nice and
  *   responsive ahead of time, but on the day-of, the arrangements were nothing
  *   like what we had discussed in the consult. They were objectively beautiful
  *   but contained flowers I specifically asked not to have."
  *
- * Danielle is a straight swap for Julia below (both illustrate reviews), or a
- * fifth card. Julia was picked so that no two cards lean on the same vendor
- * type: florist, hotel, music, planning.
+ * Danielle is a straight swap for Julia below (both are about quality only
+ * showing up on the day), or a fifth row. Julia was picked so that no two rows
+ * lean on the same vendor type: florist, hotel, music, planning.
  */
-export const VALUE_PROPS: ValueProp[] = [
+export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
   {
-    icon: Banknote,
-    title: "Real pricing, rarely available online",
+    problem: "Pricing is rarely available online",
     quote: {
       text: "This would have saved me so much time and heartache... all the florists I was referred to had minimum spend of over $20k. I would have never bothered going to their site in the first place",
       name: "Erika",
       context: "married 2025, South Denver",
     },
+    solution: "Real, filterable pricing from real couples",
+    solutionBody:
+      "Every recon entry carries the number a couple was actually quoted and the fine print underneath it, so you can rule a vendor in or out before you spend an evening on an inquiry form.",
+    visual: "filters",
   },
   {
-    icon: Layers,
-    title: "Details and intel specific to each vendor type",
+    problem: "Important details are hard to figure out",
     quote: {
       text: "For out of town guests, hotels were super hard and confusing to understand the cost of block rates",
       name: "Emily",
       context: "married 2026, Breckenridge",
     },
+    solution: "Key intel, specific to each type of vendor",
+    solutionBody:
+      "What matters about a hotel block is not what matters about a florist. Each vendor type is researched against the things couples actually get caught out by - block terms, delivery radius, catering policy, travel fees.",
+    visual: "intel",
   },
   {
-    icon: MessagesSquare,
-    title: "Reviews from real vendor experiences",
+    problem: "Quality is unknown until the big day",
     quote: {
       text: "The singer/DJ showed up late and didn't play any of the songs on our request list. The whole night was amazing but this was kind of crazy. And stressful.",
       name: "Julia",
       context: "married 2025, Buena Vista",
     },
+    solution: "Feedback from couples who have been through it",
+    solutionBody:
+      "Recon is written after the fact, not from a sales page - what the tasting was like, whether they turned up on time, what the contract actually delivered.",
+    visual: "reviews",
   },
   {
-    icon: Bookmark,
-    title: "A central hub to track and share vendor candidates",
+    problem: "Research is scattered across sites and tools",
     quote: {
       text: "Ours was such a mess. We had pages and pages of spreadsheets",
       name: "Wyatt",
       context: "married 2024, Colorado Springs",
     },
+    solution: "One hub to manage every vendor candidate",
+    solutionBody:
+      "Save anyone you are considering to your Planning Hub, sorted by category, with your own quotes and notes attached. It replaces the spreadsheet, and it is private to you.",
+    visual: "hub",
   },
 ];
 
 /* -------------------------------------------------------------------------- */
-/* Category grid                                                              */
+/* Data highlight                                                             */
 /* -------------------------------------------------------------------------- */
-
-export const CATEGORIES_SECTION = {
-  eyebrow: "What you can look up",
-  heading: "Every vendor a Colorado wedding needs.",
-  intro:
-    "Pick a category to open the map filtered to it. Colours and icons are the same ones you will see on the pins.",
-} as const;
 
 /**
- * Names for the category tiles. The grid renders CATEGORY_PLURAL from
- * `lib/constants/categories.ts` by default — the noun that counts vendors reads
- * better in a list, and searches better, than the UI label ("photographers"
- * over "Photos").
+ * STATIC, HAND-ENTERED FIGURES. Measured against the live DB on 2026-08-01 and
+ * recorded in docs/vendor-filters-proposal.md; re-measure and update the date
+ * when the directory grows materially.
  *
- * Only add an entry here to override one. These two are overridden because the
- * plural loses its meaning with no map around it: "hotels" drops the room-block
- * distinction that defines the category, and "vendors" reads like a peer of the
- * specific categories beside it rather than the catch-all it is.
+ * Deliberately not a live query. Reading the DB here would make `/` dynamic,
+ * losing static generation on the one page whose whole job is to be fast and
+ * crawlable - and it would render "0 vendors" whenever the free-tier project is
+ * paused. Nothing on this page changes often enough to be worth that.
+ *
+ * The derived percentages come from regex over recon text at partial coverage,
+ * so each one carries its base in `note`. Do not drop the note: a percentage
+ * without its denominator is the difference between a fact and a claim. When
+ * the filter tagging pipeline lands these become properly queryable and the
+ * section can move to ISR.
  */
-export const CATEGORY_GRID_LABEL: Partial<Record<VendorType, string>> = {
-  hotel: "Hotel blocks",
-  other: "Everything else",
-};
-
-/* -------------------------------------------------------------------------- */
-/* Colorado coverage                                                          */
-/* -------------------------------------------------------------------------- */
-
-export const COLORADO_SECTION = {
-  eyebrow: "1,200+ Colorado wedding vendors",
-  heading: "Colorado first, on purpose.",
-  body: [
-    "A vendor directory is only useful where it is dense. One state covered properly beats fifty covered thinly, so Wedding Recon starts on the Front Range - Denver, Boulder, Colorado Springs, Fort Collins and the towns between them - and reaches out to the mountain venues couples travel for.",
-    "Coverage grows as couples add recon. If the vendor you are looking at is not on the map yet, you can add them in a few taps, quote and all.",
+export const DATA_SECTION = {
+  eyebrow: "The directory today",
+  headline: {
+    vendors: "2,100+",
+    vendorsLabel: "Colorado wedding vendors",
+    types: "10",
+    typesLabel: "categories, from venues to hotel blocks",
+    recon: "3,100+",
+    reconLabel: "recon entries on file",
+  },
+  measuredOn: "Measured August 2026",
+  categoryChart: {
+    title: "Vendors by category",
+    subtitle: "Tap a bar to open the map filtered to it.",
+  },
+  beautyChart: {
+    title: "Hair and makeup: do they come to you?",
+    subtitle:
+      "A hard logistics constraint on the wedding morning, and the kind of detail no directory lists. Recorded from recon, not from how an artist markets themselves.",
+  },
+  medianVenue: {
+    value: "$2,250",
+    label: "median venue starting price",
+    note: "Median of the 37% of venues with a published or reported starting figure. Site fee only - catering, bar and rentals sit on top.",
+  },
+  /**
+   * Towns named so the page still carries them as search terms after the old
+   * Colorado section was removed. No counts: per-town figures were never
+   * measured, and inventing them to fill a chart is not on.
+   */
+  coverageTitle: "Across the Front Range and the mountain towns",
+  coverageAreas: [
+    "Denver",
+    "Boulder",
+    "Colorado Springs",
+    "Fort Collins",
+    "Golden",
+    "Littleton",
+    "Aurora",
+    "Arvada",
+    "Lakewood",
+    "Longmont",
+    "Loveland",
+    "Morrison",
+    "Evergreen",
+    "Castle Rock",
+    "Estes Park",
+    "Breckenridge",
+    "Vail",
+    "Steamboat Springs",
   ],
 } as const;
 
+/** Vendor counts per category. Sums to 2,163 - the whole directory. */
+export const VENDOR_COUNTS: { type: VendorType; count: number }[] = [
+  { type: "venue", count: 679 },
+  { type: "photos", count: 274 },
+  { type: "hotel", count: 253 },
+  { type: "flowers", count: 183 },
+  { type: "beauty", count: 183 },
+  { type: "food", count: 182 },
+  { type: "planner", count: 148 },
+  { type: "band", count: 119 },
+  { type: "dj", count: 77 },
+  { type: "dress", count: 65 },
+];
+
 /**
- * The chip row of Colorado towns. Front Range first, then the mountain towns
- * people travel to for a wedding.
+ * Where hair and makeup artists work: they travel to you, or you go to them.
  *
- * Presented on the page as where couples are searching, NOT as a coverage
- * promise — the directory grows one category and one run at a time, and naming
- * a town with three pins in it is the fastest way to lose someone on their
- * first search. Add or remove freely; the row wraps to fit.
+ * A real two-sided split, which is why this chart and not most of the other
+ * attributes in the filter proposal. Both halves are explicitly detected in
+ * recon text - 26% of the 151 artists with recon say on-location, 7% say
+ * studio - so the ratio between them means something.
+ *
+ * Contrast with a ONE-SIDED detection like "shoots film", where only the yes
+ * side is ever written down and silence is unknown rather than no. Publishing
+ * one of those as a rate would assert something false about every undetected
+ * vendor. Before adding a stat here, ask whether BOTH answers get recorded.
+ *
+ * `base` is the two-thirds of artists who say nothing either way, kept visible.
+ * The filter tagging pipeline should raise it to ~90% and this can be redrawn
+ * against the full type.
  */
-export const COVERAGE_AREAS = [
-  "Denver",
-  "Boulder",
-  "Colorado Springs",
-  "Fort Collins",
-  "Golden",
-  "Littleton",
-  "Aurora",
-  "Arvada",
-  "Lakewood",
-  "Longmont",
-  "Loveland",
-  "Morrison",
-  "Evergreen",
-  "Castle Rock",
-  "Estes Park",
-  "Breckenridge",
-  "Vail",
-  "Steamboat Springs",
-  "and more"
-] as const;
+export const BEAUTY_SETUP = {
+  segments: [
+    { label: "Comes to you", count: 39, pct: 78 },
+    { label: "Studio only", count: 11, pct: 22 },
+  ],
+  base: "Of the 50 of 183 hair and makeup artists who state where they work. The rest have not said.",
+} as const;
 
 /* -------------------------------------------------------------------------- */
 /* FAQ                                                                        */

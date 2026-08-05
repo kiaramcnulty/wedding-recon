@@ -6,26 +6,21 @@ import { HeroVisual } from "@/components/landing/hero-visual";
 import { LandingFaq } from "@/components/landing/landing-faq";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingHeader } from "@/components/landing/landing-header";
-import { ValueCard } from "@/components/landing/value-card";
-import { ValueCarousel } from "@/components/landing/value-carousel";
+import { DataHighlight } from "@/components/landing/data-highlight";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { ProblemSolutionRow } from "@/components/landing/problem-solution-row";
 import { buttonVariants } from "@/components/ui/button";
 import {
-  CATEGORY_LIST,
-  CATEGORY_PLURAL,
-} from "@/lib/constants/categories";
-import {
-  CATEGORIES_SECTION,
-  CATEGORY_GRID_LABEL,
   CLOSING_CTA,
-  COLORADO_SECTION,
   CONTACT_EMAIL,
-  COVERAGE_AREAS,
+  DATA_SECTION,
   FAQ_ITEMS,
   FAQ_SECTION,
   HERO,
+  HOW_SECTION,
   META,
-  VALUE_PROPS,
-  WHY_SECTION,
+  PROBLEM_SOLUTIONS,
+  PROBLEMS_SECTION,
 } from "@/lib/landing/content";
 import { APP_HREF } from "@/lib/landing/nav";
 import { SITE_URL } from "@/lib/site";
@@ -194,103 +189,48 @@ export default function LandingPage() {
         </section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Why it exists + what you get. Keeps the `how-it-works` id: the    */}
-        {/* header nav and the hero's secondary CTA both anchor to it, and    */}
-        {/* this section absorbed that content when the separate step-by-step */}
-        {/* block was removed.                                                */}
+        {/* How it works. Owns the `how-it-works` id that the header nav    */}
+        {/* and the hero's secondary CTA both anchor to.                     */}
         {/* ---------------------------------------------------------------- */}
         <Section id="how-it-works" className="border-y bg-muted/30">
-          <SectionHeading eyebrow={WHY_SECTION.eyebrow}>
-            {WHY_SECTION.heading}
+          <SectionHeading eyebrow={HOW_SECTION.eyebrow}>
+            {HOW_SECTION.heading}
           </SectionHeading>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {WHY_SECTION.intro}
-          </p>
-
-          {/* Cards are rendered here, on the server, and handed to the client
-              shell as children — `icon` is a component, and a function cannot
-              cross the server/client boundary. */}
-          <ValueCarousel
-            slideLabels={VALUE_PROPS.map((prop) => prop.title)}
-            label={WHY_SECTION.carouselLabel}
-            hint={WHY_SECTION.carouselHint}
-            className="mt-8"
-          >
-            {VALUE_PROPS.map((prop) => (
-              <ValueCard key={prop.title} {...prop} />
-            ))}
-          </ValueCarousel>
+          <HowItWorks className="mt-10" />
         </Section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Categories — each tile deep-links Explore to that filter          */}
-        {/* ---------------------------------------------------------------- */}
-        <Section className="border-y bg-muted/30">
-          <SectionHeading eyebrow={CATEGORIES_SECTION.eyebrow}>
-            {CATEGORIES_SECTION.heading}
-          </SectionHeading>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {CATEGORIES_SECTION.intro}
-          </p>
-
-          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {CATEGORY_LIST.map(({ type, icon: Icon, colorHex, lightHex }) => (
-              <li key={type}>
-                <Link
-                  href={`${APP_HREF}?types=${type}`}
-                  className="flex items-center gap-3 rounded-xl border bg-background px-3.5 py-3 no-underline transition-colors hover:bg-muted/60"
-                >
-                  <span
-                    className="flex size-9 shrink-0 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: lightHex, color: colorHex }}
-                  >
-                    <Icon className="size-[18px]" aria-hidden />
-                  </span>
-                  <span className="text-sm font-medium first-letter:uppercase">
-                    {CATEGORY_GRID_LABEL[type] ?? CATEGORY_PLURAL[type]}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Colorado                                                          */}
+        {/* Problem -> solution, one full-width row per pair, alternating.   */}
         {/* ---------------------------------------------------------------- */}
         <Section>
-          <div className="grid gap-10 md:grid-cols-[1fr_1fr] md:items-start md:gap-14">
-            <div>
-              <SectionHeading eyebrow={COLORADO_SECTION.eyebrow}>
-                {COLORADO_SECTION.heading}
-              </SectionHeading>
-              {COLORADO_SECTION.body.map((paragraph) => (
-                <p
-                  key={paragraph.slice(0, 24)}
-                  className="mt-4 text-sm leading-relaxed text-muted-foreground"
-                >
-                  {paragraph}
-                </p>
-              ))}
-            </div>
-
-            <ul className="flex flex-wrap gap-2 md:pt-12">
-              {COVERAGE_AREAS.map((area) => (
-                <li
-                  key={area}
-                  className="rounded-full border border-brand/25 bg-brand-soft/50 px-3 py-1.5 text-sm text-brand-ink"
-                >
-                  {area}
-                </li>
-              ))}
-            </ul>
+          <SectionHeading eyebrow={PROBLEMS_SECTION.eyebrow}>
+            {PROBLEMS_SECTION.heading}
+          </SectionHeading>
+          <div className="mt-12 space-y-16 md:space-y-24">
+            {PROBLEM_SOLUTIONS.map((item, i) => (
+              <ProblemSolutionRow key={item.problem} item={item} index={i} />
+            ))}
           </div>
+        </Section>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* The directory in numbers. Replaced the Colorado and category     */}
+        {/* sections; carries their internal links and keywords - see        */}
+        {/* DataHighlight.                                                   */}
+        {/* ---------------------------------------------------------------- */}
+        <Section className="border-y bg-muted/30">
+          <SectionHeading eyebrow={DATA_SECTION.eyebrow}>
+            {DATA_SECTION.headline.vendors}{" "}
+            {DATA_SECTION.headline.vendorsLabel}, across{" "}
+            {DATA_SECTION.headline.types} categories.
+          </SectionHeading>
+          <DataHighlight />
         </Section>
 
         {/* ---------------------------------------------------------------- */}
         {/* FAQ                                                               */}
         {/* ---------------------------------------------------------------- */}
-        <Section id="faq" className="border-y bg-muted/30">
+        <Section id="faq">
           <SectionHeading eyebrow={FAQ_SECTION.eyebrow}>
             {FAQ_SECTION.heading}
           </SectionHeading>
