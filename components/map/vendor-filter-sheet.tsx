@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, SlidersHorizontal } from "lucide-react";
+import { X, SlidersHorizontal, ChevronDown } from "lucide-react";
 import {
   CATEGORIES,
   CATEGORY_PLURAL,
@@ -250,54 +250,32 @@ function RangeControl({
 
 /* ------------------------------------------------------------------- sheet */
 
-export function VendorFilterSheet({
+/**
+ * The filter groups for ONE vendor type. Split out so the sheet can stack a
+ * section per selected type: filters are type-scoped, but that scopes which
+ * filters apply to a vendor, not how many types you may filter at once.
+ */
+function TypeSection({
   vendorType,
   vendors,
-  visibleTotal,
-  visiblePartial,
   state,
   dateContext,
   onChange,
   onDateContextChange,
-  onClose,
+  collapsible,
+  open,
+  onToggleOpen,
 }: {
   vendorType: VendorType;
-  /**
-   * Rows the map holds. Used ONLY to rescale histograms, never to count:
-   * it spans the padded fetch box, which reaches well beyond the viewport.
-   */
   vendors: Vendor[];
-  /**
-   * On-screen totals, straight from the map. The footer counts these rather
-   * than counting `vendors` itself, so the sheet and the results pill can never
-   * disagree — they are now literally the same numbers. Counting the fetched
-   * rows instead reported "55 matches" next to a pill saying "93 on screen".
-   */
-  visibleTotal: number;
-  visiblePartial: number;
   state: FilterState;
   dateContext: DateContext;
   onChange: (next: FilterState) => void;
   onDateContextChange: (next: DateContext) => void;
-  onClose: () => void;
+  collapsible: boolean;
+  open: boolean;
+  onToggleOpen: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
-
   const meta = CATEGORIES[vendorType];
   const defs = filtersForType(vendorType);
   const hist = HIST[vendorType] ?? {};
@@ -305,8 +283,7 @@ export function VendorFilterSheet({
     () => vendors.filter((v) => v.vendor_type === vendorType),
     [vendors, vendorType],
   );
-
-  const matched = Math.max(0, visibleTotal - visiblePartial);
+  const activeCount = Object.keys(state).length;
 
   const set = (key: string, v: unknown) => {
     const next = { ...state };
@@ -319,7 +296,7 @@ export function VendorFilterSheet({
    * Bin counts for a price histogram under the current companion selection.
    * This is the rescale: pick "Day-of coordination" and the price bars redraw
    * to day-of planners only, because the distributions genuinely differ (the
-   * $8k+ tail is almost entirely full planning).
+   * 8k-plus tail is almost entirely full planning).
    */
   const rescaledCounts = (def: FilterDef): number[] | undefined => {
     if (!def.rescaledBy) return undefined;
@@ -343,7 +320,244 @@ export function VendorFilterSheet({
     );
   };
 
-  const activeCount = Object.keys(state).length;
+  const header = (
+    <div className="flex items-center gap-2">
+      <meta.icon className="size-4 shrink-0" style={{ color: meta.colorHex }} />
+      <h3 className="text-[14px] font-semibold capitalize">
+        {CATEGORY_PLURAL[vendorType]}
+      </h3>
+      {activeCount > 0 && (
+        <span
+          className="rounded-full px-1.5 text-[11px] font-medium text-white"
+          style={{ backgroundColor: meta.colorHex }}
+        >
+          {activeCount}
+        </span>
+      )}
+      {activeCount > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange({});
+            onDateContextChange({});
+          }}
+          className="text-[12px] text-muted-foreground underline underline-offset-2"
+        >
+          Clear
+        </button>
+      )}
+      {collapsible && (
+        <ChevronDown
+          className={cn(
+            "ml-auto size-4 shrink-0 text-muted-foreground transition-transform",
+            open && "rotate-180",
+          )}
+          aria-hidden
+        />
+      )}
+    </div>
+  );
+
+  const groups = (
+    <div className="flex flex-col gap-5">
+      {defs.map((def) => {
+        const h = hist[def.lo ?? def.key];
+        const isPriceWithDate =
+          def.rescaledBy === "date_context" && vendorType === "venue";
+
+        return (
+          <section key={def.key}>
+            <div className="mb-2 flex items-baseline gap-2">
+              <h4 className="text-[13px] font-semibold">{def.label}</h4>
+              {def.rare && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Rare
+                </span>
+              )}
+            </div>
+            {def.hint && (
+              <p className="mb-2 text-[12px] text-muted-foreground">{def.hint}</p>
+            )}
+
+            {def.kind === "multi" && (
+              <ChipGroup
+                def={def}
+                meta={meta}
+                value={(state[def.key] as string[]) ?? []}
+                onChange={(v) => set(def.key, v)}
+              />
+            )}
+
+            {def.kind === "bool" && (
+              <Chip
+                on={state[def.key] === true}
+                meta={meta}
+                onClick={() => set(def.key, state[def.key] === true ? null : true)}
+              >
+                {def.label}
+              </Chip>
+            )}
+
+            {def.kind === "range" && h && (
+              <div className={cn(def.rescaledBy && "rounded-xl border border-border p-3")}>
+                {/* The rescale control lives INSIDE the price card so the two
+                    read as one thing (Kiara, 2026-08-05). */}
+                {isPriceWithDate && (
+                  <div className="mb-3 flex flex-col gap-2 border-b border-border pb-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {SEASONS.map((se) => (
+                        <Chip
+                          key={se.value}
+                          size="sm"
+                          meta={meta}
+                          on={dateContext.season === se.value}
+                          onClick={() =>
+                            onDateContextChange({
+                              ...dateContext,
+                              season:
+                                dateContext.season === se.value ? undefined : se.value,
+                            })
+                          }
+                        >
+                          {se.label} · {se.months}
+                        </Chip>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DAY_TYPES.map((d) => (
+                        <Chip
+                          key={d.value}
+                          size="sm"
+                          meta={meta}
+                          on={dateContext.day === d.value}
+                          onClick={() =>
+                            onDateContextChange({
+                              ...dateContext,
+                              day: dateContext.day === d.value ? undefined : d.value,
+                            })
+                          }
+                        >
+                          {d.label}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <RangeControl
+                  def={def}
+                  hist={h}
+                  value={state[def.key] as { min?: number; max?: number }}
+                  accent={meta.colorHex}
+                  onChange={(v) => set(def.key, v)}
+                  scaled={rescaledCounts(def)}
+                />
+
+                {def.unit === "usd" && vendorType === "venue" && def.key === "price" && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Venues quoting per person are shown at{" "}
+                    {VENUE_PRICE_ASSUMPTIONS.guests} guests, per hour at{" "}
+                    {VENUE_PRICE_ASSUMPTIONS.hours} hours.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+
+  if (!collapsible) {
+    return (
+      <div>
+        <div className="mb-3">{header}</div>
+        {groups}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-border">
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        aria-expanded={open}
+        className="w-full px-3 py-2.5 text-left"
+      >
+        {header}
+      </button>
+      {open && <div className="border-t border-border px-3 py-3">{groups}</div>}
+    </div>
+  );
+}
+
+export function VendorFilterSheet({
+  vendorTypes,
+  vendors,
+  visibleTotal,
+  visiblePartial,
+  states,
+  dateContexts,
+  onChangeType,
+  onDateContextChange,
+  onClearAll,
+  onClose,
+}: {
+  /** Every selected category. One section each. */
+  vendorTypes: VendorType[];
+  /**
+   * Rows the map holds. Used ONLY to rescale histograms, never to count:
+   * it spans the padded fetch box, which reaches well beyond the viewport.
+   */
+  vendors: Vendor[];
+  /**
+   * On-screen totals, straight from the map. The footer counts these rather
+   * than counting `vendors` itself, so the sheet and the results pill can never
+   * disagree - they are literally the same numbers. Counting the fetched rows
+   * instead reported "55 matches" next to a pill saying "93 on screen".
+   */
+  visibleTotal: number;
+  visiblePartial: number;
+  states: Partial<Record<VendorType, FilterState>>;
+  dateContexts: Partial<Record<VendorType, DateContext>>;
+  onChangeType: (t: VendorType, next: FilterState) => void;
+  onDateContextChange: (t: VendorType, next: DateContext) => void;
+  onClearAll: () => void;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  // With several categories chosen the sections collapse, so the sheet opens on
+  // a scannable list of categories rather than a wall of every filter at once.
+  // The first is open because with one category that IS the whole sheet.
+  const [openType, setOpenType] = useState<VendorType | null>(
+    vendorTypes[0] ?? null,
+  );
+
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const filterable = vendorTypes.filter((t) => filtersForType(t).length > 0);
+  const multi = filterable.length > 1;
+  const matched = Math.max(0, visibleTotal - visiblePartial);
+  const totalActive = filterable.reduce(
+    (n, t) => n + Object.keys(states[t] ?? {}).length,
+    0,
+  );
 
   const body = (
     <div className="fixed inset-0 z-[70] flex flex-col justify-end">
@@ -355,17 +569,11 @@ export function VendorFilterSheet({
       />
       <div className="relative flex max-h-[85vh] flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
-          <meta.icon className="size-4 shrink-0" style={{ color: meta.colorHex }} />
-          <h2 className="text-[15px] font-semibold">
-            Filter {CATEGORY_PLURAL[vendorType]}
-          </h2>
-          {activeCount > 0 && (
+          <h2 className="text-[15px] font-semibold">Filters</h2>
+          {totalActive > 0 && (
             <button
               type="button"
-              onClick={() => {
-                onChange({});
-                onDateContextChange({});
-              }}
+              onClick={onClearAll}
               className="text-[13px] text-muted-foreground underline underline-offset-2"
             >
               Clear all
@@ -382,115 +590,21 @@ export function VendorFilterSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <div className="flex flex-col gap-5">
-            {defs.map((def) => {
-              const h = hist[def.lo ?? def.key];
-              const isPriceWithDate =
-                def.rescaledBy === "date_context" && vendorType === "venue";
-
-              return (
-                <section key={def.key}>
-                  <div className="mb-2 flex items-baseline gap-2">
-                    <h3 className="text-[13px] font-semibold">{def.label}</h3>
-                    {def.rare && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                        Rare
-                      </span>
-                    )}
-                  </div>
-                  {def.hint && (
-                    <p className="mb-2 text-[12px] text-muted-foreground">{def.hint}</p>
-                  )}
-
-                  {def.kind === "multi" && (
-                    <ChipGroup
-                      def={def}
-                      meta={meta}
-                      value={(state[def.key] as string[]) ?? []}
-                      onChange={(v) => set(def.key, v)}
-                    />
-                  )}
-
-                  {def.kind === "bool" && (
-                    <Chip
-                      on={state[def.key] === true}
-                      meta={meta}
-                      onClick={() => set(def.key, state[def.key] === true ? null : true)}
-                    >
-                      {def.label}
-                    </Chip>
-                  )}
-
-                  {def.kind === "range" && h && (
-                    <div
-                      className={cn(
-                        def.rescaledBy && "rounded-xl border border-border p-3",
-                      )}
-                    >
-                      {/* The rescale control lives INSIDE the price card so the
-                          two read as one thing (Kiara, 2026-08-05). */}
-                      {isPriceWithDate && (
-                        <div className="mb-3 flex flex-col gap-2 border-b border-border pb-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            {SEASONS.map((s) => (
-                              <Chip
-                                key={s.value}
-                                size="sm"
-                                meta={meta}
-                                on={dateContext.season === s.value}
-                                onClick={() =>
-                                  onDateContextChange({
-                                    ...dateContext,
-                                    season: dateContext.season === s.value ? undefined : s.value,
-                                  })
-                                }
-                              >
-                                {s.label} · {s.months}
-                              </Chip>
-                            ))}
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {DAY_TYPES.map((d) => (
-                              <Chip
-                                key={d.value}
-                                size="sm"
-                                meta={meta}
-                                on={dateContext.day === d.value}
-                                onClick={() =>
-                                  onDateContextChange({
-                                    ...dateContext,
-                                    day: dateContext.day === d.value ? undefined : d.value,
-                                  })
-                                }
-                              >
-                                {d.label}
-                              </Chip>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <RangeControl
-                        def={def}
-                        hist={h}
-                        value={state[def.key] as { min?: number; max?: number }}
-                        accent={meta.colorHex}
-                        onChange={(v) => set(def.key, v)}
-                        scaled={rescaledCounts(def)}
-                      />
-
-                      {def.unit === "usd" && vendorType === "venue" && def.key === "price" && (
-                        <p className="mt-2 text-[11px] text-muted-foreground">
-                          Venues quoting per person are shown at{" "}
-                          {VENUE_PRICE_ASSUMPTIONS.guests} guests, per hour at{" "}
-                          {VENUE_PRICE_ASSUMPTIONS.hours} hours.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </section>
-              );
-            })}
+          <div className="flex flex-col gap-3">
+            {filterable.map((t) => (
+              <TypeSection
+                key={t}
+                vendorType={t}
+                vendors={vendors}
+                state={states[t] ?? {}}
+                dateContext={dateContexts[t] ?? {}}
+                onChange={(next) => onChangeType(t, next)}
+                onDateContextChange={(next) => onDateContextChange(t, next)}
+                collapsible={multi}
+                open={!multi || openType === t}
+                onToggleOpen={() => setOpenType(openType === t ? null : t)}
+              />
+            ))}
           </div>
         </div>
 
@@ -498,8 +612,7 @@ export function VendorFilterSheet({
           <button
             type="button"
             onClick={onClose}
-            style={{ backgroundColor: meta.colorHex }}
-            className="w-full rounded-xl py-3 text-[14px] font-semibold text-white"
+            className="w-full rounded-xl bg-foreground py-3 text-[14px] font-semibold text-background"
           >
             Show {matched} {matched === 1 ? "match" : "matches"} on screen
             {visiblePartial > 0 && (
@@ -541,43 +654,59 @@ function priceForContext(
 /* ----------------------------------------------------------------- trigger */
 
 export function FilterButton({
-  vendorType,
+  vendorTypes,
   activeCount,
   onClick,
   className,
 }: {
-  vendorType: VendorType | null;
+  vendorTypes: VendorType[];
   activeCount: number;
   onClick: () => void;
   className?: string;
 }) {
-  const enabled = vendorType != null && filtersForType(vendorType).length > 0;
-  // Hidden rather than disabled once a category is picked is the wrong trade at
-  // this size: with no category chosen there is nothing to filter, and a
-  // permanently visible dead control in a one-row bar reads as broken. So it
-  // renders nothing until a single category makes it meaningful.
-  if (!enabled || !vendorType) return null;
-  const meta = CATEGORIES[vendorType];
+  const filterable = vendorTypes.filter((t) => filtersForType(t).length > 0);
+  // Nothing to filter until at least one category is chosen: with "All" showing
+  // every type, a sheet of ten collapsed sections is a worse starting point than
+  // asking which category you are shopping for. Hidden rather than disabled,
+  // since a permanently dead control in a one-row bar reads as broken.
+  if (filterable.length === 0) return null;
+
+  // Tint by the single chosen category; stay neutral across several, where no
+  // one hue is honest.
+  const meta = filterable.length === 1 ? CATEGORIES[filterable[0]] : null;
+  const on = activeCount > 0;
 
   return (
     <button
       type="button"
       onClick={onClick}
       style={
-        activeCount > 0
-          ? { backgroundColor: meta.colorHex, borderColor: meta.colorHex }
-          : { borderColor: `${meta.colorHex}59`, color: meta.textHex }
+        meta
+          ? on
+            ? { backgroundColor: meta.colorHex, borderColor: meta.colorHex }
+            : { borderColor: `${meta.colorHex}59`, color: meta.textHex }
+          : undefined
       }
       className={cn(
         "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] shadow-sm transition-colors",
-        activeCount > 0 ? "font-medium text-white" : "bg-background/95 backdrop-blur",
+        on
+          ? meta
+            ? "font-medium text-white"
+            : "border-foreground bg-foreground font-medium text-background"
+          : "bg-background/95 backdrop-blur",
+        !meta && !on && "border-border",
         className,
       )}
     >
       <SlidersHorizontal className="size-3.5" aria-hidden />
       Filters
-      {activeCount > 0 && (
-        <span className="rounded-full bg-white/25 px-1.5 text-[11px]">
+      {on && (
+        <span
+          className={cn(
+            "rounded-full px-1.5 text-[11px]",
+            meta ? "bg-white/25" : "bg-background/25",
+          )}
+        >
           {activeCount}
         </span>
       )}

@@ -14,7 +14,7 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { filterRank } from "../lib/filters/match.ts";
+import { filterRank, filterRankFor, hasAnySelection, countSelections } from "../lib/filters/match.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const rows = readFileSync(resolve(ROOT, "data/filter-extraction/vendor-filters.jsonl"), "utf8")
@@ -100,6 +100,30 @@ eq("a partial anywhere makes the whole row partial",
   filterRank({ setting: ["mountain"] },
     { setting: { kind: "multi", values: ["mountain"] }, has_lodging: { kind: "bool", value: true } }), 0);
 
+// Several categories filtered at once: each vendor is judged ONLY against its
+// own type, so a venue filter must never touch a photographer.
+const multi = {
+  venue: { setting: { kind: "multi", values: ["mountain"] } },
+  photos: { shoots_film: { kind: "bool", value: true, rare: true } },
+};
+eq("venue judged by the venue filter",
+  filterRankFor("venue", { setting: ["mountain"] }, multi), 1);
+eq("venue contradicting the venue filter is excluded",
+  filterRankFor("venue", { setting: ["garden"] }, multi), -1);
+eq("photographer is NOT judged by the venue filter",
+  filterRankFor("photos", { shoots_film: true }, multi), 1);
+eq("photographer judged by its own rare filter",
+  filterRankFor("photos", { style: ["documentary"] }, multi), -1);
+eq("a type with no filters is untouched",
+  filterRankFor("flowers", { style: ["classic"] }, multi), 1);
+eq("a venue silent on setting still demotes, not excludes",
+  filterRankFor("venue", { has_lodging: true }, multi), 0);
+eq("hasAnySelection is false for empty per-type entries",
+  hasAnySelection({ venue: {}, photos: {} }), false);
+eq("hasAnySelection is true when any type carries one",
+  hasAnySelection({ venue: {}, photos: multi.photos }), true);
+eq("countSelections sums across types", countSelections(multi), 2);
+
 // --- corpus behaviour ------------------------------------------------------
 console.log("\ncorpus — what real selections return\n");
 
@@ -156,6 +180,29 @@ report("beauty · comes to you, hair and makeup", "beauty", {
   services: { kind: "multi", values: ["hair", "makeup"] },
 });
 report("no filters at all", "venue", {});
+
+// Cross-type isolation on the real corpus: filter venues by setting and
+// photographers by style at the same time, and confirm neither pool moves when
+// only the OTHER type's filter is present.
+{
+  const venueOnly = { venue: { setting: { kind: "multi", values: ["mountain"] } } };
+  const both = {
+    ...venueOnly,
+    photos: { style: { kind: "multi", values: ["documentary"] } },
+  };
+  const count = (type, sels) => {
+    const pool = rows.filter((r) => r.vendor_type === type);
+    const ranks = pool.map((r) => filterRankFor(type, norm(r), sels));
+    return { kept: ranks.filter((x) => x >= 0).length, of: pool.length };
+  };
+  const vA = count("venue", venueOnly), vB = count("venue", both);
+  const pA = count("photos", venueOnly), pB = count("photos", both);
+  console.log(`\n  venues  · venue filter only: ${vA.kept}/${vA.of} · plus a photo filter: ${vB.kept}/${vB.of}`);
+  console.log(`  photos  · venue filter only: ${pA.kept}/${pA.of} · plus a photo filter: ${pB.kept}/${pB.of}`);
+  eq("adding a photo filter does not change the venue result", vA.kept, vB.kept);
+  eq("photographers are untouched by a venue-only filter", pA.kept, pA.of);
+  eq("the photo filter does narrow photographers", pB.kept < pA.kept, true);
+}
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

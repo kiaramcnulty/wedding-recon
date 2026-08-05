@@ -26,7 +26,11 @@ import {
   type DateContext,
 } from "@/components/map/vendor-filter-sheet";
 import { filtersForType } from "@/lib/constants/vendor-filters";
-import { buildSelection } from "@/lib/filters/match";
+import {
+  buildSelection,
+  countSelections,
+  type FilterSelections,
+} from "@/lib/filters/match";
 import type { Vendor } from "@/lib/types";
 import {
   CATEGORIES,
@@ -127,26 +131,33 @@ export default function ExplorePage() {
   // client render matches the server; any persisted selection is restored after
   // mount (see below) to avoid a hydration mismatch on the chip states.
   const [selectedTypes, setSelectedTypes] = useState<VendorType[]>([]);
-  // Attribute filters. Per-vendor-type by nature (venues have no cuisine), so
-  // they apply only while exactly one type is selected, and reset when the type
-  // changes — carrying a venue capacity filter onto florists would silently
-  // exclude every one of them.
-  const [filterState, setFilterState] = useState<FilterState>({});
-  const [dateContext, setDateContext] = useState<DateContext>({});
+  // Attribute filters, keyed BY VENDOR TYPE. Filters are type-scoped (a venue
+  // has no cuisine), but that scopes which filters apply to a vendor — it is
+  // not a reason to allow only one type at a time. A couple shops for a venue
+  // and a photographer in the same session, so several categories can be
+  // filtered at once and each vendor is judged only against its own type.
+  const [filterStates, setFilterStates] = useState<
+    Partial<Record<VendorType, FilterState>>
+  >({});
+  const [dateContexts, setDateContexts] = useState<
+    Partial<Record<VendorType, DateContext>>
+  >({});
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  // Rows the map currently holds, so the sheet can show live match counts and
-  // rescale its histograms against what is actually in view.
+  // Rows the map currently holds, so the sheet can rescale its histograms
+  // against what is actually in view.
   const [mapVendors, setMapVendors] = useState<Vendor[]>([]);
 
-  const filterType = selectedTypes.length === 1 ? selectedTypes[0] : null;
+  const filterSelections = useMemo<FilterSelections>(() => {
+    const out: FilterSelections = {};
+    for (const t of selectedTypes) {
+      const st = filterStates[t];
+      if (!st || Object.keys(st).length === 0) continue;
+      out[t] = buildSelection(filtersForType(t), st, dateContexts[t] ?? {});
+    }
+    return out;
+  }, [selectedTypes, filterStates, dateContexts]);
 
-  const filterSelection = useMemo(
-    () =>
-      filterType
-        ? buildSelection(filtersForType(filterType), filterState, dateContext)
-        : {},
-    [filterType, filterState, dateContext],
-  );
+  const activeFilterCount = countSelections(filterSelections);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
@@ -262,11 +273,16 @@ export default function ExplorePage() {
   // a vendor page (restored on mount, below) just like the map view.
   const updateSelectedTypes = useCallback((next: VendorType[]) => {
     setSelectedTypes(next);
-    // Attribute filters belong to a single type, so a type change retires them
-    // rather than carrying (say) a guest-count filter onto photographers, where
-    // no row has the attribute and everything would drop to the faded tier.
-    setFilterState({});
-    setDateContext({});
+    // Drop the filters of any category that was just DESELECTED, and keep the
+    // rest. Clearing everything on any change would throw away a venue filter
+    // the moment a photographer category is added alongside it.
+    const keep = new Set(next);
+    setFilterStates((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([t]) => keep.has(t as VendorType))),
+    );
+    setDateContexts((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([t]) => keep.has(t as VendorType))),
+    );
     try {
       sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
     } catch {
@@ -507,7 +523,7 @@ export default function ExplorePage() {
           onViewChange={saveMapView}
           initialView={initialView}
           selectedTypes={selectedTypes}
-          filterSelection={filterSelection}
+          filterSelections={filterSelections}
           onVisibleVendorsChange={setVisible}
           onVendorsChange={setMapVendors}
         />
@@ -678,8 +694,8 @@ export default function ExplorePage() {
           className="pointer-events-auto"
         />
         <FilterButton
-          vendorType={filterType}
-          activeCount={Object.keys(filterState).length}
+          vendorTypes={selectedTypes}
+          activeCount={activeFilterCount}
           onClick={() => setFilterSheetOpen(true)}
           className="pointer-events-auto"
         />
@@ -691,16 +707,24 @@ export default function ExplorePage() {
         />
       </div>
 
-      {filterSheetOpen && filterType && (
+      {filterSheetOpen && selectedTypes.length > 0 && (
         <VendorFilterSheet
-          vendorType={filterType}
+          vendorTypes={selectedTypes}
           vendors={mapVendors}
           visibleTotal={visible.total}
           visiblePartial={visible.partial}
-          state={filterState}
-          dateContext={dateContext}
-          onChange={setFilterState}
-          onDateContextChange={setDateContext}
+          states={filterStates}
+          dateContexts={dateContexts}
+          onChangeType={(t, next) =>
+            setFilterStates((prev) => ({ ...prev, [t]: next }))
+          }
+          onDateContextChange={(t, next) =>
+            setDateContexts((prev) => ({ ...prev, [t]: next }))
+          }
+          onClearAll={() => {
+            setFilterStates({});
+            setDateContexts({});
+          }}
           onClose={() => setFilterSheetOpen(false)}
         />
       )}

@@ -12,7 +12,11 @@ import {
   clusterImageId,
 } from "@/lib/map/pin-images";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
-import { filterRank, type FilterSelection } from "@/lib/filters/match";
+import {
+  filterRankFor,
+  hasAnySelection,
+  type FilterSelections,
+} from "@/lib/filters/match";
 
 // MapLibre is browser-only; import deferred to effects.
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -221,7 +225,7 @@ function resolveDisplayPositions(
 function buildFeatureCollectionsByType(
   vendors: Vendor[],
   positions: Map<string, { lng: number; lat: number }>,
-  filterSelection?: FilterSelection,
+  filterSelections?: FilterSelections,
 ): Record<VendorType, GeoJSON.FeatureCollection> {
   const byType = Object.fromEntries(
     VENDOR_TYPES.map((t) => [
@@ -230,7 +234,7 @@ function buildFeatureCollectionsByType(
     ]),
   ) as Record<VendorType, GeoJSON.FeatureCollection>;
 
-  const active = filterSelection && Object.keys(filterSelection).length > 0;
+  const active = hasAnySelection(filterSelections);
 
   for (const vendor of vendors) {
     const pos = positions.get(vendor.id);
@@ -238,9 +242,11 @@ function buildFeatureCollectionsByType(
     // A contradicting vendor is dropped from the source entirely rather than
     // hidden by a layer filter, so the cluster counts drawn on screen agree
     // with the pins — MapLibre clusters the source, not the visible subset.
-    const rank = active ? filterRank(vendor.filters, filterSelection) : 1;
-    if (rank < 0) continue;
     const t = bucketType(vendor.vendor_type);
+    // Each vendor is judged against ITS OWN type's filters, so several types can
+    // be filtered at once without one type's criteria touching another.
+    const rank = active ? filterRankFor(t, vendor.filters, filterSelections) : 1;
+    if (rank < 0) continue;
     (byType[t].features as GeoJSON.Feature[]).push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
@@ -345,12 +351,12 @@ interface VendorMapProps {
    */
   selectedTypes?: VendorType[];
   /**
-   * Attribute filters, applied locally against the `filters` each row already
-   * carries — no refetch, so a chip tap is instant and the fetched-area cache
+   * Attribute filters PER VENDOR TYPE, applied locally against the `filters`
+   * each row already carries — no refetch, so a chip tap is instant and the fetched-area cache
    * in `coverageRef` stays valid. A vendor that contradicts the selection is
    * dropped from its source; one that is merely silent is kept and faded.
    */
-  filterSelection?: FilterSelection;
+  filterSelections?: FilterSelections;
   /**
    * Called whenever the set of vendors inside the viewport changes — on every
    * settled move, after new rows land, and when either filter changes. Drives
@@ -376,7 +382,7 @@ export function VendorMap({
   onViewChange,
   initialView,
   selectedTypes,
-  filterSelection,
+  filterSelections,
   onVisibleVendorsChange,
   onVendorsChange,
 }: VendorMapProps) {
@@ -400,7 +406,7 @@ export function VendorMap({
   const selectedTypesRef = useRef(selectedTypes);
   // Latest attribute filter, same reason — and read by applyVendors, which runs
   // both on new rows and on a filter change.
-  const filterSelectionRef = useRef(filterSelection);
+  const filterSelectionsRef = useRef(filterSelections);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -536,8 +542,8 @@ export function VendorMap({
     const sel = selectedTypesRef.current ?? [];
     const showAll = sel.length === 0;
 
-    const selection = filterSelectionRef.current;
-    const filtering = selection && Object.keys(selection).length > 0;
+    const selections = filterSelectionsRef.current;
+    const filtering = hasAnySelection(selections);
 
     const inView: {
       id: string;
@@ -553,7 +559,9 @@ export function VendorMap({
       if (!bounds.contains([pos.lng, pos.lat])) continue;
       // Same predicate the pins were built with, so the pill can never disagree
       // with what is drawn.
-      const rank = filtering ? filterRank(v.filters, selection) : 1;
+      const rank = filtering
+        ? filterRankFor(vendorType, v.filters, selections)
+        : 1;
       if (rank < 0) continue;
       // Squared distance from center, longitude scaled to match latitude at this
       // latitude. Only used for ordering, so no need for a real geodesic.
@@ -590,7 +598,7 @@ export function VendorMap({
       const byType = buildFeatureCollectionsByType(
         vendors,
         positions,
-        filterSelectionRef.current,
+        filterSelectionsRef.current,
       );
       for (const t of VENDOR_TYPES) {
         map.getSource(srcId(t))?.setData(byType[t]);
@@ -664,10 +672,10 @@ export function VendorMap({
    * MapLibre clusters the source rather than the drawn subset.
    */
   useEffect(() => {
-    filterSelectionRef.current = filterSelection;
+    filterSelectionsRef.current = filterSelections;
     if (vendorsRef.current.length) applyVendors(vendorsRef.current);
     reportVisibleVendors();
-  }, [filterSelection, applyVendors, reportVisibleVendors]);
+  }, [filterSelections, applyVendors, reportVisibleVendors]);
 
   /**
    * Mark the vendor whose preview card is open: its pin is bumped up a size and

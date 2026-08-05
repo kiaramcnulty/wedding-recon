@@ -33,6 +33,43 @@ export type FilterSpec =
 export type FilterSelection = Record<string, FilterSpec>;
 export type VendorFilters = Record<string, unknown> | null | undefined;
 
+/**
+ * One selection per vendor type, applied only to vendors OF that type.
+ *
+ * Attribute filters are type-scoped — a venue has no cuisine — but that scopes
+ * which filters apply to a vendor, it does not mean only one type can be
+ * filtered at a time. A couple shops for a venue and a photographer in the same
+ * session, so "mountain venues AND documentary photographers" has to be one
+ * query. A type with no entry here is unfiltered and every vendor of it ranks 1.
+ */
+export type FilterSelections = Partial<Record<string, FilterSelection>>;
+
+/** Rank a vendor against its OWN type's filters. */
+export function filterRankFor(
+  vendorType: string,
+  filters: VendorFilters,
+  selections: FilterSelections | undefined,
+): -1 | 0 | 1 {
+  const sel = selections?.[vendorType];
+  if (!sel || Object.keys(sel).length === 0) return 1;
+  return filterRank(filters, sel);
+}
+
+/** Whether any type carries a filter at all — lets callers skip the work. */
+export function hasAnySelection(selections: FilterSelections | undefined): boolean {
+  if (!selections) return false;
+  return Object.values(selections).some((s) => s && Object.keys(s).length > 0);
+}
+
+/** Total number of active filters across every type, for the trigger badge. */
+export function countSelections(selections: FilterSelections | undefined): number {
+  if (!selections) return 0;
+  return Object.values(selections).reduce(
+    (n, s) => n + (s ? Object.keys(s).length : 0),
+    0,
+  );
+}
+
 /** Matches the SQL sentinel; far above any real wedding price. */
 const OPEN_HI = 1_000_000_000;
 
