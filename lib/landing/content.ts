@@ -44,17 +44,17 @@ import type { VendorType } from "@/lib/constants/categories";
 export const META = {
   /**
    * The blue headline in Google results and the browser tab.
-   * Google truncates around 60 characters — front-load the important words.
-   * Current length is 88, so search results cut it after "…prices and intel, fr".
+   * Google truncates around 60 characters - front-load the important words.
+   * Current length is 58, so it displays in full. Keep it under 60.
    */
   title:
     "Wedding Recon - Colorado wedding vendor intel from couples",
   /**
    * The grey paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
-   * Current length is 230, cut after "…Keep your own quotes". The vendor-type
-   * list now lands inside the visible window; the planning hub and the
-   * free-to-use line still fall outside it.
+   * Current length is 252, cut after "...Manage and share y". The vendor-type
+   * list lands inside the visible window; the planning hub and the free-to-use
+   * line fall outside it.
    */
   description:
     "See quotes and insights from real Colorado brides for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Manage and share your own quotes and notes in one central planning hub. Free, no account needed to explore vendors.",
