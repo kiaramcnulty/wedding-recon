@@ -1,0 +1,532 @@
+import type { VendorType } from "./categories";
+
+/**
+ * Vendor filter definitions — the single source of truth for the Explore filter
+ * UI, the client-side matcher (`lib/filters/match.ts`), the backfill script, and
+ * the shape of the `p_filters` argument sent to `vendors_in_bbox`.
+ *
+ * Attribute values were measured across all 2,163 CO vendors rather than
+ * guessed; see `docs/vendor-filter-coverage.md` for per-attribute coverage and
+ * `data/filter-extraction/vendor-filters.jsonl` for the dataset. Coverage drives
+ * two UI behaviours that are wired through `rare` below.
+ */
+
+export type FilterKind = "multi" | "bool" | "range";
+
+export interface FilterOption {
+  value: string;
+  label: string;
+}
+
+export interface FilterDef {
+  /** Logical id. For `multi`/`bool` this is also the vendors.filters jsonb key. */
+  key: string;
+  label: string;
+  kind: FilterKind;
+  /** `multi` only. Order here is the order rendered. */
+  options?: FilterOption[];
+  /**
+   * `range` only.
+   * - `point`   — the vendor holds ONE number that must land inside the
+   *               selected range (venue capacity: big enough for my party,
+   *               not so big it swallows it).
+   * - `overlap` — the vendor holds its own [lo, hi] range and matches when the
+   *               two ranges intersect. Most prices are ranges (445 of 736
+   *               priced rows), so "is the start price inside the band" would
+   *               wrongly drop a venue quoting $4k-$12k from a $6k search.
+   */
+  mode?: "point" | "overlap";
+  /** jsonb keys holding the vendor's range ends. Defaults to `key` for both. */
+  lo?: string;
+  hi?: string;
+  unit?: "usd" | "guests" | "weeks";
+  /**
+   * `range` only. Only compare against vendors quoting in this basis; a vendor
+   * priced per-person is not comparable to one priced per-package, so an
+   * off-basis vendor reads as unknown (demoted) rather than as a miss.
+   */
+  basis?: string;
+  /**
+   * Coverage is low BUT absence is meaningful — a hotel that ran a shuttle
+   * would say so. These act as positive-only filters: selecting one excludes
+   * silent vendors instead of demoting them, because "not mentioned" really
+   * does mean "does not offer it". Contrast capacity/price, where silence just
+   * means nobody wrote it down. See "Two kinds of missing data" in the
+   * coverage doc.
+   */
+  rare?: boolean;
+  /** Companion filter id whose selection re-scales this range's histogram. */
+  rescaledBy?: string;
+  hint?: string;
+}
+
+/** Season vocabulary, normalized. The raw extraction used `peak`/`high` and
+ * `low`/`off` interchangeably; the backfill collapses them to these three.
+ * Named by MONTH, not by season word: a third of CO venues are ski-town
+ * properties that peak in fall and bottom out in winter (Della Terra), so
+ * "summer" would be actively wrong for them. */
+export const SEASONS = [
+  { value: "peak", label: "Peak", months: "May–Oct" },
+  { value: "shoulder", label: "Shoulder", months: "Apr & Nov" },
+  { value: "off", label: "Off-peak", months: "Dec–Mar" },
+] as const;
+
+export const DAY_TYPES = [
+  { value: "weekday", label: "Weekday" },
+  { value: "friday", label: "Friday" },
+  { value: "saturday", label: "Saturday" },
+  { value: "sunday", label: "Sunday" },
+] as const;
+
+const opt = (o: Record<string, string>): FilterOption[] =>
+  Object.entries(o).map(([value, label]) => ({ value, label }));
+
+const PRICE_CONFIDENCE_LABELS: Record<string, string> = {
+  published: "Published by the vendor",
+  listing: "From a listing site",
+  inferred: "Estimated from reviews",
+};
+
+export { PRICE_CONFIDENCE_LABELS };
+
+export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
+  venue: [
+    {
+      key: "capacity_max",
+      label: "Guest count",
+      kind: "range",
+      mode: "point",
+      unit: "guests",
+      hint: "Venues that seat your party, without dwarfing it.",
+    },
+    {
+      key: "setting",
+      label: "Setting",
+      kind: "multi",
+      options: opt({
+        mountain: "Mountain",
+        ranch: "Ranch",
+        garden: "Garden",
+        barn_rustic: "Barn / rustic",
+        waterfront: "Waterfront",
+        historic_estate: "Historic estate",
+        hotel_ballroom: "Hotel ballroom",
+        urban_industrial: "Urban / industrial",
+        golf_country_club: "Golf & country club",
+        church_chapel: "Church / chapel",
+        museum_gallery: "Museum / gallery",
+        winery_brewery: "Winery / brewery",
+      }),
+    },
+    {
+      key: "price",
+      label: "Venue fee",
+      kind: "range",
+      mode: "overlap",
+      lo: "price_min",
+      hi: "price_max",
+      unit: "usd",
+      basis: "package",
+      rescaledBy: "date_context",
+    },
+    {
+      key: "ceremony_location",
+      label: "Ceremony",
+      kind: "multi",
+      options: opt({ outdoor: "Outdoor", indoor: "Indoor" }),
+    },
+    {
+      key: "catering_policy",
+      label: "Catering",
+      kind: "multi",
+      options: opt({
+        outside_allowed: "Outside caterers allowed",
+        in_house_required: "In-house required",
+        approved_list: "Approved list",
+        byo_alcohol: "BYO alcohol",
+      }),
+    },
+    { key: "has_lodging", label: "On-site lodging", kind: "bool" },
+    {
+      key: "has_getting_ready_suite",
+      label: "Getting-ready suite",
+      kind: "bool",
+      rare: true,
+    },
+  ],
+
+  photos: [
+    {
+      key: "style",
+      label: "Style",
+      kind: "multi",
+      options: opt({
+        documentary: "Documentary",
+        adventure: "Adventure / elopement",
+        editorial: "Editorial",
+        classic: "Classic",
+        film: "Film",
+        fine_art: "Fine art",
+        light_airy: "Light & airy",
+        moody: "Moody",
+      }),
+    },
+    {
+      key: "price",
+      label: "Package price",
+      kind: "range",
+      mode: "overlap",
+      lo: "price_min",
+      hi: "price_max",
+      unit: "usd",
+      basis: "package",
+    },
+    { key: "does_elopements", label: "Elopements", kind: "bool" },
+    { key: "travels_destination", label: "Destination weddings", kind: "bool" },
+    { key: "includes_engagement", label: "Engagement session included", kind: "bool" },
+    { key: "shoots_film", label: "Also shoots film", kind: "bool", rare: true },
+    { key: "second_shooter", label: "Second shooter", kind: "bool" },
+    {
+      key: "turnaround_weeks",
+      label: "Delivery time",
+      kind: "range",
+      mode: "point",
+      unit: "weeks",
+    },
+  ],
+
+  beauty: [
+    {
+      key: "work_mode",
+      label: "Where they work",
+      kind: "multi",
+      options: opt({ on_location: "Comes to you", in_studio: "In studio" }),
+    },
+    {
+      key: "services",
+      label: "Services",
+      kind: "multi",
+      options: opt({ hair: "Hair", makeup: "Makeup" }),
+    },
+    {
+      key: "bride_price",
+      label: "Bride",
+      kind: "range",
+      mode: "overlap",
+      lo: "bride_price_min",
+      hi: "bride_price_max",
+      unit: "usd",
+    },
+    {
+      key: "party_price",
+      label: "Per bridesmaid",
+      kind: "range",
+      mode: "overlap",
+      lo: "party_price_min",
+      hi: "party_price_max",
+      unit: "usd",
+    },
+    {
+      key: "trial_policy",
+      label: "Trial",
+      kind: "multi",
+      options: opt({ included: "Included", paid: "Paid separately" }),
+    },
+    { key: "airbrush", label: "Airbrush", kind: "bool", rare: true },
+    { key: "textured_hair", label: "Textured hair", kind: "bool", rare: true },
+  ],
+
+  band: [
+    {
+      key: "genre",
+      label: "Genre",
+      kind: "multi",
+      options: opt({
+        funk_soul: "Funk & soul",
+        variety: "Variety / party",
+        classical_strings: "Classical strings",
+        rock_covers: "Rock covers",
+        pop_top40: "Pop & Top 40",
+        jazz_swing: "Jazz & swing",
+        country_bluegrass: "Country & bluegrass",
+        acoustic_folk: "Acoustic & folk",
+        latin: "Latin",
+      }),
+    },
+    {
+      key: "ensemble",
+      label: "Ensemble size",
+      kind: "multi",
+      options: opt({
+        solo: "Solo",
+        duo: "Duo",
+        trio: "Trio",
+        quartet: "Quartet",
+        "5_8_piece": "5–8 piece",
+        "9_plus": "9+ piece",
+      }),
+    },
+    {
+      key: "instruments",
+      label: "Instruments",
+      kind: "multi",
+      options: opt({
+        vocals: "Vocals",
+        strings: "Strings",
+        guitar: "Guitar",
+        brass: "Brass",
+        piano: "Piano",
+        harp: "Harp",
+      }),
+    },
+    {
+      key: "price",
+      label: "Price",
+      kind: "range",
+      mode: "overlap",
+      lo: "price_min",
+      hi: "price_max",
+      unit: "usd",
+      basis: "package",
+    },
+    { key: "plays_ceremony", label: "Plays the ceremony", kind: "bool" },
+    { key: "plays_cocktail", label: "Plays cocktail hour", kind: "bool" },
+  ],
+
+  dj: [
+    { key: "includes_mc", label: "Emcee included", kind: "bool" },
+    {
+      key: "price",
+      label: "Price",
+      kind: "range",
+      mode: "overlap",
+      lo: "price_min",
+      hi: "price_max",
+      unit: "usd",
+      basis: "package",
+    },
+    {
+      key: "production",
+      label: "Lighting & production",
+      kind: "multi",
+      options: opt({
+        uplighting: "Uplighting",
+        dancefloor_lighting: "Dancefloor lighting",
+        projection: "Projection",
+        fog_haze: "Fog / haze",
+        cold_sparks: "Cold sparks",
+        live_instrument: "Live instrument add-on",
+      }),
+    },
+    { key: "has_photobooth", label: "Photo booth", kind: "bool", rare: true },
+    { key: "plays_ceremony", label: "Plays the ceremony", kind: "bool" },
+  ],
+
+  planner: [
+    {
+      key: "service_tier",
+      label: "Service level",
+      kind: "multi",
+      options: opt({
+        full_planning: "Full planning",
+        partial_planning: "Partial planning",
+        day_of: "Day-of coordination",
+        month_of: "Month-of coordination",
+        a_la_carte: "A la carte",
+      }),
+    },
+    {
+      key: "price",
+      label: "Price",
+      kind: "range",
+      mode: "overlap",
+      lo: "price_min",
+      hi: "price_max",
+      unit: "usd",
+      rescaledBy: "service_tier",
+    },
+    {
+      key: "pricing_model",
+      label: "How they charge",
+      kind: "multi",
+      options: opt({
+        flat_fee: "Flat fee",
+        hourly: "Hourly",
+        percent_of_budget: "% of budget",
+      }),
+    },
+    { key: "offers_design", label: "Design services", kind: "bool" },
+  ],
+
+  food: [
+    {
+      key: "cuisine",
+      label: "Cuisine",
+      kind: "multi",
+      options: opt({
+        bbq: "BBQ",
+        mexican_latin: "Mexican & Latin",
+        italian: "Italian",
+        seafood: "Seafood",
+        comfort: "Comfort food",
+        grazing_charcuterie: "Grazing & charcuterie",
+        new_american: "New American",
+        asian: "Asian",
+        farm_to_table: "Farm to table",
+        mediterranean: "Mediterranean",
+        french: "French",
+        southern: "Southern",
+        indian: "Indian",
+      }),
+    },
+    {
+      key: "service_style",
+      label: "Service style",
+      kind: "multi",
+      options: opt({
+        buffet: "Buffet",
+        plated: "Plated",
+        drop_off: "Drop-off",
+        stations: "Stations",
+        passed_apps: "Passed appetizers",
+        family_style: "Family style",
+        food_truck: "Food truck",
+      }),
+    },
+    {
+      key: "dietary",
+      label: "Dietary",
+      kind: "multi",
+      options: opt({
+        gluten_free: "Gluten free",
+        vegetarian: "Vegetarian",
+        vegan: "Vegan",
+        allergen_aware: "Allergen aware",
+        kosher: "Kosher",
+        halal: "Halal",
+      }),
+    },
+    {
+      key: "price",
+      label: "Per person",
+      kind: "range",
+      mode: "overlap",
+      lo: "price_min",
+      hi: "price_max",
+      unit: "usd",
+      basis: "per_person",
+    },
+    {
+      key: "bar_service",
+      label: "Bar service",
+      kind: "multi",
+      rare: true,
+      options: opt({
+        bartending_only: "Bartending only",
+        full_bar: "Full bar",
+        byo_allowed: "BYO allowed",
+        beer_wine: "Beer & wine",
+      }),
+    },
+    { key: "offers_tasting", label: "Tasting offered", kind: "bool", rare: true },
+  ],
+
+  flowers: [
+    {
+      key: "engagement_model",
+      label: "How they work",
+      kind: "multi",
+      options: opt({
+        full_service: "Full service",
+        a_la_carte: "A la carte",
+      }),
+    },
+    {
+      key: "price",
+      label: "Typical spend",
+      kind: "range",
+      mode: "overlap",
+      lo: "price_min",
+      hi: "price_max",
+      unit: "usd",
+      rescaledBy: "engagement_model",
+    },
+    {
+      key: "style",
+      label: "Style",
+      kind: "multi",
+      options: opt({
+        garden_organic: "Garden & organic",
+        native_seasonal: "Native & seasonal",
+        classic: "Classic",
+        bold_colourful: "Bold & colourful",
+        modern_minimal: "Modern & minimal",
+        dried_preserved: "Dried & preserved",
+      }),
+    },
+    { key: "delivers_installs", label: "Delivery & install", kind: "bool" },
+    {
+      key: "minimum_spend",
+      label: "Minimum spend",
+      kind: "range",
+      mode: "point",
+      unit: "usd",
+      hint: "Florists at or below your ceiling.",
+    },
+    { key: "offers_rentals", label: "Rentals", kind: "bool", rare: true },
+  ],
+
+  dress: [
+    {
+      key: "price",
+      label: "Gown price",
+      kind: "range",
+      mode: "overlap",
+      lo: "price_min",
+      hi: "price_max",
+      unit: "usd",
+      basis: "per_gown",
+    },
+    { key: "off_the_rack", label: "Off the rack", kind: "bool" },
+    { key: "sample_sale", label: "Sample sales", kind: "bool", rare: true },
+    { key: "size_inclusive", label: "Size inclusive", kind: "bool" },
+    { key: "in_house_alterations", label: "In-house alterations", kind: "bool" },
+    { key: "trunk_shows", label: "Trunk shows", kind: "bool", rare: true },
+  ],
+
+  hotel: [
+    {
+      key: "block_type",
+      label: "Block type",
+      kind: "multi",
+      options: opt({
+        courtesy: "Courtesy (no minimum)",
+        guaranteed: "Guaranteed (attrition applies)",
+      }),
+    },
+    {
+      key: "parking",
+      label: "Parking",
+      kind: "multi",
+      options: opt({ free: "Free", paid: "Paid", valet: "Valet" }),
+    },
+    { key: "breakfast_included", label: "Breakfast included", kind: "bool" },
+    { key: "has_shuttle", label: "Shuttle", kind: "bool", rare: true },
+    { key: "pet_friendly", label: "Pet friendly", kind: "bool", rare: true },
+  ],
+};
+
+/** Filters for a type, or [] for types with no extraction (currently `other`). */
+export function filtersForType(t: VendorType | undefined): FilterDef[] {
+  return (t && VENDOR_FILTERS[t]) || [];
+}
+
+/**
+ * Venue pricing assumptions, stated in the UI rather than hidden. Venues that
+ * quote per-person or per-hour are converted onto the package axis so they can
+ * share one slider; the numbers are Kiara's (2026-08-05).
+ */
+export const VENUE_PRICE_ASSUMPTIONS = {
+  guests: 100,
+  hours: 5,
+} as const;

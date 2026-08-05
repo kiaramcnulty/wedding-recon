@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Search, Loader2, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,15 @@ import {
 import { ScreenResultsPill } from "@/components/map/screen-results-pill";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import { VendorTypeFilter } from "@/components/map/vendor-type-filter";
+import {
+  VendorFilterSheet,
+  FilterButton,
+  type FilterState,
+  type DateContext,
+} from "@/components/map/vendor-filter-sheet";
+import { filtersForType } from "@/lib/constants/vendor-filters";
+import { buildSelection } from "@/lib/filters/match";
+import type { Vendor } from "@/lib/types";
 import {
   CATEGORIES,
   CATEGORY_PLURAL,
@@ -107,6 +116,7 @@ export default function ExplorePage() {
   // count behind the results pill, plus the rows its list opens on.
   const [visible, setVisible] = useState<VisibleVendorsPayload>({
     total: 0,
+    partial: 0,
     entries: [],
   });
   // The open "results on screen" list (null = closed). A frozen snapshot: the
@@ -117,6 +127,26 @@ export default function ExplorePage() {
   // client render matches the server; any persisted selection is restored after
   // mount (see below) to avoid a hydration mismatch on the chip states.
   const [selectedTypes, setSelectedTypes] = useState<VendorType[]>([]);
+  // Attribute filters. Per-vendor-type by nature (venues have no cuisine), so
+  // they apply only while exactly one type is selected, and reset when the type
+  // changes — carrying a venue capacity filter onto florists would silently
+  // exclude every one of them.
+  const [filterState, setFilterState] = useState<FilterState>({});
+  const [dateContext, setDateContext] = useState<DateContext>({});
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  // Rows the map currently holds, so the sheet can show live match counts and
+  // rescale its histograms against what is actually in view.
+  const [mapVendors, setMapVendors] = useState<Vendor[]>([]);
+
+  const filterType = selectedTypes.length === 1 ? selectedTypes[0] : null;
+
+  const filterSelection = useMemo(
+    () =>
+      filterType
+        ? buildSelection(filtersForType(filterType), filterState, dateContext)
+        : {},
+    [filterType, filterState, dateContext],
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
@@ -232,6 +262,11 @@ export default function ExplorePage() {
   // a vendor page (restored on mount, below) just like the map view.
   const updateSelectedTypes = useCallback((next: VendorType[]) => {
     setSelectedTypes(next);
+    // Attribute filters belong to a single type, so a type change retires them
+    // rather than carrying (say) a guest-count filter onto photographers, where
+    // no row has the attribute and everything would drop to the faded tier.
+    setFilterState({});
+    setDateContext({});
     try {
       sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
     } catch {
@@ -472,7 +507,9 @@ export default function ExplorePage() {
           onViewChange={saveMapView}
           initialView={initialView}
           selectedTypes={selectedTypes}
+          filterSelection={filterSelection}
           onVisibleVendorsChange={setVisible}
+          onVendorsChange={setMapVendors}
         />
       </div>
 
@@ -628,9 +665,28 @@ export default function ExplorePage() {
 
       {/* Vendor-type filter: scrollable color chips beneath the search bar,
           in the same floating column. Doubles as the map's pin-color legend. */}
-      <div className="relative z-10 mx-auto w-full max-w-[520px] px-3 pt-2">
-        <VendorTypeFilter selected={selectedTypes} onChange={updateSelectedTypes} />
+      <div className="relative z-10 mx-auto flex w-full max-w-[520px] items-center gap-2 px-3 pt-2">
+        <div className="min-w-0 flex-1">
+          <VendorTypeFilter selected={selectedTypes} onChange={updateSelectedTypes} />
+        </div>
+        <FilterButton
+          vendorType={filterType}
+          activeCount={Object.keys(filterState).length}
+          onClick={() => setFilterSheetOpen(true)}
+        />
       </div>
+
+      {filterSheetOpen && filterType && (
+        <VendorFilterSheet
+          vendorType={filterType}
+          vendors={mapVendors}
+          state={filterState}
+          dateContext={dateContext}
+          onChange={setFilterState}
+          onDateContextChange={setDateContext}
+          onClose={() => setFilterSheetOpen(false)}
+        />
+      )}
 
       {/* Live count of what the map is showing, and the way into the full list.
           The row is click-through (only the pill itself takes taps) so it can't
