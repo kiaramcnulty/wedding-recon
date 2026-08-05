@@ -7,6 +7,12 @@ interface ScreenResultsPillProps {
   /** How many vendors are in the viewport right now, after the type filter. */
   total: number;
   onClick: () => void;
+  /**
+   * Short form for the single control row ("24 on screen"). The long form does
+   * not fit beside the category and filter chips at 375px, and next to a List
+   * icon the verb is redundant anyway.
+   */
+  compact?: boolean;
   className?: string;
 }
 
@@ -21,12 +27,16 @@ interface ScreenResultsPillProps {
 export function ScreenResultsPill({
   total,
   onClick,
+  compact,
   className,
 }: ScreenResultsPillProps) {
   if (total < 1) return null;
 
-  const label =
-    total === 1 ? "See 1 result on screen" : `See all ${total} results on screen`;
+  const label = compact
+    ? `${total} on screen`
+    : total === 1
+      ? "See 1 result on screen"
+      : `See all ${total} results on screen`;
 
   return (
     <button

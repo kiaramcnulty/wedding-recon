@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, SlidersHorizontal } from "lucide-react";
-import { CATEGORY_PLURAL, type VendorType } from "@/lib/constants/categories";
+import {
+  CATEGORIES,
+  CATEGORY_PLURAL,
+  type CategoryMeta,
+  type VendorType,
+} from "@/lib/constants/categories";
 import {
   filtersForType,
   SEASONS,
@@ -11,7 +16,6 @@ import {
   VENUE_PRICE_ASSUMPTIONS,
   type FilterDef,
 } from "@/lib/constants/vendor-filters";
-import { filterRank, buildSelection } from "@/lib/filters/match";
 import HISTOGRAMS from "@/lib/constants/filter-histograms.json";
 import type { Vendor } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -57,38 +61,74 @@ function fmt(def: FilterDef, n: number): string {
 
 /* ------------------------------------------------------------------ chips */
 
+/**
+ * A selected chip fills with the vendor type's OWN colour — the same hue as its
+ * map pins and its category chip — so the sheet reads as part of that category
+ * rather than as a neutral system dialog.
+ */
+function Chip({
+  on,
+  meta,
+  onClick,
+  children,
+  size = "md",
+}: {
+  on: boolean;
+  meta: CategoryMeta;
+  onClick: () => void;
+  children: React.ReactNode;
+  size?: "sm" | "md";
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      style={
+        on
+          ? { backgroundColor: meta.colorHex, borderColor: meta.colorHex }
+          : { borderColor: `${meta.colorHex}40`, color: meta.textHex }
+      }
+      className={cn(
+        "rounded-full border transition-colors",
+        size === "sm" ? "px-2.5 py-1 text-[12px]" : "px-3 py-1.5 text-[13px]",
+        on ? "font-medium text-white" : "bg-background hover:bg-muted",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 function ChipGroup({
   def,
   value,
+  meta,
   onChange,
 }: {
   def: FilterDef;
   value: string[];
+  meta: CategoryMeta;
   onChange: (next: string[]) => void;
 }) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      {def.options?.map((o) => {
-        const on = value.includes(o.value);
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={on}
-            onClick={() =>
-              onChange(on ? value.filter((v) => v !== o.value) : [...value, o.value])
-            }
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-[13px] transition-colors",
-              on
-                ? "border-foreground bg-foreground text-background"
-                : "border-border bg-background text-foreground hover:bg-muted",
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
+      {def.options?.map((o) => (
+        <Chip
+          key={o.value}
+          on={value.includes(o.value)}
+          meta={meta}
+          onClick={() =>
+            onChange(
+              value.includes(o.value)
+                ? value.filter((v) => v !== o.value)
+                : [...value, o.value],
+            )
+          }
+        >
+          {o.label}
+        </Chip>
+      ))}
     </div>
   );
 }
@@ -96,19 +136,30 @@ function ChipGroup({
 /* --------------------------------------------------------------- histogram */
 
 /**
- * Bin-indexed dual slider. The handles select a bin RANGE; the value handed
- * back is the bin edge, so the numbers shown are always real observed values.
+ * Dual-thumb range slider over the histogram.
+ *
+ * Two overlaid native `input[type=range]` elements rather than a custom drag
+ * implementation: that keeps keyboard control, focus rings and screen-reader
+ * semantics for free. The trick that makes it work is `pointer-events: none` on
+ * the inputs with it re-enabled on the THUMBS only, so a drag always reaches the
+ * nearest thumb instead of the topmost track swallowing it.
+ *
+ * The thumbs index BINS, not values. The histogram bins are roughly equal-count
+ * and therefore non-uniform in width, so a linear value track would put the
+ * handle visibly out of step with the bar under it.
  */
 function RangeControl({
   def,
   hist,
   value,
+  accent,
   onChange,
   scaled,
 }: {
   def: FilterDef;
   hist: Hist;
   value: { min?: number; max?: number } | undefined;
+  accent: string;
   onChange: (next: { min?: number; max?: number } | undefined) => void;
   /** Bin counts under the current companion selection, for the rescale. */
   scaled?: number[];
@@ -116,62 +167,82 @@ function RangeControl({
   const bins = hist.bins;
   const counts = scaled ?? bins.map((b) => b.n);
   const peak = Math.max(1, ...counts);
+  const last = bins.length - 1;
 
   const loIdx = value?.min == null ? 0 : Math.max(0, bins.findIndex((b) => b.hi > value.min!));
-  const hiIdxRaw = value?.max == null ? bins.length - 1 : bins.findIndex((b) => b.hi >= value.max!);
-  const hiIdx = hiIdxRaw < 0 ? bins.length - 1 : hiIdxRaw;
+  const hiRaw = value?.max == null ? last : bins.findIndex((b) => b.hi >= value.max!);
+  const hiIdx = hiRaw < 0 ? last : hiRaw;
 
   const emit = (lo: number, hi: number) => {
-    const full = lo === 0 && hi === bins.length - 1;
+    const full = lo === 0 && hi === last;
     onChange(full ? undefined : { min: bins[lo].lo, max: bins[hi].hi });
   };
+
+  // Thumb centres sit at bin centres, so a thumb lines up with the bar it selects.
+  const pct = (i: number) => ((i + 0.5) / bins.length) * 100;
+  const thumb =
+    "pointer-events-none absolute inset-x-0 top-0 h-full w-full appearance-none bg-transparent " +
+    "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:size-5 " +
+    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full " +
+    "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white " +
+    "[&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-grab " +
+    "[&::-webkit-slider-thumb]:bg-[var(--thumb)] [&::-moz-range-thumb]:bg-[var(--thumb)] " +
+    "[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:size-5 " +
+    "[&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full " +
+    "[&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white " +
+    "[&::-moz-range-thumb]:shadow-md";
 
   return (
     <div>
       <div className="flex h-14 items-end gap-[3px]" aria-hidden>
-        {counts.map((n, i) => {
-          const inRange = i >= loIdx && i <= hiIdx;
-          return (
-            <div
-              key={i}
-              className={cn(
-                "flex-1 rounded-t-[2px] transition-all",
-                inRange ? "bg-foreground/70" : "bg-foreground/15",
-              )}
-              style={{ height: `${Math.max(3, (n / peak) * 100)}%` }}
-            />
-          );
-        })}
+        {counts.map((n, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-t-[2px] transition-all"
+            style={{
+              height: `${Math.max(3, (n / peak) * 100)}%`,
+              backgroundColor: i >= loIdx && i <= hiIdx ? accent : `${accent}26`,
+            }}
+          />
+        ))}
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-3">
-        <label className="text-[11px] text-muted-foreground">
-          Min
-          <input
-            type="range"
-            min={0}
-            max={bins.length - 1}
-            value={loIdx}
-            onChange={(e) => emit(Math.min(+e.target.value, hiIdx), hiIdx)}
-            className="mt-0.5 w-full accent-foreground"
-          />
-        </label>
-        <label className="text-[11px] text-muted-foreground">
-          Max
-          <input
-            type="range"
-            min={0}
-            max={bins.length - 1}
-            value={hiIdx}
-            onChange={(e) => emit(loIdx, Math.max(+e.target.value, loIdx))}
-            className="mt-0.5 w-full accent-foreground"
-          />
-        </label>
+      <div
+        className="relative mt-2 h-5"
+        style={{ ["--thumb" as string]: accent }}
+      >
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted" />
+        <div
+          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
+          style={{
+            left: `${pct(loIdx)}%`,
+            right: `${100 - pct(hiIdx)}%`,
+            backgroundColor: accent,
+          }}
+        />
+        <input
+          type="range"
+          aria-label={`${def.label} minimum`}
+          min={0}
+          max={last}
+          value={loIdx}
+          onChange={(e) => emit(Math.min(+e.target.value, hiIdx), hiIdx)}
+          className={thumb}
+        />
+        <input
+          type="range"
+          aria-label={`${def.label} maximum`}
+          min={0}
+          max={last}
+          value={hiIdx}
+          onChange={(e) => emit(loIdx, Math.max(+e.target.value, loIdx))}
+          className={thumb}
+        />
       </div>
 
-      <p className="mt-1 text-[13px] font-medium">
+      <p className="mt-2 text-[13px] font-medium">
         {fmt(def, bins[loIdx].lo)} – {fmt(def, bins[hiIdx].hi)}
-        {hiIdx === bins.length - 1 && def.unit === "usd" ? "+" : ""}
+        {hiIdx === last && def.unit === "usd" ? "+" : ""}
       </p>
     </div>
   );
@@ -182,6 +253,8 @@ function RangeControl({
 export function VendorFilterSheet({
   vendorType,
   vendors,
+  visibleTotal,
+  visiblePartial,
   state,
   dateContext,
   onChange,
@@ -189,8 +262,19 @@ export function VendorFilterSheet({
   onClose,
 }: {
   vendorType: VendorType;
-  /** Rows currently in view, for the live "N match" count. */
+  /**
+   * Rows the map holds. Used ONLY to rescale histograms, never to count:
+   * it spans the padded fetch box, which reaches well beyond the viewport.
+   */
   vendors: Vendor[];
+  /**
+   * On-screen totals, straight from the map. The footer counts these rather
+   * than counting `vendors` itself, so the sheet and the results pill can never
+   * disagree — they are now literally the same numbers. Counting the fetched
+   * rows instead reported "55 matches" next to a pill saying "93 on screen".
+   */
+  visibleTotal: number;
+  visiblePartial: number;
   state: FilterState;
   dateContext: DateContext;
   onChange: (next: FilterState) => void;
@@ -214,6 +298,7 @@ export function VendorFilterSheet({
     };
   }, [onClose]);
 
+  const meta = CATEGORIES[vendorType];
   const defs = filtersForType(vendorType);
   const hist = HIST[vendorType] ?? {};
   const pool = useMemo(
@@ -221,20 +306,7 @@ export function VendorFilterSheet({
     [vendors, vendorType],
   );
 
-  const selection = useMemo(
-    () => buildSelection(defs, state, dateContext),
-    [defs, state, dateContext],
-  );
-
-  const { matched, partial } = useMemo(() => {
-    let m = 0, p = 0;
-    for (const v of pool) {
-      const r = filterRank(v.filters, selection);
-      if (r === 1) m++;
-      else if (r === 0) p++;
-    }
-    return { matched: m, partial: p };
-  }, [pool, selection]);
+  const matched = Math.max(0, visibleTotal - visiblePartial);
 
   const set = (key: string, v: unknown) => {
     const next = { ...state };
@@ -283,6 +355,7 @@ export function VendorFilterSheet({
       />
       <div className="relative flex max-h-[85vh] flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+          <meta.icon className="size-4 shrink-0" style={{ color: meta.colorHex }} />
           <h2 className="text-[15px] font-semibold">
             Filter {CATEGORY_PLURAL[vendorType]}
           </h2>
@@ -332,25 +405,20 @@ export function VendorFilterSheet({
                   {def.kind === "multi" && (
                     <ChipGroup
                       def={def}
+                      meta={meta}
                       value={(state[def.key] as string[]) ?? []}
                       onChange={(v) => set(def.key, v)}
                     />
                   )}
 
                   {def.kind === "bool" && (
-                    <button
-                      type="button"
-                      aria-pressed={state[def.key] === true}
+                    <Chip
+                      on={state[def.key] === true}
+                      meta={meta}
                       onClick={() => set(def.key, state[def.key] === true ? null : true)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-[13px] transition-colors",
-                        state[def.key] === true
-                          ? "border-foreground bg-foreground text-background"
-                          : "border-border bg-background hover:bg-muted",
-                      )}
                     >
                       {def.label}
-                    </button>
+                    </Chip>
                   )}
 
                   {def.kind === "range" && h && (
@@ -365,48 +433,38 @@ export function VendorFilterSheet({
                         <div className="mb-3 flex flex-col gap-2 border-b border-border pb-3">
                           <div className="flex flex-wrap gap-1.5">
                             {SEASONS.map((s) => (
-                              <button
+                              <Chip
                                 key={s.value}
-                                type="button"
-                                aria-pressed={dateContext.season === s.value}
+                                size="sm"
+                                meta={meta}
+                                on={dateContext.season === s.value}
                                 onClick={() =>
                                   onDateContextChange({
                                     ...dateContext,
                                     season: dateContext.season === s.value ? undefined : s.value,
                                   })
                                 }
-                                className={cn(
-                                  "rounded-full border px-2.5 py-1 text-[12px]",
-                                  dateContext.season === s.value
-                                    ? "border-foreground bg-foreground text-background"
-                                    : "border-border hover:bg-muted",
-                                )}
                               >
                                 {s.label} · {s.months}
-                              </button>
+                              </Chip>
                             ))}
                           </div>
                           <div className="flex flex-wrap gap-1.5">
                             {DAY_TYPES.map((d) => (
-                              <button
+                              <Chip
                                 key={d.value}
-                                type="button"
-                                aria-pressed={dateContext.day === d.value}
+                                size="sm"
+                                meta={meta}
+                                on={dateContext.day === d.value}
                                 onClick={() =>
                                   onDateContextChange({
                                     ...dateContext,
                                     day: dateContext.day === d.value ? undefined : d.value,
                                   })
                                 }
-                                className={cn(
-                                  "rounded-full border px-2.5 py-1 text-[12px]",
-                                  dateContext.day === d.value
-                                    ? "border-foreground bg-foreground text-background"
-                                    : "border-border hover:bg-muted",
-                                )}
                               >
                                 {d.label}
-                              </button>
+                              </Chip>
                             ))}
                           </div>
                         </div>
@@ -416,6 +474,7 @@ export function VendorFilterSheet({
                         def={def}
                         hist={h}
                         value={state[def.key] as { min?: number; max?: number }}
+                        accent={meta.colorHex}
                         onChange={(v) => set(def.key, v)}
                         scaled={rescaledCounts(def)}
                       />
@@ -439,11 +498,15 @@ export function VendorFilterSheet({
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-xl bg-foreground py-3 text-[14px] font-semibold text-background"
+            style={{ backgroundColor: meta.colorHex }}
+            className="w-full rounded-xl py-3 text-[14px] font-semibold text-white"
           >
-            Show {matched} {matched === 1 ? "match" : "matches"}
-            {partial > 0 && (
-              <span className="font-normal opacity-70"> · {partial} with info missing</span>
+            Show {matched} {matched === 1 ? "match" : "matches"} on screen
+            {visiblePartial > 0 && (
+              <span className="font-normal opacity-80">
+                {" "}
+                · {visiblePartial} missing some info
+              </span>
             )}
           </button>
         </div>
@@ -481,30 +544,40 @@ export function FilterButton({
   vendorType,
   activeCount,
   onClick,
+  className,
 }: {
   vendorType: VendorType | null;
   activeCount: number;
   onClick: () => void;
+  className?: string;
 }) {
   const enabled = vendorType != null && filtersForType(vendorType).length > 0;
+  // Hidden rather than disabled once a category is picked is the wrong trade at
+  // this size: with no category chosen there is nothing to filter, and a
+  // permanently visible dead control in a one-row bar reads as broken. So it
+  // renders nothing until a single category makes it meaningful.
+  if (!enabled || !vendorType) return null;
+  const meta = CATEGORIES[vendorType];
+
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={!enabled}
-      title={enabled ? undefined : "Pick one category to filter it"}
-      className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition-colors",
+      style={
         activeCount > 0
-          ? "border-foreground bg-foreground text-background"
-          : "border-border bg-background",
-        !enabled && "opacity-40",
+          ? { backgroundColor: meta.colorHex, borderColor: meta.colorHex }
+          : { borderColor: `${meta.colorHex}59`, color: meta.textHex }
+      }
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] shadow-sm transition-colors",
+        activeCount > 0 ? "font-medium text-white" : "bg-background/95 backdrop-blur",
+        className,
       )}
     >
-      <SlidersHorizontal className="size-3.5" />
+      <SlidersHorizontal className="size-3.5" aria-hidden />
       Filters
       {activeCount > 0 && (
-        <span className="rounded-full bg-background/25 px-1.5 text-[11px]">
+        <span className="rounded-full bg-white/25 px-1.5 text-[11px]">
           {activeCount}
         </span>
       )}

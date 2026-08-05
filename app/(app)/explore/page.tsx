@@ -18,7 +18,7 @@ import {
 } from "@/components/map/vendor-list-sheet";
 import { ScreenResultsPill } from "@/components/map/screen-results-pill";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
-import { VendorTypeFilter } from "@/components/map/vendor-type-filter";
+import { CategoryPicker } from "@/components/map/category-picker";
 import {
   VendorFilterSheet,
   FilterButton,
@@ -665,14 +665,29 @@ export default function ExplorePage() {
 
       {/* Vendor-type filter: scrollable color chips beneath the search bar,
           in the same floating column. Doubles as the map's pin-color legend. */}
-      <div className="relative z-10 mx-auto flex w-full max-w-[520px] items-center gap-2 px-3 pt-2">
-        <div className="min-w-0 flex-1">
-          <VendorTypeFilter selected={selectedTypes} onChange={updateSelectedTypes} />
-        </div>
+      {/* One control row: category, attribute filters, and the live on-screen
+          count. These were three stacked rows (a wrapping 3-line chip grid plus
+          a centred results pill) costing roughly 150px of a 812px phone — a
+          fifth of the map given to controls that are touched once a session.
+          Click-through except for the controls themselves, so it cannot steal a
+          pin tap from the map underneath. */}
+      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] items-center gap-2 px-3 pt-2">
+        <CategoryPicker
+          selected={selectedTypes}
+          onChange={updateSelectedTypes}
+          className="pointer-events-auto"
+        />
         <FilterButton
           vendorType={filterType}
           activeCount={Object.keys(filterState).length}
           onClick={() => setFilterSheetOpen(true)}
+          className="pointer-events-auto"
+        />
+        <ScreenResultsPill
+          total={visible.total}
+          onClick={openScreenList}
+          compact
+          className="pointer-events-auto ml-auto"
         />
       </div>
 
@@ -680,6 +695,8 @@ export default function ExplorePage() {
         <VendorFilterSheet
           vendorType={filterType}
           vendors={mapVendors}
+          visibleTotal={visible.total}
+          visiblePartial={visible.partial}
           state={filterState}
           dateContext={dateContext}
           onChange={setFilterState}
@@ -688,16 +705,6 @@ export default function ExplorePage() {
         />
       )}
 
-      {/* Live count of what the map is showing, and the way into the full list.
-          The row is click-through (only the pill itself takes taps) so it can't
-          steal a pin tap from the map band behind it. */}
-      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] justify-center px-3 pt-2">
-        <ScreenResultsPill
-          total={visible.total}
-          onClick={openScreenList}
-          className="pointer-events-auto"
-        />
-      </div>
 
       {/* Bottom stack over the map: the single-pin peek card (Zillow-style) sits
           on top of the control row, so the brand mark and locate button stay
