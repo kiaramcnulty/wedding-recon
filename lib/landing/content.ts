@@ -342,10 +342,10 @@ export const CLOSING_CTA = {
   quote: {
     text: "I needed a photographer. Wedding planning is so much work! So this is seriously so helpful",
     name: "Cassie",
-    context: "wedding 2027, Larkspur",
+    context: "2027 wedding, Larkspur",
   },
   heading: "Start with the map.",
-  body: "See who is near your date's hometown, read what other couples paid, and keep the rest of your search in one place.",
+  body: "See what vendors are near your target region and filter by your criteria. Read what other couples paid and how the vendor did. Save your favorites to narrow down your search.",
   cta: "Explore Colorado vendors",
 } as const;
 
@@ -355,7 +355,7 @@ export const CLOSING_CTA = {
 
 export const FOOTER = {
   blurb:
-    "A community directory of Colorado wedding vendors, built on the price quotes and notes couples share with each other.",
+    "A community space for Colorado wedding vendor intel, built on quotes and real experiences from couples who went through it.",
   productHeading: "Product",
   aboutHeading: "About",
   exploreLabel: "Explore the map",
