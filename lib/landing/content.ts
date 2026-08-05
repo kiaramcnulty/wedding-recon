@@ -42,7 +42,7 @@ export const META = {
   title:
     "Wedding Recon - Colorado wedding vendor intel from couples",
   /**
-   * The grey paragraph under the headline in Google results, and the preview
+   * The gray paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
    * Current length is 252, cut after "...Manage and share y". The vendor-type
    * list lands inside the visible window; the planning hub and the free-to-use
@@ -76,7 +76,6 @@ export const HERO = {
   subheading:
     "Wedding Recon is a community of couples sharing their firsthand quotes, intel and experiences with florists, hotel blocks, photographers and more. So you can find great-fit, in-budget vendors for your perfect day.",
   primaryCta: "Explore Colorado vendors",
-  secondaryCta: "See how it works",
   reassurance: "Free to use. No account needed to explore vendors.",
 } as const;
 
@@ -107,7 +106,7 @@ export const EXAMPLE_RECON = {
 /**
  * Which in-app visual a step or a solution row shows. The visuals are stylised
  * mock-ups drawn in code (components/landing/app-visual.tsx), not screenshots:
- * they stay sharp at any size, cost no bytes, take their colours straight from
+ * they stay sharp at any size, cost no bytes, take their colors straight from
  * CATEGORIES so they cannot drift from the real map, and - the reason that
  * matters most - they invent no vendor names or prices attached to one.
  *
@@ -141,7 +140,7 @@ export const HOW_STEPS: HowStep[] = [
     visual: "reviews",
   },
   {
-    title: "Save your favourites",
+    title: "Save your favorites",
     body: "Keep every candidate in one hub, sorted by category, with your own notes and quotes alongside.",
     visual: "hub",
   },
@@ -154,6 +153,9 @@ export const HOW_STEPS: HowStep[] = [
 export const PROBLEMS_SECTION = {
   eyebrow: "Why this exists",
   heading: "Four things that are broken about choosing a wedding vendor.",
+  /** Small labels over each half of a row, so which is which is never in doubt. */
+  problemLabel: "The problem",
+  solutionLabel: "On Wedding Recon",
 } as const;
 
 export interface Quote {
@@ -273,7 +275,10 @@ export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
  * section can move to ISR.
  */
 export const DATA_SECTION = {
-  eyebrow: "The directory today",
+  eyebrow: "Quick facts",
+  /** Screen-reader label for the deck, and the hint under it. */
+  carouselLabel: "Quick facts about the directory",
+  carouselHint: "Swipe or use the arrows",
   headline: {
     vendors: "2,100+",
     vendorsLabel: "Colorado wedding vendors",
@@ -285,7 +290,12 @@ export const DATA_SECTION = {
   measuredOn: "Measured August 2026",
   categoryChart: {
     title: "Vendors by category",
-    subtitle: "Tap a bar to open the map filtered to it.",
+    subtitle: "Tap a row to open the map filtered to it.",
+  },
+  reconFact: {
+    value: "3,100+",
+    label: "recon entries on file",
+    note: "Price quotes, notes and photos, collected from couples, reviews and vendor sites across Colorado.",
   },
   beautyChart: {
     title: "Hair and makeup: do they come to you?",

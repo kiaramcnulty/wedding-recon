@@ -1,18 +1,44 @@
-import { ArrowDown, Check, Quote as QuoteIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { AppVisual } from "@/components/landing/app-visual";
-import type { ProblemSolution } from "@/lib/landing/content";
+import { PROBLEMS_SECTION, type ProblemSolution } from "@/lib/landing/content";
 import { cn } from "@/lib/utils";
 
 /**
- * One problem/solution pair, as a full-width row: what is broken in a couple's
- * own words on one side, what the product does about it - with the matching
- * in-app visual - on the other.
+ * A pair of opening/closing quote marks, drawn rather than taken from lucide.
  *
- * Rows alternate sides down the page. A Server Component, so all four pairs and
- * all four quotes are in the HTML a crawler reads; the earlier carousel put
- * three of them behind horizontal scroll and left no room for a visual, which
- * is what this layout is for.
+ * Lucide's Quote glyph only comes as one mark, so a closing pair meant flipping
+ * it - and a flipped opening mark is not a closing mark, it is an upside-down
+ * one. These are the real characters at the right optical weight, and they are
+ * decorative: the <blockquote> element already tells assistive tech this is a
+ * quotation, so a screen reader must not announce them.
+ */
+function QuoteMark({ closing }: { closing?: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "font-heading text-3xl leading-none text-brand/35",
+        closing ? "align-bottom" : "align-top",
+      )}
+    >
+      {closing ? "”" : "“"}
+    </span>
+  );
+}
+
+/**
+ * One problem/solution pair, as a full-width row.
+ *
+ * The hierarchy is explicit rather than implied (Kiara, 2026-08-04): each half
+ * carries a small label, the problem is the largest thing in the row, the quote
+ * is set in italics between real quote marks, and the solution sits in its own
+ * tinted card. The earlier version leaned on size alone and read ambiguously -
+ * the solution title was *smaller* than the problem it answered, which is
+ * backwards for the payoff.
+ *
+ * A Server Component, so all four pairs and all four quotes are in the HTML a
+ * crawler reads.
  */
 export function ProblemSolutionRow({
   item,
@@ -28,16 +54,20 @@ export function ProblemSolutionRow({
   return (
     <div className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
       <div className={cn(visualFirst && "md:order-2")}>
-        <h3 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {PROBLEMS_SECTION.problemLabel}
+        </p>
+        <h3 className="mt-2 font-heading text-2xl font-semibold leading-snug tracking-tight sm:text-[1.75rem]">
           {item.problem}
         </h3>
 
-        <figure className="mt-4 border-l-2 border-brand/25 pl-4">
-          <QuoteIcon className="size-4 text-brand/40" aria-hidden />
-          <blockquote className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+        <figure className="mt-5">
+          <blockquote className="text-base italic leading-relaxed text-muted-foreground">
+            <QuoteMark />
             {item.quote.text}
+            <QuoteMark closing />
           </blockquote>
-          <figcaption className="mt-2.5 text-xs">
+          <figcaption className="mt-3 text-xs not-italic">
             <span className="font-medium text-foreground">
               {item.quote.name}
             </span>
@@ -48,17 +78,15 @@ export function ProblemSolutionRow({
           </figcaption>
         </figure>
 
-        <ArrowDown
-          className="mt-6 size-4 text-brand/50"
-          aria-hidden
-        />
-
-        <div className="mt-3 rounded-2xl border border-brand/20 bg-brand-soft/40 p-4">
-          <p className="flex items-start gap-2 font-heading text-base font-semibold">
-            <Check className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+        <div className="mt-7 rounded-2xl border border-brand/25 bg-brand-soft/50 p-5">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink">
+            <ArrowRight className="size-3.5" aria-hidden />
+            {PROBLEMS_SECTION.solutionLabel}
+          </p>
+          <p className="mt-2.5 font-heading text-lg font-semibold leading-snug">
             {item.solution}
           </p>
-          <p className="mt-2 pl-6 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {item.solutionBody}
           </p>
         </div>

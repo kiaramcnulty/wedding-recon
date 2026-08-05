@@ -11,34 +11,31 @@ const STEP_MS = 6000;
 const TICK_MS = 50;
 
 /**
- * The three-step product tour: steps listed on one side, the matching in-app
- * visual on the other, advancing on a timer.
+ * The three-step product tour: one panel, with the step text overlaid on the
+ * in-app visual rather than listed beside it. Roughly halves the vertical space
+ * the section used to take (Kiara, 2026-08-04).
  *
  * Auto-advance is deliberately constrained, because a step-by-step explanation
  * is the worst possible content to yank away from a reader mid-sentence:
  *
- * - Every step has a progress bar, and the whole strip is a pause control.
- *   WCAG 2.2.2 (Pause, Stop, Hide) requires one for anything that moves on its
- *   own for more than five seconds, and this runs indefinitely.
+ * - Progress bars across the top double as the step picker and show where the
+ *   timer is. WCAG 2.2.2 (Pause, Stop, Hide) requires a control for anything
+ *   moving unprompted past five seconds, and this runs indefinitely - hence the
+ *   explicit pause button too.
  * - Choosing a step stops the timer for good. Someone who has taken control is
  *   reading at their own pace; resuming would fight them.
- * - `prefers-reduced-motion: reduce` means it never starts. That is the
- *   accessibility contract, not a nicety - vestibular triggers aside, plenty of
- *   people simply cannot read against a moving deadline.
- * - Hover and keyboard focus pause it, and release resumes, so a reader mousing
- *   over the panel is not racing the clock.
+ * - `prefers-reduced-motion: reduce` means it never starts.
+ * - Hover and keyboard focus pause it, and leaving resumes.
  *
- * All three steps render in the HTML, so a crawler (and a no-JS reader) gets
- * the full text; only which one is visually foregrounded is client-side.
+ * Every step's text is in the HTML whichever is showing, so a crawler reads all
+ * three; inactive ones are aria-hidden so a screen reader is not read three
+ * overlapping descriptions at once.
  */
 export function HowItWorks({ className }: { className?: string }) {
   const [active, setActive] = useState(0);
   const [progress, setProgress] = useState(0);
-  // Null until the media query is read on the client, so the server render and
-  // the first client render agree.
   const [playing, setPlaying] = useState(false);
   const [hovered, setHovered] = useState(false);
-  // Set once the reader takes control; never cleared.
   const takenOver = useRef(false);
 
   // Start only if the visitor has not asked for reduced motion. Deferred a tick
@@ -79,74 +76,86 @@ export function HowItWorks({ className }: { className?: string }) {
 
   return (
     <div
-      className={cn("grid gap-8 md:grid-cols-[1fr_1fr] md:items-center", className)}
+      className={cn(
+        "relative mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-brand/20 bg-brand-soft/50 shadow-sm",
+        className,
+      )}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocusCapture={() => setHovered(true)}
       onBlurCapture={() => setHovered(false)}
     >
-      <ol className="space-y-2">
-        {HOW_STEPS.map((step, i) => {
-          const isActive = i === active;
-          return (
-            <li key={step.title}>
-              <button
-                type="button"
-                onClick={() => selectStep(i)}
-                aria-current={isActive}
-                className={cn(
-                  "w-full rounded-xl border p-4 text-left transition-colors",
-                  isActive
-                    ? "border-brand/30 bg-background shadow-sm"
-                    : "border-transparent hover:bg-background/60",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={cn(
-                      "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                      isActive
-                        ? "bg-brand text-white"
-                        : "bg-brand-soft text-brand-ink",
-                    )}
-                  >
-                    {i + 1}
-                  </span>
-                  <span className="font-heading text-sm font-semibold">
-                    {step.title}
-                  </span>
-                </div>
-                <p
-                  className={cn(
-                    "mt-2 pl-10 text-sm leading-relaxed text-muted-foreground",
-                    // Body text for the inactive steps stays in the HTML for
-                    // crawlers and screen readers; it is only dimmed visually.
-                    !isActive && "opacity-70",
-                  )}
-                >
-                  {step.body}
-                </p>
+      {/* Progress bars, doubling as the step picker. */}
+      <div className="absolute inset-x-0 top-0 z-20 flex gap-1.5 p-3">
+        {HOW_STEPS.map((step, i) => (
+          <button
+            key={step.title}
+            type="button"
+            onClick={() => selectStep(i)}
+            aria-label={`Step ${i + 1}: ${step.title}`}
+            aria-current={i === active}
+            className="group h-4 flex-1"
+          >
+            <span className="block h-1 w-full overflow-hidden rounded-full bg-white/70 transition-colors group-hover:bg-white">
+              <span
+                className="block h-full bg-brand transition-[width] duration-100 ease-linear"
+                style={{
+                  width:
+                    i < active
+                      ? "100%"
+                      : i === active
+                        ? `${playing ? progress * 100 : 100}%`
+                        : "0%",
+                }}
+              />
+            </span>
+          </button>
+        ))}
+      </div>
 
-                {/* Progress track. Full on the active step when paused, so the
-                    control never looks broken while stopped. */}
-                <span className="mt-3 ml-10 block h-0.5 overflow-hidden rounded-full bg-border">
-                  <span
-                    className="block h-full bg-brand transition-[width] duration-100 ease-linear"
-                    style={{
-                      width: isActive ? `${playing ? progress * 100 : 100}%` : "0%",
-                    }}
-                  />
+      {/* Visuals, crossfaded. All mounted so the swap is instant. */}
+      <div className="relative h-[300px] sm:h-[340px]">
+        {HOW_STEPS.map((step, i) => (
+          <div
+            key={step.title}
+            className={cn(
+              "absolute inset-0 flex items-start justify-center overflow-hidden px-4 pt-10 transition-opacity duration-500",
+              i === active ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+          >
+            <AppVisual variant={step.visual} bare className="w-full max-w-sm" />
+          </div>
+        ))}
+      </div>
+
+      {/* Text overlay. Sits over the foot of the visual rather than beside it,
+          on a blurred surface so the panel behind stays legible. */}
+      <div className="relative z-10 -mt-6 px-4 pb-4 sm:px-6 sm:pb-6">
+        <div className="rounded-2xl border border-white/60 bg-background/85 p-5 shadow-lg backdrop-blur-md">
+          {HOW_STEPS.map((step, i) => (
+            <div
+              key={step.title}
+              aria-hidden={i !== active}
+              className={i === active ? "block" : "hidden"}
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
+                  {i + 1}
                 </span>
-              </button>
-            </li>
-          );
-        })}
+                <h3 className="font-heading text-base font-semibold">
+                  {step.title}
+                </h3>
+              </div>
+              <p className="mt-2 pl-10 text-sm leading-relaxed text-muted-foreground">
+                {step.body}
+              </p>
+            </div>
+          ))}
 
-        <li className="pl-4 pt-1">
           <button
             type="button"
             onClick={togglePlaying}
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="mt-3 ml-10 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             {playing ? (
               <>
@@ -160,26 +169,7 @@ export function HowItWorks({ className }: { className?: string }) {
               </>
             )}
           </button>
-        </li>
-      </ol>
-
-      {/* One visual per step, all mounted, crossfaded. Mounting them together
-          keeps the swap instant and avoids a layout jump between panels of
-          different height. */}
-      <div className="relative min-h-[340px]">
-        {HOW_STEPS.map((step, i) => (
-          <div
-            key={step.title}
-            className={cn(
-              "transition-opacity duration-500",
-              i === active
-                ? "opacity-100"
-                : "pointer-events-none absolute inset-0 opacity-0",
-            )}
-          >
-            <AppVisual variant={step.visual} />
-          </div>
-        ))}
+        </div>
       </div>
     </div>
   );

@@ -157,7 +157,7 @@ export default function LandingPage() {
                 {HERO.subheading}
               </p>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="mt-8">
                 <Link
                   href={APP_HREF}
                   className={cn(
@@ -167,15 +167,6 @@ export default function LandingPage() {
                 >
                   {HERO.primaryCta}
                   <ArrowRight className="size-4" aria-hidden />
-                </Link>
-                <Link
-                  href="#how-it-works"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "lg" }),
-                    "h-12 px-6 text-base",
-                  )}
-                >
-                  {HERO.secondaryCta}
                 </Link>
               </div>
 

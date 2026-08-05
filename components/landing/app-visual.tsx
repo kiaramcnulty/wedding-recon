@@ -22,9 +22,12 @@ import { cn } from "@/lib/utils";
  */
 export function AppVisual({
   variant,
+  bare,
   className,
 }: {
   variant: AppVisualKey;
+  /** Drop the panel chrome when nested inside another panel (the stepper). */
+  bare?: boolean;
   className?: string;
 }) {
   return (
@@ -34,7 +37,10 @@ export function AppVisual({
       // narrated twice.
       aria-hidden="true"
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-brand/15 bg-brand-soft/40 p-4",
+        "relative overflow-hidden",
+        bare
+          ? "p-0"
+          : "rounded-2xl border border-brand/15 bg-brand-soft/40 p-4",
         className,
       )}
     >
