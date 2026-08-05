@@ -74,7 +74,7 @@ export const HERO = {
   /** The one <h1> on the page. Keep it short enough to sit on two lines. */
   heading: "Real prices & intel from real Colorado weddings.",
   subheading:
-    "Wedding Recon is a community of couples sharing their firsthand quotes, intel and experiences with florists, hotel blocks, photographers and more. So you can find great-fit, in-budget vendors for your perfect day.",
+    "Wedding Recon is a community of couples sharing their firsthand quotes, intel and experiences with florists, hotel blocks, photographers and others vendors. So you can find great-fit, in-budget vendors for your perfect day.",
   primaryCta: "Explore Colorado vendors",
   secondaryCta: "See how it works",
   reassurance: "Free to use. No account needed to explore vendors.",
