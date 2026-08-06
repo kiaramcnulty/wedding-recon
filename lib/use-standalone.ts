@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
  * is the easy path (one tap, no typing); inside an installed PWA it is the one
  * path that cannot work, because the mail client opens it in the default browser
  * — a separate cookie/storage container on iOS — so the session never reaches
- * the app the person is looking at. There the 6-digit code has to lead.
+ * the app the person is looking at. There the emailed code has to lead.
  *
  * Starts false so the server render and first client render agree; it flips
  * after mount. Both branches render the same controls, so the correction is a

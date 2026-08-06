@@ -12,7 +12,7 @@ import { postSignInPath } from "@/lib/auth/post-signin";
  * redirect, so they land in whichever browser made the request. Email links are
  * opened by the mail client in the default browser, which on iOS is a different
  * storage container from an installed home-screen PWA — so this route can never
- * sign someone in *inside the PWA*. That is what the 6-digit code path is for
+ * sign someone in *inside the PWA*. That is what the emailed-code path is for
  * (components/auth/otp-code-form.tsx); it is not a redirect bug to be fixed here.
  */
 export async function GET(request: NextRequest) {

@@ -497,7 +497,7 @@ function AddReconForm() {
         <div className="space-y-1.5 text-center">
           <h1 className="font-heading text-lg font-semibold">Check your email</h1>
           <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-            We sent a 6-digit code to <strong>{sentTo}</strong>. Enter it here to
+            We sent a sign-in code to <strong>{sentTo}</strong>. Enter it here to
             finish saving — your recon, including photos, is stored in this app,
             so this is where it has to be published from.
           </p>

@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Shared by BOTH sign-in completions so they can never disagree about where a
  * login lands:
  *   • the emailed link  — /auth/callback, verified server-side;
- *   • the 6-digit code  — verified in the browser, then bounced through
+ *   • the emailed code  — verified in the browser, then bounced through
  *     /auth/post-signin purely to run this check.
  *
  * Returns "/login" when there's no session, so a caller can redirect blindly.

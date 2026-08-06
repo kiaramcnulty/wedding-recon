@@ -98,8 +98,8 @@ function LoginContent() {
           </div>
           <CardTitle>Check your email</CardTitle>
           <CardDescription>
-            We sent a 6-digit code to <strong>{email}</strong>. Enter it below to
-            sign in — it expires in 1 hour.
+            We sent a sign-in code to <strong>{email}</strong>. Enter it below
+            to sign in — it expires in 1 hour.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

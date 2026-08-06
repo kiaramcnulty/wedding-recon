@@ -9,11 +9,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-/** Supabase email OTPs are 6 digits. */
-const CODE_LENGTH = 6;
+/**
+ * Supabase's email OTP length is a PROJECT SETTING (Authentication → Providers →
+ * Email → Email OTP Length), not a constant — it defaults to 6 but is settable
+ * from 6 to 10, and this project sends 8.
+ *
+ * So the form must not assert a length. It was written against a hardcoded 6,
+ * and `maxLength` silently truncated an 8-digit code as it was typed: the code
+ * was correct, the email was correct, and the box simply refused the last two
+ * digits. Bound the input generously and let Supabase be the authority on
+ * whether a code is right — the client cannot know the project's setting, and
+ * guessing it is what broke this.
+ */
+const MIN_CODE_LENGTH = 6;
+const MAX_CODE_LENGTH = 10;
 
 /**
- * Completes a sign-in from the 6-digit code in the email, IN THE APP.
+ * Completes a sign-in from the numeric code in the email, IN THE APP.
  *
  * Why this exists at all: /auth/callback verifies the emailed link server-side
  * and hands the session cookies back to whichever browser opened it. A mail
@@ -37,8 +49,8 @@ export function OtpCodeForm({ email }: { email: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (code.length !== CODE_LENGTH) {
-      setError(`Enter all ${CODE_LENGTH} digits.`);
+    if (code.length < MIN_CODE_LENGTH) {
+      setError("Enter the full code from your email.");
       return;
     }
 
@@ -81,21 +93,20 @@ export function OtpCodeForm({ email }: { email: string }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="otp-code">6-digit code</Label>
+        <Label htmlFor="otp-code">Sign-in code</Label>
         <Input
           id="otp-code"
           value={code}
           onChange={(e) =>
             // Strip as typed: people paste the code with stray spaces, and a
             // non-digit would only fail at Supabase.
-            setCode(e.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))
+            setCode(e.target.value.replace(/\D/g, "").slice(0, MAX_CODE_LENGTH))
           }
-          placeholder="123456"
           // Numeric keypad on mobile without the spinners/validation of
           // type="number", which also mangles a leading zero.
           inputMode="numeric"
           autoComplete="one-time-code"
-          maxLength={CODE_LENGTH}
+          maxLength={MAX_CODE_LENGTH}
           disabled={verifying}
           autoFocus
           // `md:text-lg` is load-bearing: Input's base carries `md:text-sm`,
@@ -114,7 +125,7 @@ export function OtpCodeForm({ email }: { email: string }) {
       <Button
         type="submit"
         className="w-full"
-        disabled={verifying || code.length !== CODE_LENGTH}
+        disabled={verifying || code.length < MIN_CODE_LENGTH}
       >
         {verifying ? (
           <>

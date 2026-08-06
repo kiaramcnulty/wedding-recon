@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { postSignInPath } from "@/lib/auth/post-signin";
 
 /**
- * Destination hop for the 6-digit code path.
+ * Destination hop for the emailed-code path.
  *
  * The code is verified in the BROWSER (so the session lands in the calling
  * context's own cookie jar — the whole point of the code, see
