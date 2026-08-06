@@ -185,10 +185,29 @@ function RangeControl({
     onChange(full ? undefined : { min: bins[lo].lo, max: bins[hi].hi });
   };
 
-  // Thumb centres sit at bin centres, so a thumb lines up with the bar it selects.
-  const pct = (i: number) => ((i + 0.5) / bins.length) * 100;
+  // Everything on this control is positioned in ONE coordinate system: the
+  // centre of the histogram bar a value selects.
+  //
+  // A native range input does NOT put its thumb at value/max across the track.
+  // It insets the travel by half a thumb at each end so the thumb never
+  // overhangs, so its centre is `half + (v/max) * (width - thumbWidth)`. Placing
+  // the filled range at bar centres while the thumbs used that other geometry
+  // left a visible gap between thumb and fill that grew toward both ends.
+  //
+  // Rather than reposition the fill to match the input, the inputs are inset so
+  // their thumb travel runs exactly from the first bar centre to the last. Then
+  // thumb, fill and bar all agree, and the fill can stay in plain percentages.
+  const n = bins.length;
+  const pct = (i: number) => ((i + 0.5) / n) * 100;
+  const THUMB_PX = 20; // must match the size-5 thumb below
+  // Travel starts at bar-centre 0 and ends at bar-centre last; the +/- half a
+  // thumb converts between "thumb centre" and the input box the browser insets.
+  const inputInset = {
+    left: `calc(${100 / (2 * n)}% - ${THUMB_PX / 2}px)`,
+    width: `calc(${100 - 100 / n}% + ${THUMB_PX}px)`,
+  };
   const thumb =
-    "pointer-events-none absolute inset-x-0 top-0 h-full w-full appearance-none bg-transparent " +
+    "pointer-events-none absolute top-0 h-full appearance-none bg-transparent " +
     "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:size-5 " +
     "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full " +
     "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white " +
@@ -218,7 +237,13 @@ function RangeControl({
         className="relative mt-2 h-5"
         style={{ ["--thumb" as string]: accent }}
       >
-        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted" />
+        {/* The unfilled track spans the same first-to-last bar-centre range the
+            thumbs travel, so it starts and ends under them rather than running
+            past into the gutter. */}
+        <div
+          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted"
+          style={{ left: `${pct(0)}%`, right: `${100 - pct(last)}%` }}
+        />
         <div
           className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
           style={{
@@ -234,6 +259,7 @@ function RangeControl({
           max={last}
           value={loIdx}
           onChange={(e) => emit(Math.min(+e.target.value, hiIdx), hiIdx)}
+          style={inputInset}
           className={thumb}
         />
         <input
@@ -243,6 +269,7 @@ function RangeControl({
           max={last}
           value={hiIdx}
           onChange={(e) => emit(loIdx, Math.max(+e.target.value, loIdx))}
+          style={inputInset}
           className={thumb}
         />
       </div>
