@@ -29,9 +29,10 @@ import type { VendorType } from "@/lib/constants/categories";
  *    emitted as FAQPage structured data for Google, and a mismatch between the
  *    visible answer and the structured one is a policy violation. Use the
  *    optional `link` field if an answer needs a link.
- * 5. Nothing here may name a real vendor or attach a price to one. The figures
- *    in EXAMPLE_RECON are invented and the card no longer carries an "Example"
- *    badge, so its anonymity is the only thing keeping it honest.
+ * 5. Nothing here may name a REAL vendor or attach a price to one. EXAMPLE_RECON
+ *    is invented throughout and its `place` is a venue-style name by choice - so
+ *    the one thing to check, if that name is ever edited, is that no actual
+ *    Colorado business goes by it. See the note above EXAMPLE_RECON.
  * 6. Length guides where they matter are noted inline (META especially).
  *
  * Run `npm run build` after editing to catch a stray quote or comma.
@@ -90,15 +91,23 @@ export const HERO = {
 /**
  * The sample recon entry floating over the hero illustration.
  *
- * Intentionally anonymous, and that anonymity is the whole safeguard: every
- * number here is invented, so `place` must stay a region ("Boulder County")
- * and never a business a reader could go and check. There is no "Example"
- * badge on the card any more (dropped 2026-08-04 as redundant), which leaves
- * nothing else marking the figures as illustrative.
+ * Every number on it is invented. `place` reads as a venue name rather than a
+ * region by choice (Kiara, 2026-08-04) - it was "Boulder County" precisely so
+ * nothing on the card could be mistaken for a real business, and the "Example"
+ * badge that used to say so was dropped the same day, so the card now carries
+ * no marker at all that its figures are illustrative.
+ *
+ * That is a deliberate trade, but it has one live condition: "Boulder Ranch"
+ * must not be, or become, an actual Colorado wedding venue. It is not one as of
+ * 2026-08-04 (checked). Ranch-named venues around Boulder are common - Colorado
+ * Mountain Ranch, ~10 miles out, starts near $7,500 for up to 150 guests with
+ * outside catering, which is close to the invented figures below. If a business
+ * by this name turns up, change it: an invented price against a real venue is a
+ * fabricated review of someone's livelihood.
  */
 export const EXAMPLE_RECON = {
   category: "Venue",
-  place: "Boulder County",
+  place: "Boulder Ranch",
   price: "$8,400",
   priceDetail: "price for Saturday in September · we did DIY package tier, price can range up to $12k",
   notes:
