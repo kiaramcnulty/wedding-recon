@@ -30,6 +30,16 @@ const MAP_STYLE_URL =
 const PRECISE_ZOOM = 15;
 const APPROXIMATE_ZOOM = 11;
 
+/**
+ * Upper bound on how long the map may wait for an idle main thread before it
+ * starts anyway. The point of the deferral is to lose the race against
+ * hydration and the photo strip, not to skip the map: whatever happens, the
+ * grey box resolves within this window.
+ */
+const IDLE_TIMEOUT_MS = 2000;
+/** Same intent for browsers without requestIdleCallback (Safari < 16.4). */
+const FALLBACK_DELAY_MS = 600;
+
 interface VendorMapPreviewProps {
   lng: number;
   lat: number;
@@ -55,8 +65,8 @@ export function VendorMapPreview({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = React.useRef<any>(null);
 
-  // Initialize on mount, matching vendor-map.tsx — the pattern that is proven in
-  // production on Explore.
+  // Initialized on mount but SCHEDULED off the critical path — see the block
+  // comment below on why this is a deferral and not a visibility gate.
   //
   // This was briefly gated behind an IntersectionObserver to avoid loading
   // MapLibre for a page nobody scrolls. It shipped broken: the observer fires an
@@ -68,13 +78,35 @@ export function VendorMapPreview({
   // every viewer reaches it. The dynamic `import()` below is where the real win
   // was and it stays — MapLibre is still its own chunk, out of the initial
   // bundle, exactly as on Explore.
+  //
+  // WHAT THAT REASONING MISSED, and why this is now deferred (2026-08-06):
+  // "its own chunk" keeps MapLibre out of the *initial* bundle, but a mount-time
+  // effect still downloads and executes it immediately, so it lands squarely in
+  // the initial load anyway. Measured on the built app against a local backend,
+  // a venue page went from 529 KB / 40 requests before this preview existed to
+  // 850 KB / 45 after — 1.2 MB more JavaScript decoded, plus a ~466 KB MapLibre
+  // worker blob, plus a basemap fetch to tiles.openfreemap.org (a third-party
+  // origin, so a fresh DNS + TLS handshake before the style, sprite, glyph and
+  // vector-tile fan-out even starts). All of that was competing with hydration,
+  // the photo strip, and the recon the reader actually came for.
+  //
+  // A visibility gate is still the wrong tool — on a 390x844 phone this map sits
+  // inside the first viewport, so it would fire instantly and save nothing (and
+  // it is the thing that shipped broken). Scheduling is the right axis: the map
+  // is an orienting glance, not the content, so it can start once the main
+  // thread has drawn everything else. requestIdleCallback carries a `timeout`,
+  // which is what makes this safe where the observer was not — the callback is
+  // guaranteed to run, so the failure mode that produced a permanently grey box
+  // cannot recur.
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     if (!containerRef.current) return;
     if (mapRef.current) return; // already initialized
 
     let cancelled = false;
-    (async () => {
+
+    const init = async () => {
+      if (cancelled || !containerRef.current || mapRef.current) return;
       const maplibregl = (await import("maplibre-gl")).default;
       if (cancelled || !containerRef.current) return;
 
@@ -129,10 +161,25 @@ export function VendorMapPreview({
       map.on("error", (e: { error?: Error }) => {
         console.error("[VendorMapPreview] map error:", e.error?.message ?? e);
       });
-    })();
+    };
+
+    // Hand the main thread back to hydration and the photo strip first. The
+    // `timeout` is load-bearing, not a tuning knob: without it a page that never
+    // goes idle would never draw the map, which is the failure the observer had.
+    let cancelSchedule: () => void;
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(() => void init(), {
+        timeout: IDLE_TIMEOUT_MS,
+      });
+      cancelSchedule = () => window.cancelIdleCallback?.(handle);
+    } else {
+      const handle = window.setTimeout(() => void init(), FALLBACK_DELAY_MS);
+      cancelSchedule = () => window.clearTimeout(handle);
+    }
 
     return () => {
       cancelled = true;
+      cancelSchedule();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
