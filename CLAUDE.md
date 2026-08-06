@@ -99,6 +99,7 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - Wider content (hub, vendor page): `max-w-[760px]` for better use of desktop space while staying readable.
 - Bottom nav items: grid layout centered via `mx-auto` with the `max-w-[520px]` constraint (matches mobile frame + padding).
 - Headers with profile menu: use `ProfileMenu className="ml-auto shrink-0"` to right-align; it auto-portals internally.
+- **A `flex-1` item holding nowrap text needs `min-w-0`, and `truncate` is not a substitute.** A flex item's default `min-width: auto` floors it at its **min-content** width, so one `whitespace-nowrap` string inside (which is what `truncate` sets) becomes a width the item cannot shrink past — it overflows its row instead. The truncate classes only clip once the width is already definite; they cannot create the constraint. This is what pushed the Explore profile icon off-screen: the search box is `flex-1`, and its suggestion dropdown carries Nominatim area strings like "Denver, Denver County, Colorado, 80202, United States", so the box sat at 398px inside a 390px viewport (fixed 2026-08-06). **It only misbehaves when the long content is present** — the resting search bar looked perfect, so check the populated state, not the empty one.
 
 ### Supabase patterns
 - **Idempotent upserts:** `upsert(..., { onConflict: "col1,col2" })` for operations that might repeat (e.g., save vendor to hub).

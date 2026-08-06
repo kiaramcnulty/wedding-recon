@@ -546,7 +546,17 @@ export default function ExplorePage() {
         >
           <BrandMark className="size-5" />
         </Link>
-        <div className="pointer-events-auto flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
+        {/* min-w-0 is load-bearing, not tidying. This is a flex-1 item, so its
+            automatic minimum size is its MIN-CONTENT — and the suggestion rows
+            below are whitespace-nowrap (truncate), so the longest one ("Denver,
+            Denver County, Colorado, 80202, United States") became a floor the
+            box could not shrink past. It grew to 398px in a 390px viewport and
+            pushed the profile icon clean off the screen. The truncate classes
+            cannot save it: they only clip once the width is definite, and
+            without this the width is whatever the text demands. Only visible
+            with the dropdown OPEN, which is why the resting search bar looks
+            fine. */}
+        <div className="pointer-events-auto min-w-0 flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
           <form
             onSubmit={handleSearch}
             className="flex items-center gap-2 px-3 py-2"
