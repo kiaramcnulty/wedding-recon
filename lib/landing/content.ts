@@ -166,13 +166,16 @@ export const HOW_STEPS: HowStep[] = [
 /* -------------------------------------------------------------------------- */
 
 export const PROBLEMS_SECTION = {
+  /** Small label above the heading, matching the other sections. */
+  eyebrow: "Why we exist",
   /**
    * Visible section heading. It replaced a per-card "The problem" label (Kiara,
    * 2026-08-04): saying it once above the deck beats repeating it on all four
    * cards, and it doubles as the h2 the four card h3s need over them for the
    * document outline.
    */
-  heading: "Why Wedding Recon exists",
+  heading:
+    "Built to create transparency in the wedding vendor search process",
   /** Label over the solution half of a card. The problem half needs none now. */
   solutionLabel: "On Wedding Recon",
   carouselLabel: "Problems Wedding Recon solves",

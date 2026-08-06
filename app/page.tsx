@@ -101,7 +101,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className={cn("px-5 py-14 md:py-20", className)}>
+    // scroll-mt keeps an anchored section's heading clear of the sticky
+    // header, which would otherwise cover it when a nav link jumps here.
+    <section id={id} className={cn("px-5 py-14 md:py-20", id && "scroll-mt-16", className)}>
       <div className="mx-auto w-full max-w-5xl">{children}</div>
     </section>
   );
@@ -197,7 +199,9 @@ export default function LandingPage() {
         <Section>
           {/* Says once, above the deck, what a per-card "The problem" label
               used to repeat four times. Also the h2 the card h3s sit under. */}
-          <SectionHeading>{PROBLEMS_SECTION.heading}</SectionHeading>
+          <SectionHeading eyebrow={PROBLEMS_SECTION.eyebrow}>
+            {PROBLEMS_SECTION.heading}
+          </SectionHeading>
           <SwipeCarousel
             slideLabels={PROBLEM_SOLUTIONS.map((item) => item.problem)}
             label={PROBLEMS_SECTION.carouselLabel}

@@ -24,18 +24,24 @@ export function LandingHeader() {
         </Link>
 
         <nav className="ml-auto flex items-center gap-1 sm:gap-4">
-          <Link
+          {/* Plain anchors, not next/link. A <Link> on a same-page fragment is
+              a router navigation to `/`, and `/` is exactly the path the
+              first-visit gate redirects to /explore once someone has the visit
+              cookie - so the "scroll down" links could open the app instead
+              (reported 2026-08-04). A bare <a href="#id"> is handled by the
+              browser: it scrolls, never routes, and never prefetches. */}
+          <a
             href="#how-it-works"
-            className="hidden px-1 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline"
+            className="hidden px-1 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground sm:inline"
           >
             {HEADER.howItWorks}
-          </Link>
-          <Link
+          </a>
+          <a
             href="#faq"
-            className="hidden px-1 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline"
+            className="hidden px-1 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground sm:inline"
           >
             {HEADER.faq}
-          </Link>
+          </a>
           <Link
             href={APP_HREF}
             className={cn(
