@@ -5,16 +5,19 @@
  *
  *   node scripts/test-filter-match.mjs
  *
- * This is the only executable check on the matching RULES. The SQL twin in
- * migration 0033 cannot be run locally (no Postgres here), so the guarantee is
- * that both implement the same spec and this side is tested. If you change one,
- * change the other and re-run this.
+ * This is the only executable check on the matching RULES, and matching is
+ * client-side only — there is no SQL twin to keep in step (an older note here
+ * said otherwise; `vendor_filter_rank` was never shipped and `vendors_in_bbox`
+ * takes no `p_filters`). Re-run this after any change to lib/filters/match.ts.
  */
 
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { filterRank, filterRankFor, hasAnySelection, countSelections } from "../lib/filters/match.ts";
+import {
+  filterRank, filterRankFor, filterMatch, filterMatchFor, matchedFraction,
+  hasAnySelection, countSelections,
+} from "../lib/filters/match.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const rows = readFileSync(resolve(ROOT, "data/filter-extraction/vendor-filters.jsonl"), "utf8")
@@ -39,11 +42,17 @@ eq("present and matching -> full",
 eq("present and contradicting -> excluded",
   filterRank({ setting: ["garden"] }, { setting: { kind: "multi", values: ["mountain"] } }), -1);
 
-// A rare filter inverts it: a hotel that ran a shuttle would have said so.
-eq("rare + silent -> excluded",
-  filterRank({ parking: ["free"] }, { has_shuttle: { kind: "bool", value: true, rare: true } }), -1);
-eq("rare + present -> full",
-  filterRank({ has_shuttle: true }, { has_shuttle: { kind: "bool", value: true, rare: true } }), 1);
+// A low-coverage ("rare") attribute is no longer an exception: silence demotes
+// there too, so the vendor stays visible in the partial tier. `rare` is a UI
+// badge only now, and the matcher does not read it at all.
+eq("low-coverage attribute + silent -> partial, NOT excluded",
+  filterRank({ parking: ["free"] }, { has_shuttle: { kind: "bool", value: true } }), 0);
+eq("low-coverage attribute + present -> full",
+  filterRank({ has_shuttle: true }, { has_shuttle: { kind: "bool", value: true } }), 1);
+eq("low-coverage attribute + contradicted -> still excluded",
+  filterRank({ has_shuttle: false }, { has_shuttle: { kind: "bool", value: true } }), -1);
+eq("a stray `rare` on a spec is inert",
+  filterRank({ parking: ["free"] }, { has_shuttle: { kind: "bool", value: true, rare: true } }), 0);
 eq("explicit false is a contradiction, not silence",
   filterRank({ has_lodging: false }, { has_lodging: { kind: "bool", value: true } }), -1);
 
@@ -104,7 +113,7 @@ eq("a partial anywhere makes the whole row partial",
 // own type, so a venue filter must never touch a photographer.
 const multi = {
   venue: { setting: { kind: "multi", values: ["mountain"] } },
-  photos: { shoots_film: { kind: "bool", value: true, rare: true } },
+  photos: { shoots_film: { kind: "bool", value: true } },
 };
 eq("venue judged by the venue filter",
   filterRankFor("venue", { setting: ["mountain"] }, multi), 1);
@@ -112,8 +121,8 @@ eq("venue contradicting the venue filter is excluded",
   filterRankFor("venue", { setting: ["garden"] }, multi), -1);
 eq("photographer is NOT judged by the venue filter",
   filterRankFor("photos", { shoots_film: true }, multi), 1);
-eq("photographer judged by its own rare filter",
-  filterRankFor("photos", { style: ["documentary"] }, multi), -1);
+eq("photographer silent on its own filter is demoted, not excluded",
+  filterRankFor("photos", { style: ["documentary"] }, multi), 0);
 eq("a type with no filters is untouched",
   filterRankFor("flowers", { style: ["classic"] }, multi), 1);
 eq("a venue silent on setting still demotes, not excludes",
@@ -123,6 +132,45 @@ eq("hasAnySelection is false for empty per-type entries",
 eq("hasAnySelection is true when any type carries one",
   hasAnySelection({ venue: {}, photos: multi.photos }), true);
 eq("countSelections sums across types", countSelections(multi), 2);
+
+// --- how MUCH of the ask was met -------------------------------------------
+// Grades the partial tier in the Explore list: a vendor silent on 1 filter of 3
+// outranks one silent on 2. Only the silences count — a contradiction is
+// excluded outright and never reaches the list.
+console.log("\nunit — partial-match arithmetic\n");
+
+const three = {
+  setting: { kind: "multi", values: ["mountain"] },
+  has_lodging: { kind: "bool", value: true },
+  has_getting_ready_suite: { kind: "bool", value: true },
+};
+const detail = (f) => {
+  const d = filterMatch(f, three);
+  return [d.rank, d.unknown, d.active, Number(matchedFraction(d).toFixed(3))];
+};
+eq("matches all three", detail({ setting: ["mountain"], has_lodging: true, has_getting_ready_suite: true }),
+  [1, 0, 3, 1]);
+eq("silent on one of three", detail({ setting: ["mountain"], has_lodging: true }),
+  [0, 1, 3, 0.667]);
+eq("silent on two of three", detail({ setting: ["mountain"] }),
+  [0, 2, 3, 0.333]);
+eq("silent on all three (attributes present but unrelated)", detail({ parking: ["free"] }),
+  [0, 3, 3, 0]);
+eq("no attributes at all is silent on all three", detail(null),
+  [0, 3, 3, 0]);
+eq("a contradiction is excluded whatever else is silent",
+  filterMatch({ setting: ["garden"] }, three).rank, -1);
+eq("an unfiltered type scores a full match",
+  [filterMatchFor("flowers", { style: ["classic"] }, multi), matchedFraction(filterMatchFor("flowers", null, multi))],
+  [{ rank: 1, unknown: 0, active: 0 }, 1]);
+eq("unknown can never exceed active",
+  filterMatch({}, three).unknown <= filterMatch({}, three).active, true);
+// A fraction, not a count of misses: these two are NOT interchangeable once two
+// categories with different filter counts are in one feed.
+eq("1 of 2 missing ranks below 1 of 3 missing",
+  matchedFraction(filterMatch({ setting: ["mountain"] }, {
+    setting: three.setting, has_lodging: three.has_lodging,
+  })) < matchedFraction(filterMatch({ setting: ["mountain"], has_lodging: true }, three)), true);
 
 // --- corpus behaviour ------------------------------------------------------
 console.log("\ncorpus — what real selections return\n");
@@ -165,11 +213,11 @@ report("photos · documentary, does elopements, under $4k", "photos", {
   does_elopements: { kind: "bool", value: true },
   price: { ...price(0, 4000), basis: "package" },
 });
-report("photos · also shoots film (rare)", "photos", {
-  shoots_film: { kind: "bool", value: true, rare: true },
+report("photos · also shoots film (low coverage)", "photos", {
+  shoots_film: { kind: "bool", value: true },
 });
-report("hotel · has a shuttle (rare)", "hotel", {
-  has_shuttle: { kind: "bool", value: true, rare: true },
+report("hotel · has a shuttle (low coverage)", "hotel", {
+  has_shuttle: { kind: "bool", value: true },
 });
 report("food · gluten free + vegan, under $80pp", "food", {
   dietary: { kind: "multi", values: ["gluten_free", "vegan"] },

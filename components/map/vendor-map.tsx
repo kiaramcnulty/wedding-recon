@@ -15,7 +15,10 @@ import { isApproximateLocation } from "@/lib/map/vendor-location";
 import { bboxForView, padBbox, type ViewportBbox } from "@/lib/map/viewport";
 import {
   filterRankFor,
+  filterMatchFor,
+  matchedFraction,
   hasAnySelection,
+  type FilterMatchDetail,
   type FilterSelections,
 } from "@/lib/filters/match";
 
@@ -77,6 +80,11 @@ const PREVIEW_SAFE_PX = 300;
 // past the cap degrades to "the closest N" rather than an arbitrary subset.
 const MAX_VISIBLE_ENTRIES = 200;
 
+// What every vendor scores when no attribute filter is active: a full match,
+// nothing asked, nothing missing. Hoisted so the hot loop does not allocate one
+// per row per pan.
+const UNFILTERED_MATCH: FilterMatchDetail = { rank: 1, unknown: 0, active: 0 };
+
 // Label sizes: the selected pin's name is set larger than its neighbours', and
 // offset further down to clear its bigger disc (offsets are in ems of text-size).
 const LABEL_SIZE = 11;
@@ -89,6 +97,38 @@ type Expr = import("maplibre-gl").ExpressionSpecification;
 /** `["case", <feature is the selected vendor>, whenSelected, otherwise]`. */
 function whenSelected(selectedId: string, whenTrue: unknown, whenFalse: unknown) {
   return ["case", ["==", ["get", "id"], selectedId], whenTrue, whenFalse] as Expr;
+}
+
+/**
+ * How far a rank-0 pin recedes. It is silent on something the couple filtered
+ * for, not a miss, so it stays on the map — but well back, so the pins that DO
+ * match read as the answer and these as texture behind them.
+ *
+ * The label goes fainter than the disc rather than tracking it. A disc is a
+ * shape and survives being pale; text at low opacity fades its white halo too,
+ * so it stops being legible while still adding clutter — and the name is the
+ * least useful thing about a vendor whose attributes are unknown anyway.
+ */
+const PARTIAL_ICON_OPACITY = 0.22;
+const PARTIAL_LABEL_OPACITY = 0.28;
+
+/**
+ * The paint properties that depend on the selection: opacity.
+ *
+ * The SELECTED pin is always fully opaque whatever its rank. Without that, at
+ * these opacities, tapping a faded pin opens its card next to a ghost — the one
+ * pin the couple has actively asked about, and the only one the card refers to.
+ * The rank fade is the resting state, not a permanent handicap.
+ */
+function selectionPaint(selectedId: string | null) {
+  const faded = (partial: number) =>
+    (selectedId
+      ? whenSelected(selectedId, 1, ["case", ["==", ["get", "rank"], 0], partial, 1])
+      : ["case", ["==", ["get", "rank"], 0], partial, 1]) as Expr;
+  return {
+    "icon-opacity": faded(PARTIAL_ICON_OPACITY),
+    "text-opacity": faded(PARTIAL_LABEL_OPACITY),
+  };
 }
 
 /**
@@ -649,6 +689,9 @@ export function VendorMap({
       id: string;
       vendorType: VendorType;
       rank: 0 | 1;
+      matched: number;
+      priced: boolean;
+      photo: boolean;
       d: number;
     }[] = [];
     for (const v of vendorsRef.current) {
@@ -658,22 +701,60 @@ export function VendorMap({
       if (!pos) continue; // no coordinates — never drawn, so never "on screen"
       if (!bounds.contains([pos.lng, pos.lat])) continue;
       // Same predicate the pins were built with, so the pill can never disagree
-      // with what is drawn.
-      const rank = filtering
-        ? filterRankFor(vendorType, v.filters, selections)
-        : 1;
+      // with what is drawn. The detail form additionally carries how many of the
+      // filters the vendor was silent on, which orders the partial tier below.
+      const match = filtering
+        ? filterMatchFor(vendorType, v.filters, selections)
+        : UNFILTERED_MATCH;
+      const rank = match.rank;
       if (rank < 0) continue;
       // Squared distance from center, longitude scaled to match latitude at this
       // latitude. Only used for ordering, so no need for a real geodesic.
       const dx = (pos.lng - center.lng) * cosLat;
       const dy = pos.lat - center.lat;
-      inView.push({ id: v.id, vendorType, rank: rank as 0 | 1, d: dx * dx + dy * dy });
+      inView.push({
+        id: v.id,
+        vendorType,
+        rank: rank as 0 | 1,
+        matched: matchedFraction(match),
+        // `=== true` rather than a truthiness test: both flags are undefined on
+        // every row until migration 0035 is applied, and that has to read as
+        // false for all rows alike so the two keys drop out and leave the old
+        // nearest-first order — not as NaN, which would corrupt the comparator.
+        priced: v.has_price === true,
+        photo: v.has_photo === true,
+        d: dx * dx + dy * dy,
+      });
     }
 
-    // Full matches first, then nearest the center. Ordering by rank before
-    // distance is what puts the "missing some information" rows at the bottom
-    // of the list, and what the cap keeps when it bites.
-    inView.sort((a, b) => b.rank - a.rank || a.d - b.d);
+    // Five keys, in order:
+    //
+    //   rank     full matches before the "missing some information" ones. This
+    //            has to stay outermost: it is the partition the list draws its
+    //            divider on, and what the cap keeps when it bites.
+    //   matched  how MUCH of the ask a vendor met — the partial tier is itself
+    //            graded, so a venue silent on 1 filter of 3 outranks one silent
+    //            on 2. A no-op above the divider, where every row matched
+    //            everything and scores 1, which is why it can sit here rather
+    //            than being special-cased to rank 0.
+    //   priced   a vendor with an extracted price before one without. A couple
+    //            is shopping on budget, and a card that can answer "what does
+    //            this cost" is worth more than one that cannot. No divider —
+    //            this tier is internal, unlike rank.
+    //   photo    a card that draws an image before one that falls through to a
+    //            category placeholder.
+    //   d        then nearest the map center, as before.
+    //
+    // Each key only ever reorders within the tier above it, so distance still
+    // decides everything at the bottom.
+    inView.sort(
+      (a, b) =>
+        b.rank - a.rank ||
+        b.matched - a.matched ||
+        Number(b.priced) - Number(a.priced) ||
+        Number(b.photo) - Number(a.photo) ||
+        a.d - b.d,
+    );
     const entries: VisibleVendor[] = inView
       .slice(0, MAX_VISIBLE_ENTRIES)
       .map(({ id, vendorType, rank }) => ({ id, vendorType, rank }));
@@ -818,12 +899,19 @@ export function VendorMap({
   const applySelection = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    const layout = selectionLayout(selectedVendorIdRef.current ?? null);
+    const selected = selectedVendorIdRef.current ?? null;
+    const layout = selectionLayout(selected);
+    const paint = selectionPaint(selected);
     for (const t of VENDOR_TYPES) {
       const layer = pinLayerId(t);
       if (!map.getLayer(layer)) continue; // layers not added yet (still loading)
       for (const [prop, value] of Object.entries(layout)) {
         map.setLayoutProperty(layer, prop, value);
+      }
+      // Opacity is paint, not layout, so it needs its own pass — a selected
+      // rank-0 pin must come back to full opacity.
+      for (const [prop, value] of Object.entries(paint)) {
+        map.setPaintProperty(layer, prop, value);
       }
     }
   }, []);
@@ -964,10 +1052,9 @@ export function VendorMap({
               // rank 0 means the vendor is silent on something you filtered
               // for. It fades rather than disappearing: low coverage mostly
               // means nobody wrote the answer down, so hiding it would bury a
-              // real candidate. Kept above 0.4 so a faded pin is still
-              // tappable-looking on a bright basemap.
-              "icon-opacity": ["case", ["==", ["get", "rank"], 0], 0.45, 1],
-              "text-opacity": ["case", ["==", ["get", "rank"], 0], 0.55, 1],
+              // real candidate. Updated on selection change — see
+              // selectionPaint.
+              ...selectionPaint(null),
             },
           });
         }
