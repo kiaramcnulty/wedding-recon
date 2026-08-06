@@ -195,14 +195,14 @@ export default function LandingPage() {
         {/* Problem -> solution, one full-width row per pair, alternating.   */}
         {/* ---------------------------------------------------------------- */}
         <Section>
-          {/* Visible heading cut so the section opens straight into the cards;
-              kept sr-only because four h3s still need an h2 over them for the
-              document outline. */}
-          <h2 className="sr-only">{PROBLEMS_SECTION.srHeading}</h2>
+          {/* Says once, above the deck, what a per-card "The problem" label
+              used to repeat four times. Also the h2 the card h3s sit under. */}
+          <SectionHeading>{PROBLEMS_SECTION.heading}</SectionHeading>
           <SwipeCarousel
             slideLabels={PROBLEM_SOLUTIONS.map((item) => item.problem)}
             label={PROBLEMS_SECTION.carouselLabel}
             hint={PROBLEMS_SECTION.carouselHint}
+            className="mt-8"
           >
             {PROBLEM_SOLUTIONS.map((item) => (
               <ProblemCard key={item.problem} item={item} />

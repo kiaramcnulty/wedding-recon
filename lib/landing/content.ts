@@ -160,14 +160,13 @@ export const HOW_STEPS: HowStep[] = [
 
 export const PROBLEMS_SECTION = {
   /**
-   * Rendered sr-only. The visible heading was cut so the section opens straight
-   * into the cards (Kiara, 2026-08-04), but a section with four h3s under it
-   * still needs an h2 above them or the document outline breaks - and an
-   * outline is what a screen-reader user navigates by. Invisible, not absent.
+   * Visible section heading. It replaced a per-card "The problem" label (Kiara,
+   * 2026-08-04): saying it once above the deck beats repeating it on all four
+   * cards, and it doubles as the h2 the four card h3s need over them for the
+   * document outline.
    */
-  srHeading: "Why Wedding Recon exists",
-  /** Small labels over each half of a card, so which is which is never in doubt. */
-  problemLabel: "The problem",
+  heading: "Why Wedding Recon exists",
+  /** Label over the solution half of a card. The problem half needs none now. */
   solutionLabel: "On Wedding Recon",
   carouselLabel: "Problems Wedding Recon solves",
   carouselHint: "Swipe or use the arrows",

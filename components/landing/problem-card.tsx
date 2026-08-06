@@ -43,10 +43,7 @@ export function ProblemCard({ item }: { item: ProblemSolution }) {
 
   return (
     <li className="flex min-w-0 shrink-0 basis-[88%] snap-start flex-col rounded-2xl border bg-background p-6 shadow-sm sm:basis-[64%] lg:basis-[46%]">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        {PROBLEMS_SECTION.problemLabel}
-      </p>
-      <h3 className="mt-2 font-heading text-xl font-semibold leading-snug tracking-tight">
+      <h3 className="font-heading text-xl font-semibold leading-snug tracking-tight">
         {item.problem}
       </h3>
 
