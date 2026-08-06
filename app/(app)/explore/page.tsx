@@ -596,24 +596,6 @@ export default function ExplorePage() {
         <ProfileMenu className="shrink-0" />
       </div>
 
-      {/* List view: the same rows the map is showing, as a feed. Sits above the
-          map in the stack and is opaque, so the hidden map behind it cannot
-          bleed through. */}
-      {view === "list" && (
-        <div className="absolute inset-0 z-[5] flex flex-col bg-background pt-[52px]">
-          <VendorFeed
-            entries={visible.entries}
-            scrollKey="wr:screenScroll"
-            className="flex-1"
-            footnote={
-              visible.entries.length < visible.total
-                ? `Showing the ${visible.entries.length} nearest of ${visible.total}. Zoom in to narrow the list.`
-                : undefined
-            }
-          />
-        </div>
-      )}
-
       {/* One control row: what to show, how many there are, and which view.
           The count is deliberately NOT a button — it used to be a
           "see all N results on screen" pill doing double duty as both the count
@@ -627,21 +609,48 @@ export default function ExplorePage() {
           selectedTypes={selectedTypes}
           activeCount={activeFilterCount}
           onClick={() => setFilterSheetOpen(true)}
-          className="pointer-events-auto max-w-[46%] [&>span]:truncate"
+          className="pointer-events-auto max-w-[42%] [&>span]:truncate"
         />
+        <span className="flex-1" aria-hidden />
+        {/* The count sits ON the map, so it needs its own surface. A text
+            shadow was not enough: the basemap runs from near-white fields to
+            mid-grey urban blocks and dark green parks, so no single text colour
+            stays legible across it. A chip matching the neighbouring controls
+            fixes the contrast and makes the row read as one set. */}
         <span
           // aria-live so a screen reader hears the count settle after a pan.
           aria-live="polite"
-          className="min-w-0 flex-1 truncate text-center text-[13px] font-medium text-foreground drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
+          className="min-w-0 shrink truncate rounded-full border border-border bg-background/95 px-2.5 py-1 text-center text-[13px] font-medium shadow-sm backdrop-blur"
         >
           {visible.total === 1 ? "1 result" : `${visible.total} results`}
         </span>
+        <span className="flex-1" aria-hidden />
         <ViewToggle
           view={view}
           onChange={setView}
           className="pointer-events-auto"
         />
       </div>
+
+      {/* List view. In normal FLOW after the control row, not absolutely
+          positioned over it: an absolute overlay had to guess a top inset to
+          clear the header, that guess was wrong, and the first card slid under
+          the controls. As a flex child it simply takes the space that is left,
+          so it cannot overlap whatever sits above it. */}
+      {view === "list" && (
+        <div className="relative z-[5] flex min-h-0 flex-1 flex-col bg-background">
+          <VendorFeed
+            entries={visible.entries}
+            scrollKey="wr:screenScroll"
+            className="flex-1"
+            footnote={
+              visible.entries.length < visible.total
+                ? `Showing the ${visible.entries.length} nearest of ${visible.total}. Zoom in to narrow the list.`
+                : undefined
+            }
+          />
+        </div>
+      )}
 
       {filterSheetOpen && (
         <VendorFilterSheet
