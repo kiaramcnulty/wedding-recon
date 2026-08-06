@@ -7,6 +7,7 @@ import { MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
 import { formatVendorLocality } from "@/lib/vendor-locality";
+import { sortReconEntries } from "@/lib/recon-sort";
 import { cn } from "@/lib/utils";
 
 /**
@@ -61,6 +62,11 @@ interface ReconRow {
   price_text: string | null;
   price_details: string | null;
   notes: string | null;
+  // Read by sortReconEntries — the collected date is the recency it orders on,
+  // with created_at as the tiebreak and the fallback for pre-migration rows.
+  recon_collected_month: number | null;
+  recon_collected_year: number | null;
+  created_at: string | null;
   media: { thumb_path: string | null; storage_path: string }[] | null;
 }
 
@@ -73,7 +79,8 @@ interface ReconRow {
  *
  * The identity check is `getClaims()` — a local JWT verify, no round trip on a
  * project with asymmetric signing keys. Explore is public, so a signed-out
- * viewer is normal: `viewerId` is simply null and the sort/tag are no-ops.
+ * viewer is normal: `viewerId` is simply null and the "mine first" key and the
+ * tag are both no-ops (the price and recency keys still apply).
  */
 /** Ceiling on the per-session preview cache before it is dropped wholesale. */
 const PREVIEW_CACHE_MAX = 600;
@@ -125,7 +132,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         supabase
           .from("recon_entries")
           .select(
-            "vendor_id, author_id, price_text, price_details, notes, media:recon_media(thumb_path, storage_path)",
+            "vendor_id, author_id, price_text, price_details, notes, recon_collected_month, recon_collected_year, created_at, media:recon_media(thumb_path, storage_path)",
           )
           .eq("status", "active")
           .in("vendor_id", idList)
@@ -141,13 +148,19 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
       const vendorById = new Map<string, VendorLite>();
       for (const v of vendors) vendorById.set(v.id, v);
 
-      // Tally active recon counts, capture the first recon thumbnail per vendor,
-      // and collect text previews (newest first — the query orders by created_at
-      // desc, matching the vendor page). Entries with no text get no slide.
+      // Sorted ONCE over the flat result, before anything is grouped, so the
+      // count, the fallback thumbnail and the slides all follow one order — and
+      // it is the same order the vendor page uses. Bucketing by vendor_id below
+      // preserves the relative order inside each vendor's rows, which is the
+      // only ordering that matters here.
+      const ordered = sortReconEntries(recons, viewerId);
+
+      // Tally active recon counts, capture the leading entry's thumbnail per
+      // vendor, and collect text previews. Entries with no text get no slide.
       const counts = new Map<string, number>();
       const reconThumb = new Map<string, string>();
       const slidesByVendor = new Map<string, ReconSlide[]>();
-      for (const row of recons) {
+      for (const row of ordered) {
         counts.set(row.vendor_id, (counts.get(row.vendor_id) ?? 0) + 1);
         if (!reconThumb.has(row.vendor_id)) {
           const first = row.media?.[0];
@@ -172,15 +185,6 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
             isMine: !!viewerId && row.author_id === viewerId,
           });
           slidesByVendor.set(row.vendor_id, list);
-        }
-      }
-
-      // Surface the viewer's own recon first, matching how the vendor page
-      // orders its entry list. sort() is stable, so everything keeps its
-      // created_at (newest-first) order within the "mine" / "others" groups.
-      if (viewerId) {
-        for (const list of slidesByVendor.values()) {
-          list.sort((a, b) => Number(b.isMine) - Number(a.isMine));
         }
       }
 

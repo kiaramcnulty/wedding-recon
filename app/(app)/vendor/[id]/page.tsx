@@ -17,6 +17,7 @@ import {
   type VendorType,
 } from "@/lib/constants/categories";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
+import { sortReconEntries } from "@/lib/recon-sort";
 import { VendorMapPreview } from "@/components/vendor/vendor-map-preview";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { VendorPhotos } from "@/components/vendor/vendor-photos";
@@ -189,16 +190,10 @@ export default async function VendorPage({
 
   const rawList = (entriesRes.data ?? []) as ReconEntryWithDetails[];
 
-  // Surface the current user's own entry first. sort() is stable, so entries
-  // keep their created_at (newest-first) order within the "mine" / "others"
-  // groups.
-  const entries = userId
-    ? [...rawList].sort((a, b) => {
-        const aMine = a.author_id === userId ? 0 : 1;
-        const bMine = b.author_id === userId ? 0 : 1;
-        return aMine - bMine;
-      })
-    : rawList;
+  // Your own entry first, then entries that state a price, then most recently
+  // collected. Shared with the preview card's carousel so the entry a card
+  // leads with is the entry this page leads with — see lib/recon-sort.ts.
+  const entries = sortReconEntries(rawList, userId);
 
   // Media for the carousel: thumbnails inline, full opened in the lightbox so
   // the carousel itself stays cheap on egress.
