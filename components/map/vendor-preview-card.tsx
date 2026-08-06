@@ -75,17 +75,43 @@ interface ReconRow {
  * project with asymmetric signing keys. Explore is public, so a signed-out
  * viewer is normal: `viewerId` is simply null and the sort/tag are no-ops.
  */
+/** Ceiling on the per-session preview cache before it is dropped wholesale. */
+const PREVIEW_CACHE_MAX = 600;
+
 export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
-  const [items, setItems] = React.useState<VendorPreview[] | null>(null);
+  // Previews already fetched this session, keyed by vendor id.
+  //
+  // This used to be plain state that the effect reset to null on every change
+  // of the id list, which made the feed unusable in two ways. The whole list
+  // blanked to a spinner whenever the set shifted — including when the caller
+  // merely GREW it, so paging in more rows threw away everything on screen —
+  // and every fetch re-asked for vendors it already had. Caching by id means a
+  // request only ever covers ids genuinely not seen yet.
+  // Split deliberately across state and a ref, because the two are read at
+  // different times. `cache` holds the data the render reads, so it must be
+  // state (a ref cannot be read during render). `fetchedRef` is bookkeeping the
+  // EFFECT reads to work out what is missing — keeping it in a ref is what lets
+  // the effect depend on `idsKey` alone instead of on the cache it just wrote,
+  // which would loop.
+  const [cache, setCache] = React.useState<ReadonlyMap<string, VendorPreview>>(
+    () => new Map(),
+  );
+  const fetchedRef = React.useRef(new Set<string>());
 
   // Stable key so the fetch effect doesn't re-run on array identity changes.
   const idsKey = ids.join(",");
 
   React.useEffect(() => {
     let cancelled = false;
-    const idList = idsKey ? idsKey.split(",") : [];
+    const wanted = idsKey ? idsKey.split(",") : [];
+    // Only the ids we have never fetched. This is what keeps a "load 20 more"
+    // request proportional to the page rather than to the whole list.
+    const idList = wanted.filter((id) => !fetchedRef.current.has(id));
+    // Nothing new to ask for: the render below already derives from the cache,
+    // so there is no state to set here (and setting it synchronously in an
+    // effect would be a cascading render).
+    if (idList.length === 0) return;
     (async () => {
-      setItems(null);
       const supabase = createClient();
       const [vendorsRes, reconRes, claimsRes] = await Promise.all([
         supabase
@@ -183,14 +209,39 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         ];
       });
 
-      if (!cancelled) setItems(built);
+      if (cancelled) return;
+      // Mark every id we ASKED for, not just the ones that came back: a vendor
+      // row that is gone must not be re-requested on every subsequent render.
+      for (const id of idList) fetchedRef.current.add(id);
+      setCache((prev) => {
+        // Bound the session cache. Panning a map for a while would otherwise
+        // accumulate every vendor ever previewed; dropping it wholesale is fine
+        // because the next render simply refetches the ids on screen.
+        const overflowing = prev.size + built.length > PREVIEW_CACHE_MAX;
+        if (overflowing) fetchedRef.current = new Set(idList);
+        const next = overflowing
+          ? new Map<string, VendorPreview>()
+          : new Map(prev);
+        for (const item of built) next.set(item.id, item);
+        return next;
+      });
     })();
     return () => {
       cancelled = true;
     };
   }, [idsKey]);
 
-  return items;
+  return React.useMemo(() => {
+    const wanted = idsKey ? idsKey.split(",") : [];
+    const built = wanted.flatMap((id) => cache.get(id) ?? []);
+    // Null (the caller's spinner) only while we have NOTHING to show. Once any
+    // row has landed the feed renders what it has and fills in the rest as it
+    // arrives, which is what makes paging feel additive instead of destructive.
+    // An id with no cache entry is either still in flight or a vendor row that
+    // is gone; both correctly render as absent rather than as a gap.
+    if (built.length === 0 && wanted.length > 0) return null;
+    return built;
+  }, [idsKey, cache]);
 }
 
 /**
