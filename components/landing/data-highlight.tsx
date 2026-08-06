@@ -104,10 +104,7 @@ export function DataHighlight() {
 
         {/* Hair and makeup: comes-to-you vs studio. */}
         <li className={CARD}>
-          <CardHeading
-            title={DATA_SECTION.beautyChart.title}
-            subtitle={DATA_SECTION.beautyChart.subtitle}
-          />
+          <CardHeading title={DATA_SECTION.beautyChart.title} />
 
           {/* Part-to-whole, so one stacked bar rather than two. The 2px gap is
               in the surface color and is what separates the segments - never a
@@ -145,11 +142,17 @@ export function DataHighlight() {
             ))}
           </ul>
 
-          {/* The denominator ships with the chart. A share without its base is
-              a claim rather than a fact. */}
-          <p className="mt-auto pt-4 text-xs leading-relaxed text-muted-foreground">
-            {BEAUTY_SETUP.base}
-          </p>
+          {/* If a base is set it ships with the chart. NOTE (2026-08-04): the
+              base was removed from content.ts, so the 78/22 split now reads as
+              a share of ALL hair and makeup artists rather than of the 50 who
+              said where they work. Optional here so that stays the author's
+              call, but a percentage without its denominator asserts something
+              the data does not support - put it back if in doubt. */}
+          {"base" in BEAUTY_SETUP && (
+            <p className="mt-auto pt-4 text-xs leading-relaxed text-muted-foreground">
+              {(BEAUTY_SETUP as { base?: string }).base}
+            </p>
+          )}
         </li>
 
         {/* Median venue starting price. */}
@@ -157,7 +160,6 @@ export function DataHighlight() {
           <FigureCard
             value={DATA_SECTION.medianVenue.value}
             label={DATA_SECTION.medianVenue.label}
-            note={DATA_SECTION.medianVenue.note}
           />
         </li>
 
@@ -196,13 +198,15 @@ export function DataHighlight() {
   );
 }
 
-function CardHeading({ title, subtitle }: { title: string; subtitle: string }) {
+function CardHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <>
       <h3 className="font-heading text-base font-semibold">{title}</h3>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        {subtitle}
-      </p>
+      {subtitle && (
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          {subtitle}
+        </p>
+      )}
     </>
   );
 }
@@ -215,7 +219,7 @@ function FigureCard({
 }: {
   value: string;
   label: string;
-  note: string;
+  note?: string;
 }) {
   return (
     <div className="flex h-full flex-col justify-center">
@@ -223,9 +227,11 @@ function FigureCard({
         {value}
       </p>
       <p className="mt-2 text-sm font-medium">{label}</p>
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        {note}
-      </p>
+      {note && (
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          {note}
+        </p>
+      )}
     </div>
   );
 }

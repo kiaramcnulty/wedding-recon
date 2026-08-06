@@ -314,11 +314,12 @@ export const DATA_SECTION = {
     note: "Price quotes, notes and photos, collected from couples, reviews and vendor sites across Colorado.",
   },
   beautyChart: {
-    title: "Hair and makeup: do they come to you?"
+    title: "Hair and makeup: do they come to you?",
   },
   medianVenue: {
     value: "$2,250",
-    label: "median venue starting price"  },
+    label: "median venue starting price",
+  },
   /**
    * Towns named so the page still carries them as search terms after the old
    * Colorado section was removed. No counts: per-town figures were never
@@ -382,7 +383,7 @@ export const BEAUTY_SETUP = {
   segments: [
     { label: "Comes to you", count: 39, pct: 78 },
     { label: "Studio only", count: 11, pct: 22 },
-  ]
+  ],
 } as const;
 
 /* -------------------------------------------------------------------------- */
