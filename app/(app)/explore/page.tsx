@@ -92,6 +92,28 @@ function parseTypeList(raw: unknown): VendorType[] | null {
   return clean.length ? [...new Set(clean)] : null;
 }
 
+/**
+ * Keep only the entries of a type-keyed map whose type is still selected.
+ *
+ * Used at both ends of the same rule: pruning in memory when a category is
+ * deselected, and pruning again when the persisted payload is read back, so a
+ * filter can never outlive the category it belongs to. Takes `unknown` because
+ * one caller is a `JSON.parse` result — a malformed payload yields `{}` rather
+ * than throwing, matching how `parseTypeList` degrades.
+ */
+function pickTypes<T>(
+  raw: unknown,
+  keep: readonly VendorType[],
+): Partial<Record<VendorType, T>> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const allowed = new Set<string>(keep);
+  const out: Partial<Record<VendorType, T>> = {};
+  for (const [t, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (allowed.has(t) && v && typeof v === "object") out[t as VendorType] = v as T;
+  }
+  return out;
+}
+
 export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
@@ -135,6 +157,12 @@ export default function ExplorePage() {
   // sheet needed (a modal list cannot reshuffle under a scroll, so it had to be
   // pinned at open time). The map stays MOUNTED underneath either way — see the
   // render — so toggling never re-inits MapLibre or refetches.
+  //
+  // Starts on the map so the first client render matches the server; a persisted
+  // choice is applied after mount (below), for the same hydration reason the
+  // type filter is. It cannot use the lazy-initializer trick `initialView` uses
+  // — that one is only ever read imperatively by MapLibre, while this drives
+  // what renders, so a "list" initializer would diff against the server HTML.
   const [view, setView] = useState<"map" | "list">("map");
   // Rows the map currently holds, so the sheet can rescale its histograms
   // against what is actually in view.
@@ -230,25 +258,109 @@ export default function ExplorePage() {
     [],
   );
 
+  // Persist the ATTRIBUTE filters per-tab, next to the type selection and the
+  // map view, so the whole filter set survives a round trip to a vendor page.
+  // The two maps are written as one payload because they are read back as one:
+  // a date context is meaningless without the price range it re-scales.
+  //
+  // Both are plain JSON — FilterState holds string arrays, booleans and
+  // {min,max} objects; DateContext holds two strings — so there is nothing here
+  // that needs a custom serializer.
+  const persistFilters = useCallback(
+    (
+      states: Partial<Record<VendorType, FilterState>>,
+      dates: Partial<Record<VendorType, DateContext>>,
+    ) => {
+      try {
+        sessionStorage.setItem(
+          "wr:vendorFilters",
+          JSON.stringify({ states, dateContexts: dates }),
+        );
+      } catch {
+        // sessionStorage unavailable (e.g. private mode) — the filters still
+        // apply this session; only restore-on-return is lost.
+      }
+    },
+    [],
+  );
+
   // Update the type filter and persist it per-tab, so it survives a round trip to
   // a vendor page (restored on mount, below) just like the map view.
-  const updateSelectedTypes = useCallback((next: VendorType[]) => {
-    setSelectedTypes(next);
-    // Drop the filters of any category that was just DESELECTED, and keep the
-    // rest. Clearing everything on any change would throw away a venue filter
-    // the moment a photographer category is added alongside it.
-    const keep = new Set(next);
-    setFilterStates((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([t]) => keep.has(t as VendorType))),
-    );
-    setDateContexts((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([t]) => keep.has(t as VendorType))),
-    );
+  const updateSelectedTypes = useCallback(
+    (next: VendorType[]) => {
+      // Drop the filters of any category that was just DESELECTED, and keep the
+      // rest. Clearing everything on any change would throw away a venue filter
+      // the moment a photographer category is added alongside it.
+      //
+      // Computed eagerly rather than inside a functional update: the pruned maps
+      // have to be persisted as well as set, and a store write inside an updater
+      // would run twice under StrictMode.
+      const nextStates = pickTypes<FilterState>(filterStates, next);
+      const nextDates = pickTypes<DateContext>(dateContexts, next);
+      setSelectedTypes(next);
+      setFilterStates(nextStates);
+      setDateContexts(nextDates);
+      try {
+        sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
+      } catch {
+        // sessionStorage unavailable — the filter still applies this session.
+      }
+      persistFilters(nextStates, nextDates);
+    },
+    [filterStates, dateContexts, persistFilters],
+  );
+
+  const updateFilterState = useCallback(
+    (t: VendorType, next: FilterState) => {
+      const merged = { ...filterStates, [t]: next };
+      setFilterStates(merged);
+      persistFilters(merged, dateContexts);
+    },
+    [filterStates, dateContexts, persistFilters],
+  );
+
+  const updateDateContext = useCallback(
+    (t: VendorType, next: DateContext) => {
+      const merged = { ...dateContexts, [t]: next };
+      setDateContexts(merged);
+      persistFilters(filterStates, merged);
+    },
+    [filterStates, dateContexts, persistFilters],
+  );
+
+  const clearAllFilters = useCallback(() => {
+    setFilterStates({});
+    setDateContexts({});
+    persistFilters({}, {});
+  }, [persistFilters]);
+
+  // Persist the map/list choice per-tab, like the filters and the map view.
+  // Tapping a card in the list navigates to that vendor, so coming back to the
+  // map would drop the couple somewhere they never chose to be — and it strands
+  // the scroll position VendorFeed already saves under `wr:screenScroll`, which
+  // is a one-shot restore that only fires while the feed is mounted.
+  const updateView = useCallback((next: "map" | "list") => {
+    setView(next);
     try {
-      sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
+      sessionStorage.setItem("wr:view", next);
     } catch {
-      // sessionStorage unavailable — the filter still applies this session.
+      // sessionStorage unavailable — the toggle still works this session.
     }
+  }, []);
+
+  // Apply the persisted view after mount. Deferred a tick for the same reason
+  // the type filter is: the first client render has to match the server's "map".
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let saved: string | null = null;
+    try {
+      saved = sessionStorage.getItem("wr:view");
+    } catch {
+      // sessionStorage unavailable — stay on the map
+    }
+    if (saved !== "list") return;
+    const t = setTimeout(() => setView("list"), 0);
+    return () => clearTimeout(t);
   }, []);
 
   // Apply the type filter after mount, from a `?types=` deeplink if there is
@@ -263,12 +375,14 @@ export default function ExplorePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     let restored: VendorType[] | null = null;
+    let fromDeeplink = false;
     try {
       const fromUrl = parseTypeList(
         new URLSearchParams(window.location.search).get("types"),
       );
       if (fromUrl) {
         restored = fromUrl;
+        fromDeeplink = true;
       } else {
         const raw = sessionStorage.getItem("wr:typeFilter");
         if (raw) restored = parseTypeList(JSON.parse(raw) as unknown);
@@ -276,10 +390,39 @@ export default function ExplorePage() {
     } catch {
       // malformed payload — fall back to showing all
     }
+
+    // The attribute filters ride along with the type selection they were set
+    // under, pruned to it — a persisted venue price range is meaningless once
+    // venues are no longer selected.
+    //
+    // A `?types=` deeplink takes none of them, and CLEARS the stored payload.
+    // The link is an explicit request from outside the app for a category, and
+    // quietly re-applying a leftover $6k-$8k range would land that visitor on an
+    // empty map. Dropping the payload (rather than just ignoring it) is what
+    // stops it coming back on the next return trip, which carries no `?types=`.
+    let restoredStates: Partial<Record<VendorType, FilterState>> = {};
+    let restoredDates: Partial<Record<VendorType, DateContext>> = {};
+    try {
+      if (fromDeeplink) {
+        sessionStorage.removeItem("wr:vendorFilters");
+      } else if (restored) {
+        const raw = sessionStorage.getItem("wr:vendorFilters");
+        if (raw) {
+          const d = JSON.parse(raw) as { states?: unknown; dateContexts?: unknown };
+          restoredStates = pickTypes<FilterState>(d.states, restored);
+          restoredDates = pickTypes<DateContext>(d.dateContexts, restored);
+        }
+      }
+    } catch {
+      // malformed payload — fall back to no attribute filters
+    }
+
     if (!restored) return;
     const next = restored;
     const t = setTimeout(() => {
       setSelectedTypes(next);
+      setFilterStates(restoredStates);
+      setDateContexts(restoredDates);
       // Persist it like a tapped chip, so it survives the round trip to a
       // vendor page — which returns via ?restore=1 and drops the query string.
       try {
@@ -287,9 +430,12 @@ export default function ExplorePage() {
       } catch {
         // sessionStorage unavailable — the filter still applies this session.
       }
+      persistFilters(restoredStates, restoredDates);
     }, 0);
     return () => clearTimeout(t);
-  }, []);
+    // Still mount-only: persistFilters is a useCallback([]), so its identity
+    // never changes and this cannot re-run. Listed rather than suppressed.
+  }, [persistFilters]);
 
   // On a restore mount, reopen whichever preview was showing — the cluster
   // sheet, the on-screen results list, or a single pin's card — from its saved
@@ -710,7 +856,7 @@ export default function ExplorePage() {
         <span className="flex-1" aria-hidden />
         <ViewToggle
           view={view}
-          onChange={setView}
+          onChange={updateView}
           className="pointer-events-auto"
         />
       </div>
@@ -744,16 +890,9 @@ export default function ExplorePage() {
           visiblePartial={visible.partial}
           states={filterStates}
           dateContexts={dateContexts}
-          onChangeType={(t, next) =>
-            setFilterStates((prev) => ({ ...prev, [t]: next }))
-          }
-          onDateContextChange={(t, next) =>
-            setDateContexts((prev) => ({ ...prev, [t]: next }))
-          }
-          onClearAll={() => {
-            setFilterStates({});
-            setDateContexts({});
-          }}
+          onChangeType={updateFilterState}
+          onDateContextChange={updateDateContext}
+          onClearAll={clearAllFilters}
           onClose={() => setFilterSheetOpen(false)}
         />
       )}
