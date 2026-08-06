@@ -25,8 +25,10 @@ import {
   VENDOR_TYPES,
   type VendorType,
 } from "@/lib/constants/categories";
-import { BrandLockup } from "@/components/brand-lockup";
+import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 import { ProfileMenu } from "@/components/profile-menu";
+import { LANDING_HREF } from "@/lib/landing/nav";
 import { cn } from "@/lib/utils";
 
 interface GeocodeSuggestion {
@@ -538,8 +540,20 @@ export default function ExplorePage() {
         />
       )}
 
-      {/* Search bar + autocomplete dropdown, with the account control beside it */}
+      {/* Brand mark, search bar, account control. The mark is the route back to
+          the landing page: it used to be a wordmark pill in the bottom-left
+          corner, which read as decoration rather than a control (Kiara,
+          2026-08-04). Top-left next to the search bar is where a logo is
+          expected to be clickable. LANDING_HREF, not "/", or the first-visit
+          gate bounces the visitor straight back here. */}
       <div className="relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">
+        <Link
+          href={LANDING_HREF}
+          aria-label="About Wedding Recon"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-background/95 shadow-md backdrop-blur-sm transition-opacity hover:opacity-80"
+        >
+          <BrandMark className="size-5" />
+        </Link>
         <div className="flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
           <form
             onSubmit={handleSearch}
@@ -695,12 +709,10 @@ export default function ExplorePage() {
           </div>
         )}
 
-        {/* Control row, lifted clear of the map attribution along the bottom
-            edge: quiet brand mark on the left, locate button right. */}
-        <div className="flex items-end justify-between px-3 pb-9 pt-3">
-          <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
-            <BrandLockup size="sm" />
-          </div>
+        {/* Locate button, lifted clear of the map attribution along the bottom
+            edge. The brand pill that used to sit opposite it moved to the top
+            bar, so this row is just the one control now. */}
+        <div className="flex items-end justify-end px-3 pb-9 pt-3">
           <button
             type="button"
             onClick={handleLocate}
