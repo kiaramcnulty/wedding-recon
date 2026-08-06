@@ -132,24 +132,22 @@ export const HOW_SECTION = {
 
 export interface HowStep {
   title: string;
-  body: string;
+  /** Optional. Dropped 2026-08-04 - the titles carry the steps on their own. */
+  body?: string;
   visual: AppVisual;
 }
 
 export const HOW_STEPS: HowStep[] = [
   {
     title: "Explore vendors in your wedding region",
-    body: "Open the map where you are getting married and filter by the criteria that actually decide it for you.",
     visual: "map",
   },
   {
     title: "See real quotes, advice and feedback",
-    body: "Open a vendor to read what couples were quoted, what the fine print covered, and how the day itself went.",
     visual: "reviews",
   },
   {
-    title: "Save your favorites",
-    body: "Keep every candidate in one hub, sorted by category, with your own notes and quotes alongside.",
+    title: "Save your favorites, all in one place",
     visual: "hub",
   },
 ];
@@ -186,7 +184,8 @@ export interface ProblemSolution {
   quote: Quote;
   /** What Wedding Recon does about it. */
   solution: string;
-  solutionBody: string;
+  /** Optional. Dropped 2026-08-04 - the one-line solution carries the card. */
+  solutionBody?: string;
   /** Sits beside the solution copy. Plain icon, not an app mock-up. */
   icon: LucideIcon;
 }
@@ -220,39 +219,33 @@ export interface ProblemSolution {
  */
 export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
   {
-    problem: "Pricing is rarely available online",
+    problem: "Pricing for vendors is rarely available online",
     quote: {
       text: "This would have saved me so much time and heartache... all the florists I was referred to had minimum spend of over $20k. I would have never bothered going to their site in the first place",
       name: "Erika",
       context: "married 2025, South Denver",
     },
-    solution: "Real, filterable pricing from real couples",
-    solutionBody:
-      "Every recon entry carries the number a couple was actually quoted and the fine print underneath it, so you can rule a vendor in or out before you spend an evening on an inquiry form.",
+    solution: "Filterable pricing from real couples' quotes and invoices",
     icon: DollarSign,
   },
   {
-    problem: "Important details are hard to figure out",
+    problem: "Key vendor details are hard to figure out",
     quote: {
       text: "For out of town guests, hotels were super hard and confusing to understand the cost of block rates",
       name: "Emily",
       context: "married 2026, Breckenridge",
     },
-    solution: "Key intel, specific to each type of vendor",
-    solutionBody:
-      "What matters about a hotel block is not what matters about a florist. Each vendor type is researched against the things couples actually get caught out by - block terms, delivery radius, catering policy, travel fees.",
+    solution: "Niche intel, specific to each type of vendor",
     icon: NotebookPen,
   },
   {
-    problem: "Quality is unknown until the big day",
+    problem: "Vendor quality is unknown until the big day",
     quote: {
       text: "The singer/DJ showed up late and didn't play any of the songs on our request list. The whole night was amazing but this was kind of crazy. And stressful.",
       name: "Julia",
       context: "married 2025, Buena Vista",
     },
-    solution: "Feedback from couples who have been through it",
-    solutionBody:
-      "Recon is written after the fact, not from a sales page - what the tasting was like, whether they turned up on time, what the contract actually delivered.",
+    solution: "Feedback from couples who went through it themselves",
     icon: Users,
   },
   {
@@ -262,9 +255,7 @@ export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
       name: "Wyatt",
       context: "married 2024, Colorado Springs",
     },
-    solution: "One hub to manage every vendor candidate",
-    solutionBody:
-      "Save anyone you are considering to your Planning Hub, sorted by category, with your own quotes and notes attached. It replaces the spreadsheet, and it is private to you.",
+    solution: "One hub to manage and share every vendor candidate",
     icon: LayoutDashboard,
   },
 ];
@@ -283,11 +274,14 @@ export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
  * crawlable - and it would render "0 vendors" whenever the free-tier project is
  * paused. Nothing on this page changes often enough to be worth that.
  *
- * The derived percentages come from regex over recon text at partial coverage,
- * so each one carries its base in `note`. Do not drop the note: a percentage
- * without its denominator is the difference between a fact and a claim. When
- * the filter tagging pipeline lands these become properly queryable and the
- * section can move to ISR.
+ * The derived percentages come from regex over recon text at PARTIAL coverage.
+ * `note` and `base` fields carrying each denominator were removed on 2026-08-04
+ * and the components render them only when present - so as it stands the median
+ * price reads as the median of all 679 venues (it is the median of the 37% with
+ * a published figure, site fee only) and the hair and makeup split reads as a
+ * share of all 183 artists (it is a share of the 50 who said). Putting a `note`
+ * or `base` string back is all it takes. When the filter tagging pipeline lands
+ * these become properly queryable and the section can move to ISR.
  */
 export const DATA_SECTION = {
   eyebrow: "Quick facts",
@@ -374,9 +368,10 @@ export const VENDOR_COUNTS: { type: VendorType; count: number }[] = [
  * one of those as a rate would assert something false about every undetected
  * vendor. Before adding a stat here, ask whether BOTH answers get recorded.
  *
- * `base` is the two-thirds of artists who say nothing either way, kept visible.
- * The filter tagging pipeline should raise it to ~90% and this can be redrawn
- * against the full type.
+ * Two-thirds of artists say nothing either way. A `base` string here is
+ * rendered under the chart when present; without one the split reads as a share
+ * of all 183. The filter tagging pipeline should raise coverage to ~90%, at
+ * which point this can be redrawn against the full type.
  */
 export const BEAUTY_SETUP = {
   segments: [
@@ -414,23 +409,23 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Do I need an account to use?",
     answer:
-      "No. The map and every vendor page are public, and a link a friend sends you opens without signing up. An account is only needed to save vendors to your Planning Hub or post recon - and it is a magic link to your email, with no password to invent.",
+      "No. The map and every vendor page are public, and a link a friend sends you opens without signing up. An account is only needed to save vendors to your Planning Hub or post recon - to sign up, all we need is an email and (anonymous encouraged) username.",
   },
   {
     question: "Where do the prices come from?",
     answer:
-      "From other couples. Each entry records what one couple was quoted, when they collected it, and how - online research, a call, or an in-person visit. Prices move with the date, the season, the guest count, and the package, so treat a recon entry as a starting range and confirm the details with the vendor directly.",
+      "From other couples. Each entry records what one couple was quoted, when they collected it, and how - online research, a call, or an in-person visit. We aggregate those entries and make sense of them specific to the type of vendor to create filterable ranges.",
     link: { href: "/terms", label: "Read the full disclaimer" },
   },
   {
     question: "Which parts of Colorado are covered?",
     answer:
-      "The Front Range is deepest - Denver, Boulder, Colorado Springs, Fort Collins and the surrounding towns - alongside the mountain venues couples travel to. Any vendor missing from the map can be added by anyone, so coverage follows wherever couples are actually searching.",
+      "The Front Range is deepest - Denver, Boulder, Colorado Springs, Fort Collins and the surrounding towns - alongside the mountain venues couples travel to. Any vendor missing from the map can be added by anyone, so coverage is always growing.",
   },
   {
     question: "Can vendors pay to appear, or to change what is written about them?",
     answer:
-      "No. There is no paid placement and there are no sponsored listings. Vendors appear because couples are researching them. If an entry is inaccurate or unfair, anyone can report it and it gets reviewed.",
+      "No. Vendors appear because couples are researching them. If an entry is inaccurate or unfair, anyone can report it and it gets reviewed.",
   },
   {
     question: "What kinds of vendors are on here?",
@@ -457,7 +452,7 @@ export const CLOSING_CTA = {
     context: "2027 wedding, Larkspur",
   },
   heading: "Start with the map.",
-  body: "See what vendors are near your target region and filter by your criteria. Read what other couples paid and how the vendor did. Save your favorites to narrow down your search.",
+  body: "Find vendors near your target region, filtered by your most important criteria. Read what other couples paid and how the vendor did. Save your favorites to narrow down your search.",
   cta: "Explore Colorado vendors",
 } as const;
 

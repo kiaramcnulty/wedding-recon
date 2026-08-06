@@ -195,9 +195,11 @@ export function HowItWorks({ className }: { className?: string }) {
                   {step.title}
                 </h3>
               </div>
-              <p className="mt-2 pl-10 text-sm leading-relaxed text-muted-foreground">
-                {step.body}
-              </p>
+              {step.body && (
+                <p className="mt-2 pl-10 text-sm leading-relaxed text-muted-foreground">
+                  {step.body}
+                </p>
+              )}
             </div>
           ))}
         </div>

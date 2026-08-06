@@ -84,9 +84,11 @@ export function ProblemCard({ item }: { item: ProblemSolution }) {
             </p>
           </div>
         </div>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          {item.solutionBody}
-        </p>
+        {item.solutionBody && (
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            {item.solutionBody}
+          </p>
+        )}
       </div>
     </li>
   );
