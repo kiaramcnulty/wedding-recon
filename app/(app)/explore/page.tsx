@@ -430,6 +430,16 @@ export default function ExplorePage() {
       setSelectedTypes(next);
       setFilterStates(restoredStates);
       setDateContexts(restoredDates);
+      // A RESTORED attribute filter is the one path to an active selection that
+      // never opens the filter sheet, so it has to latch `filtersWanted` itself.
+      // Without this the couple returns from a vendor page with their filter
+      // chips still lit, while the map holds no attributes to rank against —
+      // every vendor scores 1 and the filter silently does nothing until the
+      // sheet is opened again. Type-only selections need no attributes, so this
+      // deliberately checks for a non-empty per-type state rather than for
+      // `next.length`.
+      if (Object.values(restoredStates).some((s) => s && Object.keys(s).length))
+        setFiltersWanted(true);
       // Persist it like a tapped chip, so it survives the round trip to a
       // vendor page — which returns via ?restore=1 and drops the query string.
       try {
