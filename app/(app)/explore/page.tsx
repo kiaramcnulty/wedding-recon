@@ -157,6 +157,12 @@ export default function ExplorePage() {
   // sheet needed (a modal list cannot reshuffle under a scroll, so it had to be
   // pinned at open time). The map stays MOUNTED underneath either way — see the
   // render — so toggling never re-inits MapLibre or refetches.
+  //
+  // Starts on the map so the first client render matches the server; a persisted
+  // choice is applied after mount (below), for the same hydration reason the
+  // type filter is. It cannot use the lazy-initializer trick `initialView` uses
+  // — that one is only ever read imperatively by MapLibre, while this drives
+  // what renders, so a "list" initializer would diff against the server HTML.
   const [view, setView] = useState<"map" | "list">("map");
   // Rows the map currently holds, so the sheet can rescale its histograms
   // against what is actually in view.
@@ -327,6 +333,35 @@ export default function ExplorePage() {
     setDateContexts({});
     persistFilters({}, {});
   }, [persistFilters]);
+
+  // Persist the map/list choice per-tab, like the filters and the map view.
+  // Tapping a card in the list navigates to that vendor, so coming back to the
+  // map would drop the couple somewhere they never chose to be — and it strands
+  // the scroll position VendorFeed already saves under `wr:screenScroll`, which
+  // is a one-shot restore that only fires while the feed is mounted.
+  const updateView = useCallback((next: "map" | "list") => {
+    setView(next);
+    try {
+      sessionStorage.setItem("wr:view", next);
+    } catch {
+      // sessionStorage unavailable — the toggle still works this session.
+    }
+  }, []);
+
+  // Apply the persisted view after mount. Deferred a tick for the same reason
+  // the type filter is: the first client render has to match the server's "map".
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let saved: string | null = null;
+    try {
+      saved = sessionStorage.getItem("wr:view");
+    } catch {
+      // sessionStorage unavailable — stay on the map
+    }
+    if (saved !== "list") return;
+    const t = setTimeout(() => setView("list"), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   // Apply the type filter after mount, from a `?types=` deeplink if there is
   // one and the persisted selection otherwise. Deferred a tick (setTimeout 0,
@@ -821,7 +856,7 @@ export default function ExplorePage() {
         <span className="flex-1" aria-hidden />
         <ViewToggle
           view={view}
-          onChange={setView}
+          onChange={updateView}
           className="pointer-events-auto"
         />
       </div>
