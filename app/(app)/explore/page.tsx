@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Search, Loader2, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -12,16 +12,23 @@ import {
   type VisibleVendorsPayload,
 } from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
-import {
-  VendorListSheet,
-  type VendorListEntry,
-} from "@/components/map/vendor-list-sheet";
-import { ScreenResultsPill } from "@/components/map/screen-results-pill";
+import { VendorFeed, ViewToggle } from "@/components/map/vendor-feed";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
-import { VendorTypeFilter } from "@/components/map/vendor-type-filter";
+import {
+  VendorFilterSheet,
+  FilterButton,
+  type FilterState,
+  type DateContext,
+} from "@/components/map/vendor-filter-sheet";
+import { filtersForType } from "@/lib/constants/vendor-filters";
+import {
+  buildSelection,
+  countSelections,
+  type FilterSelections,
+} from "@/lib/filters/match";
+import type { Vendor } from "@/lib/types";
 import {
   CATEGORIES,
-  CATEGORY_PLURAL,
   VENDOR_TYPES,
   type VendorType,
 } from "@/lib/constants/categories";
@@ -58,35 +65,6 @@ const MAP_TILE_ORIGIN = (() => {
     return "https://tiles.openfreemap.org";
   }
 })();
-
-/** The open "results on screen" list — frozen at the moment it was opened. */
-interface ScreenList {
-  /** True on-screen count, which can exceed `entries` when the map caps the list. */
-  total: number;
-  entries: VendorListEntry[];
-}
-
-/**
- * Title for the on-screen results feed. Names the category when the list is
- * unambiguously one type — either the user filtered to exactly one, or every
- * row in a complete (uncapped) list happens to share one — and stays generic
- * otherwise. A capped list can't speak for the types it didn't include.
- */
-function screenListHeading(
-  list: ScreenList,
-  selectedTypes: VendorType[],
-): string {
-  if (list.total === 1) return "1 result on screen";
-  const complete = list.entries.length === list.total;
-  const listTypes = new Set(list.entries.map((e) => e.vendorType));
-  const soleType =
-    selectedTypes.length === 1
-      ? selectedTypes[0]
-      : complete && listTypes.size === 1
-        ? [...listTypes][0]
-        : null;
-  return `${list.total} ${soleType ? CATEGORY_PLURAL[soleType] : "results"} on screen`;
-}
 
 /**
  * Read a vendor-type selection from either source that can supply one: a
@@ -131,16 +109,46 @@ export default function ExplorePage() {
   // count behind the results pill, plus the rows its list opens on.
   const [visible, setVisible] = useState<VisibleVendorsPayload>({
     total: 0,
+    partial: 0,
     entries: [],
   });
-  // The open "results on screen" list (null = closed). A frozen snapshot: the
-  // sheet is modal, so the map can't move underneath it, and a list that
-  // reshuffled mid-scroll would be unusable.
-  const [screenList, setScreenList] = useState<ScreenList | null>(null);
   // Selected vendor-type filter (empty = show all). Starts empty so the first
   // client render matches the server; any persisted selection is restored after
   // mount (see below) to avoid a hydration mismatch on the chip states.
   const [selectedTypes, setSelectedTypes] = useState<VendorType[]>([]);
+  // Attribute filters, keyed BY VENDOR TYPE. Filters are type-scoped (a venue
+  // has no cuisine), but that scopes which filters apply to a vendor — it is
+  // not a reason to allow only one type at a time. A couple shops for a venue
+  // and a photographer in the same session, so several categories can be
+  // filtered at once and each vendor is judged only against its own type.
+  const [filterStates, setFilterStates] = useState<
+    Partial<Record<VendorType, FilterState>>
+  >({});
+  const [dateContexts, setDateContexts] = useState<
+    Partial<Record<VendorType, DateContext>>
+  >({});
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  // Map or list. The list is a VIEW, not a modal: that is what lets it render
+  // live off `visible.entries` instead of the frozen snapshot the old bottom
+  // sheet needed (a modal list cannot reshuffle under a scroll, so it had to be
+  // pinned at open time). The map stays MOUNTED underneath either way — see the
+  // render — so toggling never re-inits MapLibre or refetches.
+  const [view, setView] = useState<"map" | "list">("map");
+  // Rows the map currently holds, so the sheet can rescale its histograms
+  // against what is actually in view.
+  const [mapVendors, setMapVendors] = useState<Vendor[]>([]);
+
+  const filterSelections = useMemo<FilterSelections>(() => {
+    const out: FilterSelections = {};
+    for (const t of selectedTypes) {
+      const st = filterStates[t];
+      if (!st || Object.keys(st).length === 0) continue;
+      out[t] = buildSelection(filtersForType(t), st, dateContexts[t] ?? {});
+    }
+    return out;
+  }, [selectedTypes, filterStates, dateContexts]);
+
+  const activeFilterCount = countSelections(filterSelections);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
@@ -176,42 +184,12 @@ export default function ExplorePage() {
       sessionStorage.removeItem("wr:clusterScroll");
       // The map previews are mutually exclusive; only one can be restored.
       sessionStorage.removeItem("wr:pin");
-      sessionStorage.removeItem("wr:screen");
     } catch {
       // sessionStorage unavailable (e.g. private mode) — the sheet still opens;
       // only reopen-on-back is lost.
     }
     setPin(null);
-    setScreenList(null);
     setCluster({ ids: payload.ids, vendorType: payload.vendorType });
-  }, []);
-
-  // The results pill: freeze what's on screen right now and open it as a feed.
-  // Persisted like the cluster so the list survives a round trip to a vendor
-  // page — recomputing it on return would race the map's first fetch.
-  const openScreenList = useCallback(() => {
-    const list: ScreenList = { total: visible.total, entries: visible.entries };
-    if (list.entries.length === 0) return;
-    try {
-      sessionStorage.setItem("wr:screen", JSON.stringify(list));
-      sessionStorage.removeItem("wr:screenScroll");
-      sessionStorage.removeItem("wr:cluster");
-      sessionStorage.removeItem("wr:pin");
-    } catch {
-      // sessionStorage unavailable — the sheet still opens.
-    }
-    setPin(null);
-    setCluster(null);
-    setScreenList(list);
-  }, [visible]);
-
-  const closeScreenList = useCallback(() => {
-    try {
-      sessionStorage.removeItem("wr:screen");
-    } catch {
-      // nothing persisted to clear
-    }
-    setScreenList(null);
   }, []);
 
   // A single pin tap peeks the vendor rather than navigating — persisted the same
@@ -220,11 +198,9 @@ export default function ExplorePage() {
     try {
       sessionStorage.setItem("wr:pin", JSON.stringify(payload));
       sessionStorage.removeItem("wr:cluster");
-      sessionStorage.removeItem("wr:screen");
     } catch {
       // sessionStorage unavailable — the card still opens.
     }
-    setScreenList(null);
     setPin({ id: payload.id, vendorType: payload.vendorType });
   }, []);
 
@@ -256,6 +232,16 @@ export default function ExplorePage() {
   // a vendor page (restored on mount, below) just like the map view.
   const updateSelectedTypes = useCallback((next: VendorType[]) => {
     setSelectedTypes(next);
+    // Drop the filters of any category that was just DESELECTED, and keep the
+    // rest. Clearing everything on any change would throw away a venue filter
+    // the moment a photographer category is added alongside it.
+    const keep = new Set(next);
+    setFilterStates((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([t]) => keep.has(t as VendorType))),
+    );
+    setDateContexts((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([t]) => keep.has(t as VendorType))),
+    );
     try {
       sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
     } catch {
@@ -314,7 +300,6 @@ export default function ExplorePage() {
     if (!new URLSearchParams(window.location.search).has("restore")) return;
     let restoredCluster: { ids: string[]; vendorType: VendorType } | null = null;
     let restoredPin: { id: string; vendorType: VendorType } | null = null;
-    let restoredScreen: ScreenList | null = null;
     try {
       const raw = sessionStorage.getItem("wr:cluster");
       if (raw) {
@@ -330,17 +315,10 @@ export default function ExplorePage() {
           restoredPin = { id: d.id, vendorType: d.vendorType };
         }
       }
-      const rawScreen = sessionStorage.getItem("wr:screen");
-      if (rawScreen) {
-        const d = JSON.parse(rawScreen) as Partial<ScreenList>;
-        if (d.entries?.length && typeof d.total === "number") {
-          restoredScreen = { total: d.total, entries: d.entries };
-        }
-      }
     } catch {
       // ignore a malformed payload — the user just lands on the map
     }
-    if (!restoredCluster && !restoredPin && !restoredScreen) {
+    if (!restoredCluster && !restoredPin) {
       // Nothing to reopen — still drop the marker so a later in-page navigation
       // doesn't re-trigger a restore.
       window.history.replaceState(null, "", "/explore");
@@ -348,7 +326,6 @@ export default function ExplorePage() {
     }
     const t = setTimeout(() => {
       if (restoredCluster) setCluster(restoredCluster);
-      else if (restoredScreen) setScreenList(restoredScreen);
       else setPin(restoredPin);
       // Consumed together with the restore, NOT before it: in development React
       // mounts twice, and the first pass's cleanup cancels this timeout. Dropping
@@ -492,13 +469,17 @@ export default function ExplorePage() {
   }
 
   return (
-    <div className="relative flex flex-1 flex-col min-h-[60vh]">
+    <div className="relative flex min-h-[60vh] flex-1 flex-col">
       {/* Warm the basemap connection early (hoisted to <head> by React). */}
       <link rel="preconnect" href={MAP_TILE_ORIGIN} crossOrigin="anonymous" />
       <link rel="dns-prefetch" href={MAP_TILE_ORIGIN} />
 
-      {/* Full-bleed map behind everything */}
-      <div className="absolute inset-0">
+      {/* Full-bleed map behind everything. Kept MOUNTED in list view rather
+          than unmounted: MapLibre re-initialising costs a style load and a full
+          refetch, and the map would lose its centre and zoom, so switching back
+          would dump the couple somewhere else. `invisible` also stops it
+          painting while hidden. */}
+      <div className={cn("absolute inset-0", view === "list" && "invisible")}>
         <VendorMap
           flyToPosition={flyTo}
           userPosition={userPosition}
@@ -509,9 +490,28 @@ export default function ExplorePage() {
           onViewChange={saveMapView}
           initialView={initialView}
           selectedTypes={selectedTypes}
+          filterSelections={filterSelections}
           onVisibleVendorsChange={setVisible}
+          onVendorsChange={setMapVendors}
         />
       </div>
+
+      {/* Everything over the map lives in ONE absolutely-positioned flex
+          column. That is what gives the list a bounded height: `absolute
+          inset-0` makes this box exactly as tall as the page container, so a
+          `flex-1 min-h-0` child resolves against a DEFINITE height and scrolls
+          internally.
+
+          In normal flow it could not. The chain up to <main> is sized by
+          min-height (min-h-dvh) with no definite height anywhere, so a tall
+          feed grew every ancestor instead of scrolling — 875 results rendered a
+          12,324px-tall list that simply ran off the page (Kiara, 2026-08-05).
+          Clipping the container did not help, because the growth is in the
+          ancestors, not the overflow.
+
+          Click-through by default so the map stays pannable; each control opts
+          back in with pointer-events-auto. */}
+      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
 
       {/* Cluster list feed (portals to <body>; opens on a cluster tap) */}
       {cluster && (
@@ -524,19 +524,6 @@ export default function ExplorePage() {
 
       {/* Everything on screen, as one feed (portals to <body>; opens on the
           results pill). Same sheet as the cluster feed, but mixed-type. */}
-      {screenList && (
-        <VendorListSheet
-          entries={screenList.entries}
-          heading={screenListHeading(screenList, selectedTypes)}
-          scrollKey="wr:screenScroll"
-          footnote={
-            screenList.entries.length < screenList.total
-              ? `Showing the ${screenList.entries.length} closest to the center of the map. Zoom in to see the rest.`
-              : undefined
-          }
-          onClose={closeScreenList}
-        />
-      )}
 
       {/* Search bar + autocomplete dropdown, with the account control beside it */}
       <div className="relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">
@@ -663,28 +650,95 @@ export default function ExplorePage() {
         <ProfileMenu className="shrink-0" />
       </div>
 
-      {/* Vendor-type filter: scrollable color chips beneath the search bar,
-          in the same floating column. Doubles as the map's pin-color legend. */}
-      <div className="relative z-10 mx-auto w-full max-w-[520px] px-3 pt-2">
-        <VendorTypeFilter selected={selectedTypes} onChange={updateSelectedTypes} />
-      </div>
+      {/* One control row: what to show, how many there are, and which view.
+          The count is deliberately NOT a button — it used to be a
+          "see all N results on screen" pill doing double duty as both the count
+          and the only way into the list, which the view toggle now states far
+          more plainly (Kiara, 2026-08-05).
 
-      {/* Live count of what the map is showing, and the way into the full list.
-          The row is click-through (only the pill itself takes taps) so it can't
-          steal a pin tap from the map band behind it. */}
-      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] justify-center px-3 pt-2">
-        <ScreenResultsPill
-          total={visible.total}
-          onClick={openScreenList}
+          Click-through except for the controls themselves, so it cannot steal a
+          pin tap from the map underneath. */}
+      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] shrink-0 items-center gap-2 px-3 pt-2">
+        <FilterButton
+          selectedTypes={selectedTypes}
+          activeCount={activeFilterCount}
+          onClick={() => setFilterSheetOpen(true)}
+          className="pointer-events-auto max-w-[42%] [&>span]:truncate"
+        />
+        <span className="flex-1" aria-hidden />
+        {/* The count sits ON the map, so it needs its own surface. A text
+            shadow was not enough: the basemap runs from near-white fields to
+            mid-grey urban blocks and dark green parks, so no single text colour
+            stays legible across it. A chip matching the neighbouring controls
+            fixes the contrast and makes the row read as one set. */}
+        <span
+          // aria-live so a screen reader hears the count settle after a pan.
+          aria-live="polite"
+          className="min-w-0 shrink truncate rounded-full border border-border bg-background/95 px-2.5 py-1 text-center text-[13px] font-medium shadow-sm backdrop-blur"
+        >
+          {visible.total === 1 ? "1 result" : `${visible.total} results`}
+        </span>
+        <span className="flex-1" aria-hidden />
+        <ViewToggle
+          view={view}
+          onChange={setView}
           className="pointer-events-auto"
         />
       </div>
 
+      {/* List view. In normal FLOW after the control row, not absolutely
+          positioned over it: an absolute overlay had to guess a top inset to
+          clear the header, that guess was wrong, and the first card slid under
+          the controls. As a flex child it simply takes the space that is left,
+          so it cannot overlap whatever sits above it. */}
+      {view === "list" && (
+        <div className="pointer-events-auto relative z-[5] flex min-h-0 flex-1 flex-col bg-background">
+          <VendorFeed
+            entries={visible.entries}
+            scrollKey="wr:screenScroll"
+            className="flex-1"
+            footnote={
+              visible.entries.length < visible.total
+                ? `Showing the ${visible.entries.length} nearest of ${visible.total}. Zoom in to narrow the list.`
+                : undefined
+            }
+          />
+        </div>
+      )}
+
+      {filterSheetOpen && (
+        <VendorFilterSheet
+          selectedTypes={selectedTypes}
+          onSelectedTypesChange={updateSelectedTypes}
+          vendors={mapVendors}
+          visibleTotal={visible.total}
+          visiblePartial={visible.partial}
+          states={filterStates}
+          dateContexts={dateContexts}
+          onChangeType={(t, next) =>
+            setFilterStates((prev) => ({ ...prev, [t]: next }))
+          }
+          onDateContextChange={(t, next) =>
+            setDateContexts((prev) => ({ ...prev, [t]: next }))
+          }
+          onClearAll={() => {
+            setFilterStates({});
+            setDateContexts({});
+          }}
+          onClose={() => setFilterSheetOpen(false)}
+        />
+      )}
+
+
       {/* Bottom stack over the map: the single-pin peek card (Zillow-style) sits
           on top of the control row, so the brand mark and locate button stay
           reachable beneath it rather than being pushed above the card. In the
-          flow, so it sits above the bottom nav and pushes nothing around. */}
-      <div className="relative z-10 mt-auto">
+          flow, so it sits above the bottom nav and pushes nothing around.
+
+          Hidden in list view: these are map controls (a locate button and the
+          basemap-anchored brand mark), and a pin peek describes a pin nobody
+          can see. */}
+      <div className={cn("relative z-10 mt-auto", view === "list" && "hidden")}>
         {pin && (
           <div className="mx-auto w-full max-w-[480px] px-3">
             <VendorPinPreview
@@ -715,6 +769,7 @@ export default function ExplorePage() {
             )}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
