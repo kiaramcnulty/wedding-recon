@@ -2,7 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
+import { postSignInPath } from "@/lib/auth/post-signin";
 
+/**
+ * Completes a sign-in from the EMAILED LINK.
+ *
+ * Scope limit worth knowing before you debug a "magic link didn't log me in"
+ * report: this mints the session server-side and hands the cookies back on the
+ * redirect, so they land in whichever browser made the request. Email links are
+ * opened by the mail client in the default browser, which on iOS is a different
+ * storage container from an installed home-screen PWA — so this route can never
+ * sign someone in *inside the PWA*. That is what the 6-digit code path is for
+ * (components/auth/otp-code-form.tsx); it is not a redirect bug to be fixed here.
+ */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
@@ -37,25 +49,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login`);
   }
 
-  // Determine where to send the user: onboarding (new user) vs explore (returning).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.redirect(`${origin}/login`);
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("username")
-    .eq("id", user.id)
-    .single();
-
-  // If the username is still the auto-generated placeholder, send to onboarding.
-  if (!profile || profile.username.startsWith("user_")) {
-    return NextResponse.redirect(`${origin}/onboarding`);
-  }
-
-  return NextResponse.redirect(`${origin}/explore`);
+  // Onboarding (new user) vs explore (returning) — shared with the code path so
+  // both sign-in routes land in the same place.
+  return NextResponse.redirect(`${origin}${await postSignInPath(supabase)}`);
 }

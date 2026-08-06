@@ -9,7 +9,8 @@ Create a private repo named `wedding-recon` (empty). The local project will push
 1. Create a free account → **New project**. Pick a US region near Denver; set + save a strong DB password.
 2. **Settings → API** → copy: **Project URL**, **anon public key**, **service_role key**.
 3. **Authentication → Providers** → enable **Email** (magic link). Under URL config add `http://localhost:3000` (and later your prod URL) to redirect URLs. The built-in email sender works for local testing but is rate-limited and not for production — set up custom SMTP (section 7) before sharing the app.
-4. Apply the database schema (choose one):
+4. **Authentication → Emails → Templates** → paste `supabase/templates/magic-link.html` into **both** "Magic Link" and "Confirm signup". **Required, not cosmetic:** the template is what puts the 6-digit `{{ .Token }}` in the email, and the code is the only sign-in path that works inside the installed PWA (the link opens in the browser, which on iOS is a separate cookie jar). Skip the "Confirm signup" half and brand-new accounts get an email with no code in it.
+5. Apply the database schema (choose one):
    - **CLI:** `npx supabase link --project-ref <ref>` then `npx supabase db push`, then run `supabase/seed.sql`.
    - **Dashboard:** paste each file in `supabase/migrations/` (in order) then `supabase/seed.sql` into the SQL editor.
    - PostGIS, the `recon-media` storage bucket, and policies are all created by the migrations — no manual DB clicks needed.
@@ -88,7 +89,7 @@ Supabase's built-in email sender is **for testing only** — it's capped at a fe
    - Username: `resend`  ·  Password: the `re_...` API key
    - Sender email: `login@yourdomain.com`  ·  Sender name: `Wedding Recon`
 5. **Raise the cap** → **Authentication → Rate Limits** → bump "Rate limit for sending emails" (e.g. 30+/hour) now that you're off the built-in sender.
-6. **Test** → trigger a magic link (login page or guest Add-Recon flow) and confirm it arrives in the inbox, not spam.
+6. **Test** → trigger a sign-in email (login page or guest Add-Recon flow) and confirm it arrives in the inbox, not spam, and that it carries **both** the 6-digit code and the link. Test the code path from the installed PWA specifically — it is the one the link cannot serve.
 
 > Optional: enable Cloudflare **Email Routing** (free) to forward replies to `login@`/`hello@` to your Gmail. Not needed for sending.
 

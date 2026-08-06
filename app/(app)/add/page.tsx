@@ -37,6 +37,13 @@ import type {
   ExistingVendorSelection,
 } from "@/components/add/places-combobox";
 import { ImageUpload } from "@/components/add/image-upload";
+import { OtpCodeForm } from "@/components/auth/otp-code-form";
+import {
+  clearPendingOtpEmail,
+  getPendingOtpEmail,
+  setPendingOtpEmail,
+} from "@/lib/auth/pending-otp";
+import { useIsStandalone } from "@/lib/use-standalone";
 import { BrandFooter } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { createRecon } from "./actions";
@@ -103,8 +110,9 @@ function AddReconForm() {
       ? rawFrom
       : null;
 
-  // Guests publish via a magic link: the form (incl. photos) is stashed locally
-  // and re-published once they authenticate. `resume=1` marks that return trip.
+  // Guests publish via an emailed sign-in code: the form (incl. photos) is
+  // stashed locally and re-published once they authenticate. `resume=1` marks
+  // that return trip.
   const isResume = searchParams.get("resume") === "1";
 
   const [vendorState, setVendorState] = React.useState<VendorState>({
@@ -122,8 +130,10 @@ function AddReconForm() {
   );
   const [email, setEmail] = React.useState("");
   const [emailError, setEmailError] = React.useState<string | null>(null);
-  // Email address we sent a magic link to; non-null swaps in the "check email" view.
+  // Email address we sent a sign-in code to; non-null swaps in the "check email" view.
   const [sentTo, setSentTo] = React.useState<string | null>(null);
+  // The draft lives in THIS app's IndexedDB, so finishing anywhere else loses it.
+  const isStandalone = useIsStandalone();
   // Resume lifecycle: auto-publishing the saved draft, or its draft went missing.
   const [resumeStatus, setResumeStatus] = React.useState<
     "idle" | "publishing" | "missing"
@@ -218,7 +228,7 @@ function AddReconForm() {
     [reset, currentMonth, currentYear],
   );
 
-  // Detect auth on mount, and — when returning from the magic link — auto-publish
+  // Detect auth on mount, and — when returning from the sign-in step — auto-publish
   // the saved draft. Runs once.
   // Set correct defaults after client hydration (avoid SSR time-zone mismatches)
   React.useEffect(() => {
@@ -242,6 +252,26 @@ function AddReconForm() {
       } = await supabase.auth.getUser();
       if (!active) return;
       setAuthState(user ? "user" : "guest");
+
+      // Reopen the code screen for a guest who sent themselves a code, left to
+      // read it, and came back to a cold start (routine on iOS, which discards
+      // backgrounded PWAs). Gated on the draft still being there: without it
+      // there is nothing left to publish, so the form is the honest screen and
+      // /login is the place to sign in.
+      if (!isResume && !user) {
+        const pending = getPendingOtpEmail();
+        if (pending) {
+          const draft = await loadReconDraft();
+          if (!active) return;
+          if (draft && Date.now() - draft.savedAt <= DRAFT_TTL_MS) {
+            setEmail(pending);
+            setSentTo(pending);
+            rehydrateForm(draft);
+          } else {
+            clearPendingOtpEmail();
+          }
+        }
+      }
 
       // Resume requires an authenticated user. If someone hits ?resume=1 while
       // signed out, drop the overlay and just show the form.
@@ -386,6 +416,10 @@ function AddReconForm() {
         const { error } = await supabase.auth.signInWithOtp({
           email: trimmed,
           options: {
+            // Inert with the current template, which renders {{ .SiteURL }}
+            // /auth/callback itself and never reads {{ .RedirectTo }}. Kept
+            // because it is what a template switched to {{ .ConfirmationURL }}
+            // would read — changing one without the other changes nothing.
             emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
           },
         });
@@ -394,6 +428,7 @@ function AddReconForm() {
           setIsSubmitting(false);
           return;
         }
+        setPendingOtpEmail(trimmed);
         setSentTo(trimmed);
       } catch {
         toast.error("Something went wrong. Please try again.");
@@ -425,7 +460,7 @@ function AddReconForm() {
     }
   }
 
-  // Returning from the magic link: auto-publishing the saved draft.
+  // Returning from the sign-in step: auto-publishing the saved draft.
   if (resumeStatus === "publishing") {
     return (
       <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center gap-3 px-4 py-16 text-center">
@@ -438,24 +473,50 @@ function AddReconForm() {
     );
   }
 
-  // Magic link sent: tell the guest to finish on this device.
+  // Code sent: the guest finishes RIGHT HERE.
+  //
+  // This screen is why the code matters more here than on the login page. The
+  // draft — including the photo Files — is in this app's IndexedDB, and the
+  // session has to be minted in this app's cookie jar. Finishing via the emailed
+  // link satisfies neither: it lands in the browser, which has no draft and
+  // whose session the PWA cannot see. The old copy said "open it on this
+  // device", which is true and still not enough — device was never the unit,
+  // the app is.
+  //
+  // Verifying here signs them in without leaving the page, then hands off to
+  // /auth/post-signin → (onboarding →) explore, where ResumePublishWatcher sees
+  // the resume flag set at submit time and routes to /add?resume=1 to publish.
+  // Deliberately NOT a direct jump to ?resume=1: that would skip onboarding for
+  // a new account, publishing under a placeholder username with no TOS accepted.
   if (sentTo) {
     return (
-      <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center gap-4 px-4 py-16 text-center">
+      <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center gap-4 px-4 py-16">
         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
           <Mail className="size-6 text-primary" />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 text-center">
           <h1 className="font-heading text-lg font-semibold">Check your email</h1>
           <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-            We sent a magic link to <strong>{sentTo}</strong>.{" "}
-            <strong>Open it on this device</strong> to finish saving — your
-            recon, including photos, is stored right here in this browser.
+            We sent a 6-digit code to <strong>{sentTo}</strong>. Enter it here to
+            finish saving — your recon, including photos, is stored in this app,
+            so this is where it has to be published from.
           </p>
         </div>
+
+        <div className="w-full max-w-xs">
+          <OtpCodeForm email={sentTo} />
+        </div>
+
+        <p className="mx-auto max-w-sm text-center text-xs text-muted-foreground">
+          {isStandalone
+            ? "Do not use the link in the email — it opens in your browser, which cannot see the recon you just wrote here."
+            : "The email also has a link, but open it in this same browser or your saved recon will not be there."}
+        </p>
+
         <Button
           variant="ghost"
           onClick={() => {
+            clearPendingOtpEmail();
             setSentTo(null);
             setIsSubmitting(false);
           }}
@@ -523,8 +584,8 @@ function AddReconForm() {
         </section>
 
         {/* ── Email (guests only) ──────────────────────────────────────────
-            Guests publish via a magic link; this is the address we sign them in
-            or create their account with. It's never attached to the recon. */}
+            Guests publish via an emailed sign-in code; this is the address we
+            sign them in or create their account with. Never attached to the recon. */}
         {authState === "guest" && (
           <section className="space-y-1.5">
             <Label htmlFor="email">Email address</Label>

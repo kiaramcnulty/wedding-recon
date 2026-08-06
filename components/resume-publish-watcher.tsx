@@ -8,10 +8,14 @@ import { getResumeFlag } from "@/lib/recon-draft";
 
 /**
  * Mounted in the (app) shell. When a guest publishes a recon they're emailed a
- * magic link; after they authenticate they land on whichever page the auth flow
- * chooses (onboarding → explore, or explore directly). If a publish is still
- * pending (localStorage flag set) and they're now signed in, route them to the
- * resume step so their saved draft gets published.
+ * sign-in code; after they authenticate they land on whichever page the auth
+ * flow chooses (onboarding → explore, or explore directly). If a publish is
+ * still pending (localStorage flag set) and they're now signed in, route them to
+ * the resume step so their saved draft gets published.
+ *
+ * This hop is what lets the code path skip straight to sign-in without skipping
+ * onboarding: /add hands off to /auth/post-signin, and this watcher picks the
+ * draft back up on the far side.
  *
  * Deliberately inert on /add (the resume handler lives there and clears the flag
  * itself) and on (auth) pages, which don't render this shell — so it never yanks
