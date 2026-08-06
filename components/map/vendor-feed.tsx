@@ -20,7 +20,26 @@ const FEED_PAGE_SIZE = 20;
 export interface VendorListEntry {
   id: string;
   vendorType: VendorType;
+  /**
+   * 1 matches every active attribute filter, 0 is silent on at least one (see
+   * `lib/filters/match.ts` — silence demotes rather than excludes). The feed
+   * draws a labelled divider where the list crosses from one to the other.
+   *
+   * Optional because the cluster feed has no filter notion and passes rows
+   * without it; undefined reads as a full match, so that feed never divides.
+   */
+  rank?: 0 | 1;
 }
+
+/**
+ * Header over the second tier. Deliberately the ONLY divider in the feed: the
+ * list also sorts priced-before-unpriced and photo-before-placeholder, but
+ * those are internal tiers with no visual break, because they rank vendors that
+ * all equally match what the couple asked for. Rank is different in kind — a
+ * partial match is one the filters could not confirm, so saying it out loud is
+ * what stops the rows below reading as matches.
+ */
+const PARTIAL_DIVIDER_LABEL = "Partial matches in the area";
 
 /**
  * The scrollable list of vendor cards, with no shell of its own.
@@ -97,6 +116,28 @@ export function VendorFeed({
   }, [entries]);
   const items = useVendorPreviews(ids);
 
+  const rankById = React.useMemo(() => {
+    const m = new Map<string, 0 | 1>();
+    for (const e of entries) if (e.rank != null) m.set(e.id, e.rank);
+    return m;
+  }, [entries]);
+
+  // Id the divider is drawn above: the first partial match actually RENDERED.
+  // Derived from `items` rather than from `entries` so that a vendor whose row
+  // has since been deleted — which useVendorPreviews silently drops — cannot
+  // take the divider with it and leave the rows below reading as full matches.
+  //
+  // The list is sorted rank-first, so this is a single boundary. While it sits
+  // beyond the window it simply has not been paged to yet.
+  //
+  // Rendered even when it lands at the very top (every result is partial).
+  // That reads oddly as a "divider", but the alternative is worse: a list of
+  // rows that match nothing the couple asked for, presented as if they did.
+  const firstPartialId = React.useMemo(
+    () => items?.find((i) => rankById.get(i.id) === 0)?.id ?? null,
+    [items, rankById],
+  );
+
   // Grow the window when the sentinel below the last card comes near. The
   // observer is created only while there IS more to show, so it stops costing
   // anything at the end of the list. rootMargin buys a screenful of runway so
@@ -169,24 +210,37 @@ export function VendorFeed({
         <>
           <ul className="flex flex-col gap-3">
             {items.map((item) => (
-              <li
-                key={item.id}
-                // Native content-visibility virtualization: off-screen cards
-                // skip layout/paint, so a few-hundred-item feed stays smooth.
-                className={cn(
-                  "[content-visibility:auto]",
-                  item.slides.length > 0
-                    ? "[contain-intrinsic-size:auto_196px]"
-                    : "[contain-intrinsic-size:auto_112px]",
+              <React.Fragment key={item.id}>
+                {item.id === firstPartialId && (
+                  // A real list item, not a decorated gap: a screen reader
+                  // should hear where the tier changes too, so it is left in
+                  // the a11y tree rather than marked presentational.
+                  <li className="flex items-center gap-3 pt-1">
+                    <span className="h-px flex-1 bg-border" aria-hidden />
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {PARTIAL_DIVIDER_LABEL}
+                    </span>
+                    <span className="h-px flex-1 bg-border" aria-hidden />
+                  </li>
                 )}
-              >
-                <VendorPreviewCard
-                  item={item}
-                  vendorType={typeById.get(item.id) ?? "other"}
-                  href={vendorHref(item.id)}
-                  onNavigate={rememberScroll}
-                />
-              </li>
+                <li
+                  // Native content-visibility virtualization: off-screen cards
+                  // skip layout/paint, so a few-hundred-item feed stays smooth.
+                  className={cn(
+                    "[content-visibility:auto]",
+                    item.slides.length > 0
+                      ? "[contain-intrinsic-size:auto_196px]"
+                      : "[contain-intrinsic-size:auto_112px]",
+                  )}
+                >
+                  <VendorPreviewCard
+                    item={item}
+                    vendorType={typeById.get(item.id) ?? "other"}
+                    href={vendorHref(item.id)}
+                    onNavigate={rememberScroll}
+                  />
+                </li>
+              </React.Fragment>
             ))}
           </ul>
           {/* Sentinel: crossing into view (or within 600px of it) pages in the

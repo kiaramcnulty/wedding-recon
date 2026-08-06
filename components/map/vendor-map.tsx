@@ -649,6 +649,8 @@ export function VendorMap({
       id: string;
       vendorType: VendorType;
       rank: 0 | 1;
+      priced: boolean;
+      photo: boolean;
       d: number;
     }[] = [];
     for (const v of vendorsRef.current) {
@@ -667,13 +669,42 @@ export function VendorMap({
       // latitude. Only used for ordering, so no need for a real geodesic.
       const dx = (pos.lng - center.lng) * cosLat;
       const dy = pos.lat - center.lat;
-      inView.push({ id: v.id, vendorType, rank: rank as 0 | 1, d: dx * dx + dy * dy });
+      inView.push({
+        id: v.id,
+        vendorType,
+        rank: rank as 0 | 1,
+        // `=== true` rather than a truthiness test: both flags are undefined on
+        // every row until migration 0035 is applied, and that has to read as
+        // false for all rows alike so the two keys drop out and leave the old
+        // nearest-first order — not as NaN, which would corrupt the comparator.
+        priced: v.has_price === true,
+        photo: v.has_photo === true,
+        d: dx * dx + dy * dy,
+      });
     }
 
-    // Full matches first, then nearest the center. Ordering by rank before
-    // distance is what puts the "missing some information" rows at the bottom
-    // of the list, and what the cap keeps when it bites.
-    inView.sort((a, b) => b.rank - a.rank || a.d - b.d);
+    // Four keys, in order:
+    //
+    //   rank    full matches before the "missing some information" ones. This
+    //           has to stay outermost: it is the partition the list draws its
+    //           divider on, and what the cap keeps when it bites.
+    //   priced  a vendor with an extracted price before one without. A couple
+    //           is shopping on budget, and a card that can answer "what does
+    //           this cost" is worth more than one that cannot. No divider —
+    //           this tier is internal, unlike rank.
+    //   photo   a card that draws an image before one that falls through to a
+    //           category placeholder.
+    //   d       then nearest the map center, as before.
+    //
+    // Both middle keys are booleans, so each only ever reorders within the tier
+    // above it and distance still decides everything at the bottom.
+    inView.sort(
+      (a, b) =>
+        b.rank - a.rank ||
+        Number(b.priced) - Number(a.priced) ||
+        Number(b.photo) - Number(a.photo) ||
+        a.d - b.d,
+    );
     const entries: VisibleVendor[] = inView
       .slice(0, MAX_VISIBLE_ENTRIES)
       .map(({ id, vendorType, rank }) => ({ id, vendorType, rank }));
