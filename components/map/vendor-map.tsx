@@ -100,6 +100,38 @@ function whenSelected(selectedId: string, whenTrue: unknown, whenFalse: unknown)
 }
 
 /**
+ * How far a rank-0 pin recedes. It is silent on something the couple filtered
+ * for, not a miss, so it stays on the map — but well back, so the pins that DO
+ * match read as the answer and these as texture behind them.
+ *
+ * The label goes fainter than the disc rather than tracking it. A disc is a
+ * shape and survives being pale; text at low opacity fades its white halo too,
+ * so it stops being legible while still adding clutter — and the name is the
+ * least useful thing about a vendor whose attributes are unknown anyway.
+ */
+const PARTIAL_ICON_OPACITY = 0.22;
+const PARTIAL_LABEL_OPACITY = 0.28;
+
+/**
+ * The paint properties that depend on the selection: opacity.
+ *
+ * The SELECTED pin is always fully opaque whatever its rank. Without that, at
+ * these opacities, tapping a faded pin opens its card next to a ghost — the one
+ * pin the couple has actively asked about, and the only one the card refers to.
+ * The rank fade is the resting state, not a permanent handicap.
+ */
+function selectionPaint(selectedId: string | null) {
+  const faded = (partial: number) =>
+    (selectedId
+      ? whenSelected(selectedId, 1, ["case", ["==", ["get", "rank"], 0], partial, 1])
+      : ["case", ["==", ["get", "rank"], 0], partial, 1]) as Expr;
+  return {
+    "icon-opacity": faded(PARTIAL_ICON_OPACITY),
+    "text-opacity": faded(PARTIAL_LABEL_OPACITY),
+  };
+}
+
+/**
  * The layout properties that depend on which vendor's preview is open. The pin
  * whose card is showing swaps to its emphasized image (bigger disc + a ring — see
  * `pin-images.ts`) and gets a larger name label at ANY zoom, so it's obvious which
@@ -867,12 +899,19 @@ export function VendorMap({
   const applySelection = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    const layout = selectionLayout(selectedVendorIdRef.current ?? null);
+    const selected = selectedVendorIdRef.current ?? null;
+    const layout = selectionLayout(selected);
+    const paint = selectionPaint(selected);
     for (const t of VENDOR_TYPES) {
       const layer = pinLayerId(t);
       if (!map.getLayer(layer)) continue; // layers not added yet (still loading)
       for (const [prop, value] of Object.entries(layout)) {
         map.setLayoutProperty(layer, prop, value);
+      }
+      // Opacity is paint, not layout, so it needs its own pass — a selected
+      // rank-0 pin must come back to full opacity.
+      for (const [prop, value] of Object.entries(paint)) {
+        map.setPaintProperty(layer, prop, value);
       }
     }
   }, []);
@@ -1013,10 +1052,9 @@ export function VendorMap({
               // rank 0 means the vendor is silent on something you filtered
               // for. It fades rather than disappearing: low coverage mostly
               // means nobody wrote the answer down, so hiding it would bury a
-              // real candidate. Kept above 0.4 so a faded pin is still
-              // tappable-looking on a bright basemap.
-              "icon-opacity": ["case", ["==", ["get", "rank"], 0], 0.45, 1],
-              "text-opacity": ["case", ["==", ["get", "rank"], 0], 0.55, 1],
+              // real candidate. Updated on selection change — see
+              // selectionPaint.
+              ...selectionPaint(null),
             },
           });
         }
