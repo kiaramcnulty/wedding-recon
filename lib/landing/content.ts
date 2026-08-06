@@ -1,3 +1,11 @@
+import {
+  DollarSign,
+  LayoutDashboard,
+  NotebookPen,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+
 import type { VendorType } from "@/lib/constants/categories";
 
 /**
@@ -151,11 +159,18 @@ export const HOW_STEPS: HowStep[] = [
 /* -------------------------------------------------------------------------- */
 
 export const PROBLEMS_SECTION = {
-  eyebrow: "Why this exists",
-  heading: "Four things that are broken about choosing a wedding vendor.",
-  /** Small labels over each half of a row, so which is which is never in doubt. */
+  /**
+   * Rendered sr-only. The visible heading was cut so the section opens straight
+   * into the cards (Kiara, 2026-08-04), but a section with four h3s under it
+   * still needs an h2 above them or the document outline breaks - and an
+   * outline is what a screen-reader user navigates by. Invisible, not absent.
+   */
+  srHeading: "Why Wedding Recon exists",
+  /** Small labels over each half of a card, so which is which is never in doubt. */
   problemLabel: "The problem",
   solutionLabel: "On Wedding Recon",
+  carouselLabel: "Problems Wedding Recon solves",
+  carouselHint: "Swipe or use the arrows",
 } as const;
 
 export interface Quote {
@@ -173,7 +188,8 @@ export interface ProblemSolution {
   /** What Wedding Recon does about it. */
   solution: string;
   solutionBody: string;
-  visual: AppVisual;
+  /** Sits beside the solution copy. Plain icon, not an app mock-up. */
+  icon: LucideIcon;
 }
 
 /**
@@ -214,7 +230,7 @@ export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
     solution: "Real, filterable pricing from real couples",
     solutionBody:
       "Every recon entry carries the number a couple was actually quoted and the fine print underneath it, so you can rule a vendor in or out before you spend an evening on an inquiry form.",
-    visual: "filters",
+    icon: DollarSign,
   },
   {
     problem: "Important details are hard to figure out",
@@ -226,7 +242,7 @@ export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
     solution: "Key intel, specific to each type of vendor",
     solutionBody:
       "What matters about a hotel block is not what matters about a florist. Each vendor type is researched against the things couples actually get caught out by - block terms, delivery radius, catering policy, travel fees.",
-    visual: "intel",
+    icon: NotebookPen,
   },
   {
     problem: "Quality is unknown until the big day",
@@ -238,7 +254,7 @@ export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
     solution: "Feedback from couples who have been through it",
     solutionBody:
       "Recon is written after the fact, not from a sales page - what the tasting was like, whether they turned up on time, what the contract actually delivered.",
-    visual: "reviews",
+    icon: Users,
   },
   {
     problem: "Research is scattered across sites and tools",
@@ -250,7 +266,7 @@ export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
     solution: "One hub to manage every vendor candidate",
     solutionBody:
       "Save anyone you are considering to your Planning Hub, sorted by category, with your own quotes and notes attached. It replaces the spreadsheet, and it is private to you.",
-    visual: "hub",
+    icon: LayoutDashboard,
   },
 ];
 

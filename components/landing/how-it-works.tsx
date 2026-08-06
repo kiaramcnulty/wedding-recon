@@ -21,7 +21,12 @@ const TICK_MS = 50;
  * - Progress bars across the top double as the step picker and show where the
  *   timer is. WCAG 2.2.2 (Pause, Stop, Hide) requires a control for anything
  *   moving unprompted past five seconds, and this runs indefinitely - hence the
- *   explicit pause button too.
+ *   explicit pause button too, floated at the panel's top-right so it reads as
+ *   governing the whole slideshow rather than the caption it used to sit in.
+ * - Tapping the visual advances to the next step. It is a real <button> with an
+ *   accessible name rather than a click handler on a div, so it is reachable by
+ *   keyboard and announced; the pause control and the progress bars sit above
+ *   it in the stacking order so neither is swallowed by the tap target.
  * - Choosing a step jumps to it and keeps playing. It used to stop the timer
  *   for good, on the theory that someone who has taken control wants to read at
  *   their own pace - but that reads as broken (reported 2026-08-04, "stuck on
@@ -79,6 +84,12 @@ export function HowItWorks({ className }: { className?: string }) {
     setActive(index);
   }, []);
 
+  const nextStep = useCallback(() => {
+    progressRef.current = 0;
+    setProgress(0);
+    setActive((a) => (a + 1) % HOW_STEPS.length);
+  }, []);
+
   const togglePlaying = useCallback(() => {
     progressRef.current = 0;
     setProgress(0);
@@ -129,8 +140,30 @@ export function HowItWorks({ className }: { className?: string }) {
         ))}
       </div>
 
+      {/* Governs the whole slideshow, so it sits on the panel rather than in
+          the caption. Above the tap layer so it is not swallowed by it. */}
+      <button
+        type="button"
+        onClick={togglePlaying}
+        aria-label={playing ? "Pause the slideshow" : "Play the slideshow"}
+        className="absolute right-3 top-7 z-30 flex size-8 items-center justify-center rounded-full border border-white/70 bg-background/85 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:text-foreground"
+      >
+        {playing ? (
+          <Pause className="size-3.5" aria-hidden />
+        ) : (
+          <Play className="size-3.5" aria-hidden />
+        )}
+      </button>
+
       {/* Visuals, crossfaded. All mounted so the swap is instant. */}
       <div className="relative h-[300px] sm:h-[340px]">
+        {/* Tap anywhere on the visual to skip ahead. */}
+        <button
+          type="button"
+          onClick={nextStep}
+          aria-label="Next step"
+          className="absolute inset-0 z-10 cursor-pointer"
+        />
         {HOW_STEPS.map((step, i) => (
           <div
             key={step.title}
@@ -167,24 +200,6 @@ export function HowItWorks({ className }: { className?: string }) {
               </p>
             </div>
           ))}
-
-          <button
-            type="button"
-            onClick={togglePlaying}
-            className="mt-3 ml-10 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {playing ? (
-              <>
-                <Pause className="size-3" aria-hidden />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play className="size-3" aria-hidden />
-                Play
-              </>
-            )}
-          </button>
         </div>
       </div>
     </div>

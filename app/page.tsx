@@ -8,7 +8,8 @@ import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { DataHighlight } from "@/components/landing/data-highlight";
 import { HowItWorks } from "@/components/landing/how-it-works";
-import { ProblemSolutionRow } from "@/components/landing/problem-solution-row";
+import { ProblemCard } from "@/components/landing/problem-card";
+import { SwipeCarousel } from "@/components/landing/swipe-carousel";
 import { buttonVariants } from "@/components/ui/button";
 import {
   CLOSING_CTA,
@@ -194,14 +195,19 @@ export default function LandingPage() {
         {/* Problem -> solution, one full-width row per pair, alternating.   */}
         {/* ---------------------------------------------------------------- */}
         <Section>
-          <SectionHeading eyebrow={PROBLEMS_SECTION.eyebrow}>
-            {PROBLEMS_SECTION.heading}
-          </SectionHeading>
-          <div className="mt-12 space-y-16 md:space-y-24">
-            {PROBLEM_SOLUTIONS.map((item, i) => (
-              <ProblemSolutionRow key={item.problem} item={item} index={i} />
+          {/* Visible heading cut so the section opens straight into the cards;
+              kept sr-only because four h3s still need an h2 over them for the
+              document outline. */}
+          <h2 className="sr-only">{PROBLEMS_SECTION.srHeading}</h2>
+          <SwipeCarousel
+            slideLabels={PROBLEM_SOLUTIONS.map((item) => item.problem)}
+            label={PROBLEMS_SECTION.carouselLabel}
+            hint={PROBLEMS_SECTION.carouselHint}
+          >
+            {PROBLEM_SOLUTIONS.map((item) => (
+              <ProblemCard key={item.problem} item={item} />
             ))}
-          </div>
+          </SwipeCarousel>
         </Section>
 
         {/* ---------------------------------------------------------------- */}
