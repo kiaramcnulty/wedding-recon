@@ -47,12 +47,21 @@ export interface FilterDef {
    */
   basis?: string;
   /**
-   * Coverage is low BUT absence is meaningful — a hotel that ran a shuttle
-   * would say so. These act as positive-only filters: selecting one excludes
-   * silent vendors instead of demoting them, because "not mentioned" really
-   * does mean "does not offer it". Contrast capacity/price, where silence just
-   * means nobody wrote it down. See "Two kinds of missing data" in the
-   * coverage doc.
+   * Coverage is low: few vendors have this recorded either way. Purely a UI
+   * hint now — it paints the "Rare" badge on the filter in the sheet, warning
+   * the couple that selecting it will not narrow much.
+   *
+   * It used to make the filter positive-only, EXCLUDING silent vendors rather
+   * than demoting them, on the reasoning that a hotel running a shuttle would
+   * say so. That is no longer the behaviour (Kiara, 2026-08-06): silence never
+   * excludes anywhere now. The old rule was quietly deleting most of the map on
+   * one tap — filtering photographers on "also shoots film" ruled out 233 of
+   * 274 — and it was indefensible in the one case it most wanted to catch,
+   * since a vendor is silent far more often because nobody extracted the fact
+   * than because they lack the thing. Those vendors now land in the list view's
+   * partial tier, under its divider and graded by how much of the ask they met,
+   * where the couple can see them and judge. See "Two kinds of missing data" in
+   * the coverage doc, which describes the superseded rule.
    */
   rare?: boolean;
   /** Companion filter id whose selection re-scales this range's histogram. */

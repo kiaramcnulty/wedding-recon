@@ -1,22 +1,30 @@
 import type { FilterDef } from "@/lib/constants/vendor-filters";
 
 /**
- * Client-side twin of the `vendor_filter_rank` SQL function (migration 0033).
+ * Attribute matching for the Explore filters. **This is the only
+ * implementation** — matching is entirely client-side.
  *
- * The map filters server-side — it has to, because `vendors_in_bbox` caps a
- * fetch and would otherwise filter an arbitrary sample. This module exists for
- * the surfaces that never touch that RPC (the Hub) and as the executable
- * specification the SQL is tested against: `scripts/test-filter-match.mjs` runs
- * this over the real dataset, so a semantic change here that is not mirrored in
- * the migration shows up as a diff in the counts.
+ * There is no SQL twin to keep in step, despite what an older comment here
+ * claimed: `vendor_filter_rank` was never shipped, and `vendors_in_bbox` takes
+ * no `p_filters`. Migration `0033` sets out why the RPC sends attributes rather
+ * than matching on them — the map caches a fetched area and skips refetching
+ * while panning inside it, so a filter-specific row set would strand stale pins
+ * on screen.
  *
- * **Keep the two in lockstep.** If you change a rule here, change 0033.
+ * `scripts/test-filter-match.mjs` runs this over the real 2,163-vendor dataset
+ * and is the only executable check on the rules. Run it after any change here.
+ *
+ * **The one rule everything else follows: silence NEVER excludes.** A vendor is
+ * only ruled out by positively contradicting a filter. Missing data means
+ * nobody wrote the fact down, so it demotes the vendor into the list view's
+ * partial tier — under its own divider, graded by how much of the ask it did
+ * meet — where the couple can still see it and judge for themselves.
  */
 
-/** Wire format sent as the RPC `p_filters` argument. */
+/** One selected filter, built from the UI state by `buildSelection`. */
 export type FilterSpec =
-  | { kind: "multi"; values: string[]; rare?: boolean }
-  | { kind: "bool"; value: boolean; rare?: boolean }
+  | { kind: "multi"; values: string[] }
+  | { kind: "bool"; value: boolean }
   | {
       kind: "range";
       mode: "point" | "overlap";
@@ -25,7 +33,6 @@ export type FilterSpec =
       min?: number;
       max?: number;
       basis?: string;
-      rare?: boolean;
       season?: string;
       day?: string;
     };
@@ -121,7 +128,7 @@ const OPEN_HI = 1_000_000_000;
  * -1 excluded (positively contradicts), 0 partial (silent on something),
  * 1 full match. Silence demotes rather than excludes — coverage is low mostly
  * because nobody wrote the fact down, not because the vendor lacks the thing.
- * A `rare` filter inverts that: there, silence really does mean no.
+ * There is no exception to that: see the module header.
  */
 export function filterRank(
   filters: VendorFilters,
@@ -142,13 +149,9 @@ export function filterMatch(
   const keys = Object.keys(selection);
   const active = keys.length;
   if (active === 0) return { rank: 1, unknown: 0, active: 0 };
-  if (!filters) {
-    // No attributes at all: silent on every one of them, unless a `rare` filter
-    // is in play, where silence is a positive no and rules the vendor out.
-    return keys.some((k) => selection[k].rare)
-      ? { rank: -1, unknown: 0, active }
-      : { rank: 0, unknown: active, active };
-  }
+  // No attributes at all: silent on every one of them. Bottom of the partial
+  // tier, since it met none of the ask, but still visible.
+  if (!filters) return { rank: 0, unknown: active, active };
 
   let unknown = 0;
 
@@ -158,7 +161,6 @@ export function filterMatch(
     if (spec.kind === "multi") {
       const v = filters[key];
       if (!Array.isArray(v) || v.length === 0) {
-        if (spec.rare) return { rank: -1, unknown, active };
         unknown++;
       } else if (!v.some((x) => spec.values.includes(String(x)))) {
         return { rank: -1, unknown, active };
@@ -169,7 +171,6 @@ export function filterMatch(
     if (spec.kind === "bool") {
       const v = filters[key];
       if (typeof v !== "boolean") {
-        if (spec.rare) return { rank: -1, unknown, active };
         unknown++;
       } else if (v !== spec.value) {
         return { rank: -1, unknown, active };
@@ -208,7 +209,6 @@ export function filterMatch(
     }
 
     if (lo === undefined && hi === undefined) {
-      if (spec.rare) return { rank: -1, unknown, active };
       unknown++;
       continue;
     }
@@ -258,9 +258,9 @@ export function buildSelection(
     if (v == null) continue;
 
     if (d.kind === "multi" && Array.isArray(v) && v.length) {
-      out[d.key] = { kind: "multi", values: v as string[], ...(d.rare && { rare: true }) };
+      out[d.key] = { kind: "multi", values: v as string[] };
     } else if (d.kind === "bool" && v === true) {
-      out[d.key] = { kind: "bool", value: true, ...(d.rare && { rare: true }) };
+      out[d.key] = { kind: "bool", value: true };
     } else if (d.kind === "range" && typeof v === "object") {
       const r = v as { min?: number; max?: number };
       if (r.min == null && r.max == null) continue;
