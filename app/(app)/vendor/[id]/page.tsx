@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -52,6 +53,22 @@ interface VendorPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+/**
+ * The vendor row, fetched at most ONCE per request.
+ *
+ * generateMetadata and the page component both need it, and they used to issue
+ * a query each — two Supabase round trips for one row, on every vendor page
+ * view. React's `cache()` dedupes within a single request render, so the second
+ * caller gets the first one's promise. It has to be the full `select("*")` the
+ * page needs (metadata reads three of those columns), which is why metadata now
+ * over-fetches slightly: one wider query beats two narrow ones when the cost is
+ * a network round trip, not bytes.
+ */
+const getVendor = cache(async (id: string) => {
+  const supabase = await createClient();
+  return supabase.from("vendors").select("*").eq("id", id).single();
+});
+
 // Per-vendor social metadata: a shared /vendor/[id] link (SMS, X, etc.) should
 // preview with the vendor's name + a real description, not the static root
 // title. The brand og:image (app/opengraph-image.png) is inherited from the
@@ -60,12 +77,7 @@ export async function generateMetadata({
   params,
 }: VendorPageProps): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: vendor } = await supabase
-    .from("vendors")
-    .select("name, city, vendor_type")
-    .eq("id", id)
-    .single();
+  const { data: vendor } = await getVendor(id);
 
   if (!vendor) {
     return { title: "Vendor not found" };
@@ -115,7 +127,8 @@ export default async function VendorPage({
   // signing keys; falls back to a network check otherwise — never slower than
   // the getUser() it replaces, and it runs in parallel here regardless).
   const [vendorRes, claimsRes, entriesRes] = await Promise.all([
-    supabase.from("vendors").select("*").eq("id", id).single(),
+    // Deduped with generateMetadata's fetch via React cache() — see getVendor.
+    getVendor(id),
     supabase.auth.getClaims(),
     supabase
       .from("recon_entries")
