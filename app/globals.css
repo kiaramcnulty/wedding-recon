@@ -26,6 +26,9 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
@@ -74,6 +77,13 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* Brand green. The same three values the logo, the PWA theme color, and the
+     venue category already use — named here so marketing surfaces reference a
+     token instead of re-typing the hex. The app's `primary` stays neutral: the
+     green is an accent, not the button color. */
+  --brand: #1d9e75;
+  --brand-ink: #085041;
+  --brand-soft: #e1f5ee;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -109,6 +119,11 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  /* Lifted and dimmed respectively so the pair keeps contrast on a dark
+     surface — the light-mode values invert into unreadable ones. */
+  --brand: #2fb88c;
+  --brand-ink: #a7e3ce;
+  --brand-soft: #0e3b30;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

@@ -1,0 +1,511 @@
+import {
+  DollarSign,
+  LayoutDashboard,
+  NotebookPen,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+
+import type { VendorType } from "@/lib/constants/categories";
+
+/**
+ * ============================================================================
+ * EVERY WORD ON THE LANDING PAGE LIVES IN THIS FILE.
+ * ============================================================================
+ *
+ * The components under `components/landing/` and `app/page.tsx` are layout
+ * only - they contain no sentences of their own. To reword the page, edit the
+ * strings below and nothing else.
+ *
+ * Editing rules:
+ *
+ * 1. Keep the quotes and the trailing commas. Text goes between the quotes.
+ * 2. Use a typographic apostrophe (it is / does not) or escape a straight one
+ *    (\'). An unescaped ' inside a '...' string breaks the build.
+ * 3. NO EM DASHES in copy. Use a spaced hyphen ( - ) for a sentence break
+ *    (Kiara, 2026-08-04). Same house style the enrich pipeline enforces on
+ *    recon text, where upload.mjs hard-fails an em dash outright.
+ * 4. FAQ `answer` must stay PLAIN TEXT with no markup - the same string is
+ *    emitted as FAQPage structured data for Google, and a mismatch between the
+ *    visible answer and the structured one is a policy violation. Use the
+ *    optional `link` field if an answer needs a link.
+ * 5. Nothing here may name a REAL vendor or attach a price to one. EXAMPLE_RECON
+ *    is invented throughout and its `place` is a venue-style name by choice - so
+ *    the one thing to check, if that name is ever edited, is that no actual
+ *    Colorado business goes by it. See the note above EXAMPLE_RECON.
+ * 6. Length guides where they matter are noted inline (META especially).
+ *
+ * Run `npm run build` after editing to catch a stray quote or comma.
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Search engine + social preview                                             */
+/* -------------------------------------------------------------------------- */
+
+export const META = {
+  /**
+   * The blue headline in Google results and the browser tab.
+   * Google truncates around 60 characters - front-load the important words.
+   * Current length is 58, so it displays in full. Keep it under 60.
+   */
+  title:
+    "Wedding Recon - Colorado wedding vendor intel from couples",
+  /**
+   * The gray paragraph under the headline in Google results, and the preview
+   * text when the link is shared. Google shows roughly 155 characters.
+   * Current length is 252, cut after "...Manage and share y". The vendor-type
+   * list lands inside the visible window; the planning hub and the free-to-use
+   * line fall outside it.
+   */
+  description:
+    "See quotes and insights from real Colorado couples for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Manage and share your own quotes and notes in one central planning hub. Free, no account needed to explore vendors.",
+  /** Shorter title used for link previews (iMessage, X, Facebook). */
+  socialTitle: "Wedding Recon - real Colorado wedding vendor prices and intel",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Header                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const HEADER = {
+  howItWorks: "How it works",
+  faq: "FAQ",
+  cta: "Explore vendors",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Hero — the first screen                                                    */
+/* -------------------------------------------------------------------------- */
+
+export const HERO = {
+  /** Small green pill above the headline. */
+  eyebrow: "Colorado wedding vendors",
+  /** The one <h1> on the page. Keep it short enough to sit on two lines. */
+  heading: "Real prices & intel from real Colorado weddings.",
+  subheading:
+    "Wedding Recon is a community of couples sharing their firsthand quotes, intel and experiences with florists, hotel blocks, photographers and other vendors. So you can find great-fit, in-budget vendors for your perfect day.",
+  primaryCta: "Explore Colorado vendors",
+  reassurance: "Free to use. No account needed to explore vendors.",
+} as const;
+
+/**
+ * The sample recon entry floating over the hero illustration.
+ *
+ * Every number on it is invented. `place` reads as a venue name rather than a
+ * region by choice (Kiara, 2026-08-04) - it was "Boulder County" precisely so
+ * nothing on the card could be mistaken for a real business, and the "Example"
+ * badge that used to say so was dropped the same day, so the card now carries
+ * no marker at all that its figures are illustrative.
+ *
+ * That is a deliberate trade, but it has one live condition: "Boulder Ranch"
+ * must not be, or become, an actual Colorado wedding venue. It is not one as of
+ * 2026-08-04 (checked). Ranch-named venues around Boulder are common - Colorado
+ * Mountain Ranch, ~10 miles out, starts near $7,500 for up to 150 guests with
+ * outside catering, which is close to the invented figures below. If a business
+ * by this name turns up, change it: an invented price against a real venue is a
+ * fabricated review of someone's livelihood.
+ */
+export const EXAMPLE_RECON = {
+  category: "Venue",
+  place: "Boulder Ranch",
+  price: "$8,400",
+  priceDetail: "price for Saturday in September · we did DIY package tier, price can range up to $12k",
+  notes:
+    "Ceremony site, chairs and the bridal suite are included. The bar minimum is separate, that costs about $3.5k for 120 guests. Outside catering is allowed, which we are doing.",
+  reconType: "In person",
+  collected: "Collected Jun 2026",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* How it works - the three steps, shown as an auto-advancing stepper          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Which in-app visual a step or a solution row shows. The visuals are stylised
+ * mock-ups drawn in code (components/landing/app-visual.tsx), not screenshots:
+ * they stay sharp at any size, cost no bytes, take their colors straight from
+ * CATEGORIES so they cannot drift from the real map, and - the reason that
+ * matters most - they invent no vendor names or prices attached to one.
+ *
+ * SWAP POINT: to use real screenshots instead, replace the switch in
+ * app-visual.tsx with an <img>. Capture them from a session that has DB
+ * credentials, and check what is on screen before shipping it - a screenshot
+ * reads as authoritative in a way an illustration does not.
+ */
+export type AppVisual = "map" | "filters" | "intel" | "reviews" | "hub";
+
+export const HOW_SECTION = {
+  eyebrow: "How it works",
+  heading: "Three steps, on your phone, for free.",
+} as const;
+
+export interface HowStep {
+  title: string;
+  /** Optional. Dropped 2026-08-04 - the titles carry the steps on their own. */
+  body?: string;
+  visual: AppVisual;
+}
+
+export const HOW_STEPS: HowStep[] = [
+  {
+    title: "Explore vendors in your wedding region",
+    visual: "map",
+  },
+  {
+    title: "See real quotes, advice and feedback",
+    visual: "reviews",
+  },
+  {
+    title: "Save your favorites, all in one place",
+    visual: "hub",
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Problem -> solution rows                                                    */
+/* -------------------------------------------------------------------------- */
+
+export const PROBLEMS_SECTION = {
+  /** Small label above the heading, matching the other sections. */
+  eyebrow: "Why we exist",
+  /**
+   * Visible section heading. It replaced a per-card "The problem" label (Kiara,
+   * 2026-08-04): saying it once above the deck beats repeating it on all four
+   * cards, and it doubles as the h2 the four card h3s need over them for the
+   * document outline.
+   */
+  heading:
+    "Built to create transparency in the wedding vendor search process.",
+  /** Label over the solution half of a card. The problem half needs none now. */
+  solutionLabel: "On Wedding Recon",
+  carouselLabel: "Problems Wedding Recon solves",
+  carouselHint: "Swipe or use the arrows",
+} as const;
+
+export interface Quote {
+  /** Verbatim. Do not paraphrase a real person. */
+  text: string;
+  name: string;
+  /** Wedding year and town, shown under the name. */
+  context: string;
+}
+
+export interface ProblemSolution {
+  /** What is broken about vendor selection today. */
+  problem: string;
+  quote: Quote;
+  /** What Wedding Recon does about it. */
+  solution: string;
+  /** Optional. Dropped 2026-08-04 - the one-line solution carries the card. */
+  solutionBody?: string;
+  /** Sits beside the solution copy. Plain icon, not an app mock-up. */
+  icon: LucideIcon;
+}
+
+/**
+ * The spine of the page: four things that are wrong with picking wedding
+ * vendors, each in a real couple's words, each answered by something the
+ * product does.
+ *
+ * Every quote is a real thing a real couple said, reproduced verbatim - these
+ * are attributed testimonials, not illustrative copy, so the wording is not
+ * ours to tidy. If one is ever cut for length, cut whole sentences from the end
+ * rather than editing inside one, and never add words.
+ *
+ * All six people confirmed they are happy to be quoted publicly under a first
+ * name, wedding year and town (Kiara, 2026-08-04). That consent covers the
+ * wording as it stands; a NEW quote, or a new attribution, needs its own. Note
+ * none of them names a vendor, which is what keeps an unflattering experience a
+ * personal account rather than a claim about a named business - keep it so.
+ *
+ * A seventh quote is on file and unused, kept here so it is not lost:
+ *
+ *   Danielle, married 2024 in Boulder - "The florist was super nice and
+ *   responsive ahead of time, but on the day-of, the arrangements were nothing
+ *   like what we had discussed in the consult. They were objectively beautiful
+ *   but contained flowers I specifically asked not to have."
+ *
+ * Danielle is a straight swap for Julia below (both are about quality only
+ * showing up on the day), or a fifth row. Julia was picked so that no two rows
+ * lean on the same vendor type: florist, hotel, music, planning.
+ */
+export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
+  {
+    problem: "Pricing for vendors is rarely available online",
+    quote: {
+      text: "This would have saved me so much time and heartache... all the florists I was referred to had minimum spend of over $20k. I would have never bothered going to their site in the first place",
+      name: "Erika",
+      context: "married 2025, South Denver",
+    },
+    solution: "Filterable pricing from real couples' quotes and invoices",
+    icon: DollarSign,
+  },
+  {
+    problem: "Key vendor details are hard to figure out",
+    quote: {
+      text: "For out of town guests, hotels were super hard and confusing to understand the cost of block rates",
+      name: "Emily",
+      context: "married 2026, Breckenridge",
+    },
+    solution: "Niche intel, specific to each type of vendor",
+    icon: NotebookPen,
+  },
+  {
+    problem: "Vendor quality is unknown until the big day",
+    quote: {
+      text: "The singer/DJ showed up late and didn't play any of the songs on our request list. The whole night was amazing but this was kind of crazy. And stressful.",
+      name: "Julia",
+      context: "married 2025, Buena Vista",
+    },
+    solution: "Feedback from couples who went through it themselves",
+    icon: Users,
+  },
+  {
+    problem: "Research is scattered across sites and tools",
+    quote: {
+      text: "Ours was such a mess. We had pages and pages of spreadsheets",
+      name: "Wyatt",
+      context: "married 2024, Colorado Springs",
+    },
+    solution: "One hub to manage and share every vendor candidate",
+    icon: LayoutDashboard,
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Data highlight                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * STATIC, HAND-ENTERED FIGURES. Measured against the live DB on 2026-08-01 and
+ * recorded in docs/vendor-filters-proposal.md; re-measure and update the date
+ * when the directory grows materially.
+ *
+ * Deliberately not a live query. Reading the DB here would make `/` dynamic,
+ * losing static generation on the one page whose whole job is to be fast and
+ * crawlable - and it would render "0 vendors" whenever the free-tier project is
+ * paused. Nothing on this page changes often enough to be worth that.
+ *
+ * The derived percentages come from regex over recon text at PARTIAL coverage.
+ * `note` and `base` fields carrying each denominator were removed on 2026-08-04
+ * and the components render them only when present - so as it stands the median
+ * price reads as the median of all 679 venues (it is the median of the 37% with
+ * a published figure, site fee only) and the hair and makeup split reads as a
+ * share of all 183 artists (it is a share of the 50 who said). Putting a `note`
+ * or `base` string back is all it takes. When the filter tagging pipeline lands
+ * these become properly queryable and the section can move to ISR.
+ */
+export const DATA_SECTION = {
+  eyebrow: "Quick facts",
+  /** Screen-reader label for the deck, and the hint under it. */
+  carouselLabel: "Quick facts about the directory",
+  carouselHint: "Swipe or use the arrows",
+  headline: {
+    vendors: "2,100+",
+    vendorsLabel: "Colorado wedding vendors",
+    types: "10",
+    typesLabel: "categories, from venues to hotel blocks",
+    recon: "3,100+",
+    reconLabel: "recon entries on file",
+  },
+  measuredOn: "Measured August 2026",
+  categoryChart: {
+    title: "Vendors by category",
+    subtitle: "Tap a row to open the map filtered to it.",
+  },
+  reconFact: {
+    value: "3,100+",
+    label: "recon entries on file",
+    note: "Price quotes, notes and photos, collected from couples, reviews and vendor sites across Colorado.",
+  },
+  beautyChart: {
+    title: "Hair and makeup: do they come to you?",
+  },
+  medianVenue: {
+    value: "$2,250",
+    label: "median venue starting price",
+  },
+  /**
+   * Towns named so the page still carries them as search terms after the old
+   * Colorado section was removed. No counts: per-town figures were never
+   * measured, and inventing them to fill a chart is not on.
+   */
+  coverageTitle: "Across the Front Range and the mountain towns",
+  coverageAreas: [
+    "Denver",
+    "Boulder",
+    "Colorado Springs",
+    "Fort Collins",
+    "Golden",
+    "Littleton",
+    "Aurora",
+    "Arvada",
+    "Lakewood",
+    "Longmont",
+    "Loveland",
+    "Morrison",
+    "Evergreen",
+    "Castle Rock",
+    "Estes Park",
+    "Breckenridge",
+    "Vail",
+    "Steamboat Springs",
+  ],
+} as const;
+
+/**
+ * Vendor counts per category. `count` is the true figure and they sum to 2,163,
+ * the whole directory.
+ *
+ * `display` and `barValue` are a presentation cap, set only on venues (Kiara,
+ * 2026-08-04). At true scale 679 venues is 2.5x the next category, which
+ * squashes everything below it into slivers - so the bar is drawn as if it were
+ * 300 and printed as "300+".
+ *
+ * The trade, stated plainly: the chart then understates venues by more than
+ * half. "300+" is true as a lower bound rather than wrong, and `count` still
+ * holds 679 for anything that needs the real number. If the cap ever reads as
+ * misleading, the honest alternative is to keep the label at 679 and clip the
+ * bar with a visible break, rather than to quietly rescale it.
+ */
+export const VENDOR_COUNTS: {
+  type: VendorType;
+  count: number;
+  /** Printed instead of `count` when set. */
+  display?: string;
+  /** Drawn instead of `count` when set, and caps the chart's scale. */
+  barValue?: number;
+}[] = [
+  { type: "venue", count: 679, display: "300+", barValue: 300 },
+  { type: "photos", count: 274 },
+  { type: "hotel", count: 253 },
+  { type: "flowers", count: 183 },
+  { type: "beauty", count: 183 },
+  { type: "food", count: 182 },
+  { type: "planner", count: 148 },
+  { type: "band", count: 119 },
+  { type: "dj", count: 77 },
+  { type: "dress", count: 65 },
+];
+
+/**
+ * Where hair and makeup artists work: they travel to you, or you go to them.
+ *
+ * A real two-sided split, which is why this chart and not most of the other
+ * attributes in the filter proposal. Both halves are explicitly detected in
+ * recon text - 26% of the 151 artists with recon say on-location, 7% say
+ * studio - so the ratio between them means something.
+ *
+ * Contrast with a ONE-SIDED detection like "shoots film", where only the yes
+ * side is ever written down and silence is unknown rather than no. Publishing
+ * one of those as a rate would assert something false about every undetected
+ * vendor. Before adding a stat here, ask whether BOTH answers get recorded.
+ *
+ * Two-thirds of artists say nothing either way. A `base` string here is
+ * rendered under the chart when present; without one the split reads as a share
+ * of all 183. The filter tagging pipeline should raise coverage to ~90%, at
+ * which point this can be redrawn against the full type.
+ */
+export const BEAUTY_SETUP = {
+  segments: [
+    { label: "Comes to you", count: 39, pct: 78 },
+    { label: "Studio only", count: 11, pct: 22 },
+  ],
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* FAQ                                                                        */
+/* -------------------------------------------------------------------------- */
+
+export const FAQ_SECTION = {
+  eyebrow: "Questions",
+  heading: "Before you get started",
+  /** The line under the accordion, before the mailto link. */
+  footerPrompt: "Other questions or feedback?",
+  footerLinkLabel: "Email Kiara, the founder",
+} as const;
+
+export interface FaqItem {
+  question: string;
+  /** PLAIN TEXT ONLY — also emitted as FAQPage structured data. See rule 3. */
+  answer: string;
+  /** Optional link rendered after the answer; omitted from structured data. */
+  link?: { href: string; label: string };
+}
+
+export const FAQ_ITEMS: FaqItem[] = [
+  {
+    question: "Is Wedding Recon free?",
+    answer:
+      "Yes. Browsing, saving vendors, and posting your own recon are all free, there's no cost at all to use the site. This is simply a community-focused project.",
+  },
+  {
+    question: "Do I need an account to use?",
+    answer:
+      "No. The map and every vendor page are public, and a link a friend sends you opens without signing up. An account is only needed to save vendors to your Planning Hub or post recon - to sign up, all we need is an email and (anonymous encouraged) username.",
+  },
+  {
+    question: "Where do the prices come from?",
+    answer:
+      "From other couples. Each entry records what one couple was quoted, when they collected it, and how - online research, a call, or an in-person visit. We aggregate those entries and make sense of them specific to the type of vendor to create filterable ranges.",
+    link: { href: "/terms", label: "Read the full disclaimer" },
+  },
+  {
+    question: "Which parts of Colorado are covered?",
+    answer:
+      "The Front Range is deepest - Denver, Boulder, Colorado Springs, Fort Collins and the surrounding towns - alongside the mountain venues couples travel to. Any vendor missing from the map can be added by anyone, so coverage is always growing.",
+  },
+  {
+    question: "Can vendors pay to appear, or to change what is written about them?",
+    answer:
+      "No. Vendors appear because couples are researching them. If an entry is inaccurate or unfair, anyone can report it and it gets reviewed.",
+  },
+  {
+    question: "What kinds of vendors are on here?",
+    answer:
+      "Venues, catering, photographers, florists, DJs, live music, bridal shops, hair and makeup, planners, and hotel room blocks - plus an open category for everything a wedding turns out to need.",
+  },
+  {
+    question: "Is what I save private?",
+    answer:
+      "Your Planning Hub is yours alone - nobody else sees which vendors you have saved or what you are weighing up. Recon entries you post are public, shown under the anonymous username you pick when you sign up, never your email or your real name.",
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Closing call to action                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const CLOSING_CTA = {
+  /** The sixth quote on file. Praise for the product rather than a problem, so
+      it sits here rather than on a carousel card. Safe to delete. */
+  quote: {
+    text: "I needed a photographer. Wedding planning is so much work! So this is seriously so helpful",
+    name: "Cassie",
+    context: "2027 wedding, Larkspur",
+  },
+  heading: "Start with the map.",
+  body: "Find vendors near your target region, filtered by your most important criteria. Read what other couples paid and how the vendor did. Save your favorites to narrow down your search.",
+  cta: "Explore Colorado vendors",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Footer                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const FOOTER = {
+  blurb:
+    "A community space for Colorado wedding vendor intel, built on quotes and real experiences from couples who went through it.",
+  productHeading: "Product",
+  aboutHeading: "About",
+  exploreLabel: "Explore the map",
+  addReconLabel: "Add recon",
+  hubLabel: "Planning Hub",
+  termsLabel: "Terms & disclaimer",
+  contactLabel: "Contact",
+  /** Appears after "© <year> Wedding Recon." at the very bottom. */
+  disclaimer:
+    "Recon entries are personal experiences shared by couples, not verified facts - always confirm pricing and details with the vendor.",
+} as const;
+
+export const CONTACT_EMAIL = "kiaramcnulty@gmail.com";

@@ -1,8 +1,13 @@
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { applyFirstVisitGate } from "@/lib/landing/first-visit";
 
 export async function proxy(request: NextRequest) {
-  return await updateSession(request);
+  const { response, claims } = await updateSession(request);
+  // Decides between the landing page and the product at `/`, and records that a
+  // visitor has reached the product. Reuses the claims updateSession already
+  // verified, so recognising a signed-in visitor costs no extra auth call.
+  return applyFirstVisitGate(request, response, !!claims?.sub);
 }
 
 export const config = {
