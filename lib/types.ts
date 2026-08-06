@@ -45,6 +45,17 @@ export interface Vendor {
    * matchable values only.
    */
   filters?: Record<string, unknown> | null;
+  /**
+   * Whether this vendor's pin sits on a city/region centroid rather than a
+   * street address — the dashed pin outline. Computed server-side by the
+   * `vendors_in_bbox` RPC (migration 0034) so the map payload can drop the
+   * three columns `isApproximateLocation()` would otherwise need.
+   *
+   * Present only on rows from that RPC, and only once 0034 is applied; every
+   * other caller leaves it undefined and uses the client-side heuristic in
+   * `lib/map/vendor-location.ts`, which is its deliberate twin.
+   */
+  approximate?: boolean;
 }
 
 /**

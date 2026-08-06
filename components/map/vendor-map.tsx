@@ -12,6 +12,7 @@ import {
   clusterImageId,
 } from "@/lib/map/pin-images";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
+import { bboxForView, padBbox, type ViewportBbox } from "@/lib/map/viewport";
 import {
   filterRankFor,
   hasAnySelection,
@@ -247,15 +248,21 @@ function buildFeatureCollectionsByType(
     // be filtered at once without one type's criteria touching another.
     const rank = active ? filterRankFor(t, vendor.filters, filterSelections) : 1;
     if (rank < 0) continue;
+    // Migration 0034 computes this server-side (a boolean is far cheaper than
+    // the three columns the heuristic reads). Pre-0034 the column is absent and
+    // those columns are still present, so fall back to the shared client-side
+    // heuristic — the two are deliberate twins.
+    const approximate =
+      vendor.approximate ?? isApproximateLocation(vendor);
     (byType[t].features as GeoJSON.Feature[]).push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
       properties: {
         id: vendor.id,
         name: vendor.name,
-        icon: pinImageId(t, isApproximateLocation(vendor)),
+        icon: pinImageId(t, approximate),
         // Emphasized variant, swapped in while this vendor's preview is open.
-        iconSelected: pinImageId(t, isApproximateLocation(vendor), true),
+        iconSelected: pinImageId(t, approximate, true),
         // 1 matches everything asked, 0 is silent on at least one thing. Drives
         // the faded pin — a vendor nobody has written the answer for is still a
         // real candidate, so it stays on the map rather than vanishing.
@@ -358,6 +365,22 @@ interface VendorMapProps {
    */
   filterSelections?: FilterSelections;
   /**
+   * Whether this session needs the per-vendor `filters` attributes at all.
+   *
+   * They are two thirds of the map payload (about 257 of 625 bytes per row,
+   * measured over the real corpus) and most sessions never open the filter
+   * sheet, so migration 0034 moved them out of `vendors_in_bbox` into their own
+   * function. Set this true when the couple opens the sheet — the map then
+   * fetches the attributes for the covered area, merges them into the rows it
+   * already holds, re-applies, and re-emits via `onVendorsChange`. Once true it
+   * should stay true for the session: later pans fetch both together.
+   *
+   * Leaving it false is safe, not lossy — with no filters loaded every vendor
+   * ranks 1 (unfiltered), which is exactly the state a session that never
+   * filters is in anyway.
+   */
+  withFilters?: boolean;
+  /**
    * Called whenever the set of vendors inside the viewport changes — on every
    * settled move, after new rows land, and when either filter changes. Drives
    * the "see all N results on screen" pill and the list it opens.
@@ -383,6 +406,7 @@ export function VendorMap({
   initialView,
   selectedTypes,
   filterSelections,
+  withFilters,
   onVisibleVendorsChange,
   onVendorsChange,
 }: VendorMapProps) {
@@ -425,12 +449,14 @@ export function VendorMap({
   const lastVisibleKeyRef = useRef<string | null>(null);
   // Area covered by the last *complete* fetch. When the viewport stays inside
   // it, the pins on the map are already correct — skip the refetch.
-  const coverageRef = useRef<{
-    minLng: number;
-    minLat: number;
-    maxLng: number;
-    maxLat: number;
-  } | null>(null);
+  const coverageRef = useRef<ViewportBbox | null>(null);
+  // Whether this session wants the `filters` attributes at all — read inside the
+  // fetch, which is not re-created when the prop changes.
+  const withFiltersRef = useRef(withFilters);
+  // Area the filter attributes have been loaded for. Tracked separately from
+  // `coverageRef` because the two are fetched at different times: pins land
+  // immediately, attributes only once the filter sheet is opened.
+  const filtersLoadedRef = useRef<ViewportBbox | null>(null);
   // Overlay shown only during a *truly-new* fetch (first load + search jumps),
   // never on ordinary pans/zooms. Safety timeout hides it if the map never
   // settles (e.g. tiles fail) so it can't get stuck.
@@ -457,6 +483,103 @@ export function VendorMap({
   ]);
 
   /**
+   * Fetch the per-vendor filter attributes for a box and merge them onto rows.
+   *
+   * Split out of the pin payload by migration 0034: `filters` is about 257 of
+   * the 625 bytes a row used to cost, and it is read by nothing until the couple
+   * opens the filter sheet. Returns the merged rows, or null if the fetch failed
+   * or the function is not there yet (pre-0034 hosted DB), in which case the
+   * caller keeps the unmerged rows and every vendor simply ranks as unfiltered.
+   */
+  const fetchFiltersFor = useCallback(
+    async (box: ViewportBbox, vendors: Vendor[]): Promise<Vendor[] | null> => {
+      const { data, error } = await supabase.rpc("vendor_filters_in_bbox", {
+        min_lng: box.minLng,
+        min_lat: box.minLat,
+        max_lng: box.maxLng,
+        max_lat: box.maxLat,
+        max_rows: MAX_ROWS,
+      });
+
+      if (error) {
+        // Until 0034 is hand-applied this function does not exist. That is not
+        // a broken state: pre-0034 `vendors_in_bbox` still returns filters
+        // inline, so this path is never reached on that schema.
+        console.error(
+          "[VendorMap] vendor_filters_in_bbox error:",
+          error.message,
+        );
+        return null;
+      }
+
+      const byId = new Map<string, Record<string, unknown> | null>();
+      for (const row of (data ?? []) as {
+        id: string;
+        filters: Record<string, unknown> | null;
+      }[]) {
+        byId.set(row.id, row.filters);
+      }
+
+      filtersLoadedRef.current = box;
+      // A vendor with no row in the result genuinely has no attributes, so it
+      // gets null rather than staying undefined — that is what stops a later
+      // `filters !== undefined` check from re-triggering this fetch forever.
+      return vendors.map((v) => ({ ...v, filters: byId.get(v.id) ?? null }));
+    },
+    [supabase],
+  );
+
+  /**
+   * Run the bbox query for an explicit box and record it as the covered area.
+   *
+   * Takes the box as an argument rather than reading it off the map, which is
+   * what lets the first fetch start at MOUNT — before MapLibre has even been
+   * downloaded — instead of inside `map.on("load")`. See the init effect.
+   */
+  const fetchBbox = useCallback(
+    async (box: ViewportBbox): Promise<Vendor[] | null> => {
+      const args = {
+        min_lng: box.minLng,
+        min_lat: box.minLat,
+        max_lng: box.maxLng,
+        max_lat: box.maxLat,
+        max_rows: MAX_ROWS,
+      };
+
+      const { data, error } = await supabase.rpc("vendors_in_bbox", args);
+
+      if (error) {
+        console.error("[VendorMap] vendors_in_bbox error:", error.message);
+        return null; // keep existing pins and coverage — stale beats blank
+      }
+
+      const vendors = (data ?? []) as Vendor[];
+
+      // A truncated result (hit MAX_ROWS) means the padded area is only
+      // partially known — zooming into it could reveal vendors we never
+      // received, so only a complete result is safe to treat as covered. An
+      // empty area is complete, so cover it too (otherwise panning an empty
+      // region refetches forever).
+      coverageRef.current = vendors.length < MAX_ROWS ? box : null;
+
+      // Migration 0034 moved `filters` out of this payload (two thirds of its
+      // bytes, read only by the filter sheet). Pre-0034 the rows still carry it
+      // inline, which is the signal that no companion fetch is needed — see
+      // fetchFiltersFor. Post-0034 the key is absent and filters arrive only
+      // once the couple opens the sheet.
+      const inlineFilters = vendors.some((v) => v.filters !== undefined);
+      filtersLoadedRef.current = inlineFilters ? box : null;
+      if (!inlineFilters && withFiltersRef.current) {
+        const merged = await fetchFiltersFor(box, vendors);
+        if (merged) return merged;
+      }
+
+      return vendors;
+    },
+    [supabase, fetchFiltersFor],
+  );
+
+  /**
    * Query the RPC for the current bounds. Returns the vendor rows, or null when
    * nothing needs applying (cache hit or error). Kept separate from applying so
    * the first fetch can run concurrently with map image baking on load.
@@ -472,7 +595,10 @@ export function VendorMap({
     const north = bounds.getNorth();
 
     // Cache hit: viewport fully inside the area of the last complete fetch —
-    // every vendor in view is already in a source.
+    // every vendor in view is already in a source. This is also what lets the
+    // mount-time prefetch satisfy the map's own first request: the prefetch
+    // sets coverage before `load` fires, so this returns null and the load
+    // handler applies the already-arrived rows.
     const cov = coverageRef.current;
     if (
       cov &&
@@ -484,39 +610,13 @@ export function VendorMap({
       return null;
     }
 
-    const lngPad = (east - west) * BBOX_PAD_FACTOR;
-    const latPad = (north - south) * BBOX_PAD_FACTOR;
-    const min_lng = west - lngPad;
-    const max_lng = east + lngPad;
-    const min_lat = Math.max(south - latPad, -85);
-    const max_lat = Math.min(north + latPad, 85);
-
-    const { data, error } = await supabase.rpc("vendors_in_bbox", {
-      min_lng,
-      min_lat,
-      max_lng,
-      max_lat,
-      max_rows: MAX_ROWS,
-    });
-
-    if (error) {
-      console.error("[VendorMap] vendors_in_bbox error:", error.message);
-      return null; // keep existing pins and coverage — stale beats blank
-    }
-
-    const vendors = (data ?? []) as Vendor[];
-
-    // A truncated result (hit MAX_ROWS) means the padded area is only partially
-    // known — zooming into it could reveal vendors we never received, so only a
-    // complete result is safe to treat as covered. An empty area is complete,
-    // so cover it too (otherwise panning an empty region refetches forever).
-    coverageRef.current =
-      vendors.length < MAX_ROWS
-        ? { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat }
-        : null;
-
-    return vendors;
-  }, [supabase]);
+    return fetchBbox(
+      padBbox(
+        { minLng: west, minLat: south, maxLng: east, maxLat: north },
+        BBOX_PAD_FACTOR,
+      ),
+    );
+  }, [fetchBbox]);
 
   /**
    * Report every vendor currently inside the viewport, after the type filter —
@@ -678,6 +778,37 @@ export function VendorMap({
   }, [filterSelections, applyVendors, reportVisibleVendors]);
 
   /**
+   * Load the filter attributes the first time this session needs them.
+   *
+   * Post-0034 the pin payload carries no `filters`, so opening the filter sheet
+   * is what pays for them — a second, much smaller query over the same box.
+   * Until it lands every vendor ranks 1 (unfiltered), which is a benign
+   * transient: nothing dims yet, rather than anything dimming wrongly. In
+   * practice the sheet is opened before any chip can be tapped, so the
+   * attributes are almost always in hand by the time a selection exists.
+   */
+  useEffect(() => {
+    withFiltersRef.current = withFilters;
+    if (!withFilters) return;
+
+    const cov = coverageRef.current;
+    const rows = vendorsRef.current;
+    if (!cov || rows.length === 0) return;
+    if (filtersLoadedRef.current === cov) return; // already have them for this box
+
+    let cancelled = false;
+    (async () => {
+      const merged = await fetchFiltersFor(cov, rows);
+      // Guard against a pan having replaced the rows while this was in flight.
+      if (cancelled || !merged || vendorsRef.current !== rows) return;
+      applyVendors(merged);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [withFilters, fetchFiltersFor, applyVendors]);
+
+  /**
    * Mark the vendor whose preview card is open: its pin is bumped up a size and
    * labelled at any zoom. Both are layout expressions on the existing pin layers,
    * so a selection change is two setLayoutProperty calls per type — no new
@@ -712,6 +843,34 @@ export function VendorMap({
     loadTimeoutRef.current = setTimeout(() => setLoading(false), 10000);
 
     let map: import("maplibre-gl").Map;
+
+    // Ask for the vendors NOW, before MapLibre is even downloaded.
+    //
+    // This fetch used to live inside `map.on("load")`, which put it at the end
+    // of a long serial chain — ~1 MB MapLibre chunk, construct the map, fetch
+    // the basemap style from a third-party CDN, parse it, fire `load` — none of
+    // which the query actually depends on. It only needs a bounding box, and
+    // the box is a pure function of the initial center, zoom and container
+    // size, all known right here. Measured on a 4x-CPU / 1.6 Mbps / 150 ms
+    // profile, the style request had not even STARTED until +5.9 s, so the pins
+    // were queued behind someone else's CDN for no reason.
+    //
+    // The result is not awaited here: `fetchBbox` records the box as covered,
+    // so the `fetchVendors()` call in the load handler sees a cache hit and
+    // returns null, and the load handler applies whatever this resolved to. If
+    // the container has not been laid out yet, `bboxForView` returns null and
+    // we simply fall back to the old fetch-after-load path.
+    const iv0 = initialViewRef.current;
+    const initialBox = bboxForView(
+      iv0?.lng ?? DEFAULT_CENTER[0],
+      iv0?.lat ?? DEFAULT_CENTER[1],
+      iv0?.zoom ?? DEFAULT_ZOOM,
+      containerRef.current.clientWidth,
+      containerRef.current.clientHeight,
+    );
+    const prefetch = initialBox
+      ? fetchBbox(padBbox(initialBox, BBOX_PAD_FACTOR))
+      : null;
 
     (async () => {
       const maplibregl = (await import("maplibre-gl")).default;
@@ -756,7 +915,13 @@ export function VendorMap({
           });
         }
 
-        const firstData = fetchVendors();
+        // Usually already resolved (or in flight) from the mount-time prefetch
+        // above; fetchVendors() then sees the covered box and returns null, so
+        // this resolves to the prefetched rows rather than issuing a second
+        // query. Falls back to a real fetch when there was no prefetch, or when
+        // the map settled somewhere the prefetched box does not cover.
+        const firstData = (async () =>
+          (prefetch ? await prefetch : null) ?? (await fetchVendors()))();
 
         // Pre-rasterize category pins + cluster discs before layers use them.
         await registerPinImages(map);

@@ -130,6 +130,13 @@ export default function ExplorePage() {
     Partial<Record<VendorType, DateContext>>
   >({});
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  // Latched once the filter sheet is first opened, and never cleared for the
+  // session. The per-vendor `filters` attributes are two thirds of the map
+  // payload and most sessions never filter at all, so migration 0034 moved them
+  // out of the pin query — this is what tells the map to go and get them. It
+  // latches rather than tracking `filterSheetOpen` so closing the sheet does not
+  // throw away attributes that are already in hand.
+  const [filtersWanted, setFiltersWanted] = useState(false);
   // Map or list. The list is a VIEW, not a modal: that is what lets it render
   // live off `visible.entries` instead of the frozen snapshot the old bottom
   // sheet needed (a modal list cannot reshuffle under a scroll, so it had to be
@@ -493,6 +500,7 @@ export default function ExplorePage() {
           initialView={initialView}
           selectedTypes={selectedTypes}
           filterSelections={filterSelections}
+          withFilters={filtersWanted}
           onVisibleVendorsChange={setVisible}
           onVendorsChange={setMapVendors}
         />
@@ -691,7 +699,15 @@ export default function ExplorePage() {
         <FilterButton
           selectedTypes={selectedTypes}
           activeCount={activeFilterCount}
-          onClick={() => setFilterSheetOpen(true)}
+          onClick={() => {
+            // Opening the sheet is the moment this session needs the per-vendor
+            // filter attributes, which the pin query no longer carries. Setting
+            // this here (rather than on the first chip tap) means the fetch
+            // overlaps the couple reading the sheet, so the attributes are
+            // normally in hand before anything can be selected.
+            setFiltersWanted(true);
+            setFilterSheetOpen(true);
+          }}
           className="pointer-events-auto max-w-[42%] [&>span]:truncate"
         />
         <span className="flex-1" aria-hidden />
