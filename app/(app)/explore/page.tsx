@@ -532,16 +532,21 @@ export default function ExplorePage() {
           corner, which read as decoration rather than a control (Kiara,
           2026-08-04). Top-left next to the search bar is where a logo is
           expected to be clickable. LANDING_HREF, not "/", or the first-visit
-          gate bounces the visitor straight back here. */}
-      <div className="relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">
+          gate bounces the visitor straight back here.
+
+          Click-through row, controls opt back in — same rule as every other
+          overlay here. The row must NOT take pointer events as a whole: it is a
+          full-width band across the top of the map, and the gaps between the
+          three controls are map the couple can still pan. */}
+      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">
         <Link
           href={LANDING_HREF}
           aria-label="About Wedding Recon"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-background/95 shadow-md backdrop-blur-sm transition-opacity hover:opacity-80"
+          className="pointer-events-auto flex size-9 shrink-0 items-center justify-center rounded-full border bg-background/95 shadow-md backdrop-blur-sm transition-opacity hover:opacity-80"
         >
           <BrandMark className="size-5" />
         </Link>
-        <div className="flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
+        <div className="pointer-events-auto flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
           <form
             onSubmit={handleSearch}
             className="flex items-center gap-2 px-3 py-2"
@@ -661,7 +666,7 @@ export default function ExplorePage() {
             )}
         </div>
 
-        <ProfileMenu className="shrink-0" />
+        <ProfileMenu className="pointer-events-auto shrink-0" />
       </div>
 
       {/* One control row: what to show, how many there are, and which view.
@@ -752,9 +757,14 @@ export default function ExplorePage() {
           Hidden in list view: these are map controls (a locate button and the
           basemap-anchored brand mark), and a pin peek describes a pin nobody
           can see. */}
-      <div className={cn("relative z-10 mt-auto", view === "list" && "hidden")}>
+      <div
+        className={cn(
+          "pointer-events-none relative z-10 mt-auto",
+          view === "list" && "hidden",
+        )}
+      >
         {pin && (
-          <div className="mx-auto w-full max-w-[480px] px-3">
+          <div className="pointer-events-auto mx-auto w-full max-w-[480px] px-3">
             <VendorPinPreview
               vendorId={pin.id}
               vendorType={pin.vendorType}
@@ -765,14 +775,19 @@ export default function ExplorePage() {
 
         {/* Locate button, lifted clear of the map attribution along the bottom
             edge. The brand pill that used to sit opposite it moved to the top
-            bar, so this row is just the one control now. */}
+            bar, so this row is just the one control now.
+
+            The row stays click-through and only the button takes taps, which
+            also settles the long-standing complaint that this full-width row
+            ate every map tap in its ~90px band — a pin sitting down there could
+            not be tapped at all. */}
         <div className="flex items-end justify-end px-3 pb-9 pt-3">
           <button
             type="button"
             onClick={handleLocate}
             disabled={locating}
             aria-label="Center map on my location"
-            className="flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
+            className="pointer-events-auto flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
           >
             {locating ? (
               <Loader2 size={20} className="animate-spin" aria-hidden />
