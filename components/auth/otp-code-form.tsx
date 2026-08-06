@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
 import { clearPendingOtpEmail } from "@/lib/auth/pending-otp";
@@ -25,6 +26,14 @@ const MIN_CODE_LENGTH = 6;
 const MAX_CODE_LENGTH = 10;
 
 /**
+ * Seconds before "Send a new code" re-arms. Not security — Supabase enforces its
+ * own send limit — but that limit is low (a couple an hour on the built-in
+ * sender), and without a visible cooldown an impatient tap-tap-tap burns the
+ * whole allowance and returns an error that reads like the app is broken.
+ */
+const RESEND_COOLDOWN_S = 30;
+
+/**
  * Completes a sign-in from the numeric code in the email, IN THE APP.
  *
  * Why this exists at all: /auth/callback verifies the emailed link server-side
@@ -42,10 +51,68 @@ const MAX_CODE_LENGTH = 10;
  * The same fix covers in-app browsers (Instagram/Facebook link previews) and
  * typed-on-phone/opened-on-laptop, which fail for the same reason.
  */
-export function OtpCodeForm({ email }: { email: string }) {
+export function OtpCodeForm({
+  email,
+  onBack,
+  backLabel = "Use a different email",
+}: {
+  email: string;
+  /**
+   * Leaves the code step. Required, not optional: this screen is a dead end
+   * without it — a mistyped address or an email that never arrives leaves
+   * nothing to do but force-quit the app.
+   */
+  onBack: () => void;
+  backLabel?: string;
+}) {
   const [code, setCode] = React.useState("");
   const [verifying, setVerifying] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [resending, setResending] = React.useState(false);
+  const [cooldown, setCooldown] = React.useState(0);
+
+  // Starts at 0, so a resend is available immediately — arriving here after a
+  // relaunch can be long after the code was sent, and making someone wait out a
+  // timer for an email they never got is the opposite of a way out.
+  React.useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  async function handleResend() {
+    setResending(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error: sendError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          // Kept identical to the original send so the two cannot drift; inert
+          // with the current template (see the call sites for why).
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        },
+      });
+
+      if (sendError) {
+        // Most often the send rate limit. Surfacing the real message beats a
+        // generic one here: "email rate limit exceeded" tells someone to wait,
+        // where "something went wrong" tells them to keep tapping.
+        setError(sendError.message ?? "Could not send a new code.");
+        return;
+      }
+
+      // Clear the box: whatever is in it belongs to the superseded email, and
+      // leaving it there invites submitting the old code against the new one.
+      setCode("");
+      setCooldown(RESEND_COOLDOWN_S);
+      toast.success(`New code sent to ${email}`);
+    } catch {
+      setError("Could not send a new code. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -136,6 +203,41 @@ export function OtpCodeForm({ email }: { email: string }) {
           "Sign in"
         )}
       </Button>
+
+      {/* The two ways out. Both are type="button" — inside a <form> the default
+          is submit, which would fire the verify handler instead. */}
+      <div className="flex flex-col gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full"
+          onClick={handleResend}
+          disabled={resending || cooldown > 0 || verifying}
+        >
+          {resending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Sending…
+            </>
+          ) : cooldown > 0 ? (
+            `Send a new code (${cooldown}s)`
+          ) : (
+            "Send a new code"
+          )}
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full"
+          onClick={onBack}
+          disabled={verifying}
+        >
+          {backLabel}
+        </Button>
+      </div>
     </form>
   );
 }

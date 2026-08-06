@@ -504,7 +504,19 @@ function AddReconForm() {
         </div>
 
         <div className="w-full max-w-xs">
-          <OtpCodeForm email={sentTo} />
+          <OtpCodeForm
+            email={sentTo}
+            // Back to the recon form, which the draft rehydrate has already
+            // refilled — so this is "let me change the address" (or just get out
+            // of here), not "start over". The draft stays in IndexedDB either
+            // way; only the send is undone.
+            backLabel="Back to your recon"
+            onBack={() => {
+              clearPendingOtpEmail();
+              setSentTo(null);
+              setIsSubmitting(false);
+            }}
+          />
         </div>
 
         <p className="mx-auto max-w-sm text-center text-xs text-muted-foreground">
@@ -512,17 +524,6 @@ function AddReconForm() {
             ? "Do not use the link in the email — it opens in your browser, which cannot see the recon you just wrote here."
             : "The email also has a link, but open it in this same browser or your saved recon will not be there."}
         </p>
-
-        <Button
-          variant="ghost"
-          onClick={() => {
-            clearPendingOtpEmail();
-            setSentTo(null);
-            setIsSubmitting(false);
-          }}
-        >
-          Use a different email
-        </Button>
       </div>
     );
   }
