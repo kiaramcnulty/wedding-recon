@@ -12,6 +12,11 @@ import {
   clusterImageId,
 } from "@/lib/map/pin-images";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
+import {
+  filterRankFor,
+  hasAnySelection,
+  type FilterSelections,
+} from "@/lib/filters/match";
 
 // MapLibre is browser-only; import deferred to effects.
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -220,6 +225,7 @@ function resolveDisplayPositions(
 function buildFeatureCollectionsByType(
   vendors: Vendor[],
   positions: Map<string, { lng: number; lat: number }>,
+  filterSelections?: FilterSelections,
 ): Record<VendorType, GeoJSON.FeatureCollection> {
   const byType = Object.fromEntries(
     VENDOR_TYPES.map((t) => [
@@ -228,10 +234,19 @@ function buildFeatureCollectionsByType(
     ]),
   ) as Record<VendorType, GeoJSON.FeatureCollection>;
 
+  const active = hasAnySelection(filterSelections);
+
   for (const vendor of vendors) {
     const pos = positions.get(vendor.id);
     if (!pos) continue; // missing coordinates
+    // A contradicting vendor is dropped from the source entirely rather than
+    // hidden by a layer filter, so the cluster counts drawn on screen agree
+    // with the pins — MapLibre clusters the source, not the visible subset.
     const t = bucketType(vendor.vendor_type);
+    // Each vendor is judged against ITS OWN type's filters, so several types can
+    // be filtered at once without one type's criteria touching another.
+    const rank = active ? filterRankFor(t, vendor.filters, filterSelections) : 1;
+    if (rank < 0) continue;
     (byType[t].features as GeoJSON.Feature[]).push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
@@ -241,6 +256,10 @@ function buildFeatureCollectionsByType(
         icon: pinImageId(t, isApproximateLocation(vendor)),
         // Emphasized variant, swapped in while this vendor's preview is open.
         iconSelected: pinImageId(t, isApproximateLocation(vendor), true),
+        // 1 matches everything asked, 0 is silent on at least one thing. Drives
+        // the faded pin — a vendor nobody has written the answer for is still a
+        // real candidate, so it stays on the map rather than vanishing.
+        rank,
       },
     });
   }
@@ -269,15 +288,23 @@ export interface VendorOpenPayload {
 export interface VisibleVendor {
   id: string;
   vendorType: VendorType;
+  /**
+   * 1 matches every active attribute filter, 0 is silent on at least one. Lets
+   * the list draw its second tier without re-running the matcher, and is always
+   * 1 when no attribute filter is active.
+   */
+  rank: 0 | 1;
 }
 
 /**
- * What's on screen right now, after the type filter: the true `total`, and the
+ * What's on screen right now, after both filters: the true `total`, and the
  * (capped, nearest-center-first) rows a list can actually render. `total` drives
- * the results pill; `entries` is what the list sheet opens on.
+ * the results pill; `entries` is what the list sheet opens on. `partial` is how
+ * many of `total` are the faded, missing-information kind.
  */
 export interface VisibleVendorsPayload {
   total: number;
+  partial: number;
   entries: VisibleVendor[];
 }
 
@@ -324,11 +351,25 @@ interface VendorMapProps {
    */
   selectedTypes?: VendorType[];
   /**
+   * Attribute filters PER VENDOR TYPE, applied locally against the `filters`
+   * each row already carries — no refetch, so a chip tap is instant and the fetched-area cache
+   * in `coverageRef` stays valid. A vendor that contradicts the selection is
+   * dropped from its source; one that is merely silent is kept and faded.
+   */
+  filterSelections?: FilterSelections;
+  /**
    * Called whenever the set of vendors inside the viewport changes — on every
-   * settled move, after new rows land, and when the type filter changes. Drives
+   * settled move, after new rows land, and when either filter changes. Drives
    * the "see all N results on screen" pill and the list it opens.
    */
   onVisibleVendorsChange?: (payload: VisibleVendorsPayload) => void;
+  /**
+   * Called with the raw rows behind the pins whenever a fetch lands. The filter
+   * sheet needs the `filters` on them to show live match counts and to rescale
+   * its histograms — that data is already in hand, so handing it over avoids a
+   * second query for rows the map is holding anyway.
+   */
+  onVendorsChange?: (vendors: Vendor[]) => void;
 }
 
 export function VendorMap({
@@ -341,7 +382,9 @@ export function VendorMap({
   onViewChange,
   initialView,
   selectedTypes,
+  filterSelections,
   onVisibleVendorsChange,
+  onVendorsChange,
 }: VendorMapProps) {
   const router = useRouter();
   // Latest onClusterOpen, callable from the run-once init effect's handlers.
@@ -353,12 +396,17 @@ export function VendorMap({
   const onViewChangeRef = useRef(onViewChange);
   // Latest on-screen-vendors handler, same reason.
   const onVisibleVendorsChangeRef = useRef(onVisibleVendorsChange);
+  // Latest raw-rows handler, same reason.
+  const onVendorsChangeRef = useRef(onVendorsChange);
   // Latest selection, read by the init effect once the pin layers first exist.
   const selectedVendorIdRef = useRef(selectedVendorId);
   // Captured once — the map reads center/zoom at init only.
   const initialViewRef = useRef(initialView);
   // Latest type filter, read by the init effect once the layers first exist.
   const selectedTypesRef = useRef(selectedTypes);
+  // Latest attribute filter, same reason — and read by applyVendors, which runs
+  // both on new rows and on a filter change.
+  const filterSelectionsRef = useRef(filterSelections);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -398,12 +446,14 @@ export function VendorMap({
     onBackgroundTapRef.current = onBackgroundTap;
     onViewChangeRef.current = onViewChange;
     onVisibleVendorsChangeRef.current = onVisibleVendorsChange;
+    onVendorsChangeRef.current = onVendorsChange;
   }, [
     onClusterOpen,
     onVendorOpen,
     onBackgroundTap,
     onViewChange,
     onVisibleVendorsChange,
+    onVendorsChange,
   ]);
 
   /**
@@ -492,31 +542,47 @@ export function VendorMap({
     const sel = selectedTypesRef.current ?? [];
     const showAll = sel.length === 0;
 
-    const inView: { id: string; vendorType: VendorType; d: number }[] = [];
+    const selections = filterSelectionsRef.current;
+    const filtering = hasAnySelection(selections);
+
+    const inView: {
+      id: string;
+      vendorType: VendorType;
+      rank: 0 | 1;
+      d: number;
+    }[] = [];
     for (const v of vendorsRef.current) {
       const vendorType = bucketType(v.vendor_type);
       if (!showAll && !sel.includes(vendorType)) continue;
       const pos = positionsRef.current.get(v.id);
       if (!pos) continue; // no coordinates — never drawn, so never "on screen"
       if (!bounds.contains([pos.lng, pos.lat])) continue;
+      // Same predicate the pins were built with, so the pill can never disagree
+      // with what is drawn.
+      const rank = filtering
+        ? filterRankFor(vendorType, v.filters, selections)
+        : 1;
+      if (rank < 0) continue;
       // Squared distance from center, longitude scaled to match latitude at this
       // latitude. Only used for ordering, so no need for a real geodesic.
       const dx = (pos.lng - center.lng) * cosLat;
       const dy = pos.lat - center.lat;
-      inView.push({ id: v.id, vendorType, d: dx * dx + dy * dy });
+      inView.push({ id: v.id, vendorType, rank: rank as 0 | 1, d: dx * dx + dy * dy });
     }
 
-    // Nearest the center first: the closest rows are the ones the user is
-    // looking at, and they're the ones kept when the list hits its cap.
-    inView.sort((a, b) => a.d - b.d);
+    // Full matches first, then nearest the center. Ordering by rank before
+    // distance is what puts the "missing some information" rows at the bottom
+    // of the list, and what the cap keeps when it bites.
+    inView.sort((a, b) => b.rank - a.rank || a.d - b.d);
     const entries: VisibleVendor[] = inView
       .slice(0, MAX_VISIBLE_ENTRIES)
-      .map(({ id, vendorType }) => ({ id, vendorType }));
+      .map(({ id, vendorType, rank }) => ({ id, vendorType, rank }));
+    const partial = inView.reduce((n, e) => n + (e.rank === 0 ? 1 : 0), 0);
 
-    const key = `${inView.length}|${entries.map((e) => e.id).join(",")}`;
+    const key = `${inView.length}|${partial}|${entries.map((e) => e.id).join(",")}`;
     if (key === lastVisibleKeyRef.current) return; // nothing changed
     lastVisibleKeyRef.current = key;
-    notify({ total: inView.length, entries });
+    notify({ total: inView.length, partial, entries });
   }, []);
 
   /** Push vendor rows into the per-type clustered sources. */
@@ -524,8 +590,16 @@ export function VendorMap({
     (vendors: Vendor[]) => {
       const map = mapRef.current;
       if (!map) return;
+      // Positions are resolved over EVERY row, including ones the filter will
+      // drop. The fan-out for pins sharing a coordinate is derived from the set
+      // that shares it, so resolving over the filtered subset would make the
+      // survivors re-fan and visibly jump on every chip tap.
       const positions = resolveDisplayPositions(vendors);
-      const byType = buildFeatureCollectionsByType(vendors, positions);
+      const byType = buildFeatureCollectionsByType(
+        vendors,
+        positions,
+        filterSelectionsRef.current,
+      );
       for (const t of VENDOR_TYPES) {
         map.getSource(srcId(t))?.setData(byType[t]);
       }
@@ -533,6 +607,7 @@ export function VendorMap({
       // on any move without going back to the network.
       vendorsRef.current = vendors;
       positionsRef.current = positions;
+      onVendorsChangeRef.current?.(vendors);
       reportVisibleVendors();
     },
     [reportVisibleVendors],
@@ -589,6 +664,20 @@ export function VendorMap({
   }, [selectedTypes, applyTypeFilter, reportVisibleVendors]);
 
   /**
+   * Re-apply the attribute filter. Unlike the type filter this cannot be a
+   * visibility toggle: the decision is per-vendor, not per-layer, so the source
+   * data is rebuilt from the rows already in hand. Still no network — that is
+   * the whole reason the filter runs client-side (see migration 0033) — and
+   * rebuilding the source is also what keeps cluster counts honest, since
+   * MapLibre clusters the source rather than the drawn subset.
+   */
+  useEffect(() => {
+    filterSelectionsRef.current = filterSelections;
+    if (vendorsRef.current.length) applyVendors(vendorsRef.current);
+    reportVisibleVendors();
+  }, [filterSelections, applyVendors, reportVisibleVendors]);
+
+  /**
    * Mark the vendor whose preview card is open: its pin is bumped up a size and
    * labelled at any zoom. Both are layout expressions on the existing pin layers,
    * so a selection change is two setLayoutProperty calls per type — no new
@@ -642,6 +731,16 @@ export function VendorMap({
       );
 
       mapRef.current = map;
+
+      // MapLibre reports a failed style, a rejected layer expression, or a bad
+      // source through this event and NOWHERE else — without it the map simply
+      // renders blank with a clean console, which is the single most misleading
+      // failure mode here. The vendor-page mini-map already had one; this one
+      // did not, and that cost a debugging round on 2026-08-05.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      map.on("error", (e: any) => {
+        console.error("[VendorMap] maplibre error:", e?.error?.message ?? e);
+      });
 
       map.on("load", async () => {
         // Sources need no images, so add them first and kick off the first
@@ -697,6 +796,13 @@ export function VendorMap({
               "text-halo-color": "#ffffff",
               "text-halo-width": 1.5,
               "text-halo-blur": 0.5,
+              // rank 0 means the vendor is silent on something you filtered
+              // for. It fades rather than disappearing: low coverage mostly
+              // means nobody wrote the answer down, so hiding it would bury a
+              // real candidate. Kept above 0.4 so a faded pin is still
+              // tappable-looking on a bright basemap.
+              "icon-opacity": ["case", ["==", ["get", "rank"], 0], 0.45, 1],
+              "text-opacity": ["case", ["==", ["get", "rank"], 0], 0.55, 1],
             },
           });
         }

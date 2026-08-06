@@ -33,6 +33,18 @@ export interface Vendor {
   google_photos: GooglePhotoRef[] | null;
   /** When google_photos was last resolved; rows older than ~30d are re-resolved on next view. */
   google_photos_fetched_at: string | null;
+  /**
+   * Extracted filter attributes, keyed per vendor type — see
+   * `lib/constants/vendor-filters.ts` for the shape and
+   * `docs/vendor-filter-coverage.md` for how much of it is populated.
+   *
+   * Absent keys mean nobody wrote the fact down, NOT that the vendor lacks the
+   * thing, which is why `lib/filters/match.ts` demotes rather than excludes on
+   * a missing key. The `vendors_in_bbox` RPC strips the verbatim evidence
+   * quotes from this on the way out (migration 0033), so a map row carries the
+   * matchable values only.
+   */
+  filters?: Record<string, unknown> | null;
 }
 
 /**
