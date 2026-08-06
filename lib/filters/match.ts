@@ -44,15 +44,59 @@ export type VendorFilters = Record<string, unknown> | null | undefined;
  */
 export type FilterSelections = Partial<Record<string, FilterSelection>>;
 
+/**
+ * A rank plus the arithmetic behind it: how many of the active filters the
+ * vendor was SILENT on, and how many were active at all.
+ *
+ * `filterRank` collapses this to the three-way verdict, which is all the pin
+ * dimming and the divider need. The list view needs the counts too, so it can
+ * order the partial tier by how much of the couple's ask a vendor actually met.
+ */
+export interface FilterMatchDetail {
+  rank: -1 | 0 | 1;
+  /** Filters this vendor says nothing about. Always 0 when `rank` is 1. */
+  unknown: number;
+  /** Filters active for this vendor's type. 0 means the type is unfiltered. */
+  active: number;
+}
+
+/**
+ * The share of the active filters a vendor actually matched, 0..1.
+ *
+ * Deliberately a FRACTION rather than a count of misses, because a mixed-type
+ * search is one query: a venue judged on 3 attributes and a photographer judged
+ * on 2 are not comparable by "missing 1" (that is 67% against 50%), and the
+ * feed interleaves both. With a single type filtered — the common case — the
+ * two orderings are identical, since every vendor shares the same denominator.
+ *
+ * An unfiltered type scores 1: nothing was asked, so nothing is missing.
+ */
+export function matchedFraction(detail: FilterMatchDetail): number {
+  return detail.active === 0
+    ? 1
+    : (detail.active - detail.unknown) / detail.active;
+}
+
 /** Rank a vendor against its OWN type's filters. */
 export function filterRankFor(
   vendorType: string,
   filters: VendorFilters,
   selections: FilterSelections | undefined,
 ): -1 | 0 | 1 {
+  return filterMatchFor(vendorType, filters, selections).rank;
+}
+
+/** As `filterRankFor`, but keeping the counts behind the verdict. */
+export function filterMatchFor(
+  vendorType: string,
+  filters: VendorFilters,
+  selections: FilterSelections | undefined,
+): FilterMatchDetail {
   const sel = selections?.[vendorType];
-  if (!sel || Object.keys(sel).length === 0) return 1;
-  return filterRank(filters, sel);
+  if (!sel || Object.keys(sel).length === 0) {
+    return { rank: 1, unknown: 0, active: 0 };
+  }
+  return filterMatch(filters, sel);
 }
 
 /** Whether any type carries a filter at all — lets callers skip the work. */
@@ -83,13 +127,30 @@ export function filterRank(
   filters: VendorFilters,
   selection: FilterSelection,
 ): -1 | 0 | 1 {
+  return filterMatch(filters, selection).rank;
+}
+
+/**
+ * As `filterRank`, but counting the silences instead of collapsing them to a
+ * flag. `unknown` rises by at most 1 per filter — every branch that notices a
+ * silence also ends that filter's turn — so it can never exceed `active`.
+ */
+export function filterMatch(
+  filters: VendorFilters,
+  selection: FilterSelection,
+): FilterMatchDetail {
   const keys = Object.keys(selection);
-  if (keys.length === 0) return 1;
+  const active = keys.length;
+  if (active === 0) return { rank: 1, unknown: 0, active: 0 };
   if (!filters) {
-    return keys.some((k) => selection[k].rare) ? -1 : 0;
+    // No attributes at all: silent on every one of them, unless a `rare` filter
+    // is in play, where silence is a positive no and rules the vendor out.
+    return keys.some((k) => selection[k].rare)
+      ? { rank: -1, unknown: 0, active }
+      : { rank: 0, unknown: active, active };
   }
 
-  let unknown = false;
+  let unknown = 0;
 
   for (const key of keys) {
     const spec = selection[key];
@@ -97,10 +158,10 @@ export function filterRank(
     if (spec.kind === "multi") {
       const v = filters[key];
       if (!Array.isArray(v) || v.length === 0) {
-        if (spec.rare) return -1;
-        unknown = true;
+        if (spec.rare) return { rank: -1, unknown, active };
+        unknown++;
       } else if (!v.some((x) => spec.values.includes(String(x)))) {
-        return -1;
+        return { rank: -1, unknown, active };
       }
       continue;
     }
@@ -108,10 +169,10 @@ export function filterRank(
     if (spec.kind === "bool") {
       const v = filters[key];
       if (typeof v !== "boolean") {
-        if (spec.rare) return -1;
-        unknown = true;
+        if (spec.rare) return { rank: -1, unknown, active };
+        unknown++;
       } else if (v !== spec.value) {
-        return -1;
+        return { rank: -1, unknown, active };
       }
       continue;
     }
@@ -120,7 +181,7 @@ export function filterRank(
     const basis = filters["price_basis"];
     if (spec.basis && typeof basis === "string" && basis !== spec.basis) {
       // Another unit is not comparable, so it reads as silence, not a miss.
-      unknown = true;
+      unknown++;
       continue;
     }
 
@@ -147,8 +208,8 @@ export function filterRank(
     }
 
     if (lo === undefined && hi === undefined) {
-      if (spec.rare) return -1;
-      unknown = true;
+      if (spec.rare) return { rank: -1, unknown, active };
+      unknown++;
       continue;
     }
 
@@ -165,17 +226,17 @@ export function filterRank(
 
     if (spec.mode === "point") {
       if ((spec.min != null && vLo < spec.min) || (spec.max != null && vLo > spec.max)) {
-        return -1;
+        return { rank: -1, unknown, active };
       }
     } else if (
       (spec.max != null && vLo > spec.max) ||
       (spec.min != null && vHi < spec.min)
     ) {
-      return -1;
+      return { rank: -1, unknown, active };
     }
   }
 
-  return unknown ? 0 : 1;
+  return { rank: unknown ? 0 : 1, unknown, active };
 }
 
 function num(v: unknown): number | undefined {

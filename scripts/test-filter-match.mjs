@@ -14,7 +14,10 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { filterRank, filterRankFor, hasAnySelection, countSelections } from "../lib/filters/match.ts";
+import {
+  filterRank, filterRankFor, filterMatch, filterMatchFor, matchedFraction,
+  hasAnySelection, countSelections,
+} from "../lib/filters/match.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const rows = readFileSync(resolve(ROOT, "data/filter-extraction/vendor-filters.jsonl"), "utf8")
@@ -123,6 +126,45 @@ eq("hasAnySelection is false for empty per-type entries",
 eq("hasAnySelection is true when any type carries one",
   hasAnySelection({ venue: {}, photos: multi.photos }), true);
 eq("countSelections sums across types", countSelections(multi), 2);
+
+// --- how MUCH of the ask was met -------------------------------------------
+// Grades the partial tier in the Explore list: a vendor silent on 1 filter of 3
+// outranks one silent on 2. Only the silences count — a contradiction is
+// excluded outright and never reaches the list.
+console.log("\nunit — partial-match arithmetic\n");
+
+const three = {
+  setting: { kind: "multi", values: ["mountain"] },
+  has_lodging: { kind: "bool", value: true },
+  has_getting_ready_suite: { kind: "bool", value: true },
+};
+const detail = (f) => {
+  const d = filterMatch(f, three);
+  return [d.rank, d.unknown, d.active, Number(matchedFraction(d).toFixed(3))];
+};
+eq("matches all three", detail({ setting: ["mountain"], has_lodging: true, has_getting_ready_suite: true }),
+  [1, 0, 3, 1]);
+eq("silent on one of three", detail({ setting: ["mountain"], has_lodging: true }),
+  [0, 1, 3, 0.667]);
+eq("silent on two of three", detail({ setting: ["mountain"] }),
+  [0, 2, 3, 0.333]);
+eq("silent on all three (attributes present but unrelated)", detail({ parking: ["free"] }),
+  [0, 3, 3, 0]);
+eq("no attributes at all is silent on all three", detail(null),
+  [0, 3, 3, 0]);
+eq("a contradiction is excluded whatever else is silent",
+  filterMatch({ setting: ["garden"] }, three).rank, -1);
+eq("an unfiltered type scores a full match",
+  [filterMatchFor("flowers", { style: ["classic"] }, multi), matchedFraction(filterMatchFor("flowers", null, multi))],
+  [{ rank: 1, unknown: 0, active: 0 }, 1]);
+eq("unknown can never exceed active",
+  filterMatch({}, three).unknown <= filterMatch({}, three).active, true);
+// A fraction, not a count of misses: these two are NOT interchangeable once two
+// categories with different filter counts are in one feed.
+eq("1 of 2 missing ranks below 1 of 3 missing",
+  matchedFraction(filterMatch({ setting: ["mountain"] }, {
+    setting: three.setting, has_lodging: three.has_lodging,
+  })) < matchedFraction(filterMatch({ setting: ["mountain"], has_lodging: true }, three)), true);
 
 // --- corpus behaviour ------------------------------------------------------
 console.log("\ncorpus — what real selections return\n");

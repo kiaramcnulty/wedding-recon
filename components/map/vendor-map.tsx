@@ -15,7 +15,10 @@ import { isApproximateLocation } from "@/lib/map/vendor-location";
 import { bboxForView, padBbox, type ViewportBbox } from "@/lib/map/viewport";
 import {
   filterRankFor,
+  filterMatchFor,
+  matchedFraction,
   hasAnySelection,
+  type FilterMatchDetail,
   type FilterSelections,
 } from "@/lib/filters/match";
 
@@ -76,6 +79,11 @@ const PREVIEW_SAFE_PX = 300;
 // feed became browsable. The nearest-to-center rows are kept, so zooming out
 // past the cap degrades to "the closest N" rather than an arbitrary subset.
 const MAX_VISIBLE_ENTRIES = 200;
+
+// What every vendor scores when no attribute filter is active: a full match,
+// nothing asked, nothing missing. Hoisted so the hot loop does not allocate one
+// per row per pan.
+const UNFILTERED_MATCH: FilterMatchDetail = { rank: 1, unknown: 0, active: 0 };
 
 // Label sizes: the selected pin's name is set larger than its neighbours', and
 // offset further down to clear its bigger disc (offsets are in ems of text-size).
@@ -649,6 +657,7 @@ export function VendorMap({
       id: string;
       vendorType: VendorType;
       rank: 0 | 1;
+      matched: number;
       priced: boolean;
       photo: boolean;
       d: number;
@@ -660,10 +669,12 @@ export function VendorMap({
       if (!pos) continue; // no coordinates — never drawn, so never "on screen"
       if (!bounds.contains([pos.lng, pos.lat])) continue;
       // Same predicate the pins were built with, so the pill can never disagree
-      // with what is drawn.
-      const rank = filtering
-        ? filterRankFor(vendorType, v.filters, selections)
-        : 1;
+      // with what is drawn. The detail form additionally carries how many of the
+      // filters the vendor was silent on, which orders the partial tier below.
+      const match = filtering
+        ? filterMatchFor(vendorType, v.filters, selections)
+        : UNFILTERED_MATCH;
+      const rank = match.rank;
       if (rank < 0) continue;
       // Squared distance from center, longitude scaled to match latitude at this
       // latitude. Only used for ordering, so no need for a real geodesic.
@@ -673,6 +684,7 @@ export function VendorMap({
         id: v.id,
         vendorType,
         rank: rank as 0 | 1,
+        matched: matchedFraction(match),
         // `=== true` rather than a truthiness test: both flags are undefined on
         // every row until migration 0035 is applied, and that has to read as
         // false for all rows alike so the two keys drop out and leave the old
@@ -683,24 +695,30 @@ export function VendorMap({
       });
     }
 
-    // Four keys, in order:
+    // Five keys, in order:
     //
-    //   rank    full matches before the "missing some information" ones. This
-    //           has to stay outermost: it is the partition the list draws its
-    //           divider on, and what the cap keeps when it bites.
-    //   priced  a vendor with an extracted price before one without. A couple
-    //           is shopping on budget, and a card that can answer "what does
-    //           this cost" is worth more than one that cannot. No divider —
-    //           this tier is internal, unlike rank.
-    //   photo   a card that draws an image before one that falls through to a
-    //           category placeholder.
-    //   d       then nearest the map center, as before.
+    //   rank     full matches before the "missing some information" ones. This
+    //            has to stay outermost: it is the partition the list draws its
+    //            divider on, and what the cap keeps when it bites.
+    //   matched  how MUCH of the ask a vendor met — the partial tier is itself
+    //            graded, so a venue silent on 1 filter of 3 outranks one silent
+    //            on 2. A no-op above the divider, where every row matched
+    //            everything and scores 1, which is why it can sit here rather
+    //            than being special-cased to rank 0.
+    //   priced   a vendor with an extracted price before one without. A couple
+    //            is shopping on budget, and a card that can answer "what does
+    //            this cost" is worth more than one that cannot. No divider —
+    //            this tier is internal, unlike rank.
+    //   photo    a card that draws an image before one that falls through to a
+    //            category placeholder.
+    //   d        then nearest the map center, as before.
     //
-    // Both middle keys are booleans, so each only ever reorders within the tier
-    // above it and distance still decides everything at the bottom.
+    // Each key only ever reorders within the tier above it, so distance still
+    // decides everything at the bottom.
     inView.sort(
       (a, b) =>
         b.rank - a.rank ||
+        b.matched - a.matched ||
         Number(b.priced) - Number(a.priced) ||
         Number(b.photo) - Number(a.photo) ||
         a.d - b.d,
