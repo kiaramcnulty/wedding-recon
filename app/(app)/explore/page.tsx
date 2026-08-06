@@ -432,7 +432,7 @@ export default function ExplorePage() {
   }
 
   return (
-    <div className="relative flex flex-1 flex-col min-h-[60vh]">
+    <div className="relative flex min-h-[60vh] flex-1 flex-col">
       {/* Warm the basemap connection early (hoisted to <head> by React). */}
       <link rel="preconnect" href={MAP_TILE_ORIGIN} crossOrigin="anonymous" />
       <link rel="dns-prefetch" href={MAP_TILE_ORIGIN} />
@@ -458,6 +458,23 @@ export default function ExplorePage() {
           onVendorsChange={setMapVendors}
         />
       </div>
+
+      {/* Everything over the map lives in ONE absolutely-positioned flex
+          column. That is what gives the list a bounded height: `absolute
+          inset-0` makes this box exactly as tall as the page container, so a
+          `flex-1 min-h-0` child resolves against a DEFINITE height and scrolls
+          internally.
+
+          In normal flow it could not. The chain up to <main> is sized by
+          min-height (min-h-dvh) with no definite height anywhere, so a tall
+          feed grew every ancestor instead of scrolling — 875 results rendered a
+          12,324px-tall list that simply ran off the page (Kiara, 2026-08-05).
+          Clipping the container did not help, because the growth is in the
+          ancestors, not the overflow.
+
+          Click-through by default so the map stays pannable; each control opts
+          back in with pointer-events-auto. */}
+      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
 
       {/* Cluster list feed (portals to <body>; opens on a cluster tap) */}
       {cluster && (
@@ -604,7 +621,7 @@ export default function ExplorePage() {
 
           Click-through except for the controls themselves, so it cannot steal a
           pin tap from the map underneath. */}
-      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] items-center gap-2 px-3 pt-2">
+      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] shrink-0 items-center gap-2 px-3 pt-2">
         <FilterButton
           selectedTypes={selectedTypes}
           activeCount={activeFilterCount}
@@ -638,7 +655,7 @@ export default function ExplorePage() {
           the controls. As a flex child it simply takes the space that is left,
           so it cannot overlap whatever sits above it. */}
       {view === "list" && (
-        <div className="relative z-[5] flex min-h-0 flex-1 flex-col bg-background">
+        <div className="pointer-events-auto relative z-[5] flex min-h-0 flex-1 flex-col bg-background">
           <VendorFeed
             entries={visible.entries}
             scrollKey="wr:screenScroll"
@@ -715,6 +732,7 @@ export default function ExplorePage() {
             )}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
