@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { UserRound, LogIn, LogOut, X, Mail } from "lucide-react";
+import { UserRound, LogIn, LogOut, X, Mail, Info } from "lucide-react";
 
+import { LANDING_HREF } from "@/lib/landing/nav";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/app/(auth)/actions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -217,7 +218,19 @@ export function ProfileMenu({ className }: { className?: string }) {
             )}
           </div>
 
-          <div className="mt-auto border-t p-4">
+          <div className="mt-auto space-y-3 border-t p-4">
+            {/* The way back to the landing page from Explore, which is a
+                full-bleed map with no BrandFooter to link out of. LANDING_HREF
+                (not "/") so the first-visit gate renders it instead of
+                bouncing the visit straight back here. */}
+            <Link
+              href={LANDING_HREF}
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground"
+            >
+              <Info className="size-4 shrink-0" />
+              About Wedding Recon
+            </Link>
             <button
               type="button"
               onClick={() => setFeedbackOpen(true)}

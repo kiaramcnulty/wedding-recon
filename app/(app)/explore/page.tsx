@@ -66,6 +66,30 @@ const MAP_TILE_ORIGIN = (() => {
   }
 })();
 
+/**
+ * Read a vendor-type selection from either source that can supply one: a
+ * `?types=venue,flowers` deeplink (comma-separated string) or the persisted
+ * `wr:typeFilter` payload (array of strings).
+ *
+ * Unknown and legacy values are dropped individually rather than rejecting the
+ * whole list, so an old link still filters to whatever it names that is still a
+ * selectable category. Returns null when nothing usable survives — the caller
+ * treats that as "show everything", which is also the no-filter default.
+ */
+function parseTypeList(raw: unknown): VendorType[] | null {
+  const values =
+    typeof raw === "string"
+      ? raw.split(",").map((v) => v.trim())
+      : Array.isArray(raw)
+        ? raw
+        : [];
+  const clean = values.filter(
+    (t): t is VendorType =>
+      typeof t === "string" && (VENDOR_TYPES as readonly string[]).includes(t),
+  );
+  return clean.length ? [...new Set(clean)] : null;
+}
+
 export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
@@ -225,30 +249,43 @@ export default function ExplorePage() {
     }
   }, []);
 
-  // Restore the persisted type filter after mount. Deferred a tick (setTimeout 0,
+  // Apply the type filter after mount, from a `?types=` deeplink if there is
+  // one and the persisted selection otherwise. Deferred a tick (setTimeout 0,
   // same pattern as the cluster restore below) so the first client render matches
-  // the server's default ("all shown") before any saved selection is applied.
+  // the server's default ("all shown") before any selection is applied.
+  //
+  // The URL wins over sessionStorage on purpose: `?types=` is an explicit
+  // request from outside the app (the landing page's category grid links one
+  // URL per category), and silently overriding it with a stale tab-local filter
+  // would make those links look broken.
   useEffect(() => {
     if (typeof window === "undefined") return;
     let restored: VendorType[] | null = null;
     try {
-      const raw = sessionStorage.getItem("wr:typeFilter");
-      if (raw) {
-        const parsed: unknown = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const clean = parsed.filter(
-            (t): t is VendorType =>
-              typeof t === "string" &&
-              (VENDOR_TYPES as readonly string[]).includes(t),
-          );
-          if (clean.length) restored = clean;
-        }
+      const fromUrl = parseTypeList(
+        new URLSearchParams(window.location.search).get("types"),
+      );
+      if (fromUrl) {
+        restored = fromUrl;
+      } else {
+        const raw = sessionStorage.getItem("wr:typeFilter");
+        if (raw) restored = parseTypeList(JSON.parse(raw) as unknown);
       }
     } catch {
       // malformed payload — fall back to showing all
     }
     if (!restored) return;
-    const t = setTimeout(() => setSelectedTypes(restored), 0);
+    const next = restored;
+    const t = setTimeout(() => {
+      setSelectedTypes(next);
+      // Persist it like a tapped chip, so it survives the round trip to a
+      // vendor page — which returns via ?restore=1 and drops the query string.
+      try {
+        sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
+      } catch {
+        // sessionStorage unavailable — the filter still applies this session.
+      }
+    }, 0);
     return () => clearTimeout(t);
   }, []);
 

@@ -13,11 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 import { Toaster } from "@/components/ui/sonner";
+import { SITE_URL } from "@/lib/site";
 
-// Absolute base for Open Graph / icon URLs — social crawlers (iMessage, X,
-// Facebook) require absolute image URLs, so relative metadata paths resolve
-// against this. Set NEXT_PUBLIC_SITE_URL per environment; fall back to prod.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://weddingrecon.com";
 const DESCRIPTION = "Explore local wedding vendors and share your own recon.";
 
 export const metadata: Metadata = {
