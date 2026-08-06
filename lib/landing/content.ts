@@ -314,15 +314,11 @@ export const DATA_SECTION = {
     note: "Price quotes, notes and photos, collected from couples, reviews and vendor sites across Colorado.",
   },
   beautyChart: {
-    title: "Hair and makeup: do they come to you?",
-    subtitle:
-      "A hard logistics constraint on the wedding morning, and the kind of detail no directory lists. Recorded from recon, not from how an artist markets themselves.",
+    title: "Hair and makeup: do they come to you?"
   },
   medianVenue: {
     value: "$2,250",
-    label: "median venue starting price",
-    note: "Median of the 37% of venues with a published or reported starting figure. Site fee only - catering, bar and rentals sit on top.",
-  },
+    label: "median venue starting price"  },
   /**
    * Towns named so the page still carries them as search terms after the old
    * Colorado section was removed. No counts: per-town figures were never
@@ -386,8 +382,7 @@ export const BEAUTY_SETUP = {
   segments: [
     { label: "Comes to you", count: 39, pct: 78 },
     { label: "Studio only", count: 11, pct: 22 },
-  ],
-  base: "Of the 50 of 183 hair and makeup artists who state where they work. The rest have not said.",
+  ]
 } as const;
 
 /* -------------------------------------------------------------------------- */
