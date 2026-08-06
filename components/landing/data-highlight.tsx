@@ -52,7 +52,12 @@ const CARD =
   "flex min-w-0 shrink-0 basis-[88%] snap-start flex-col rounded-2xl border bg-background p-5 shadow-sm sm:basis-[62%] lg:basis-[46%]";
 
 export function DataHighlight() {
-  const maxVendors = Math.max(...VENDOR_COUNTS.map((row) => row.count));
+  // The scale is set by the capped values, not the true ones - see the note on
+  // VENDOR_COUNTS. Without the cap the venue bar is 2.5x the next category and
+  // the bottom half of the chart is unreadable.
+  const maxVendors = Math.max(
+    ...VENDOR_COUNTS.map((row) => row.barValue ?? row.count),
+  );
 
   const labels = [
     DATA_SECTION.categoryChart.title,
@@ -78,7 +83,7 @@ export function DataHighlight() {
             subtitle={DATA_SECTION.categoryChart.subtitle}
           />
           <ul className="mt-4 space-y-0.5">
-            {VENDOR_COUNTS.map(({ type, count }) => (
+            {VENDOR_COUNTS.map(({ type, count, display, barValue }) => (
               <li key={type}>
                 <Link
                   href={`${APP_HREF}?types=${type}`}
@@ -87,14 +92,16 @@ export function DataHighlight() {
                   <span
                     aria-hidden
                     className="absolute inset-y-0 left-0 rounded-r-[4px] bg-brand/15"
-                    style={{ width: `${(count / maxVendors) * 100}%` }}
+                    style={{
+                      width: `${Math.min((barValue ?? count) / maxVendors, 1) * 100}%`,
+                    }}
                   />
                   <CategorySwatch type={type} />
                   <span className="relative text-[13px] first-letter:uppercase">
                     {CATEGORY_PLURAL[type]}
                   </span>
                   <span className="relative ml-auto text-[13px] font-medium tabular-nums">
-                    {count}
+                    {display ?? count}
                   </span>
                 </Link>
               </li>

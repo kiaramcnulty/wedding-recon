@@ -175,7 +175,7 @@ export const PROBLEMS_SECTION = {
    * document outline.
    */
   heading:
-    "Built to create transparency in the wedding vendor search process",
+    "Built to create transparency in the wedding vendor search process.",
   /** Label over the solution half of a card. The problem half needs none now. */
   solutionLabel: "On Wedding Recon",
   carouselLabel: "Problems Wedding Recon solves",
@@ -353,9 +353,30 @@ export const DATA_SECTION = {
   ],
 } as const;
 
-/** Vendor counts per category. Sums to 2,163 - the whole directory. */
-export const VENDOR_COUNTS: { type: VendorType; count: number }[] = [
-  { type: "venue", count: 679 },
+/**
+ * Vendor counts per category. `count` is the true figure and they sum to 2,163,
+ * the whole directory.
+ *
+ * `display` and `barValue` are a presentation cap, set only on venues (Kiara,
+ * 2026-08-04). At true scale 679 venues is 2.5x the next category, which
+ * squashes everything below it into slivers - so the bar is drawn as if it were
+ * 300 and printed as "300+".
+ *
+ * The trade, stated plainly: the chart then understates venues by more than
+ * half. "300+" is true as a lower bound rather than wrong, and `count` still
+ * holds 679 for anything that needs the real number. If the cap ever reads as
+ * misleading, the honest alternative is to keep the label at 679 and clip the
+ * bar with a visible break, rather than to quietly rescale it.
+ */
+export const VENDOR_COUNTS: {
+  type: VendorType;
+  count: number;
+  /** Printed instead of `count` when set. */
+  display?: string;
+  /** Drawn instead of `count` when set, and caps the chart's scale. */
+  barValue?: number;
+}[] = [
+  { type: "venue", count: 679, display: "300+", barValue: 300 },
   { type: "photos", count: 274 },
   { type: "hotel", count: 253 },
   { type: "flowers", count: 183 },
