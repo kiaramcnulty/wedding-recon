@@ -47,6 +47,20 @@ export interface FilterDef {
    */
   basis?: string;
   /**
+   * `range` only. Multipliers that convert an off-`basis` quote ONTO `basis`,
+   * keyed by the vendor's own `price_basis`. A basis listed here is comparable
+   * after scaling and is matched normally; one that is not stays unknown.
+   *
+   * This is what makes an assumption like "a per-person venue at 100 guests"
+   * real rather than a claim in the copy. Both readers of a range — the matcher
+   * in `lib/filters/match.ts` and the sheet's histogram — apply it, so a vendor
+   * is binned under the same number it is judged by. Without it the two
+   * disagreed: the histogram binned a $150-per-person venue in the $0-499 bar
+   * while the matcher demoted that same venue into the partial tier for being
+   * silent on a price it had published (Kiara, 2026-08-06).
+   */
+  basisScale?: Record<string, number>;
+  /**
    * Coverage is low: few vendors have this recorded either way. Purely a UI
    * hint now — it paints the "Rare" badge on the filter in the sheet, warning
    * the couple that selecting it will not narrow much.
@@ -86,6 +100,20 @@ export const DAY_TYPES = [
   { value: "saturday", label: "Saturday" },
   { value: "sunday", label: "Sunday" },
 ] as const;
+
+/**
+ * Venue pricing assumptions, stated in the UI rather than hidden. Venues that
+ * quote per-person or per-hour are converted onto the package axis so they can
+ * share one slider; the numbers are Kiara's (2026-08-05).
+ *
+ * Declared above VENDOR_FILTERS because the venue price filter's `basisScale`
+ * is built from it at module init — a `const` below would still be in its
+ * temporal dead zone here.
+ */
+export const VENUE_PRICE_ASSUMPTIONS = {
+  guests: 100,
+  hours: 5,
+} as const;
 
 const opt = (o: Record<string, string>): FilterOption[] =>
   Object.entries(o).map(([value, label]) => ({ value, label }));
@@ -136,6 +164,13 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       hi: "price_max",
       unit: "usd",
       basis: "package",
+      // The conversion the sheet's footnote promises the couple. Only these two
+      // bases are convertible: `per_night` is a hotel room rate that happens to
+      // sit on a venue row, and no guest count turns it into a venue fee.
+      basisScale: {
+        per_person: VENUE_PRICE_ASSUMPTIONS.guests,
+        per_hour: VENUE_PRICE_ASSUMPTIONS.hours,
+      },
       rescaledBy: "date_context",
     },
     {
@@ -530,12 +565,3 @@ export function filtersForType(t: VendorType | undefined): FilterDef[] {
   return (t && VENDOR_FILTERS[t]) || [];
 }
 
-/**
- * Venue pricing assumptions, stated in the UI rather than hidden. Venues that
- * quote per-person or per-hour are converted onto the package axis so they can
- * share one slider; the numbers are Kiara's (2026-08-05).
- */
-export const VENUE_PRICE_ASSUMPTIONS = {
-  guests: 100,
-  hours: 5,
-} as const;

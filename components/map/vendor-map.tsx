@@ -314,15 +314,28 @@ function buildFeatureCollectionsByType(
 }
 
 /**
- * Emitted when a cluster pin is tapped: the vendor ids it contains plus the map
+ * Emitted when a cluster pin is tapped: the vendors it contains plus the map
  * view at tap time, so the caller can reopen the same view after a round trip to
  * a vendor page.
  */
 export interface ClusterOpenPayload {
-  ids: string[];
+  /**
+   * The cluster's vendors, each with its match rank, ordered full matches
+   * first — the same two-tier ordering `reportVisibleVendors` gives the results
+   * feed, so the cluster feed can draw the same divider rather than presenting
+   * a demoted vendor as a match.
+   */
+  entries: ClusterEntry[];
   vendorType: VendorType;
   center: [number, number];
   zoom: number;
+}
+
+/** One vendor in a tapped cluster. The type is a per-cluster fact, so it is not repeated per row. */
+export interface ClusterEntry {
+  id: string;
+  /** 1 matches every active attribute filter, 0 is silent on at least one. */
+  rank: 0 | 1;
 }
 
 /** Emitted when an individual (non-cluster) vendor pin is tapped. */
@@ -1000,6 +1013,17 @@ export function VendorMap({
             cluster: true,
             clusterRadius: CLUSTER_RADIUS,
             clusterMaxZoom: CLUSTER_MAX_ZOOM,
+            // How many of a bubble's vendors are FULL matches. `rank` is 1 or 0
+            // per point (contradicting rows never reach the source), so summing
+            // it counts the matches. Without this a bubble reports point_count
+            // and silently claims every vendor under it matched — the whole
+            // reason a filter could say "5 matches" over a map of 126 pins
+            // (Kiara, 2026-08-06). The individual pins have receded the partial
+            // tier since the filter shipped; at cluster zooms there are no
+            // individual pins, so nothing was carrying that signal. Recomputed
+            // automatically: a filter change rebuilds the source via
+            // applyVendors.
+            clusterProperties: { matched: ["+", ["get", "rank"]] },
           });
         }
 
@@ -1075,7 +1099,21 @@ export function VendorMap({
               "icon-size": ["step", ["get", "point_count"], 1, 10, 1.15, 25, 1.3],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
-              "text-field": ["get", "point_count_abbreviated"],
+              // The number is what MATCHED, not what is underneath. Three cases,
+              // in order: every leaf matched (always true with no filter active)
+              // shows the abbreviated total, so nothing changes for the common
+              // case and big counts keep their "1.2k" form; a partial hit shows
+              // the match count; a bubble with no matches falls back to its
+              // total and recedes below, reading as "12 here, none confirmed"
+              // rather than a bare "0".
+              "text-field": [
+                "case",
+                ["==", ["get", "matched"], ["get", "point_count"]],
+                ["get", "point_count_abbreviated"],
+                [">", ["get", "matched"], 0],
+                ["to-string", ["get", "matched"]],
+                ["get", "point_count_abbreviated"],
+              ],
               "text-font": ["Noto Sans Regular"],
               "text-size": ["step", ["get", "point_count"], 13, 10, 15, 25, 17],
               // Sit the count in the lower half of the disc (icon is up top);
@@ -1088,6 +1126,23 @@ export function VendorMap({
               "text-color": "#ffffff",
               "text-halo-color": "rgba(0,0,0,0.25)",
               "text-halo-width": 1,
+              // A bubble holding nothing that matches recedes exactly as far as
+              // an individual rank-0 pin, and for the same reason: it is still
+              // worth tapping, because low coverage mostly means nobody wrote
+              // the answer down. No selection case here — a cluster is never
+              // the selected vendor.
+              "icon-opacity": [
+                "case",
+                ["==", ["get", "matched"], 0],
+                PARTIAL_ICON_OPACITY,
+                1,
+              ],
+              "text-opacity": [
+                "case",
+                ["==", ["get", "matched"], 0],
+                PARTIAL_LABEL_OPACITY,
+                1,
+              ],
               "icon-translate": off,
               "text-translate": off,
             },
@@ -1117,13 +1172,21 @@ export function VendorMap({
             if (onOpen) {
               const count = (feature.properties?.point_count as number) ?? 0;
               src.getClusterLeaves(clusterId, count, 0).then((leaves) => {
-                const ids = leaves
-                  .map((l) => l.properties?.id)
-                  .filter((id): id is string => typeof id === "string");
-                if (ids.length === 0) return;
+                const entries = leaves
+                  .map((l) => ({
+                    id: l.properties?.id,
+                    // Leaves are the original points, so each carries the rank
+                    // buildFeatureCollectionsByType stamped on it.
+                    rank: l.properties?.rank === 0 ? 0 : 1,
+                  }))
+                  .filter((e): e is ClusterEntry => typeof e.id === "string")
+                  // Full matches first, mirroring the results feed. Leaf order
+                  // is supercluster's, which has nothing to do with relevance.
+                  .sort((a, b) => b.rank - a.rank);
+                if (entries.length === 0) return;
                 const c = map.getCenter();
                 onOpen({
-                  ids,
+                  entries,
                   vendorType: t,
                   center: [c.lng, c.lat],
                   zoom: map.getZoom(),

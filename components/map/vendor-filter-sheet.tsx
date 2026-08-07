@@ -925,7 +925,16 @@ export function VendorFilterSheet({
   return mounted ? createPortal(body, document.body) : null;
 }
 
-/** The number a price histogram should bin this vendor under. */
+/**
+ * The number a price histogram should bin this vendor under.
+ *
+ * Returns undefined for a vendor the matcher cannot judge, so the bars only
+ * ever count rows a selection can actually match. An off-basis quote is binned
+ * only when `basisScale` can convert it (a per-person venue at the stated guest
+ * count) and dropped otherwise — binning it raw put $150-per-person venues in
+ * the $0-499 bar while the matcher was demoting them into the partial tier,
+ * which is exactly the contradiction the couple was reading (Kiara, 2026-08-06).
+ */
 function priceForContext(
   v: Vendor,
   def: FilterDef,
@@ -933,6 +942,15 @@ function priceForContext(
 ): number | undefined {
   const f = v.filters;
   if (!f) return undefined;
+
+  let scale = 1;
+  const basis = f.price_basis;
+  if (def.basis && typeof basis === "string" && basis !== def.basis) {
+    const factor = def.basisScale?.[basis];
+    if (factor === undefined) return undefined;
+    scale = factor;
+  }
+
   if (def.rescaledBy === "date_context" && (dc.season || dc.day) && Array.isArray(f.price_tiers)) {
     const hits = (f.price_tiers as Array<Record<string, unknown>>).filter(
       (t) =>
@@ -940,10 +958,10 @@ function priceForContext(
         (!dc.day || t.day_type == null || t.day_type === dc.day),
     );
     const mins = hits.map((t) => t.min).filter((n): n is number => typeof n === "number");
-    if (mins.length) return Math.min(...mins);
+    if (mins.length) return Math.min(...mins) * scale;
   }
   const n = f[def.lo ?? def.key];
-  return typeof n === "number" ? n : undefined;
+  return typeof n === "number" ? n * scale : undefined;
 }
 
 /* ----------------------------------------------------------------- trigger */

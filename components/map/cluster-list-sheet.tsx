@@ -3,10 +3,11 @@
 import * as React from "react";
 import { CATEGORY_PLURAL, type VendorType } from "@/lib/constants/categories";
 import { VendorListSheet } from "@/components/map/vendor-list-sheet";
+import { type ClusterEntry } from "@/components/map/vendor-map";
 
 interface ClusterListSheetProps {
-  /** Vendor ids in the tapped cluster (leaf order from the map). */
-  ids: string[];
+  /** Vendors in the tapped cluster, full matches first (see ClusterOpenPayload). */
+  entries: ClusterEntry[];
   vendorType: VendorType;
   onClose: () => void;
 }
@@ -19,19 +20,35 @@ interface ClusterListSheetProps {
  * `vendor-list-sheet.tsx`.
  */
 export function ClusterListSheet({
-  ids,
+  entries,
   vendorType,
   onClose,
 }: ClusterListSheetProps) {
-  const entries = React.useMemo(
-    () => ids.map((id) => ({ id, vendorType })),
-    [ids, vendorType],
+  // Passing `rank` through is what lets this feed draw the partial-tier divider
+  // it already knows how to render — before, the cluster feed handed over bare
+  // ids, so every row read as a full match however little it matched.
+  const rows = React.useMemo(
+    () => entries.map((e) => ({ ...e, vendorType })),
+    [entries, vendorType],
   );
+
+  // The heading counts MATCHES, not leaves, for the same reason the bubble it
+  // came from does: with a filter active most of a cluster is usually the
+  // partial tier, and "35 venues available" over 1 match is the claim that
+  // started this. The divider below labels the remainder.
+  const matched = React.useMemo(
+    () => entries.reduce((n, e) => n + e.rank, 0),
+    [entries],
+  );
+  const heading =
+    matched === entries.length
+      ? `${entries.length} ${CATEGORY_PLURAL[vendorType]} available`
+      : `${matched} of ${entries.length} ${CATEGORY_PLURAL[vendorType]} match`;
 
   return (
     <VendorListSheet
-      entries={entries}
-      heading={`${ids.length} ${CATEGORY_PLURAL[vendorType]} available`}
+      entries={rows}
+      heading={heading}
       scrollKey="wr:clusterScroll"
       onClose={onClose}
     />

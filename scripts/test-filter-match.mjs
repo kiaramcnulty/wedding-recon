@@ -77,6 +77,35 @@ eq("on-basis compares normally",
   filterRank({ price_min: 8000, price_basis: "package" },
     { price: { ...price(5000, 15000), basis: "package" } }), 1);
 
+// ...unless the filter carries a conversion, which is what the venue slider's
+// "per person shown at 100 guests" footnote promises. Scaled, then judged like
+// any other number — never demoted, because it IS comparable now.
+const venuePrice = (min, max) => ({
+  ...price(min, max),
+  basis: "package",
+  scale: { per_person: 100, per_hour: 5 },
+});
+eq("per-person venue is scaled onto the package axis",
+  filterRank({ price_min: 150, price_basis: "per_person" }, { price: venuePrice(10000, 20000) }), 1);
+eq("scaled per-person venue can also be ruled out",
+  filterRank({ price_min: 150, price_basis: "per_person" }, { price: venuePrice(0, 499) }), -1);
+eq("per-hour venue is scaled too",
+  filterRank({ price_min: 300, price_basis: "per_hour" }, { price: venuePrice(1000, 2000) }), 1);
+eq("a basis with no conversion factor still reads as silence",
+  filterRank({ price_min: 220, price_basis: "per_night" }, { price: venuePrice(0, 499) }), 0);
+eq("the open-ended sentinel is not scaled",
+  filterRank({ price_min: 150, price_basis: "per_person", price_kind: "starting_at" },
+    { price: venuePrice(50000, 90000) }), 1);
+eq("scaling applies to a season tier as well as the headline",
+  filterRank(
+    { price_min: 90, price_max: 150, price_basis: "per_person",
+      price_tiers: [{ season: "peak", day_type: "saturday", min: 150, max: 180 }] },
+    { price: { ...venuePrice(15000, 18000), season: "peak", day: "saturday" } }), 1);
+eq("a scaled row still reports its silences for the partial-tier grading",
+  filterMatch({ price_min: 150, price_basis: "per_person" },
+    { price: venuePrice(10000, 20000), setting: { kind: "multi", values: ["mountain"] } }),
+  { rank: 0, unknown: 1, active: 2 });
+
 // Capacity is a point test in both directions — Kiara: "if I have 100 guests,
 // I probably don't want a 400 capacity venue".
 const cap = (min, max) => ({ kind: "range", mode: "point", lo: "capacity_max", min, max });
@@ -202,11 +231,16 @@ report("venue · mountain or garden, 100-250 guests", "venue", {
 });
 report("venue · outside catering allowed, under $10k", "venue", {
   catering_policy: { kind: "multi", values: ["outside_allowed"] },
-  price: { ...price(0, 10000), basis: "package" },
+  price: venuePrice(0, 10000),
 });
 report("venue · same, but a peak Saturday", "venue", {
   catering_policy: { kind: "multi", values: ["outside_allowed"] },
-  price: { ...price(0, 10000), basis: "package", season: "peak", day: "saturday" },
+  price: { ...venuePrice(0, 10000), season: "peak", day: "saturday" },
+});
+// The reported bug: a cheap venue-fee band, where nearly every row is silent on
+// price. The split itself is honest - the map and list have to SHOW it.
+report("venue · fee under $500 (the 2026-08-06 report)", "venue", {
+  price: venuePrice(0, 499),
 });
 report("photos · documentary, does elopements, under $4k", "photos", {
   style: { kind: "multi", values: ["documentary"] },

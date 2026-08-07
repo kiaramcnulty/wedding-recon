@@ -35,6 +35,9 @@ export type FilterSpec =
       basis?: string;
       season?: string;
       day?: string;
+      /** Multipliers converting an off-`basis` quote onto `basis`, by the
+       * vendor's own `price_basis`. See `FilterDef.basisScale`. */
+      scale?: Record<string, number>;
     };
 
 export type FilterSelection = Record<string, FilterSpec>;
@@ -179,11 +182,21 @@ export function filterMatch(
     }
 
     // range
+    //
+    // An off-basis quote is either convertible or incomparable. A venue quoting
+    // per person can be put on the package axis by assuming a guest count (the
+    // sheet states the assumption in so many words), so it is scaled and then
+    // judged normally. A caterer's per-person rate against a per-package slider
+    // has no such factor, and reads as silence rather than as a miss.
     const basis = filters["price_basis"];
+    let scale = 1;
     if (spec.basis && typeof basis === "string" && basis !== spec.basis) {
-      // Another unit is not comparable, so it reads as silence, not a miss.
-      unknown++;
-      continue;
+      const factor = spec.scale?.[basis];
+      if (factor === undefined) {
+        unknown++;
+        continue;
+      }
+      scale = factor;
     }
 
     let lo = num(filters[spec.lo]);
@@ -211,6 +224,14 @@ export function filterMatch(
     if (lo === undefined && hi === undefined) {
       unknown++;
       continue;
+    }
+
+    // Onto the filter's axis. Applied after the tier lookup because a tier is
+    // quoted in the vendor's own basis too, and before the open-ended sentinel
+    // below, which is not a price and must not be multiplied.
+    if (scale !== 1) {
+      if (lo !== undefined) lo *= scale;
+      if (hi !== undefined) hi *= scale;
     }
 
     const vLo = (lo ?? hi) as number;
@@ -272,6 +293,7 @@ export function buildSelection(
         ...(r.min != null && { min: r.min }),
         ...(r.max != null && { max: r.max }),
         ...(d.basis && { basis: d.basis }),
+        ...(d.basisScale && { scale: d.basisScale }),
         ...(d.rescaledBy === "date_context" && dateContext?.season && { season: dateContext.season }),
         ...(d.rescaledBy === "date_context" && dateContext?.day && { day: dateContext.day }),
       };
