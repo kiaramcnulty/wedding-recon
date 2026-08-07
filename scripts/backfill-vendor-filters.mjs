@@ -27,6 +27,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { VENDOR_FILTERS } from "../lib/constants/vendor-filters.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = resolve(ROOT, "data/filter-extraction/vendor-filters.jsonl");
@@ -213,11 +214,37 @@ for (const r of rows) {
   if (f) payload.push({ id: r.vendor_id, filters: f });
 }
 
+const HIST_KEYS = ["price_min", "capacity_max", "minimum_spend", "bride_price_min", "party_price_min", "turnaround_weeks"];
+
+/**
+ * The number a row should be binned under — the generator's half of the sheet's
+ * `priceForContext`, and it has to agree with it. A filter that declares a
+ * `basis` only compares against quotes in that basis: an off-basis one is
+ * converted when `basisScale` can (a per-person venue at the stated guest
+ * count) and dropped when it cannot (a per-night hotel rate on a venue row is
+ * not a venue fee at any guest count).
+ *
+ * Edges and bars must come from ONE value set. Binning raw put 13 per-person
+ * venues quoting $25-$150 into the $0-499 bar while the matcher was reading
+ * them as $2.5k-$15k, and let a single $22,000 room rate pad the top bin.
+ */
+function valueFor(f, key, def) {
+  const n = f[key];
+  if (typeof n !== "number") return undefined;
+  if (!def?.basis) return n;
+  const basis = f.price_basis;
+  if (typeof basis !== "string" || basis === def.basis) return n;
+  const factor = def.basisScale?.[basis];
+  return factor === undefined ? undefined : n * factor;
+}
+
 const hist = {};
 for (const [t, list] of Object.entries(byType)) {
   const h = {};
-  for (const key of ["price_min", "capacity_max", "minimum_spend", "bride_price_min", "party_price_min", "turnaround_weeks"]) {
-    const b = bins(list.map((f) => f[key]).filter((n) => typeof n === "number"));
+  const defs = VENDOR_FILTERS[t] ?? [];
+  for (const key of HIST_KEYS) {
+    const def = defs.find((d) => d.kind === "range" && (d.lo ?? d.key) === key);
+    const b = bins(list.map((f) => valueFor(f, key, def)).filter((n) => n !== undefined));
     if (b) h[key] = b;
   }
   if (Object.keys(h).length) hist[t] = h;
