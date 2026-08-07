@@ -14,7 +14,6 @@ import {
   filtersForType,
   SEASONS,
   DAY_TYPES,
-  VENUE_PRICE_ASSUMPTIONS,
   type FilterDef,
 } from "@/lib/constants/vendor-filters";
 import HISTOGRAMS from "@/lib/constants/filter-histograms.json";
@@ -529,15 +528,14 @@ function TypeSection({
                     scaled={rescaledCounts(def)}
                   />
 
-                  {def.unit === "usd" &&
-                    vendorType === "venue" &&
-                    def.key === "price" && (
-                      <p className="mt-2 text-[11px] text-muted-foreground">
-                        Venues quoting per person are shown at{" "}
-                        {VENUE_PRICE_ASSUMPTIONS.guests} guests, per hour at{" "}
-                        {VENUE_PRICE_ASSUMPTIONS.hours} hours.
-                      </p>
-                    )}
+                  {/* Any slider that converts an off-basis quote says so, from
+                      the def's own `basisNote` — the assumption is the filter's,
+                      not this component's, so a new one cannot ship silently. */}
+                  {def.basisNote && (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      {def.basisNote}
+                    </p>
+                  )}
                 </div>
               )}
             </AccordionContent>
