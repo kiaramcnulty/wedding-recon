@@ -70,7 +70,9 @@ Archive into `intel` now; the enrichment pass consumes it:
   day-of / month-of coordination, à la carte / hourly, elopement or "wedding guiding".
 - **Pricing** — package starting prices, hourly, flat fees, or **percentage-of-budget**
   (a real planner model, ~10-15%); deposits/retainers; what a package includes. Never invent
-  numbers — "consultation/quote only" is the honest answer when only package NAMES are listed.
+  numbers — record that only package NAMES were listed and no figures were published. (Do
+  not write it up as "quote only"; the enrich pass has plain wordings for that, see
+  `enrichvendors/references/common/entry-rules-core.md`.)
 - **Service region + travel fees** — becomes `service_region` on every recon entry,
   **required**; **if no service area is stated, default to the whole state** (planners
   travel). Capture any stated travel fee for mountain/destination weddings.
