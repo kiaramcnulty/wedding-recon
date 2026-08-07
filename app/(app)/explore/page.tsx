@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   VendorMap,
+  type ClusterEntry,
   type ClusterOpenPayload,
   type VendorOpenPayload,
   type VisibleVendorsPayload,
 } from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
-import type { VendorListEntry } from "@/components/map/vendor-feed";
 import { VendorFeed, ViewToggle } from "@/components/map/vendor-feed";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import {
@@ -127,7 +127,7 @@ export default function ExplorePage() {
   // The open cluster list (null = closed). Opened on a cluster tap, or restored
   // when returning from a vendor page (?restore=1).
   const [cluster, setCluster] = useState<{
-    entries: VendorListEntry[];
+    entries: ClusterEntry[];
     vendorType: VendorType;
   } | null>(null);
   // The single vendor whose peek card is open (null = closed). Opened on a pin
@@ -190,6 +190,11 @@ export default function ExplorePage() {
   }, [selectedTypes, filterStates, dateContexts]);
 
   const activeFilterCount = countSelections(filterSelections);
+  // Vendors on screen that match every filter they were judged against. The
+  // rest are `visible.partial`: on the map, under the list's divider, but
+  // silent on something filtered for. Same arithmetic the filter sheet's footer
+  // does, over the same payload, so the pill and the sheet cannot disagree.
+  const matchedCount = Math.max(0, visible.total - visible.partial);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
@@ -219,7 +224,10 @@ export default function ExplorePage() {
     try {
       sessionStorage.setItem(
         "wr:cluster",
-        JSON.stringify({ entries: payload.entries, vendorType: payload.vendorType }),
+        JSON.stringify({
+          entries: payload.entries,
+          vendorType: payload.vendorType,
+        }),
       );
       // Fresh cluster → open at the top (drop any saved feed scroll position).
       sessionStorage.removeItem("wr:clusterScroll");
@@ -467,27 +475,28 @@ export default function ExplorePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!new URLSearchParams(window.location.search).has("restore")) return;
-    let restoredCluster: { entries: VendorListEntry[]; vendorType: VendorType } | null = null;
+    let restoredCluster: {
+      entries: ClusterEntry[];
+      vendorType: VendorType;
+    } | null = null;
     let restoredPin: { id: string; vendorType: VendorType } | null = null;
     try {
       const raw = sessionStorage.getItem("wr:cluster");
       if (raw) {
-        // `ids` is the pre-2026-08-07 shape, when the cluster feed was an
-        // unranked id list. A tab open across that deploy still has one parked
-        // here, so it is read rather than dropped; those rows just have no rank
-        // and render as full matches, which is what they did before anyway.
         const d = JSON.parse(raw) as {
-          entries?: VendorListEntry[];
+          entries?: ClusterEntry[];
+          // Pre-2026-08-06 payloads carried bare ids. A tab open across the
+          // deploy still restores, with every row read as a full match — which
+          // is what it meant before ranks were persisted.
           ids?: string[];
           vendorType?: VendorType;
         };
-        const entries =
-          d.entries?.length
-            ? d.entries
-            : d.ids?.length && d.vendorType
-              ? d.ids.map((id) => ({ id, vendorType: d.vendorType as VendorType }))
-              : null;
-        if (entries?.length && d.vendorType) {
+        const entries = d.entries?.length
+          ? d.entries
+          : d.ids?.length
+            ? d.ids.map((id) => ({ id, rank: 1 as const }))
+            : null;
+        if (entries && d.vendorType) {
           restoredCluster = { entries, vendorType: d.vendorType };
         }
       }
@@ -893,9 +902,25 @@ export default function ExplorePage() {
         <span
           // aria-live so a screen reader hears the count settle after a pan.
           aria-live="polite"
+          // The visible text has to stay short — this chip shares a row with the
+          // filter button and the view toggle inside a 390px viewport — so the
+          // full sentence goes to the label instead of being truncated away.
+          aria-label={
+            visible.partial > 0
+              ? `${matchedCount} of ${visible.total} vendors on screen match your filters. ${visible.partial} are partial matches, missing some information.`
+              : undefined
+          }
           className="min-w-0 shrink truncate rounded-full border border-border bg-background/95 px-2.5 py-1 text-center text-[13px] font-medium shadow-sm backdrop-blur"
         >
-          {visible.total === 1 ? "1 result" : `${visible.total} results`}
+          {/* "N results" was counting the partial tier as results, so the map
+              claimed 126 where the filter sheet said 5 (Kiara, 2026-08-06).
+              Both numbers now, which is the only reading that cannot conflict
+              with the sheet's footer, the list's divider, or the pins. */}
+          {visible.partial > 0
+            ? `${matchedCount} of ${visible.total}`
+            : visible.total === 1
+              ? "1 result"
+              : `${visible.total} results`}
         </span>
         <span className="flex-1" aria-hidden />
         <ViewToggle

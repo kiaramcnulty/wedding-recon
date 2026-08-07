@@ -55,12 +55,13 @@ Content is about the getting-ready morning — the look, the timeline, the trave
 
 ## price_details specifics
 - **This type usually POSTS its rates — dig them out of the dossier rather than defaulting
-  to "quote only."** The shapes to look for: bride hair, bride makeup, bride hair + makeup
+  to a no-price headline.** The shapes to look for: bride hair, bride makeup, bride hair + makeup
   combined; per-person bridal-party rates (often priced separately for hair vs. makeup);
   trial / preview fee and whether it's credited toward the wedding; add-ons (lash strips or
   extensions, hair extensions installation, veil placement, touch-up kit, an artist staying
   on-site for touch-ups); travel fee / mileage / minimums / early-start fee; deposit terms.
 - **Wedding pricing only.** Ignore prom, homecoming, and general special-event rate cards
   even when they're on the same page — they mislead couples about what a wedding costs.
-- Never invent a number. "Quote only" is the honest fallback when nothing is posted, but on
-  this type it should be the exception, not the default.
+- Never invent a number. A plain "no quote found" headline (wording per
+  `common/entry-rules-core.md`) is the honest fallback when nothing is posted, but on this
+  type it should be the exception, not the default.

@@ -85,9 +85,30 @@ const EMDASH = /[—–]/; // no em/en dashes anywhere in entry text — real us
 // so failing the whole upload over it would be pure friction. The count is reported below
 // so a run that produces a lot of them is still visible.
 const ESCAPES = /\\{1,2}[rnt]/;
+// "Quote only" and its family — the retired price_text sentinel for a vendor that
+// publishes nothing (Kiara, 2026-08-07). It was wrong twice over: asserted even on
+// entries that DID state a number, which contradicts itself on the card ("Quote only but
+// The Knot says $8k" — if we have a number we have a price data point), and read as a
+// category label rather than as something a couple would say. Rows already in the DB were
+// rewritten by migration 0036; the drafting contract now asks for plain wordings.
+// Handled in two halves, exactly as that migration split them:
+//   - wording alone       -> REPAIRED at insert by plainQuoteOnly() below, because the
+//                            fix is unambiguous and failing an upload over a word choice
+//                            would be pure friction (same call as ESCAPES).
+//   - wording + a figure  -> HARD GATE here. What that headline should say instead is an
+//                            editorial decision (lead with the number, in the entry's own
+//                            voice), and a script amputating the clause would hide a
+//                            drafting error rather than fix it. The migration had to do
+//                            it mechanically only because legacy rows have no drafter to
+//                            send back to.
+// Keep both regexes in lockstep with pipeline.mjs, which counts them at the cheap
+// pre-check so neither first surfaces here.
+const QUOTE_ONLY = /(?:(?:pricing|price|prices|rates?|available|custom|by|on|via|per)\s+)*quotes?[\s-]+only|only\s+(?:available\s+)?(?:by|upon|on|via)\s+quotes?/i;
+// Twin of MONEY in lib/recon-sort.ts and of the money pattern in migration 0036.
+const MONEY = /\$\s*\d|\d\s*\$|\d\s*(?:dollars|usd)\b/i;
 const errors = [];
 const perBot = new Map(), perBotVenue = new Set();
-let escaped = 0;
+let escaped = 0, quoteOnly = 0;
 for (const [i, r] of recons.entries()) {
   const at = `row ${i + 2} (${r.venue})`;
   if (!r.vendor_id) errors.push(`${at}: missing vendor_id`);
@@ -105,6 +126,15 @@ for (const [i, r] of recons.entries()) {
   if (artifact) errors.push(`${at}: research-artifact narration "${artifact[0]}" — say what's true of the VENDOR ("they don't post pricing"), not what the source material looked like`);
   if (EMDASH.test(text)) errors.push(`${at}: em/en dash in entry text — use a comma, period, or hyphen`);
   if (ESCAPES.test(text)) escaped++;
+  // Per FIELD, not per entry. A plain "no quote found" headline above a price_details
+  // that cites a third-party figure is honest and must not fail: it says we did not get a
+  // quote, not that no price exists. The contradiction is a single field claiming pricing
+  // is quote-only while stating a figure in that same breath.
+  for (const col of ['price_text', 'price_details']) {
+    if (!QUOTE_ONLY.test(r[col])) continue;
+    quoteOnly++;
+    if (MONEY.test(r[col])) errors.push(`${at}: ${col} says pricing is quote-only but states a figure in the same breath ("${r[col].slice(0, 70)}") — if you have a number you have a price data point, so lead with it and drop the quote-only framing`);
+  }
   const m = parseInt(r.month, 10), y = parseInt(r.year, 10);
   if (!(m >= 1 && m <= 12)) errors.push(`${at}: bad month "${r.month}"`);
   if (!(y >= 2000 && y <= 2100)) errors.push(`${at}: bad year "${r.year}"`);
@@ -158,6 +188,7 @@ for (const [b, n] of perBot) console.log(`  ${b}: ${n} entries`);
 const photoCount = toInsert.reduce((n, r) => n + (r.photos ? r.photos.split(';').filter(Boolean).length : 0), 0);
 console.log(`  photos to upload: ${photoCount} (x2 with thumbs)`);
 if (escaped) console.log(`  literal line-break escapes repaired at insert: ${escaped} rows (see ESCAPES above)`);
+if (quoteOnly) console.log(`  quote-only wording reworded at insert: ${quoteOnly} fields (see QUOTE_ONLY above)`);
 if (!APPLY) { console.log('\nDRY RUN — nothing written. Re-run with --apply after user confirmation.'); process.exit(0); }
 
 // ── Apply ─────────────────────────────────────────────────────────────────────
@@ -186,6 +217,29 @@ const unescapeBreaks = (t) => (t || '')
 // `\s+` below is looking at the "n" of an escape and the bullet never becomes a line.
 const debullet = (t) => unescapeBreaks(t).replace(/\s+(?=-[A-Za-z])/g, '\n').replace(/ - (?=[A-Z0-9])/g, '\n- ');
 
+// Swap the retired quote-only wording (flagged by QUOTE_ONLY above) for plain language.
+// Only the two positions that cannot break a sentence are touched, matching migration
+// 0036: the phrase OPENING the field, and the phrase closing it as its own fenced clause.
+// A mid-sentence occurrence is left verbatim — "they are no quote found so you email
+// them" is worse than the phrase it replaces — and the validation loop above has already
+// hard-failed the case where the field states a figure anyway, so the money-bearing shape
+// never reaches here.
+//
+// The wording is drawn from the vendor+bot pair rather than at random so the same CSV
+// uploads identically on a re-run, and so two entries on one vendor can still differ.
+const WORDINGS = ['No quote provided', 'No quote found', "Didn't get a quote"];
+const wordingFor = (seed) => WORDINGS[[...seed].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7) % WORDINGS.length];
+const QO_LEAD = /^[\s,;:.!/-]*(?:(?:pricing|price|prices|rates?|available|custom|by|on|via|per)\s+)*quotes?[\s-]+only|^[\s,;:.!/-]*only\s+(?:available\s+)?(?:by|upon|on|via)\s+quotes?/i;
+const QO_TAIL = /[,;:-]\s*(?:(?:pricing|price|prices|rates?|available|custom|by|on|via|per)\s+)*quotes?[\s-]+only[\s.!]*$/i;
+const plainQuoteOnly = (t, seed) => {
+  const s = t || '';
+  if (!QUOTE_ONLY.test(s)) return s;
+  const w = wordingFor(seed);
+  if (QO_LEAD.test(s)) return s.replace(QO_LEAD, w);
+  if (QO_TAIL.test(s)) return s.replace(/\s*(?:(?:pricing|price|prices|rates?|available|custom|by|on|via|per)\s+)*quotes?[\s-]+only[\s.!]*$/i, ` ${w.toLowerCase()}`);
+  return s;
+};
+
 let inserted = 0, media = 0;
 for (const r of toInsert) {
   const bot = botByKey.get(r.bot);
@@ -195,8 +249,8 @@ for (const r of toInsert) {
     recon_type: r.recon_type,
     recon_collected_month: parseInt(r.month, 10),
     recon_collected_year: parseInt(r.year, 10),
-    price_text: unescapeBreaks(r.price_text) || null,
-    price_details: unescapeBreaks(r.price_details) || null,
+    price_text: plainQuoteOnly(unescapeBreaks(r.price_text), `${r.vendor_id}|${r.bot}`) || null,
+    price_details: plainQuoteOnly(unescapeBreaks(r.price_details), `${r.vendor_id}|${r.bot}|d`) || null,
     notes: debullet(r.notes) || null,
     service_region: profile.serviceRegionRequired ? (r.service_region || null) : null,
     status: 'active',

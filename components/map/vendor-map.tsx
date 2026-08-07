@@ -404,20 +404,29 @@ function buildFeatureCollectionsByType(
 }
 
 /**
- * Emitted when a cluster pin is tapped: the vendor ids it contains plus the map
+ * Emitted when a cluster pin is tapped: the vendors it contains plus the map
  * view at tap time, so the caller can reopen the same view after a round trip to
  * a vendor page.
  */
 export interface ClusterOpenPayload {
   /**
-   * The cluster's vendors, already in list order and carrying their rank — the
-   * same shape and the same ordering the results feed gets, so the two feeds
-   * cannot present the same vendors differently.
+   * The cluster's vendors, each with its match rank, ordered by the SAME
+   * comparator the results feed uses (`compareRanked`) — so the two feeds can
+   * never present the same vendors in a different order, and the cluster feed
+   * can draw the same partial-tier divider rather than showing a demoted vendor
+   * as a match.
    */
-  entries: VisibleVendor[];
+  entries: ClusterEntry[];
   vendorType: VendorType;
   center: [number, number];
   zoom: number;
+}
+
+/** One vendor in a tapped cluster. The type is a per-cluster fact, so it is not repeated per row. */
+export interface ClusterEntry {
+  id: string;
+  /** 1 matches every active attribute filter, 0 is silent on at least one. */
+  rank: 0 | 1;
 }
 
 /** Emitted when an individual (non-cluster) vendor pin is tapped. */
@@ -780,15 +789,7 @@ export function VendorMap({
     const selections = filterSelectionsRef.current;
     const filtering = hasAnySelection(selections);
 
-    const inView: {
-      id: string;
-      vendorType: VendorType;
-      rank: 0 | 1;
-      matched: number;
-      priced: boolean;
-      photo: boolean;
-      d: number;
-    }[] = [];
+    const inView: RankedVendor[] = [];
     for (const v of vendorsRef.current) {
       const vendorType = bucketType(v.vendor_type);
       if (!showAll && !sel.includes(vendorType)) continue;
@@ -1045,6 +1046,17 @@ export function VendorMap({
             cluster: true,
             clusterRadius: CLUSTER_RADIUS,
             clusterMaxZoom: CLUSTER_MAX_ZOOM,
+            // How many of a bubble's vendors are FULL matches. `rank` is 1 or 0
+            // per point (contradicting rows never reach the source), so summing
+            // it counts the matches. Without this a bubble reports point_count
+            // and silently claims every vendor under it matched — the whole
+            // reason a filter could say "5 matches" over a map of 126 pins
+            // (Kiara, 2026-08-06). The individual pins have receded the partial
+            // tier since the filter shipped; at cluster zooms there are no
+            // individual pins, so nothing was carrying that signal. Recomputed
+            // automatically: a filter change rebuilds the source via
+            // applyVendors.
+            clusterProperties: { matched: ["+", ["get", "rank"]] },
           });
         }
 
@@ -1120,7 +1132,21 @@ export function VendorMap({
               "icon-size": ["step", ["get", "point_count"], 1, 10, 1.15, 25, 1.3],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
-              "text-field": ["get", "point_count_abbreviated"],
+              // The number is what MATCHED, not what is underneath. Three cases,
+              // in order: every leaf matched (always true with no filter active)
+              // shows the abbreviated total, so nothing changes for the common
+              // case and big counts keep their "1.2k" form; a partial hit shows
+              // the match count; a bubble with no matches falls back to its
+              // total and recedes below, reading as "12 here, none confirmed"
+              // rather than a bare "0".
+              "text-field": [
+                "case",
+                ["==", ["get", "matched"], ["get", "point_count"]],
+                ["get", "point_count_abbreviated"],
+                [">", ["get", "matched"], 0],
+                ["to-string", ["get", "matched"]],
+                ["get", "point_count_abbreviated"],
+              ],
               "text-font": ["Noto Sans Regular"],
               "text-size": ["step", ["get", "point_count"], 13, 10, 15, 25, 17],
               // Sit the count in the lower half of the disc (icon is up top);
@@ -1133,6 +1159,23 @@ export function VendorMap({
               "text-color": "#ffffff",
               "text-halo-color": "rgba(0,0,0,0.25)",
               "text-halo-width": 1,
+              // A bubble holding nothing that matches recedes exactly as far as
+              // an individual rank-0 pin, and for the same reason: it is still
+              // worth tapping, because low coverage mostly means nobody wrote
+              // the answer down. No selection case here — a cluster is never
+              // the selected vendor.
+              "icon-opacity": [
+                "case",
+                ["==", ["get", "matched"], 0],
+                PARTIAL_ICON_OPACITY,
+                1,
+              ],
+              "text-opacity": [
+                "case",
+                ["==", ["get", "matched"], 0],
+                PARTIAL_LABEL_OPACITY,
+                1,
+              ],
               "icon-translate": off,
               "text-translate": off,
             },
@@ -1162,51 +1205,56 @@ export function VendorMap({
             if (onOpen) {
               const count = (feature.properties?.point_count as number) ?? 0;
               src.getClusterLeaves(clusterId, count, 0).then((leaves) => {
-                const leafIds = leaves
-                  .map((l) => l.properties?.id)
-                  .filter((id): id is string => typeof id === "string");
-                if (leafIds.length === 0) return;
+                // id plus the rank buildFeatureCollectionsByType stamped on
+                // the point, which is the fallback for any leaf we cannot score
+                // below.
+                const leafRows = leaves
+                  .map((l) => ({
+                    id: l.properties?.id,
+                    rank: (l.properties?.rank === 0 ? 0 : 1) as 0 | 1,
+                  }))
+                  .filter((e): e is ClusterEntry => typeof e.id === "string");
+                if (leafRows.length === 0) return;
                 const c = map.getCenter();
 
                 // Order the leaves the way the results feed orders its rows.
                 // getClusterLeaves returns supercluster TREE order, which is
-                // spatial-index insertion order and arbitrary to a reader — so
-                // without this the same two vendors came out in a different
-                // order depending on whether the list was opened from a cluster
-                // or from the results pill.
+                // spatial-index insertion order and arbitrary to a reader, so
+                // without this the same two vendors came out differently
+                // depending on whether the list was opened from a cluster or
+                // from the results pill. Sorting on rank alone is not enough
+                // either: it leaves the priced/photo/distance keys unapplied,
+                // which is what put a "No quote found" photographer above one
+                // quoting $2.5k (reported 2026-08-07).
                 //
                 // Everything needed is already in hand: these ids are in the
                 // clustered source, so their rows are in `vendorsRef` and their
                 // display positions in `positionsRef`. A leaf missing either is
-                // kept, at the end, rather than dropped — this is a list of
-                // what is in the cluster, and the count in the heading comes
-                // from it.
+                // kept — this list is what the heading counts — at the end, on
+                // its stamped rank.
                 const selections = filterSelectionsRef.current;
                 const filtering = hasAnySelection(selections);
                 const cosLat = Math.cos((c.lat * Math.PI) / 180);
                 const byId = new Map(vendorsRef.current.map((v) => [v.id, v]));
                 const scored: RankedVendor[] = [];
-                const unscored: VisibleVendor[] = [];
-                for (const id of leafIds) {
-                  const v = byId.get(id);
-                  const pos = positionsRef.current.get(id);
+                const unscored: ClusterEntry[] = [];
+                for (const leaf of leafRows) {
+                  const v = byId.get(leaf.id);
+                  const pos = positionsRef.current.get(leaf.id);
                   const s = v && pos
                     ? rankVendor(v, t, pos, c, cosLat, selections, filtering)
                     : null;
                   if (s) scored.push(s);
-                  // Ranked as partial while a filter is on, since "we could not
-                  // score it" is exactly the unknown the partial tier is for —
-                  // and that also keeps rank monotonic down the list, which the
-                  // divider depends on.
-                  else unscored.push({ id, vendorType: t, rank: filtering ? 0 : 1 });
+                  else unscored.push(leaf);
                 }
                 scored.sort(compareRanked);
+                const entries: ClusterEntry[] = [
+                  ...scored.map(({ id, rank }) => ({ id, rank })),
+                  ...unscored,
+                ];
 
                 onOpen({
-                  entries: [
-                    ...scored.map(({ id, vendorType, rank }) => ({ id, vendorType, rank })),
-                    ...unscored,
-                  ],
+                  entries,
                   vendorType: t,
                   center: [c.lng, c.lat],
                   zoom: map.getZoom(),

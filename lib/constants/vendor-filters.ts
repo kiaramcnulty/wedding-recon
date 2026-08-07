@@ -47,6 +47,27 @@ export interface FilterDef {
    */
   basis?: string;
   /**
+   * `range` only. Multipliers that convert an off-`basis` quote ONTO `basis`,
+   * keyed by the vendor's own `price_basis`. A basis listed here is comparable
+   * after scaling and is matched normally; one that is not stays unknown.
+   *
+   * This is what makes an assumption like "a per-person venue at 100 guests"
+   * real rather than a claim in the copy. Both readers of a range — the matcher
+   * in `lib/filters/match.ts` and the sheet's histogram — apply it, so a vendor
+   * is binned under the same number it is judged by. Without it the two
+   * disagreed: the histogram binned a $150-per-person venue in the $0-499 bar
+   * while the matcher demoted that same venue into the partial tier for being
+   * silent on a price it had published (Kiara, 2026-08-06).
+   */
+  basisScale?: Record<string, number>;
+  /**
+   * The sentence the sheet prints under the slider to state that conversion.
+   * A `basisScale` without one is an assumption the couple is never told about,
+   * so they travel together — and build the numbers from `PRICE_ASSUMPTIONS`
+   * rather than typing them, or the copy starts lying the moment it is retuned.
+   */
+  basisNote?: string;
+  /**
    * Coverage is low: few vendors have this recorded either way. Purely a UI
    * hint now — it paints the "Rare" badge on the filter in the sheet, warning
    * the couple that selecting it will not narrow much.
@@ -86,6 +107,26 @@ export const DAY_TYPES = [
   { value: "saturday", label: "Saturday" },
   { value: "sunday", label: "Sunday" },
 ] as const;
+
+/**
+ * The pricing assumptions, stated in the UI rather than hidden — a vendor
+ * quoting on a different axis is converted onto the filter's so they can share
+ * one slider. The numbers are Kiara's (2026-08-05).
+ *
+ * `guests` runs in BOTH directions and both filters use the same 100, which is
+ * the point of one shared constant: venue multiplies a per-person quote up onto
+ * its package axis, caterers divide a package down onto their per-person one
+ * (Kiara, 2026-08-07). Two numbers here would let a $5,000 caterer and a
+ * $5,000 venue imply different weddings. `hours` is venue-only.
+ *
+ * Declared above VENDOR_FILTERS because the price filters' `basisScale` is
+ * built from it at module init — a `const` below would still be in its
+ * temporal dead zone here.
+ */
+export const PRICE_ASSUMPTIONS = {
+  guests: 100,
+  hours: 5,
+} as const;
 
 const opt = (o: Record<string, string>): FilterOption[] =>
   Object.entries(o).map(([value, label]) => ({ value, label }));
@@ -136,6 +177,14 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       hi: "price_max",
       unit: "usd",
       basis: "package",
+      // The conversion the sheet's footnote promises the couple. Only these two
+      // bases are convertible: `per_night` is a hotel room rate that happens to
+      // sit on a venue row, and no guest count turns it into a venue fee.
+      basisScale: {
+        per_person: PRICE_ASSUMPTIONS.guests,
+        per_hour: PRICE_ASSUMPTIONS.hours,
+      },
+      basisNote: `Venues quoting per person are shown at ${PRICE_ASSUMPTIONS.guests} guests, per hour at ${PRICE_ASSUMPTIONS.hours} hours.`,
       rescaledBy: "date_context",
     },
     {
@@ -424,6 +473,25 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       hi: "price_max",
       unit: "usd",
       basis: "per_person",
+      // The mirror of the venue conversion, on the same guest count: a caterer
+      // quoting a whole-event minimum is divided down onto the per-head axis
+      // (Kiara, 2026-08-07). Without it a package quote was simply dropped, so
+      // 21 of 56 priced caterers were missing from their own slider.
+      //
+      // Only `package` converts. A real minimum divides into a believable
+      // per-head figure ($5,000 -> $50), but the extraction had also tagged
+      // platter and menu prices `package`, and a charcuterie board at $85 is
+      // not $0.85 a head at any guest count. Those seven rows are now
+      // `per_item` in the dataset (scripts/retag-per-item-caterers.mjs), which
+      // is unlisted here on purpose: an unconvertible basis reads as silence,
+      // so the vendor keeps its pin and demotes to the partial tier instead of
+      // being excluded or landing on the axis at a fictional price.
+      //
+      // Do NOT add a plausibility floor here instead. A floor hides a bad row
+      // rather than fixing it, and it cannot tell a mis-tag from a caterer who
+      // is genuinely cheap.
+      basisScale: { package: 1 / PRICE_ASSUMPTIONS.guests },
+      basisNote: `Caterers quoting a package or minimum are divided across ${PRICE_ASSUMPTIONS.guests} guests.`,
     },
     {
       key: "bar_service",
@@ -530,12 +598,3 @@ export function filtersForType(t: VendorType | undefined): FilterDef[] {
   return (t && VENDOR_FILTERS[t]) || [];
 }
 
-/**
- * Venue pricing assumptions, stated in the UI rather than hidden. Venues that
- * quote per-person or per-hour are converted onto the package axis so they can
- * share one slider; the numbers are Kiara's (2026-08-05).
- */
-export const VENUE_PRICE_ASSUMPTIONS = {
-  guests: 100,
-  hours: 5,
-} as const;

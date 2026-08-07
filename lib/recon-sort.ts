@@ -48,16 +48,23 @@ const MONEY = /\$\s*\d|\d\s*\$|\d\s*(?:dollars|usd)\b/i;
  * Whether an entry actually states a price.
  *
  * **Not** "is `price_text` filled in" — that field is REQUIRED on every
- * bot-drafted entry (`references/common/entry-rules-core.md`) and carries the
- * literal sentinel `Quote only` when a vendor publishes nothing, so a non-blank
- * test would sort every entry into the priced tier including the ones saying
- * there is no price.
+ * bot-drafted entry (`references/common/entry-rules-core.md`) and says so in
+ * words when a vendor publishes nothing ("No quote found", "Didn't get a
+ * quote"), so a non-blank test would sort every entry into the priced tier
+ * including the ones saying there is no price. Those wordings are deliberately
+ * open-ended rather than a fixed sentinel — the drafting contract asks for
+ * variety — which is another reason the test has to read the text for a figure
+ * rather than compare against a known string. (It used to be the single
+ * sentinel `Quote only`; retired 2026-08-07, and migration 0036 rewrote the
+ * rows that carried it.)
  *
  * `price_details` counts too, not just the headline. The contract puts contract
  * minimums and tier tables there, and hedged-but-sourced ranges land there
- * under a `Quote only` headline ("no formal quote - going off their published
+ * under a no-price headline ("no formal quote, going off their published
  * table, $4k-$6k"). Both fields render on the card, so a number in either is a
- * number the couple gets.
+ * number the couple gets. That combination is also why the headline wording is
+ * phrased as "we did not get a quote" rather than "there is no price": it has
+ * to stay true when the details below it cite a third-party figure.
  */
 export function hasPriceQuote(entry: {
   price_text?: string | null;
