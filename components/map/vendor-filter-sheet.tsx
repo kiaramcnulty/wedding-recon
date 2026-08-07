@@ -38,9 +38,15 @@ import { cn } from "@/lib/utils";
  * Histograms come from `filter-histograms.json`, generated from the real corpus
  * by `scripts/backfill-vendor-filters.mjs`, so a slider shows where vendors
  * actually sit rather than a uniform axis nobody occupies. Bins are NON-uniform
- * (roughly equal-count), which is why every slider indexes bins rather than
- * values — a linear track over these edges would put the handle in the wrong
- * place.
+ * — roughly equal-count, then re-cut wherever one notch spanned too far — which
+ * is why every slider indexes bins rather than values: a linear track over these
+ * edges would put the handle in the wrong place. Bin COUNT varies per slider too
+ * (7 to 12 today), so nothing here may assume seven.
+ *
+ * Edges are not a UI concern and must not be tuned here. They are one rule in
+ * the generator, applied to every range filter at once; `--hist-only` regenerates
+ * them with no DB credentials and prints each axis. See the `bins()` comment
+ * there for why equal-count alone is not enough.
  */
 
 type Hist = { min: number; max: number; median: number; bins: { lo: number; hi: number; n: number }[] };

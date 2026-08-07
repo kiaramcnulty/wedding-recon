@@ -3,11 +3,16 @@
  * Backfill vendors.filters from the measured extraction dataset.
  *
  *   node scripts/backfill-vendor-filters.mjs [--dry] [--limit N]
+ *   node scripts/backfill-vendor-filters.mjs --hist-only   (no DB, no creds)
  *
  * Source: data/filter-extraction/vendor-filters.jsonl (2,163 rows, one per
  * vendor). Requires migration 0032. Safe to re-run: it only overwrites rows
  * whose filters_source is null or 'extraction', so a value a human set through
  * the app survives a re-run.
+ *
+ * It also emits lib/constants/filter-histograms.json, the slider axes. That
+ * half is pure derived data from the committed JSONL, so `--hist-only` skips
+ * the DB entirely — retuning a slider must not need production credentials.
  *
  * Normalization happens here rather than in the UI because the raw extraction
  * is inconsistent in three ways that would otherwise reach every consumer:
@@ -29,23 +34,28 @@ const HIST_OUT = resolve(ROOT, "lib/constants/filter-histograms.json");
 
 const args = process.argv.slice(2);
 const DRY = args.includes("--dry");
+const HIST_ONLY = args.includes("--hist-only");
 const LIMIT = (() => {
   const i = args.indexOf("--limit");
   return i >= 0 ? Number(args[i + 1]) : Infinity;
 })();
 
 // --- env -------------------------------------------------------------------
-for (const line of readFileSync(resolve(ROOT, ".env.local"), "utf8").split("\n")) {
-  const m = line.match(/^([A-Z_]+)=(.*)$/);
-  if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+// Deferred: --hist-only reads only the committed JSONL, so it must work in a
+// checkout with no .env.local at all.
+function connect() {
+  for (const line of readFileSync(resolve(ROOT, ".env.local"), "utf8").split("\n")) {
+    const m = line.match(/^([A-Z_]+)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+    process.exit(1);
+  }
+  return createClient(url, key, { auth: { persistSession: false } });
 }
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-  process.exit(1);
-}
-const db = createClient(url, key, { auth: { persistSession: false } });
 
 // --- normalization ---------------------------------------------------------
 const SEASON = { peak: "peak", high: "peak", mid: "shoulder", low: "off", off: "off" };
@@ -99,19 +109,95 @@ function normalize(row) {
 }
 
 // --- histograms ------------------------------------------------------------
-/** Quantile-ish bins over observed values, so the slider shows real density
- *  rather than a uniform axis nobody occupies. */
+/**
+ * Slider bin edges. Two stages, because the two failure modes pull opposite
+ * ways and neither binning scheme survives both on its own:
+ *
+ *   1. QUANTILE. Equal-count bins, so the slider shows real density rather than
+ *      a uniform axis nobody occupies. Every wedding price distribution is
+ *      long-tailed, and uniform bins put six of seven notches in empty space.
+ *
+ *   2. SPLIT the bins quantile made too WIDE. Equal count is equal *share of
+ *      vendors*, which says nothing about how far one notch moves the number.
+ *      Venue fee came out 4900-7500 and then 7500-48674 in a single step: 48
+ *      venues, 16% of the corpus, behind one notch a couple could not aim
+ *      inside (reported by Kiara, 2026-08-06). The tail is where it bites,
+ *      because that is where density collapses, but the rule is stated on the
+ *      bin rather than on the tail so it holds for any distribution.
+ *
+ * A bin is too wide when hi/lo exceeds MAX_RATIO — a ratio, not a width, since
+ * $500 is a big step at the bottom of a price range and noise at the top. Wide
+ * bins are re-cut on the NICE ladder so edges read as money a person would say
+ * ($10k, $15k), never as a quantile artifact ($11,117).
+ *
+ * What stops it shredding a sparse tail into empty notches is the density
+ * floor: no sub-bin may hold fewer than `floor` values, INCLUDING the remainder
+ * left above the last cut. So a cut is taken only where enough vendors sit on
+ * both sides of it, and the top notch stays an honest "and up". Where the data
+ * cannot support a finer axis nothing happens — 28 priced DJs keep their one
+ * wide $250-900 opening bin, which is the truthful rendering of 28 data points.
+ *
+ * Widest-first, so a fixed budget of extra notches buys down the worst jump
+ * first. MAX_BINS is a backstop against a pathological corpus, not a tuning
+ * knob: at 2,163 vendors nothing reaches it except venue capacity, which is
+ * density-saturated at 12 anyway.
+ */
+const MAX_RATIO = 3;
+const MIN_SHARE = 0.03;
+const MIN_N = 3;
+const MAX_BINS = 12;
+
+/** Round numbers a person would say, over every decade. */
+const NICE_MANTISSA = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 7.5];
+function niceBetween(lo, hi) {
+  const out = [];
+  for (let k = -3; k <= 9; k++) {
+    for (const m of NICE_MANTISSA) {
+      const value = Number((m * 10 ** k).toPrecision(12));
+      if (value > lo && value < hi) out.push(value);
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
 function bins(values, count = 7) {
   const v = values.filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
   if (v.length < count) return null;
-  const edges = [];
-  for (let i = 0; i <= count; i++) edges.push(v[Math.min(v.length - 1, Math.floor((i * v.length) / count))]);
-  const uniq = [...new Set(edges)];
+  const quantile = [];
+  for (let i = 0; i <= count; i++) quantile.push(v[Math.min(v.length - 1, Math.floor((i * v.length) / count))]);
+  const uniq = [...new Set(quantile)];
   if (uniq.length < 3) return null;
+
+  const between = (lo, hi) => v.filter((x) => x >= lo && x < hi).length;
+  const floor = Math.max(MIN_N, Math.ceil(v.length * MIN_SHARE));
+
+  // A bin whose lo is 0 has no meaningful ratio and is left alone.
+  const wide = uniq
+    .slice(0, -1)
+    .map((lo, i) => ({ lo, hi: uniq[i + 1] }))
+    .filter((b) => b.lo > 0 && b.hi / b.lo > MAX_RATIO)
+    .sort((a, b) => b.hi / b.lo - a.hi / a.lo);
+
+  const extra = new Set();
+  let budget = MAX_BINS - (uniq.length - 1);
+  for (const b of wide) {
+    if (budget <= 0) break;
+    let cur = b.lo;
+    for (const cut of niceBetween(b.lo, b.hi)) {
+      if (budget <= 0) break;
+      if (between(cur, cut) < floor) continue; // too thin below — take a wider step
+      if (between(cut, b.hi) < floor) break; // too thin above — leave the rest as one
+      extra.add(cut);
+      budget--;
+      cur = cut;
+    }
+  }
+
+  const edges = [...new Set([...uniq, ...extra])].sort((a, b) => a - b);
   const out = [];
-  for (let i = 0; i < uniq.length - 1; i++) {
-    const lo = uniq[i], hi = uniq[i + 1];
-    const last = i === uniq.length - 2;
+  for (let i = 0; i < edges.length - 1; i++) {
+    const lo = edges[i], hi = edges[i + 1];
+    const last = i === edges.length - 2;
     out.push({ lo, hi, n: v.filter((x) => x >= lo && (last ? x <= hi : x < hi)).length });
   }
   return { min: v[0], max: v[v.length - 1], median: v[Math.floor(v.length / 2)], bins: out };
@@ -152,6 +238,33 @@ if (DRY) {
 writeFileSync(HIST_OUT, JSON.stringify(hist, null, 1) + "\n");
 console.log(`\nwrote ${HIST_OUT}`);
 
+// The axes a couple actually drags, printed so a retune can be read rather
+// than diffed out of the JSON. Notches still wider than MAX_RATIO are called
+// out: every one of them is data-limited (the density floor refused the cut),
+// so the line is a read on where the corpus is thin, not a defect list.
+console.log("\nslider axes");
+for (const [t, h] of Object.entries(hist)) {
+  for (const [key, b] of Object.entries(h)) {
+    const coarse = b.bins.filter((x) => x.lo > 0 && x.hi / x.lo > MAX_RATIO);
+    console.log(
+      `  ${t}.${key}`.padEnd(30) +
+        `${b.bins.length} bins\n` +
+        `    ${b.bins.map((x) => `${x.lo}-${x.hi}:${x.n}`).join("  ")}` +
+        (coarse.length
+          ? `\n    coarse (too few vendors to cut): ${coarse
+              .map((x) => `${x.lo}-${x.hi} (${(x.hi / x.lo).toFixed(1)}x, n=${x.n})`)
+              .join(", ")}`
+          : ""),
+    );
+  }
+}
+
+if (HIST_ONLY) {
+  console.log("\n--hist-only: no vendor rows written.");
+  process.exit(0);
+}
+
+const db = connect();
 const todo = payload.slice(0, LIMIT);
 let ok = 0, failed = 0, skipped = 0;
 const POOL = 12;
