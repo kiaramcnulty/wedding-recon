@@ -63,7 +63,7 @@ filters are even worth building.
 
 | Filter | Now | Ceiling | Notes |
 |---|---|---|---|
-| **Publishes pricing publicly** (bool) | **~100%** | ~100% | **Sleeper pick — build this first.** Derivable today with near-perfect accuracy: 67–100% of entries per type already say "Quote only" / "no published rates" / "contact for pricing" in so many words. Directly answers the loudest complaint in wedding planning, and no competitor filters on it. |
+| **Publishes pricing publicly** (bool) | **~100%** | ~100% | **Sleeper pick — build this first.** Derivable today with near-perfect accuracy: 67–100% of entries per type say "no quote found" / "no published rates" / "contact for pricing" in so many words. Derive it from the presence of a **money figure** (`hasPriceQuote()`), not from matching a phrase — the phrasing is deliberately varied and the old fixed `Quote only` sentinel was retired in migration `0036`. Directly answers the loudest complaint in wedding planning, and no competitor filters on it. |
 | Price band | 30–55% | ~65% | Per type below. Semantics differ (total vs per-person vs per-piece) — must not share one slider. |
 | Service area / travels to you | **100% fill** | ~100% | `service_region` is a **required field** for photos/food/flowers/beauty/dj/band/planner (100% populated). Free text today (`"Denver + statewide Colorado travel"`) so it needs normalizing to a radius/region set — but the raw signal is already there on every row. Null by design for venue/dress/hotel (fixed locations). |
 | Google rating + review count | ~0% stored | ~95% | **Not currently a DB column** — needs a migration. Harvest already pulls it (`google 4.8★ × 351`). Cheap, high-coverage, high-trust. |

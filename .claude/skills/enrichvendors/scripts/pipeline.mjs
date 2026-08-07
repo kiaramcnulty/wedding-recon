@@ -80,6 +80,21 @@ const RESEARCH = new RegExp([
 // (unescapeBreaks) rather than failing, because the fix is unambiguous. It is counted here
 // so a batch that produces a lot of them is visible at the cheap pre-check.
 const ESCAPES = /\\{1,2}[rnt]/;
+// "Quote only" and its family — the retired price_text sentinel for a vendor that
+// publishes nothing (Kiara, 2026-08-07). Two things were wrong with it: it was asserted
+// even on entries that DID carry a number, which contradicts itself on the card, and it
+// reads as a category label rather than as something a couple would say. Workers now
+// write one of the plain wordings in common/entry-rules-core.md.
+// KEEP IN LOCKSTEP WITH upload.mjs, which splits it the same way the retired-sentinel
+// migration (0036) did: the wording alone is REPAIRED at insert because the fix is
+// unambiguous, while the phrase sitting next to a money figure is a HARD GATE, because
+// deciding what that headline should say instead is editorial. Both are counted here so
+// the cheap pre-check catches them before merge, not after.
+const QUOTE_ONLY = /(?:(?:pricing|price|prices|rates?|available|custom|by|on|via|per)\s+)*quotes?[\s-]+only|only\s+(?:available\s+)?(?:by|upon|on|via)\s+quotes?/i;
+// Twin of MONEY in lib/recon-sort.ts and of the money pattern in migration 0036, so that
+// "this entry states a price" means one thing everywhere. A bare number is deliberately
+// NOT a price: recon prose is full of guest counts, hours and years.
+const MONEY = /\$\s*\d|\d\s*\$|\d\s*(?:dollars|usd)\b/i;
 // NO bullet-style check, deliberately — matches upload.mjs, see the note there. A
 // NOTESTYLE regex briefly flagged bullet-opening notes as scratchpad dumps; Kiara reversed
 // that on 2026-07-29: "the bullets are okay and encouraged, the variety is good." Mixed
@@ -359,8 +374,8 @@ function cmdStatus() {
   const { perFile } = readWorkerRows(`${batch}-worker-`);
   const i = (n) => HEADERS.indexOf(n);
   const drafted = new Set(); let total = 0, malformed = 0, badVid = 0, badBot = 0, noPrice = 0, banned = 0, dashes = 0, noRegion = 0;
-  let tells = 0, research = 0, escapes = 0;
-  const tellRows = [];
+  let tells = 0, research = 0, escapes = 0, quoteOnly = 0, quoteOnlyPriced = 0;
+  const tellRows = [], quoteRows = [];
   for (const { file: f, rows, problems } of perFile) {
     malformed += problems.length;
     for (const r of rows) {
@@ -379,6 +394,20 @@ function cmdStatus() {
       if (t) { tells++; if (tellRows.length < 8) tellRows.push(`${r[i('venue')]} ("${t[0]}")`); }
       if (RESEARCH.test(text)) research++;
       if (ESCAPES.test(text)) escapes++;
+      // Checked per FIELD, not per entry: a headline that says the quote-only phrase
+      // while its own text also states a figure is the contradiction. A plain "no quote
+      // found" headline over a price_details that cites a third-party number is fine and
+      // must not be flagged — that headline claims we did not get a quote, not that no
+      // price exists anywhere.
+      for (const col of ['price_text', 'price_details']) {
+        const v = r[i(col)] ?? '';
+        if (!QUOTE_ONLY.test(v)) continue;
+        quoteOnly++;
+        if (MONEY.test(v)) {
+          quoteOnlyPriced++;
+          if (quoteRows.length < 8) quoteRows.push(`${r[i('venue')]} ${col} ("${v.slice(0, 60)}")`);
+        }
+      }
     }
     console.log(`  ${f}: ${rows.length} rows${problems.length ? ` | ${problems.length} unparseable JSON lines` : ''}`);
   }
@@ -386,9 +415,11 @@ function cmdStatus() {
   console.log(`\ndrafted ${drafted.size}/${manifest.length} entry slots | rows ${total} | malformed ${malformed} | bad vendor_id ${badVid} | bot mismatch ${badBot}`);
   console.log(`missing price fields ${noPrice} | banned phrases ${banned} | em-dashes ${dashes}${profile.serviceRegionRequired ? ` | missing service_region ${noRegion}` : ''}`);
   console.log(`process-tells ${tells} | research-artifact narration ${research} | literal line-break escapes ${escapes}${escapes ? ' (repaired at insert, not a gate)' : ''}`);
+  console.log(`quote-only wording ${quoteOnly}${quoteOnly ? ' (repaired at insert)' : ''} | of those, stating a price anyway ${quoteOnlyPriced}${quoteOnlyPriced ? ' (UPLOAD GATE — redraft the headline to lead with the number)' : ''}`);
   // Both are voice failures the upload gate HARD-FAILS on. Fix them here, before merge,
   // not after. (Bullet-style notes are NOT a defect — see the note at the top.)
   if (tellRows.length) console.log(`  tells e.g.: ${tellRows.join('; ')}`);
+  if (quoteRows.length) console.log(`  quote-only-with-a-price e.g.: ${quoteRows.join('; ')}`);
   if (missing.length) console.log(`MISSING SLOTS (SHORT/THIN-flagged ones are intentional): ${missing.map((m) => `${m.name} (${m.bot})`).join('; ')}`);
 }
 
@@ -439,9 +470,16 @@ function cmdMerge() {
   fs.writeFileSync(path.join(workdir, `recons-${batch}.backup.csv`), text);
 
   const { recons } = loadCsvRecons(csvName);
-  const priced = recons.filter((r) => !/^quote only/i.test(r.price_text)).length;
+  // "States a price" is the MONEY test over BOTH price columns — the same question
+  // hasPriceQuote() asks in the app when it sorts priced entries above unpriced ones, so
+  // this number predicts where the batch will land in the list. It used to be "price_text
+  // does not start with the words quote only", which counted the sentinel rather than the
+  // content: an entry whose details cited a real figure under a quote-only headline was
+  // reported as unpriced, and any other wording for the same emptiness was reported as
+  // priced. Both directions were wrong, and the sentinel is retired besides.
+  const priced = recons.filter((r) => MONEY.test(r.price_text) || MONEY.test(r.price_details)).length;
   const nVendors = new Set(recons.map((r) => r.vendor_id)).size;
-  console.log(`merged ${recons.length}/${manifest.length} entry slots (${nVendors} vendors) → ${csvName} (backup saved) | repaired ${repaired} | real pricing ${priced} | quote-only ${recons.length - priced}`);
+  console.log(`merged ${recons.length}/${manifest.length} entry slots (${nVendors} vendors) → ${csvName} (backup saved) | repaired ${repaired} | states a price ${priced} | no price stated ${recons.length - priced}`);
   for (const r of recons.filter((_, i) => i % Math.ceil(recons.length / 3) === 0).slice(0, 3)) {
     console.log(`\n── ${r.venue} [${r.bot}, ${r.month}/${r.year}]\n   ${r.price_text}\n   ${r.notes.slice(0, 220)}${r.notes.length > 220 ? '…' : ''}`);
   }
