@@ -85,6 +85,96 @@ const MAX_VISIBLE_ENTRIES = 200;
 // per row per pan.
 const UNFILTERED_MATCH: FilterMatchDetail = { rank: 1, unknown: 0, active: 0 };
 
+/** A vendor scored for the list order. `d` is squared distance from the map center. */
+interface RankedVendor {
+  id: string;
+  vendorType: VendorType;
+  rank: 0 | 1;
+  matched: number;
+  priced: boolean;
+  photo: boolean;
+  d: number;
+}
+
+/**
+ * Score one vendor for the list order, or null if it is ruled out (rank -1).
+ *
+ * `cosLat` scales longitude to match latitude at the map center, so the
+ * distance is comparable in both axes. It stays squared: this only ever orders,
+ * so there is no need for a real geodesic or a square root.
+ */
+function rankVendor(
+  v: Vendor,
+  vendorType: VendorType,
+  pos: { lng: number; lat: number },
+  center: { lng: number; lat: number },
+  cosLat: number,
+  selections: FilterSelections | undefined,
+  filtering: boolean,
+): RankedVendor | null {
+  // Same predicate the pins were built with, so no surface can disagree with
+  // what is drawn. The detail form additionally carries how many of the filters
+  // the vendor was silent on, which grades the partial tier.
+  const match = filtering
+    ? filterMatchFor(vendorType, v.filters, selections)
+    : UNFILTERED_MATCH;
+  if (match.rank < 0) return null;
+  const dx = (pos.lng - center.lng) * cosLat;
+  const dy = pos.lat - center.lat;
+  return {
+    id: v.id,
+    vendorType,
+    rank: match.rank as 0 | 1,
+    matched: matchedFraction(match),
+    // `=== true` rather than a truthiness test: both flags are undefined on
+    // every row until migration 0035 is applied, and that has to read as false
+    // for all rows alike so the two keys drop out and leave the old
+    // nearest-first order — not as NaN, which would corrupt the comparator.
+    priced: v.has_price === true,
+    photo: v.has_photo === true,
+    d: dx * dx + dy * dy,
+  };
+}
+
+/**
+ * The list order. Five keys:
+ *
+ *   rank     full matches before the "missing some information" ones. This has
+ *            to stay outermost: it is the partition the list draws its divider
+ *            on, and what the cap keeps when it bites.
+ *   matched  how MUCH of the ask a vendor met — the partial tier is itself
+ *            graded, so a venue silent on 1 filter of 3 outranks one silent on
+ *            2. A no-op above the divider, where every row matched everything
+ *            and scores 1, which is why it can sit here rather than being
+ *            special-cased to rank 0.
+ *   priced   a vendor with an extracted price before one without. A couple is
+ *            shopping on budget, and a card that can answer "what does this
+ *            cost" is worth more than one that cannot. No divider — this tier
+ *            is internal, unlike rank.
+ *   photo    a card that draws an image before one that falls through to a
+ *            category placeholder.
+ *   d        then nearest the map center.
+ *
+ * Each key only ever reorders within the tier above it, so distance still
+ * decides everything at the bottom.
+ *
+ * **Shared by BOTH feeds** — the on-screen results list and the tapped-cluster
+ * sheet. The cluster sheet used to render MapLibre leaf order, which is
+ * supercluster tree order and arbitrary to a reader, so the same two vendors
+ * came out in a different order depending on which way you opened the list
+ * (reported 2026-08-07: a "No quote found" photographer above one quoting
+ * $2.5k). If a sixth key is ever added, add it here and both move together.
+ */
+function compareRanked(a: RankedVendor, b: RankedVendor): number {
+  return (
+    b.rank - a.rank ||
+    b.matched - a.matched ||
+    Number(b.priced) - Number(a.priced) ||
+    Number(b.photo) - Number(a.photo) ||
+    a.d - b.d
+  );
+}
+
 // Label sizes: the selected pin's name is set larger than its neighbours', and
 // offset further down to clear its bigger disc (offsets are in ems of text-size).
 const LABEL_SIZE = 11;
@@ -319,7 +409,12 @@ function buildFeatureCollectionsByType(
  * a vendor page.
  */
 export interface ClusterOpenPayload {
-  ids: string[];
+  /**
+   * The cluster's vendors, already in list order and carrying their rank — the
+   * same shape and the same ordering the results feed gets, so the two feeds
+   * cannot present the same vendors differently.
+   */
+  entries: VisibleVendor[];
   vendorType: VendorType;
   center: [number, number];
   zoom: number;
@@ -700,61 +795,11 @@ export function VendorMap({
       const pos = positionsRef.current.get(v.id);
       if (!pos) continue; // no coordinates — never drawn, so never "on screen"
       if (!bounds.contains([pos.lng, pos.lat])) continue;
-      // Same predicate the pins were built with, so the pill can never disagree
-      // with what is drawn. The detail form additionally carries how many of the
-      // filters the vendor was silent on, which orders the partial tier below.
-      const match = filtering
-        ? filterMatchFor(vendorType, v.filters, selections)
-        : UNFILTERED_MATCH;
-      const rank = match.rank;
-      if (rank < 0) continue;
-      // Squared distance from center, longitude scaled to match latitude at this
-      // latitude. Only used for ordering, so no need for a real geodesic.
-      const dx = (pos.lng - center.lng) * cosLat;
-      const dy = pos.lat - center.lat;
-      inView.push({
-        id: v.id,
-        vendorType,
-        rank: rank as 0 | 1,
-        matched: matchedFraction(match),
-        // `=== true` rather than a truthiness test: both flags are undefined on
-        // every row until migration 0035 is applied, and that has to read as
-        // false for all rows alike so the two keys drop out and leave the old
-        // nearest-first order — not as NaN, which would corrupt the comparator.
-        priced: v.has_price === true,
-        photo: v.has_photo === true,
-        d: dx * dx + dy * dy,
-      });
+      const scored = rankVendor(v, vendorType, pos, center, cosLat, selections, filtering);
+      if (scored) inView.push(scored);
     }
 
-    // Five keys, in order:
-    //
-    //   rank     full matches before the "missing some information" ones. This
-    //            has to stay outermost: it is the partition the list draws its
-    //            divider on, and what the cap keeps when it bites.
-    //   matched  how MUCH of the ask a vendor met — the partial tier is itself
-    //            graded, so a venue silent on 1 filter of 3 outranks one silent
-    //            on 2. A no-op above the divider, where every row matched
-    //            everything and scores 1, which is why it can sit here rather
-    //            than being special-cased to rank 0.
-    //   priced   a vendor with an extracted price before one without. A couple
-    //            is shopping on budget, and a card that can answer "what does
-    //            this cost" is worth more than one that cannot. No divider —
-    //            this tier is internal, unlike rank.
-    //   photo    a card that draws an image before one that falls through to a
-    //            category placeholder.
-    //   d        then nearest the map center, as before.
-    //
-    // Each key only ever reorders within the tier above it, so distance still
-    // decides everything at the bottom.
-    inView.sort(
-      (a, b) =>
-        b.rank - a.rank ||
-        b.matched - a.matched ||
-        Number(b.priced) - Number(a.priced) ||
-        Number(b.photo) - Number(a.photo) ||
-        a.d - b.d,
-    );
+    inView.sort(compareRanked);
     const entries: VisibleVendor[] = inView
       .slice(0, MAX_VISIBLE_ENTRIES)
       .map(({ id, vendorType, rank }) => ({ id, vendorType, rank }));
@@ -1117,13 +1162,51 @@ export function VendorMap({
             if (onOpen) {
               const count = (feature.properties?.point_count as number) ?? 0;
               src.getClusterLeaves(clusterId, count, 0).then((leaves) => {
-                const ids = leaves
+                const leafIds = leaves
                   .map((l) => l.properties?.id)
                   .filter((id): id is string => typeof id === "string");
-                if (ids.length === 0) return;
+                if (leafIds.length === 0) return;
                 const c = map.getCenter();
+
+                // Order the leaves the way the results feed orders its rows.
+                // getClusterLeaves returns supercluster TREE order, which is
+                // spatial-index insertion order and arbitrary to a reader — so
+                // without this the same two vendors came out in a different
+                // order depending on whether the list was opened from a cluster
+                // or from the results pill.
+                //
+                // Everything needed is already in hand: these ids are in the
+                // clustered source, so their rows are in `vendorsRef` and their
+                // display positions in `positionsRef`. A leaf missing either is
+                // kept, at the end, rather than dropped — this is a list of
+                // what is in the cluster, and the count in the heading comes
+                // from it.
+                const selections = filterSelectionsRef.current;
+                const filtering = hasAnySelection(selections);
+                const cosLat = Math.cos((c.lat * Math.PI) / 180);
+                const byId = new Map(vendorsRef.current.map((v) => [v.id, v]));
+                const scored: RankedVendor[] = [];
+                const unscored: VisibleVendor[] = [];
+                for (const id of leafIds) {
+                  const v = byId.get(id);
+                  const pos = positionsRef.current.get(id);
+                  const s = v && pos
+                    ? rankVendor(v, t, pos, c, cosLat, selections, filtering)
+                    : null;
+                  if (s) scored.push(s);
+                  // Ranked as partial while a filter is on, since "we could not
+                  // score it" is exactly the unknown the partial tier is for —
+                  // and that also keeps rank monotonic down the list, which the
+                  // divider depends on.
+                  else unscored.push({ id, vendorType: t, rank: filtering ? 0 : 1 });
+                }
+                scored.sort(compareRanked);
+
                 onOpen({
-                  ids,
+                  entries: [
+                    ...scored.map(({ id, vendorType, rank }) => ({ id, vendorType, rank })),
+                    ...unscored,
+                  ],
                   vendorType: t,
                   center: [c.lng, c.lat],
                   zoom: map.getZoom(),

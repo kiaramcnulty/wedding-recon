@@ -1,12 +1,19 @@
 "use client";
 
-import * as React from "react";
 import { CATEGORY_PLURAL, type VendorType } from "@/lib/constants/categories";
 import { VendorListSheet } from "@/components/map/vendor-list-sheet";
+import type { VendorListEntry } from "@/components/map/vendor-feed";
 
 interface ClusterListSheetProps {
-  /** Vendor ids in the tapped cluster (leaf order from the map). */
-  ids: string[];
+  /**
+   * The cluster's vendors, already ordered and ranked by the map — the same
+   * comparator the results feed uses (`compareRanked` in `vendor-map.tsx`).
+   *
+   * This used to be a bare id list in MapLibre leaf order, which is supercluster
+   * tree order: arbitrary to a reader, and different from the order the same
+   * vendors got in the results feed (reported 2026-08-07).
+   */
+  entries: VendorListEntry[];
   vendorType: VendorType;
   onClose: () => void;
 }
@@ -19,19 +26,14 @@ interface ClusterListSheetProps {
  * `vendor-list-sheet.tsx`.
  */
 export function ClusterListSheet({
-  ids,
+  entries,
   vendorType,
   onClose,
 }: ClusterListSheetProps) {
-  const entries = React.useMemo(
-    () => ids.map((id) => ({ id, vendorType })),
-    [ids, vendorType],
-  );
-
   return (
     <VendorListSheet
       entries={entries}
-      heading={`${ids.length} ${CATEGORY_PLURAL[vendorType]} available`}
+      heading={`${entries.length} ${CATEGORY_PLURAL[vendorType]} available`}
       scrollKey="wr:clusterScroll"
       onClose={onClose}
     />

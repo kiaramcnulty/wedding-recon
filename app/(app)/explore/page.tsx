@@ -12,6 +12,7 @@ import {
   type VisibleVendorsPayload,
 } from "@/components/map/vendor-map";
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
+import type { VendorListEntry } from "@/components/map/vendor-feed";
 import { VendorFeed, ViewToggle } from "@/components/map/vendor-feed";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import {
@@ -125,7 +126,10 @@ export default function ExplorePage() {
   const [locating, setLocating] = useState(false);
   // The open cluster list (null = closed). Opened on a cluster tap, or restored
   // when returning from a vendor page (?restore=1).
-  const [cluster, setCluster] = useState<{ ids: string[]; vendorType: VendorType } | null>(null);
+  const [cluster, setCluster] = useState<{
+    entries: VendorListEntry[];
+    vendorType: VendorType;
+  } | null>(null);
   // The single vendor whose peek card is open (null = closed). Opened on a pin
   // tap, restored on return from the vendor page (?restore=1) like the cluster.
   const [pin, setPin] = useState<{ id: string; vendorType: VendorType } | null>(null);
@@ -215,7 +219,7 @@ export default function ExplorePage() {
     try {
       sessionStorage.setItem(
         "wr:cluster",
-        JSON.stringify({ ids: payload.ids, vendorType: payload.vendorType }),
+        JSON.stringify({ entries: payload.entries, vendorType: payload.vendorType }),
       );
       // Fresh cluster → open at the top (drop any saved feed scroll position).
       sessionStorage.removeItem("wr:clusterScroll");
@@ -226,7 +230,7 @@ export default function ExplorePage() {
       // only reopen-on-back is lost.
     }
     setPin(null);
-    setCluster({ ids: payload.ids, vendorType: payload.vendorType });
+    setCluster({ entries: payload.entries, vendorType: payload.vendorType });
   }, []);
 
   // A single pin tap peeks the vendor rather than navigating — persisted the same
@@ -463,14 +467,28 @@ export default function ExplorePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!new URLSearchParams(window.location.search).has("restore")) return;
-    let restoredCluster: { ids: string[]; vendorType: VendorType } | null = null;
+    let restoredCluster: { entries: VendorListEntry[]; vendorType: VendorType } | null = null;
     let restoredPin: { id: string; vendorType: VendorType } | null = null;
     try {
       const raw = sessionStorage.getItem("wr:cluster");
       if (raw) {
-        const d = JSON.parse(raw) as { ids?: string[]; vendorType?: VendorType };
-        if (d.ids?.length && d.vendorType) {
-          restoredCluster = { ids: d.ids, vendorType: d.vendorType };
+        // `ids` is the pre-2026-08-07 shape, when the cluster feed was an
+        // unranked id list. A tab open across that deploy still has one parked
+        // here, so it is read rather than dropped; those rows just have no rank
+        // and render as full matches, which is what they did before anyway.
+        const d = JSON.parse(raw) as {
+          entries?: VendorListEntry[];
+          ids?: string[];
+          vendorType?: VendorType;
+        };
+        const entries =
+          d.entries?.length
+            ? d.entries
+            : d.ids?.length && d.vendorType
+              ? d.ids.map((id) => ({ id, vendorType: d.vendorType as VendorType }))
+              : null;
+        if (entries?.length && d.vendorType) {
+          restoredCluster = { entries, vendorType: d.vendorType };
         }
       }
       const rawPin = sessionStorage.getItem("wr:pin");
@@ -682,7 +700,7 @@ export default function ExplorePage() {
       {/* Cluster list feed (portals to <body>; opens on a cluster tap) */}
       {cluster && (
         <ClusterListSheet
-          ids={cluster.ids}
+          entries={cluster.entries}
           vendorType={cluster.vendorType}
           onClose={() => setCluster(null)}
         />
