@@ -478,13 +478,18 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       // (Kiara, 2026-08-07). Without it a package quote was simply dropped, so
       // 21 of 56 priced caterers were missing from their own slider.
       //
-      // Read the bottom of this axis with care. A real minimum divides into a
-      // believable per-head figure ($5,000 -> $50), but the extraction also
-      // tags platter and small-order prices `package` — a charcuterie board at
-      // $85 becomes $0.85 a head, which is not a wedding quote at any guest
-      // count. Those are mis-tagged rows, not a fault in the assumption; the
-      // fix belongs in the extraction, not in a floor here that would silently
-      // hide them.
+      // Only `package` converts. A real minimum divides into a believable
+      // per-head figure ($5,000 -> $50), but the extraction had also tagged
+      // platter and menu prices `package`, and a charcuterie board at $85 is
+      // not $0.85 a head at any guest count. Those seven rows are now
+      // `per_item` in the dataset (scripts/retag-per-item-caterers.mjs), which
+      // is unlisted here on purpose: an unconvertible basis reads as silence,
+      // so the vendor keeps its pin and demotes to the partial tier instead of
+      // being excluded or landing on the axis at a fictional price.
+      //
+      // Do NOT add a plausibility floor here instead. A floor hides a bad row
+      // rather than fixing it, and it cannot tell a mis-tag from a caterer who
+      // is genuinely cheap.
       basisScale: { package: 1 / PRICE_ASSUMPTIONS.guests },
       basisNote: `Caterers quoting a package or minimum are divided across ${PRICE_ASSUMPTIONS.guests} guests.`,
     },
