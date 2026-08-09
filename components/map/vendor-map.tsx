@@ -243,6 +243,35 @@ function selectionPaint(selectedId: string | null) {
  * and below that only for the selected pin. The zoom test sits at the OUTERMOST
  * level, which is what lets a layout property mix zoom with a per-feature lookup.
  */
+/**
+ * The number on a cluster bubble.
+ *
+ * The number is what MATCHED, not what is underneath. Three cases, in order:
+ * every leaf matched (always true with no filter active) shows the abbreviated
+ * total, so nothing changes for the common case and big counts keep their
+ * "1.2k" form; a partial hit shows the match count; a bubble with no matches
+ * falls back to its total and recedes below, reading as "12 here, none
+ * confirmed" rather than a bare "0".
+ *
+ * `capped` suffixes a "+". A type whose fetch hit the row ceiling is missing
+ * rows that could belong to ANY of its bubbles — the cap is on the query, not
+ * on a place — so every cluster of that type is a lower bound and has to say
+ * so. Without this the bubble is the one surface that still reports a
+ * precise-looking number it cannot stand behind, which is exactly how the
+ * 1000-row cap stayed invisible for so long (Kiara, 2026-08-06).
+ */
+function clusterLabel(capped: boolean): Expr {
+  const base: Expr = [
+    "case",
+    ["==", ["get", "matched"], ["get", "point_count"]],
+    ["get", "point_count_abbreviated"],
+    [">", ["get", "matched"], 0],
+    ["to-string", ["get", "matched"]],
+    ["get", "point_count_abbreviated"],
+  ];
+  return capped ? (["concat", base, "+"] as Expr) : base;
+}
+
 function selectionLayout(selectedId: string | null) {
   return {
     "icon-image": selectedId
@@ -469,6 +498,13 @@ export interface VisibleVendorsPayload {
   total: number;
   partial: number;
   entries: VisibleVendor[];
+  /**
+   * True when the last fetch hit the per-type row ceiling, which makes `total`
+   * a LOWER BOUND rather than the count. Callers should mark it as such — an
+   * exact-looking number that is quietly short is the failure this whole path
+   * exists to stop.
+   */
+  capped: boolean;
 }
 
 interface VendorMapProps {
@@ -603,6 +639,13 @@ export function VendorMap({
   // Identity of the last emitted visible set, so an idle pan that changes
   // nothing doesn't push a new array (and a re-render) at the page.
   const lastVisibleKeyRef = useRef<string | null>(null);
+  // Whether the rows currently held came from a truncated fetch. Read by
+  // reportVisibleVendors so the count can present itself as a floor.
+  const cappedRef = useRef(false);
+  // WHICH types truncated. The results count only needs the boolean above, but
+  // a cluster bubble is per type, so it needs to know whether its own type was
+  // short — venues can be capped while every other bubble is exact.
+  const cappedTypesRef = useRef<Set<VendorType>>(new Set());
   // Area covered by the last *complete* fetch. When the viewport stays inside
   // it, the pins on the map are already correct — skip the refetch.
   const coverageRef = useRef<ViewportBbox | null>(null);
@@ -767,15 +810,21 @@ export function VendorMap({
       // box and pick up the rest, which degrades honestly instead of caching
       // half a map. An empty area is complete, so cover it too (otherwise
       // panning an empty region refetches forever).
-      const truncated = responses.some(
-        (r) => (r.data?.length ?? 0) >= MAX_ROWS_PER_TYPE,
-      );
+      const cappedTypes = new Set<VendorType>();
+      responses.forEach((r, i) => {
+        if ((r.data?.length ?? 0) >= MAX_ROWS_PER_TYPE) {
+          cappedTypes.add(bucketType(ALL_VENDOR_TYPES[i]));
+        }
+      });
+      cappedTypesRef.current = cappedTypes;
+      const truncated = cappedTypes.size > 0;
       if (truncated) {
         console.warn(
           "[VendorMap] a vendor type hit the row ceiling; area left uncached",
         );
       }
       coverageRef.current = truncated ? null : box;
+      cappedRef.current = truncated;
 
       // Migration 0034 moved `filters` out of this payload (two thirds of its
       // bytes, read only by the filter sheet). Pre-0034 the rows still carry it
@@ -877,10 +926,31 @@ export function VendorMap({
       .map(({ id, vendorType, rank }) => ({ id, vendorType, rank }));
     const partial = inView.reduce((n, e) => n + (e.rank === 0 ? 1 : 0), 0);
 
-    const key = `${inView.length}|${partial}|${entries.map((e) => e.id).join(",")}`;
+    const capped = cappedRef.current;
+    const key = `${inView.length}|${partial}|${capped}|${entries.map((e) => e.id).join(",")}`;
     if (key === lastVisibleKeyRef.current) return; // nothing changed
     lastVisibleKeyRef.current = key;
-    notify({ total: inView.length, partial, entries });
+    notify({ total: inView.length, partial, entries, capped });
+  }, []);
+
+  /**
+   * Re-apply the cluster labels, which carry a "+" for any type whose fetch was
+   * truncated. Layout-only, so this is one setLayoutProperty per type with no
+   * new layers or sources — the same shape as applyTypeFilter. Runs on every
+   * apply because the capped set is per fetch: panning out of a dense area
+   * clears it again.
+   */
+  const applyClusterCaps = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    for (const t of VENDOR_TYPES) {
+      if (!map.getLayer(clusterLayerId(t))) continue;
+      map.setLayoutProperty(
+        clusterLayerId(t),
+        "text-field",
+        clusterLabel(cappedTypesRef.current.has(t)),
+      );
+    }
   }, []);
 
   /** Push vendor rows into the per-type clustered sources. */
@@ -905,10 +975,11 @@ export function VendorMap({
       // on any move without going back to the network.
       vendorsRef.current = vendors;
       positionsRef.current = positions;
+      applyClusterCaps();
       onVendorsChangeRef.current?.(vendors);
       reportVisibleVendors();
     },
-    [reportVisibleVendors],
+    [reportVisibleVendors, applyClusterCaps],
   );
 
   const refreshMarkers = useCallback(async () => {
@@ -1203,21 +1274,9 @@ export function VendorMap({
               "icon-size": ["step", ["get", "point_count"], 1, 10, 1.15, 25, 1.3],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
-              // The number is what MATCHED, not what is underneath. Three cases,
-              // in order: every leaf matched (always true with no filter active)
-              // shows the abbreviated total, so nothing changes for the common
-              // case and big counts keep their "1.2k" form; a partial hit shows
-              // the match count; a bubble with no matches falls back to its
-              // total and recedes below, reading as "12 here, none confirmed"
-              // rather than a bare "0".
-              "text-field": [
-                "case",
-                ["==", ["get", "matched"], ["get", "point_count"]],
-                ["get", "point_count_abbreviated"],
-                [">", ["get", "matched"], 0],
-                ["to-string", ["get", "matched"]],
-                ["get", "point_count_abbreviated"],
-              ],
+              // See clusterLabel — the count is matches, and gains a "+" when
+              // this type's fetch was truncated.
+              "text-field": clusterLabel(cappedTypesRef.current.has(t)),
               "text-font": ["Noto Sans Regular"],
               "text-size": ["step", ["get", "point_count"], 13, 10, 15, 25, 17],
               // Sit the count in the lower half of the disc (icon is up top);
