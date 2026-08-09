@@ -5,8 +5,6 @@ import {
   LANDING_REF_APP,
   LANDING_REF_PARAM,
   VISIT_COOKIE,
-  VISIT_COOKIE_MAX_AGE,
-  isProductPath,
 } from "./nav";
 
 /**
@@ -30,23 +28,14 @@ export function applyFirstVisitGate(
   signedIn: boolean,
 ): NextResponse {
   const { pathname, searchParams } = request.nextUrl;
-  const seen = request.cookies.get(VISIT_COOKIE)?.value === "1";
 
-  // Reaching the product is what marks someone as a returning visitor.
-  if (isProductPath(pathname)) {
-    if (!seen) {
-      response.cookies.set(VISIT_COOKIE, "1", {
-        maxAge: VISIT_COOKIE_MAX_AGE,
-        path: "/",
-        sameSite: "lax",
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-      });
-    }
-    return response;
-  }
-
+  // Only `/` is decided here. The cookie itself is written client-side by
+  // <MarkVisited> in the (app) layout: a Next prefetch of a product link is a
+  // real request but not a real visit, and the header that would identify one
+  // is not visible to the proxy. See components/mark-visited.tsx.
   if (pathname !== "/") return response;
+
+  const seen = request.cookies.get(VISIT_COOKIE)?.value === "1";
   if (searchParams.get(LANDING_REF_PARAM) === LANDING_REF_APP) return response;
   if (!seen && !signedIn) return response;
 

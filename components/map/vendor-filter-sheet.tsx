@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, SlidersHorizontal, ChevronDown } from "lucide-react";
 import {
@@ -14,7 +14,6 @@ import {
   filtersForType,
   SEASONS,
   DAY_TYPES,
-  VENUE_PRICE_ASSUMPTIONS,
   type FilterDef,
 } from "@/lib/constants/vendor-filters";
 import HISTOGRAMS from "@/lib/constants/filter-histograms.json";
@@ -38,9 +37,15 @@ import { cn } from "@/lib/utils";
  * Histograms come from `filter-histograms.json`, generated from the real corpus
  * by `scripts/backfill-vendor-filters.mjs`, so a slider shows where vendors
  * actually sit rather than a uniform axis nobody occupies. Bins are NON-uniform
- * (roughly equal-count), which is why every slider indexes bins rather than
- * values — a linear track over these edges would put the handle in the wrong
- * place.
+ * — roughly equal-count, then re-cut wherever one notch spanned too far — which
+ * is why every slider indexes bins rather than values: a linear track over these
+ * edges would put the handle in the wrong place. Bin COUNT varies per slider too
+ * (7 to 12 today), so nothing here may assume seven.
+ *
+ * Edges are not a UI concern and must not be tuned here. They are one rule in
+ * the generator, applied to every range filter at once; `--hist-only` regenerates
+ * them with no DB credentials and prints each axis. See the `bins()` comment
+ * there for why equal-count alone is not enough.
  */
 
 type Hist = { min: number; max: number; median: number; bins: { lo: number; hi: number; n: number }[] };
@@ -285,6 +290,16 @@ function RangeControl({
 /* ------------------------------------------------------------------- sheet */
 
 /**
+ * Empty states are CENTRED in the body, not parked at its top. At the old 68vh
+ * this was a short paragraph over a short gap; at full height the same markup
+ * left one line of text stranded above ~600px of nothing, which reads as a
+ * panel that failed to load rather than as a prompt. `h-full` resolves because
+ * the body is a flex-1 child of a fixed-height column.
+ */
+const emptyStateClass =
+  "flex h-full items-center justify-center px-6 text-center text-[13px] text-muted-foreground";
+
+/**
  * The filter groups for ONE vendor type — whichever category tab is focused.
  * Filters are type-scoped, so only the focused type's controls are on screen;
  * the others keep their state and are one tap away.
@@ -513,15 +528,14 @@ function TypeSection({
                     scaled={rescaledCounts(def)}
                   />
 
-                  {def.unit === "usd" &&
-                    vendorType === "venue" &&
-                    def.key === "price" && (
-                      <p className="mt-2 text-[11px] text-muted-foreground">
-                        Venues quoting per person are shown at{" "}
-                        {VENUE_PRICE_ASSUMPTIONS.guests} guests, per hour at{" "}
-                        {VENUE_PRICE_ASSUMPTIONS.hours} hours.
-                      </p>
-                    )}
+                  {/* Any slider that converts an off-basis quote says so, from
+                      the def's own `basisNote` — the assumption is the filter's,
+                      not this component's, so a new one cannot ship silently. */}
+                  {def.basisNote && (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      {def.basisNote}
+                    </p>
+                  )}
                 </div>
               )}
             </AccordionContent>
@@ -593,6 +607,8 @@ export function VendorFilterSheet({
   const [focused, setFocused] = useState<VendorType | null>(
     selectedTypes[0] ?? null,
   );
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 0);
@@ -609,6 +625,90 @@ export function VendorFilterSheet({
       document.body.style.overflow = prev;
     };
   }, [onClose]);
+
+  // Swipe-down-to-dismiss, the same gesture the results list sheet has — at
+  // this height the sheet IS the screen, so the ✕ alone is a long reach.
+  //
+  // Native (non-passive) listeners so touchmove can preventDefault; React
+  // attaches touch listeners as passive. Gated on `mounted` because the panel
+  // only exists once the portal has rendered.
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el) return;
+    let startY: number | null = null;
+    let startX = 0;
+    let dragging = false;
+    // Axis lock: a touch that commits to horizontal belongs to a control
+    // inside the sheet, not to the sheet.
+    let axis: "h" | "v" | null = null;
+    let dy = 0;
+
+    const start = (e: TouchEvent) => {
+      // A range slider is itself a drag control, and the one gesture conflict
+      // this sheet has that the results feed does not: its thumb travel is
+      // mostly horizontal, but a sloppy drag is not, and yanking the whole
+      // sheet away mid-price-adjust is worse than losing the dismiss gesture
+      // over a 20px thumb.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('input[type="range"]')) return;
+      if ((scrollRef.current?.scrollTop ?? 0) > 0) return;
+      startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
+      dragging = true;
+      axis = null;
+      dy = 0;
+      el.style.transition = "none";
+    };
+    const move = (e: TouchEvent) => {
+      if (!dragging || startY == null) return;
+      dy = e.touches[0].clientY - startY;
+      if (axis === null) {
+        const dx = e.touches[0].clientX - startX;
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return; // not committed yet
+        axis = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+      }
+      if (axis === "h") {
+        dragging = false;
+        el.style.transform = "";
+        return;
+      }
+      if (dy <= 0) {
+        // Pulling up — hand control back to normal scrolling.
+        el.style.transform = "";
+        return;
+      }
+      if ((scrollRef.current?.scrollTop ?? 0) > 0) {
+        dragging = false;
+        el.style.transform = "";
+        return;
+      }
+      e.preventDefault();
+      el.style.transform = `translateY(${dy}px)`;
+    };
+    const end = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.style.transition = "transform 0.2s ease-out";
+      if (dy > 120) {
+        el.style.transform = "translateY(100%)";
+        window.setTimeout(onClose, 180);
+      } else {
+        el.style.transform = "";
+      }
+      startY = null;
+    };
+
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, [onClose, mounted]);
 
   const matched = Math.max(0, visibleTotal - visiblePartial);
   const totalActive = selectedTypes.reduce(
@@ -632,22 +732,44 @@ export function VendorFilterSheet({
   };
 
   const body = (
-    <div className="fixed inset-0 z-[70] flex flex-col justify-end">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center">
       <button
         type="button"
         aria-label="Close filters"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
       {/* A FIXED height, not max-height. With max-height the sheet resized every
           time its contents changed — picking a category grew it from a stub to
           nearly full screen, and collapsing an accordion group shrank it again,
           so the whole panel lurched under the thumb. A fixed box scrolls
-          internally instead and never moves (Kiara, 2026-08-05). Height is set
-          so the map stays visible above it: this is a filter over the map, not
-          a page of its own. */}
-      <div className="relative flex h-[68vh] flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl">
-        <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-3">
+          internally instead and never moves (Kiara, 2026-08-05).
+
+          That height is now the SAME 92dvh the results list sheet uses, and the
+          shell matches it too — grab handle, swipe-down, centred at the mobile
+          frame's width. Filtering and reading results are the two halves of one
+          task, so they should not feel like two different kinds of surface; the
+          filter groups also get the room the accordion actually needs, instead
+          of a viewport-third that made every category a scroll. What is given
+          up is the strip of map that used to show above the sheet: at 68vh it
+          was a few unreadable blocks, and the footer's live match count already
+          says what that strip was there to hint at. */}
+      <div
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Filter vendors"
+        className="relative flex h-[92dvh] w-full max-w-[480px] flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl animate-in slide-in-from-bottom-8 fade-in-0 duration-200"
+      >
+        {/* Grab handle (also the primary swipe-down target) */}
+        <div className="flex shrink-0 justify-center pb-1 pt-2">
+          <div
+            className="h-1.5 w-10 rounded-full bg-muted-foreground/30"
+            aria-hidden
+          />
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-1">
           <h2 className="text-[15px] font-semibold">Show me</h2>
           {totalActive > 0 && (
             <button
@@ -756,7 +878,10 @@ export function VendorFilterSheet({
           })}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+        >
           {focusedType ? (
             filtersForType(focusedType).length > 0 ? (
               <TypeSection
@@ -771,12 +896,12 @@ export function VendorFilterSheet({
                 }
               />
             ) : (
-              <p className="py-6 text-center text-[13px] text-muted-foreground">
+              <p className={emptyStateClass}>
                 No detail filters for {CATEGORY_PLURAL[focusedType]} yet.
               </p>
             )
           ) : (
-            <p className="py-8 text-center text-[13px] text-muted-foreground">
+            <p className={emptyStateClass}>
               Showing every category. Pick one above to narrow it down.
             </p>
           )}
@@ -804,7 +929,16 @@ export function VendorFilterSheet({
   return mounted ? createPortal(body, document.body) : null;
 }
 
-/** The number a price histogram should bin this vendor under. */
+/**
+ * The number a price histogram should bin this vendor under.
+ *
+ * Returns undefined for a vendor the matcher cannot judge, so the bars only
+ * ever count rows a selection can actually match. An off-basis quote is binned
+ * only when `basisScale` can convert it (a per-person venue at the stated guest
+ * count) and dropped otherwise — binning it raw put $150-per-person venues in
+ * the $0-499 bar while the matcher was demoting them into the partial tier,
+ * which is exactly the contradiction the couple was reading (Kiara, 2026-08-06).
+ */
 function priceForContext(
   v: Vendor,
   def: FilterDef,
@@ -812,6 +946,15 @@ function priceForContext(
 ): number | undefined {
   const f = v.filters;
   if (!f) return undefined;
+
+  let scale = 1;
+  const basis = f.price_basis;
+  if (def.basis && typeof basis === "string" && basis !== def.basis) {
+    const factor = def.basisScale?.[basis];
+    if (factor === undefined) return undefined;
+    scale = factor;
+  }
+
   if (def.rescaledBy === "date_context" && (dc.season || dc.day) && Array.isArray(f.price_tiers)) {
     const hits = (f.price_tiers as Array<Record<string, unknown>>).filter(
       (t) =>
@@ -819,10 +962,10 @@ function priceForContext(
         (!dc.day || t.day_type == null || t.day_type === dc.day),
     );
     const mins = hits.map((t) => t.min).filter((n): n is number => typeof n === "number");
-    if (mins.length) return Math.min(...mins);
+    if (mins.length) return Math.min(...mins) * scale;
   }
   const n = f[def.lo ?? def.key];
-  return typeof n === "number" ? n : undefined;
+  return typeof n === "number" ? n * scale : undefined;
 }
 
 /* ----------------------------------------------------------------- trigger */

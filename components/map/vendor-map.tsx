@@ -16,9 +16,13 @@ import {
   clusterImageId,
 } from "@/lib/map/pin-images";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
+import { bboxForView, padBbox, type ViewportBbox } from "@/lib/map/viewport";
 import {
   filterRankFor,
+  filterMatchFor,
+  matchedFraction,
   hasAnySelection,
+  type FilterMatchDetail,
   type FilterSelections,
 } from "@/lib/filters/match";
 
@@ -88,6 +92,101 @@ const PREVIEW_SAFE_PX = 300;
 // past the cap degrades to "the closest N" rather than an arbitrary subset.
 const MAX_VISIBLE_ENTRIES = 200;
 
+// What every vendor scores when no attribute filter is active: a full match,
+// nothing asked, nothing missing. Hoisted so the hot loop does not allocate one
+// per row per pan.
+const UNFILTERED_MATCH: FilterMatchDetail = { rank: 1, unknown: 0, active: 0 };
+
+/** A vendor scored for the list order. `d` is squared distance from the map center. */
+interface RankedVendor {
+  id: string;
+  vendorType: VendorType;
+  rank: 0 | 1;
+  matched: number;
+  priced: boolean;
+  photo: boolean;
+  d: number;
+}
+
+/**
+ * Score one vendor for the list order, or null if it is ruled out (rank -1).
+ *
+ * `cosLat` scales longitude to match latitude at the map center, so the
+ * distance is comparable in both axes. It stays squared: this only ever orders,
+ * so there is no need for a real geodesic or a square root.
+ */
+function rankVendor(
+  v: Vendor,
+  vendorType: VendorType,
+  pos: { lng: number; lat: number },
+  center: { lng: number; lat: number },
+  cosLat: number,
+  selections: FilterSelections | undefined,
+  filtering: boolean,
+): RankedVendor | null {
+  // Same predicate the pins were built with, so no surface can disagree with
+  // what is drawn. The detail form additionally carries how many of the filters
+  // the vendor was silent on, which grades the partial tier.
+  const match = filtering
+    ? filterMatchFor(vendorType, v.filters, selections)
+    : UNFILTERED_MATCH;
+  if (match.rank < 0) return null;
+  const dx = (pos.lng - center.lng) * cosLat;
+  const dy = pos.lat - center.lat;
+  return {
+    id: v.id,
+    vendorType,
+    rank: match.rank as 0 | 1,
+    matched: matchedFraction(match),
+    // `=== true` rather than a truthiness test: both flags are undefined on
+    // every row until migration 0035 is applied, and that has to read as false
+    // for all rows alike so the two keys drop out and leave the old
+    // nearest-first order — not as NaN, which would corrupt the comparator.
+    priced: v.has_price === true,
+    photo: v.has_photo === true,
+    d: dx * dx + dy * dy,
+  };
+}
+
+/**
+ * The list order. Five keys:
+ *
+ *   rank     full matches before the "missing some information" ones. This has
+ *            to stay outermost: it is the partition the list draws its divider
+ *            on, and what the cap keeps when it bites.
+ *   matched  how MUCH of the ask a vendor met — the partial tier is itself
+ *            graded, so a venue silent on 1 filter of 3 outranks one silent on
+ *            2. A no-op above the divider, where every row matched everything
+ *            and scores 1, which is why it can sit here rather than being
+ *            special-cased to rank 0.
+ *   priced   a vendor with an extracted price before one without. A couple is
+ *            shopping on budget, and a card that can answer "what does this
+ *            cost" is worth more than one that cannot. No divider — this tier
+ *            is internal, unlike rank.
+ *   photo    a card that draws an image before one that falls through to a
+ *            category placeholder.
+ *   d        then nearest the map center.
+ *
+ * Each key only ever reorders within the tier above it, so distance still
+ * decides everything at the bottom.
+ *
+ * **Shared by BOTH feeds** — the on-screen results list and the tapped-cluster
+ * sheet. The cluster sheet used to render MapLibre leaf order, which is
+ * supercluster tree order and arbitrary to a reader, so the same two vendors
+ * came out in a different order depending on which way you opened the list
+ * (reported 2026-08-07: a "No quote found" photographer above one quoting
+ * $2.5k). If a sixth key is ever added, add it here and both move together.
+ */
+function compareRanked(a: RankedVendor, b: RankedVendor): number {
+  return (
+    b.rank - a.rank ||
+    b.matched - a.matched ||
+    Number(b.priced) - Number(a.priced) ||
+    Number(b.photo) - Number(a.photo) ||
+    a.d - b.d
+  );
+}
+
 // Label sizes: the selected pin's name is set larger than its neighbours', and
 // offset further down to clear its bigger disc (offsets are in ems of text-size).
 const LABEL_SIZE = 11;
@@ -100,6 +199,38 @@ type Expr = import("maplibre-gl").ExpressionSpecification;
 /** `["case", <feature is the selected vendor>, whenSelected, otherwise]`. */
 function whenSelected(selectedId: string, whenTrue: unknown, whenFalse: unknown) {
   return ["case", ["==", ["get", "id"], selectedId], whenTrue, whenFalse] as Expr;
+}
+
+/**
+ * How far a rank-0 pin recedes. It is silent on something the couple filtered
+ * for, not a miss, so it stays on the map — but well back, so the pins that DO
+ * match read as the answer and these as texture behind them.
+ *
+ * The label goes fainter than the disc rather than tracking it. A disc is a
+ * shape and survives being pale; text at low opacity fades its white halo too,
+ * so it stops being legible while still adding clutter — and the name is the
+ * least useful thing about a vendor whose attributes are unknown anyway.
+ */
+const PARTIAL_ICON_OPACITY = 0.22;
+const PARTIAL_LABEL_OPACITY = 0.28;
+
+/**
+ * The paint properties that depend on the selection: opacity.
+ *
+ * The SELECTED pin is always fully opaque whatever its rank. Without that, at
+ * these opacities, tapping a faded pin opens its card next to a ghost — the one
+ * pin the couple has actively asked about, and the only one the card refers to.
+ * The rank fade is the resting state, not a permanent handicap.
+ */
+function selectionPaint(selectedId: string | null) {
+  const faded = (partial: number) =>
+    (selectedId
+      ? whenSelected(selectedId, 1, ["case", ["==", ["get", "rank"], 0], partial, 1])
+      : ["case", ["==", ["get", "rank"], 0], partial, 1]) as Expr;
+  return {
+    "icon-opacity": faded(PARTIAL_ICON_OPACITY),
+    "text-opacity": faded(PARTIAL_LABEL_OPACITY),
+  };
 }
 
 /**
@@ -259,15 +390,21 @@ function buildFeatureCollectionsByType(
     // be filtered at once without one type's criteria touching another.
     const rank = active ? filterRankFor(t, vendor.filters, filterSelections) : 1;
     if (rank < 0) continue;
+    // Migration 0034 computes this server-side (a boolean is far cheaper than
+    // the three columns the heuristic reads). Pre-0034 the column is absent and
+    // those columns are still present, so fall back to the shared client-side
+    // heuristic — the two are deliberate twins.
+    const approximate =
+      vendor.approximate ?? isApproximateLocation(vendor);
     (byType[t].features as GeoJSON.Feature[]).push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [pos.lng, pos.lat] },
       properties: {
         id: vendor.id,
         name: vendor.name,
-        icon: pinImageId(t, isApproximateLocation(vendor)),
+        icon: pinImageId(t, approximate),
         // Emphasized variant, swapped in while this vendor's preview is open.
-        iconSelected: pinImageId(t, isApproximateLocation(vendor), true),
+        iconSelected: pinImageId(t, approximate, true),
         // 1 matches everything asked, 0 is silent on at least one thing. Drives
         // the faded pin — a vendor nobody has written the answer for is still a
         // real candidate, so it stays on the map rather than vanishing.
@@ -279,15 +416,29 @@ function buildFeatureCollectionsByType(
 }
 
 /**
- * Emitted when a cluster pin is tapped: the vendor ids it contains plus the map
+ * Emitted when a cluster pin is tapped: the vendors it contains plus the map
  * view at tap time, so the caller can reopen the same view after a round trip to
  * a vendor page.
  */
 export interface ClusterOpenPayload {
-  ids: string[];
+  /**
+   * The cluster's vendors, each with its match rank, ordered by the SAME
+   * comparator the results feed uses (`compareRanked`) — so the two feeds can
+   * never present the same vendors in a different order, and the cluster feed
+   * can draw the same partial-tier divider rather than showing a demoted vendor
+   * as a match.
+   */
+  entries: ClusterEntry[];
   vendorType: VendorType;
   center: [number, number];
   zoom: number;
+}
+
+/** One vendor in a tapped cluster. The type is a per-cluster fact, so it is not repeated per row. */
+export interface ClusterEntry {
+  id: string;
+  /** 1 matches every active attribute filter, 0 is silent on at least one. */
+  rank: 0 | 1;
 }
 
 /** Emitted when an individual (non-cluster) vendor pin is tapped. */
@@ -370,6 +521,22 @@ interface VendorMapProps {
    */
   filterSelections?: FilterSelections;
   /**
+   * Whether this session needs the per-vendor `filters` attributes at all.
+   *
+   * They are two thirds of the map payload (about 257 of 625 bytes per row,
+   * measured over the real corpus) and most sessions never open the filter
+   * sheet, so migration 0034 moved them out of `vendors_in_bbox` into their own
+   * function. Set this true when the couple opens the sheet — the map then
+   * fetches the attributes for the covered area, merges them into the rows it
+   * already holds, re-applies, and re-emits via `onVendorsChange`. Once true it
+   * should stay true for the session: later pans fetch both together.
+   *
+   * Leaving it false is safe, not lossy — with no filters loaded every vendor
+   * ranks 1 (unfiltered), which is exactly the state a session that never
+   * filters is in anyway.
+   */
+  withFilters?: boolean;
+  /**
    * Called whenever the set of vendors inside the viewport changes — on every
    * settled move, after new rows land, and when either filter changes. Drives
    * the "see all N results on screen" pill and the list it opens.
@@ -395,6 +562,7 @@ export function VendorMap({
   initialView,
   selectedTypes,
   filterSelections,
+  withFilters,
   onVisibleVendorsChange,
   onVendorsChange,
 }: VendorMapProps) {
@@ -437,12 +605,14 @@ export function VendorMap({
   const lastVisibleKeyRef = useRef<string | null>(null);
   // Area covered by the last *complete* fetch. When the viewport stays inside
   // it, the pins on the map are already correct — skip the refetch.
-  const coverageRef = useRef<{
-    minLng: number;
-    minLat: number;
-    maxLng: number;
-    maxLat: number;
-  } | null>(null);
+  const coverageRef = useRef<ViewportBbox | null>(null);
+  // Whether this session wants the `filters` attributes at all — read inside the
+  // fetch, which is not re-created when the prop changes.
+  const withFiltersRef = useRef(withFilters);
+  // Area the filter attributes have been loaded for. Tracked separately from
+  // `coverageRef` because the two are fetched at different times: pins land
+  // immediately, attributes only once the filter sheet is opened.
+  const filtersLoadedRef = useRef<ViewportBbox | null>(null);
   // Overlay shown only during a *truly-new* fetch (first load + search jumps),
   // never on ordinary pans/zooms. Safety timeout hides it if the map never
   // settles (e.g. tiles fail) so it can't get stuck.
@@ -469,6 +639,162 @@ export function VendorMap({
   ]);
 
   /**
+   * Fetch the per-vendor filter attributes for a box and merge them onto rows.
+   *
+   * Split out of the pin payload by migration 0034: `filters` is about 257 of
+   * the 625 bytes a row used to cost, and it is read by nothing until the couple
+   * opens the filter sheet. Returns the merged rows, or null if the fetch failed
+   * or the function is not there yet (pre-0034 hosted DB), in which case the
+   * caller keeps the unmerged rows and every vendor simply ranks as unfiltered.
+   */
+  const fetchFiltersFor = useCallback(
+    async (box: ViewportBbox, vendors: Vendor[]): Promise<Vendor[] | null> => {
+      // Split per type for the same reason the pin fetch is (see fetchBbox):
+      // one response cannot exceed POSTGREST_MAX_ROWS, and the corpus is twice
+      // that. Getting this wrong here is quieter and worse than on the pins —
+      // a vendor missing from the result is indistinguishable from one that
+      // genuinely has no attributes, so half the corpus would look
+      // attribute-less and sink into the partial tier for no reason.
+      const responses = await Promise.all(
+        ALL_VENDOR_TYPES.map((t) =>
+          supabase.rpc("vendor_filters_in_bbox", {
+            min_lng: box.minLng,
+            min_lat: box.minLat,
+            max_lng: box.maxLng,
+            max_lat: box.maxLat,
+            p_types: [t],
+            max_rows: MAX_ROWS_PER_TYPE,
+          }),
+        ),
+      );
+
+      const failed = responses.find((r) => r.error);
+      if (failed?.error) {
+        // Until 0034 is hand-applied this function does not exist. That is not
+        // a broken state: pre-0034 `vendors_in_bbox` still returns filters
+        // inline, so this path is never reached on that schema.
+        console.error(
+          "[VendorMap] vendor_filters_in_bbox error:",
+          failed.error.message,
+        );
+        return null;
+      }
+
+      // A truncated type would leave real attributes looking absent, so treat
+      // the whole merge as failed rather than writing nulls we cannot tell apart
+      // from genuine ones. The caller keeps the unmerged rows, which ranks every
+      // vendor as unfiltered — the same state a session that never filters is in.
+      if (responses.some((r) => (r.data?.length ?? 0) >= MAX_ROWS_PER_TYPE)) {
+        console.warn(
+          "[VendorMap] vendor_filters_in_bbox hit the row ceiling; attributes not merged",
+        );
+        return null;
+      }
+
+      const byId = new Map<string, Record<string, unknown> | null>();
+      for (const row of responses.flatMap(
+        (r) =>
+          (r.data ?? []) as {
+            id: string;
+            filters: Record<string, unknown> | null;
+          }[],
+      )) {
+        byId.set(row.id, row.filters);
+      }
+
+      filtersLoadedRef.current = box;
+      // A vendor with no row in the result genuinely has no attributes, so it
+      // gets null rather than staying undefined — that is what stops a later
+      // `filters !== undefined` check from re-triggering this fetch forever.
+      return vendors.map((v) => ({ ...v, filters: byId.get(v.id) ?? null }));
+    },
+    [supabase],
+  );
+
+  /**
+   * Run the bbox query for an explicit box and record it as the covered area.
+   *
+   * Takes the box as an argument rather than reading it off the map, which is
+   * what lets the first fetch start at MOUNT — before MapLibre has even been
+   * downloaded — instead of inside `map.on("load")`. See the init effect.
+   */
+  const fetchBbox = useCallback(
+    async (box: ViewportBbox): Promise<Vendor[] | null> => {
+      const args = {
+        min_lng: box.minLng,
+        min_lat: box.minLat,
+        max_lng: box.maxLng,
+        max_lat: box.maxLat,
+      };
+
+      // One request PER TYPE, in parallel, rather than one for everything.
+      //
+      // A single response cannot exceed POSTGREST_MAX_ROWS whatever max_rows
+      // asks for, and the corpus is already twice that, so an untyped fetch was
+      // silently losing more than half the map. Split per type and every request
+      // sits well under the ceiling (the largest is venues at 678 statewide),
+      // the split is deterministic rather than an arbitrary truncation, and it
+      // lines up with the per-type sources the map already keeps.
+      //
+      // Deliberately NOT client-side pagination of the untyped query: paging
+      // with LIMIT/OFFSET over a query with no ORDER BY may repeat or skip rows
+      // between pages, which would duplicate or drop pins.
+      //
+      // ALL_VENDOR_TYPES, not VENDOR_TYPES: the selectable list omits the legacy
+      // `music` value, and iterating it would drop a straggler music row that
+      // the untyped fetch used to pick up (bucketType draws it as "other").
+      const responses = await Promise.all(
+        ALL_VENDOR_TYPES.map((t) =>
+          supabase.rpc("vendors_in_bbox", {
+            ...args,
+            p_types: [t],
+            max_rows: MAX_ROWS_PER_TYPE,
+          }),
+        ),
+      );
+
+      const failed = responses.find((r) => r.error);
+      if (failed?.error) {
+        console.error("[VendorMap] vendors_in_bbox error:", failed.error.message);
+        return null; // keep existing pins and coverage — stale beats blank
+      }
+
+      const vendors = responses.flatMap((r) => (r.data ?? []) as Vendor[]);
+
+      // If ANY type came back full it was truncated, so this area is only
+      // partially known — zooming into it could reveal vendors we never
+      // received. Leaving coverage null makes the next move refetch a smaller
+      // box and pick up the rest, which degrades honestly instead of caching
+      // half a map. An empty area is complete, so cover it too (otherwise
+      // panning an empty region refetches forever).
+      const truncated = responses.some(
+        (r) => (r.data?.length ?? 0) >= MAX_ROWS_PER_TYPE,
+      );
+      if (truncated) {
+        console.warn(
+          "[VendorMap] a vendor type hit the row ceiling; area left uncached",
+        );
+      }
+      coverageRef.current = truncated ? null : box;
+
+      // Migration 0034 moved `filters` out of this payload (two thirds of its
+      // bytes, read only by the filter sheet). Pre-0034 the rows still carry it
+      // inline, which is the signal that no companion fetch is needed — see
+      // fetchFiltersFor. Post-0034 the key is absent and filters arrive only
+      // once the couple opens the sheet.
+      const inlineFilters = vendors.some((v) => v.filters !== undefined);
+      filtersLoadedRef.current = inlineFilters ? box : null;
+      if (!inlineFilters && withFiltersRef.current) {
+        const merged = await fetchFiltersFor(box, vendors);
+        if (merged) return merged;
+      }
+
+      return vendors;
+    },
+    [supabase, fetchFiltersFor],
+  );
+
+  /**
    * Query the RPC for the current bounds. Returns the vendor rows, or null when
    * nothing needs applying (cache hit or error). Kept separate from applying so
    * the first fetch can run concurrently with map image baking on load.
@@ -484,7 +810,10 @@ export function VendorMap({
     const north = bounds.getNorth();
 
     // Cache hit: viewport fully inside the area of the last complete fetch —
-    // every vendor in view is already in a source.
+    // every vendor in view is already in a source. This is also what lets the
+    // mount-time prefetch satisfy the map's own first request: the prefetch
+    // sets coverage before `load` fires, so this returns null and the load
+    // handler applies the already-arrived rows.
     const cov = coverageRef.current;
     if (
       cov &&
@@ -496,69 +825,13 @@ export function VendorMap({
       return null;
     }
 
-    const lngPad = (east - west) * BBOX_PAD_FACTOR;
-    const latPad = (north - south) * BBOX_PAD_FACTOR;
-    const min_lng = west - lngPad;
-    const max_lng = east + lngPad;
-    const min_lat = Math.max(south - latPad, -85);
-    const max_lat = Math.min(north + latPad, 85);
-
-    // One request PER TYPE, in parallel, rather than one for everything.
-    //
-    // A single request cannot exceed POSTGREST_MAX_ROWS, and the corpus is
-    // already twice that, so an untyped fetch silently lost more than half the
-    // map. Split per type and every request sits well under the ceiling
-    // (the largest type is venues at 678 statewide), the split is deterministic
-    // instead of an arbitrary truncation, and it maps one-to-one onto the
-    // per-type sources the map already keeps.
-    //
-    // Deliberately NOT client-side pagination of the untyped query: paging with
-    // LIMIT/OFFSET over a query with no ORDER BY may repeat or skip rows
-    // between pages, which would duplicate or drop pins.
-    // ALL_VENDOR_TYPES, not VENDOR_TYPES: the selectable list omits the legacy
-    // `music` value, and iterating it would drop a straggler music row that the
-    // old untyped fetch picked up (bucketType renders it as an "other" pin).
-    const responses = await Promise.all(
-      ALL_VENDOR_TYPES.map((t) =>
-        supabase.rpc("vendors_in_bbox", {
-          min_lng,
-          min_lat,
-          max_lng,
-          max_lat,
-          p_types: [t],
-          max_rows: MAX_ROWS_PER_TYPE,
-        }),
+    return fetchBbox(
+      padBbox(
+        { minLng: west, minLat: south, maxLng: east, maxLat: north },
+        BBOX_PAD_FACTOR,
       ),
     );
-
-    const failed = responses.find((r) => r.error);
-    if (failed?.error) {
-      console.error("[VendorMap] vendors_in_bbox error:", failed.error.message);
-      return null; // keep existing pins and coverage — stale beats blank
-    }
-
-    const vendors = responses.flatMap((r) => (r.data ?? []) as Vendor[]);
-
-    // If ANY type came back full it was truncated, so this area is only
-    // partially known — zooming in could reveal vendors we never received.
-    // Leaving coverage null makes the next move refetch a smaller box and pick
-    // up the rest, which degrades honestly instead of caching a half-map.
-    const truncated = responses.some(
-      (r) => (r.data?.length ?? 0) >= MAX_ROWS_PER_TYPE,
-    );
-    if (truncated) {
-      console.warn(
-        "[VendorMap] a vendor type hit the row ceiling; area left uncached",
-      );
-    }
-    // An empty area is complete, so cover it too (otherwise panning an empty
-    // region refetches forever).
-    coverageRef.current = truncated
-      ? null
-      : { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat };
-
-    return vendors;
-  }, [supabase]);
+  }, [fetchBbox]);
 
   /**
    * Report every vendor currently inside the viewport, after the type filter —
@@ -587,35 +860,18 @@ export function VendorMap({
     const selections = filterSelectionsRef.current;
     const filtering = hasAnySelection(selections);
 
-    const inView: {
-      id: string;
-      vendorType: VendorType;
-      rank: 0 | 1;
-      d: number;
-    }[] = [];
+    const inView: RankedVendor[] = [];
     for (const v of vendorsRef.current) {
       const vendorType = bucketType(v.vendor_type);
       if (!showAll && !sel.includes(vendorType)) continue;
       const pos = positionsRef.current.get(v.id);
       if (!pos) continue; // no coordinates — never drawn, so never "on screen"
       if (!bounds.contains([pos.lng, pos.lat])) continue;
-      // Same predicate the pins were built with, so the pill can never disagree
-      // with what is drawn.
-      const rank = filtering
-        ? filterRankFor(vendorType, v.filters, selections)
-        : 1;
-      if (rank < 0) continue;
-      // Squared distance from center, longitude scaled to match latitude at this
-      // latitude. Only used for ordering, so no need for a real geodesic.
-      const dx = (pos.lng - center.lng) * cosLat;
-      const dy = pos.lat - center.lat;
-      inView.push({ id: v.id, vendorType, rank: rank as 0 | 1, d: dx * dx + dy * dy });
+      const scored = rankVendor(v, vendorType, pos, center, cosLat, selections, filtering);
+      if (scored) inView.push(scored);
     }
 
-    // Full matches first, then nearest the center. Ordering by rank before
-    // distance is what puts the "missing some information" rows at the bottom
-    // of the list, and what the cap keeps when it bites.
-    inView.sort((a, b) => b.rank - a.rank || a.d - b.d);
+    inView.sort(compareRanked);
     const entries: VisibleVendor[] = inView
       .slice(0, MAX_VISIBLE_ENTRIES)
       .map(({ id, vendorType, rank }) => ({ id, vendorType, rank }));
@@ -720,6 +976,37 @@ export function VendorMap({
   }, [filterSelections, applyVendors, reportVisibleVendors]);
 
   /**
+   * Load the filter attributes the first time this session needs them.
+   *
+   * Post-0034 the pin payload carries no `filters`, so opening the filter sheet
+   * is what pays for them — a second, much smaller query over the same box.
+   * Until it lands every vendor ranks 1 (unfiltered), which is a benign
+   * transient: nothing dims yet, rather than anything dimming wrongly. In
+   * practice the sheet is opened before any chip can be tapped, so the
+   * attributes are almost always in hand by the time a selection exists.
+   */
+  useEffect(() => {
+    withFiltersRef.current = withFilters;
+    if (!withFilters) return;
+
+    const cov = coverageRef.current;
+    const rows = vendorsRef.current;
+    if (!cov || rows.length === 0) return;
+    if (filtersLoadedRef.current === cov) return; // already have them for this box
+
+    let cancelled = false;
+    (async () => {
+      const merged = await fetchFiltersFor(cov, rows);
+      // Guard against a pan having replaced the rows while this was in flight.
+      if (cancelled || !merged || vendorsRef.current !== rows) return;
+      applyVendors(merged);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [withFilters, fetchFiltersFor, applyVendors]);
+
+  /**
    * Mark the vendor whose preview card is open: its pin is bumped up a size and
    * labelled at any zoom. Both are layout expressions on the existing pin layers,
    * so a selection change is two setLayoutProperty calls per type — no new
@@ -729,12 +1016,19 @@ export function VendorMap({
   const applySelection = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    const layout = selectionLayout(selectedVendorIdRef.current ?? null);
+    const selected = selectedVendorIdRef.current ?? null;
+    const layout = selectionLayout(selected);
+    const paint = selectionPaint(selected);
     for (const t of VENDOR_TYPES) {
       const layer = pinLayerId(t);
       if (!map.getLayer(layer)) continue; // layers not added yet (still loading)
       for (const [prop, value] of Object.entries(layout)) {
         map.setLayoutProperty(layer, prop, value);
+      }
+      // Opacity is paint, not layout, so it needs its own pass — a selected
+      // rank-0 pin must come back to full opacity.
+      for (const [prop, value] of Object.entries(paint)) {
+        map.setPaintProperty(layer, prop, value);
       }
     }
   }, []);
@@ -754,6 +1048,34 @@ export function VendorMap({
     loadTimeoutRef.current = setTimeout(() => setLoading(false), 10000);
 
     let map: import("maplibre-gl").Map;
+
+    // Ask for the vendors NOW, before MapLibre is even downloaded.
+    //
+    // This fetch used to live inside `map.on("load")`, which put it at the end
+    // of a long serial chain — ~1 MB MapLibre chunk, construct the map, fetch
+    // the basemap style from a third-party CDN, parse it, fire `load` — none of
+    // which the query actually depends on. It only needs a bounding box, and
+    // the box is a pure function of the initial center, zoom and container
+    // size, all known right here. Measured on a 4x-CPU / 1.6 Mbps / 150 ms
+    // profile, the style request had not even STARTED until +5.9 s, so the pins
+    // were queued behind someone else's CDN for no reason.
+    //
+    // The result is not awaited here: `fetchBbox` records the box as covered,
+    // so the `fetchVendors()` call in the load handler sees a cache hit and
+    // returns null, and the load handler applies whatever this resolved to. If
+    // the container has not been laid out yet, `bboxForView` returns null and
+    // we simply fall back to the old fetch-after-load path.
+    const iv0 = initialViewRef.current;
+    const initialBox = bboxForView(
+      iv0?.lng ?? DEFAULT_CENTER[0],
+      iv0?.lat ?? DEFAULT_CENTER[1],
+      iv0?.zoom ?? DEFAULT_ZOOM,
+      containerRef.current.clientWidth,
+      containerRef.current.clientHeight,
+    );
+    const prefetch = initialBox
+      ? fetchBbox(padBbox(initialBox, BBOX_PAD_FACTOR))
+      : null;
 
     (async () => {
       const maplibregl = (await import("maplibre-gl")).default;
@@ -795,10 +1117,27 @@ export function VendorMap({
             cluster: true,
             clusterRadius: CLUSTER_RADIUS,
             clusterMaxZoom: CLUSTER_MAX_ZOOM,
+            // How many of a bubble's vendors are FULL matches. `rank` is 1 or 0
+            // per point (contradicting rows never reach the source), so summing
+            // it counts the matches. Without this a bubble reports point_count
+            // and silently claims every vendor under it matched — the whole
+            // reason a filter could say "5 matches" over a map of 126 pins
+            // (Kiara, 2026-08-06). The individual pins have receded the partial
+            // tier since the filter shipped; at cluster zooms there are no
+            // individual pins, so nothing was carrying that signal. Recomputed
+            // automatically: a filter change rebuilds the source via
+            // applyVendors.
+            clusterProperties: { matched: ["+", ["get", "rank"]] },
           });
         }
 
-        const firstData = fetchVendors();
+        // Usually already resolved (or in flight) from the mount-time prefetch
+        // above; fetchVendors() then sees the covered box and returns null, so
+        // this resolves to the prefetched rows rather than issuing a second
+        // query. Falls back to a real fetch when there was no prefetch, or when
+        // the map settled somewhere the prefetched box does not cover.
+        const firstData = (async () =>
+          (prefetch ? await prefetch : null) ?? (await fetchVendors()))();
 
         // Pre-rasterize category pins + cluster discs before layers use them.
         await registerPinImages(map);
@@ -841,10 +1180,9 @@ export function VendorMap({
               // rank 0 means the vendor is silent on something you filtered
               // for. It fades rather than disappearing: low coverage mostly
               // means nobody wrote the answer down, so hiding it would bury a
-              // real candidate. Kept above 0.4 so a faded pin is still
-              // tappable-looking on a bright basemap.
-              "icon-opacity": ["case", ["==", ["get", "rank"], 0], 0.45, 1],
-              "text-opacity": ["case", ["==", ["get", "rank"], 0], 0.55, 1],
+              // real candidate. Updated on selection change — see
+              // selectionPaint.
+              ...selectionPaint(null),
             },
           });
         }
@@ -865,7 +1203,21 @@ export function VendorMap({
               "icon-size": ["step", ["get", "point_count"], 1, 10, 1.15, 25, 1.3],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
-              "text-field": ["get", "point_count_abbreviated"],
+              // The number is what MATCHED, not what is underneath. Three cases,
+              // in order: every leaf matched (always true with no filter active)
+              // shows the abbreviated total, so nothing changes for the common
+              // case and big counts keep their "1.2k" form; a partial hit shows
+              // the match count; a bubble with no matches falls back to its
+              // total and recedes below, reading as "12 here, none confirmed"
+              // rather than a bare "0".
+              "text-field": [
+                "case",
+                ["==", ["get", "matched"], ["get", "point_count"]],
+                ["get", "point_count_abbreviated"],
+                [">", ["get", "matched"], 0],
+                ["to-string", ["get", "matched"]],
+                ["get", "point_count_abbreviated"],
+              ],
               "text-font": ["Noto Sans Regular"],
               "text-size": ["step", ["get", "point_count"], 13, 10, 15, 25, 17],
               // Sit the count in the lower half of the disc (icon is up top);
@@ -878,6 +1230,23 @@ export function VendorMap({
               "text-color": "#ffffff",
               "text-halo-color": "rgba(0,0,0,0.25)",
               "text-halo-width": 1,
+              // A bubble holding nothing that matches recedes exactly as far as
+              // an individual rank-0 pin, and for the same reason: it is still
+              // worth tapping, because low coverage mostly means nobody wrote
+              // the answer down. No selection case here — a cluster is never
+              // the selected vendor.
+              "icon-opacity": [
+                "case",
+                ["==", ["get", "matched"], 0],
+                PARTIAL_ICON_OPACITY,
+                1,
+              ],
+              "text-opacity": [
+                "case",
+                ["==", ["get", "matched"], 0],
+                PARTIAL_LABEL_OPACITY,
+                1,
+              ],
               "icon-translate": off,
               "text-translate": off,
             },
@@ -907,13 +1276,56 @@ export function VendorMap({
             if (onOpen) {
               const count = (feature.properties?.point_count as number) ?? 0;
               src.getClusterLeaves(clusterId, count, 0).then((leaves) => {
-                const ids = leaves
-                  .map((l) => l.properties?.id)
-                  .filter((id): id is string => typeof id === "string");
-                if (ids.length === 0) return;
+                // id plus the rank buildFeatureCollectionsByType stamped on
+                // the point, which is the fallback for any leaf we cannot score
+                // below.
+                const leafRows = leaves
+                  .map((l) => ({
+                    id: l.properties?.id,
+                    rank: (l.properties?.rank === 0 ? 0 : 1) as 0 | 1,
+                  }))
+                  .filter((e): e is ClusterEntry => typeof e.id === "string");
+                if (leafRows.length === 0) return;
                 const c = map.getCenter();
+
+                // Order the leaves the way the results feed orders its rows.
+                // getClusterLeaves returns supercluster TREE order, which is
+                // spatial-index insertion order and arbitrary to a reader, so
+                // without this the same two vendors came out differently
+                // depending on whether the list was opened from a cluster or
+                // from the results pill. Sorting on rank alone is not enough
+                // either: it leaves the priced/photo/distance keys unapplied,
+                // which is what put a "No quote found" photographer above one
+                // quoting $2.5k (reported 2026-08-07).
+                //
+                // Everything needed is already in hand: these ids are in the
+                // clustered source, so their rows are in `vendorsRef` and their
+                // display positions in `positionsRef`. A leaf missing either is
+                // kept — this list is what the heading counts — at the end, on
+                // its stamped rank.
+                const selections = filterSelectionsRef.current;
+                const filtering = hasAnySelection(selections);
+                const cosLat = Math.cos((c.lat * Math.PI) / 180);
+                const byId = new Map(vendorsRef.current.map((v) => [v.id, v]));
+                const scored: RankedVendor[] = [];
+                const unscored: ClusterEntry[] = [];
+                for (const leaf of leafRows) {
+                  const v = byId.get(leaf.id);
+                  const pos = positionsRef.current.get(leaf.id);
+                  const s = v && pos
+                    ? rankVendor(v, t, pos, c, cosLat, selections, filtering)
+                    : null;
+                  if (s) scored.push(s);
+                  else unscored.push(leaf);
+                }
+                scored.sort(compareRanked);
+                const entries: ClusterEntry[] = [
+                  ...scored.map(({ id, rank }) => ({ id, rank })),
+                  ...unscored,
+                ];
+
                 onOpen({
-                  ids,
+                  entries,
                   vendorType: t,
                   center: [c.lng, c.lat],
                   zoom: map.getZoom(),

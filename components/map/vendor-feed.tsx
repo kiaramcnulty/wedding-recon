@@ -9,11 +9,37 @@ import {
 } from "@/components/map/vendor-preview-card";
 import { cn } from "@/lib/utils";
 
+/**
+ * Rows added per page. Sized to comfortably overfill a phone screen (cards are
+ * roughly 112-196px in an 844px viewport) so the couple never sees the bottom
+ * of the window, while keeping the preview query — and its request URL — small.
+ */
+const FEED_PAGE_SIZE = 20;
+
 /** One row of the feed: the vendor to preview, and the type that styles it. */
 export interface VendorListEntry {
   id: string;
   vendorType: VendorType;
+  /**
+   * 1 matches every active attribute filter, 0 is silent on at least one (see
+   * `lib/filters/match.ts` — silence demotes rather than excludes). The feed
+   * draws a labelled divider where the list crosses from one to the other.
+   *
+   * Optional because the cluster feed has no filter notion and passes rows
+   * without it; undefined reads as a full match, so that feed never divides.
+   */
+  rank?: 0 | 1;
 }
+
+/**
+ * Header over the second tier. Deliberately the ONLY divider in the feed: the
+ * list also sorts priced-before-unpriced and photo-before-placeholder, but
+ * those are internal tiers with no visual break, because they rank vendors that
+ * all equally match what the couple asked for. Rank is different in kind — a
+ * partial match is one the filters could not confirm, so saying it out loud is
+ * what stops the rows below reading as matches.
+ */
+const PARTIAL_DIVIDER_LABEL = "Partial matches in the area";
 
 /**
  * The scrollable list of vendor cards, with no shell of its own.
@@ -48,15 +74,90 @@ export function VendorFeed({
   const ownScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef ?? ownScrollRef;
 
+  // How many rows we have asked for previews of. The feed can be handed up to
+  // MAX_VISIBLE_ENTRIES (200) vendors, and the preview fetch pulls every active
+  // recon entry for every id in one query — full `notes` / `price_details`
+  // prose plus a media join — to render a two-line truncated carousel.
+  // Measured against a realistic corpus, 119 vendors was 237 recon rows and
+  // 171 KB, on a request URL of 4,770 characters (200 ids is about 8 KB, which
+  // is at or past what gateways will carry). Asking for a page at a time makes
+  // the first paint proportional to a screenful instead of to the whole list.
+  const [shownCount, setShownCount] = React.useState(FEED_PAGE_SIZE);
+
+  // A materially different list (a pan, a filter change) starts again at the
+  // first page. Keyed on the id list rather than array identity so a re-render
+  // that produces an equal list does not reset the couple's scroll depth.
+  //
+  // Adjusted DURING render rather than in an effect. This is React's documented
+  // way to reset state when a prop changes: setting state while rendering makes
+  // React re-run this component before it touches the DOM, so the children never
+  // see the stale window. An effect would set state after paint, which both
+  // renders a frame of the previous list and trips the cascading-render rule.
+  const entriesKey = entries.map((e) => e.id).join(",");
+  const [prevEntriesKey, setPrevEntriesKey] = React.useState(entriesKey);
+  if (prevEntriesKey !== entriesKey) {
+    setPrevEntriesKey(entriesKey);
+    setShownCount(FEED_PAGE_SIZE);
+  }
+
+  const shown = React.useMemo(
+    () => entries.slice(0, shownCount),
+    [entries, shownCount],
+  );
+  const hasMore = shownCount < entries.length;
+
   // Stable id list for the preview fetch, plus the type each id renders with —
   // a mixed feed can't take one type for the whole list.
-  const ids = React.useMemo(() => entries.map((e) => e.id), [entries]);
+  const ids = React.useMemo(() => shown.map((e) => e.id), [shown]);
   const typeById = React.useMemo(() => {
     const m = new Map<string, VendorType>();
     for (const e of entries) m.set(e.id, e.vendorType);
     return m;
   }, [entries]);
   const items = useVendorPreviews(ids);
+
+  const rankById = React.useMemo(() => {
+    const m = new Map<string, 0 | 1>();
+    for (const e of entries) if (e.rank != null) m.set(e.id, e.rank);
+    return m;
+  }, [entries]);
+
+  // Id the divider is drawn above: the first partial match actually RENDERED.
+  // Derived from `items` rather than from `entries` so that a vendor whose row
+  // has since been deleted — which useVendorPreviews silently drops — cannot
+  // take the divider with it and leave the rows below reading as full matches.
+  //
+  // The list is sorted rank-first, so this is a single boundary. While it sits
+  // beyond the window it simply has not been paged to yet.
+  //
+  // Rendered even when it lands at the very top (every result is partial).
+  // That reads oddly as a "divider", but the alternative is worse: a list of
+  // rows that match nothing the couple asked for, presented as if they did.
+  const firstPartialId = React.useMemo(
+    () => items?.find((i) => rankById.get(i.id) === 0)?.id ?? null,
+    [items, rankById],
+  );
+
+  // Grow the window when the sentinel below the last card comes near. The
+  // observer is created only while there IS more to show, so it stops costing
+  // anything at the end of the list. rootMargin buys a screenful of runway so
+  // the next page is usually already in hand by the time it is scrolled to.
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (obs) => {
+        if (obs.some((o) => o.isIntersecting)) {
+          setShownCount((n) => Math.min(n + FEED_PAGE_SIZE, entries.length));
+        }
+      },
+      { root: scrollRef.current, rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, entries.length, scrollRef, items]);
 
   // Restore scroll after returning from a vendor page. Set before paint (layout
   // effect) so the list doesn't flash at the top first.
@@ -109,27 +210,58 @@ export function VendorFeed({
         <>
           <ul className="flex flex-col gap-3">
             {items.map((item) => (
-              <li
-                key={item.id}
-                // Native content-visibility virtualization: off-screen cards
-                // skip layout/paint, so a few-hundred-item feed stays smooth.
-                className={cn(
-                  "[content-visibility:auto]",
-                  item.slides.length > 0
-                    ? "[contain-intrinsic-size:auto_196px]"
-                    : "[contain-intrinsic-size:auto_112px]",
+              <React.Fragment key={item.id}>
+                {item.id === firstPartialId && (
+                  // A real list item, not a decorated gap: a screen reader
+                  // should hear where the tier changes too, so it is left in
+                  // the a11y tree rather than marked presentational.
+                  <li className="flex items-center gap-3 pt-1">
+                    <span className="h-px flex-1 bg-border" aria-hidden />
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {PARTIAL_DIVIDER_LABEL}
+                    </span>
+                    <span className="h-px flex-1 bg-border" aria-hidden />
+                  </li>
                 )}
-              >
-                <VendorPreviewCard
-                  item={item}
-                  vendorType={typeById.get(item.id) ?? "other"}
-                  href={vendorHref(item.id)}
-                  onNavigate={rememberScroll}
-                />
-              </li>
+                <li
+                  // Native content-visibility virtualization: off-screen cards
+                  // skip layout/paint, so a few-hundred-item feed stays smooth.
+                  className={cn(
+                    "[content-visibility:auto]",
+                    item.slides.length > 0
+                      ? "[contain-intrinsic-size:auto_196px]"
+                      : "[contain-intrinsic-size:auto_112px]",
+                  )}
+                >
+                  <VendorPreviewCard
+                    item={item}
+                    vendorType={typeById.get(item.id) ?? "other"}
+                    href={vendorHref(item.id)}
+                    onNavigate={rememberScroll}
+                  />
+                </li>
+              </React.Fragment>
             ))}
           </ul>
-          {footnote && (
+          {/* Sentinel: crossing into view (or within 600px of it) pages in the
+              next batch. Kept OUTSIDE the list so it is never a stray <li>. */}
+          {hasMore && (
+            <div
+              ref={sentinelRef}
+              className="flex justify-center py-4"
+              aria-hidden
+            >
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {/* Announced separately from the spinner, which is decorative — a
+              screen reader gets the count, not a perpetual "loading". */}
+          <p className="sr-only" role="status">
+            {hasMore
+              ? `Showing ${items.length} of ${entries.length} vendors. Scroll for more.`
+              : `Showing all ${items.length} vendors.`}
+          </p>
+          {footnote && !hasMore && (
             <p className="px-1 pb-1 pt-4 text-center text-xs text-muted-foreground">
               {footnote}
             </p>

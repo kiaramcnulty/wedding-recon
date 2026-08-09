@@ -8,12 +8,14 @@
  */
 
 /**
- * Marks a visitor as having reached the product itself. Set by the middleware
- * on any product path; its presence is what sends a later visit to `/`
- * straight through to Explore instead of the landing page.
+ * Marks a visitor as having reached the product itself. Its presence is what
+ * sends a later visit to `/` straight through to Explore instead of the landing
+ * page.
  *
- * httpOnly — nothing on the client reads it, and keeping it off `document.cookie`
- * means a third-party script can't accidentally clear someone's "seen" state.
+ * Written client-side by <MarkVisited> in the (app) layout, so it cannot be
+ * httpOnly. It holds no secret, and a prefetch cannot set it - which is the
+ * whole point. See components/mark-visited.tsx for why the middleware stopped
+ * writing it.
  */
 export const VISIT_COOKIE = "wr_seen";
 
@@ -35,27 +37,11 @@ export const LANDING_HREF = `/?${LANDING_REF_PARAM}=${LANDING_REF_APP}`;
 export const APP_HREF = "/explore";
 
 /**
- * Path prefixes that count as "has used the product". Reaching any of them is
- * what sets VISIT_COOKIE.
- *
- * `/terms` is deliberately absent — it's linked from the landing page footer,
- * so treating it as a product visit would suppress the landing page for someone
- * who only ever read the disclaimer. `/vendor` and `/recon` are present because
- * a shared deeplink is a real first contact with the product: someone who
- * landed on a vendor page from a friend's text has seen what this is.
+ * Which screens count as "has used the product" is now decided by where
+ * <MarkVisited> is mounted: the `(app)` layout, covering explore, hub, add,
+ * vendor and recon. `/terms` is deliberately outside it - it is linked from the
+ * landing footer, and reading the disclaimer should not suppress the pitch. The
+ * `(auth)` screens are outside it too: visiting a login form is not using the
+ * product, and anyone who completes it is recognised by the signed-in check
+ * instead.
  */
-const PRODUCT_PREFIXES = [
-  "/explore",
-  "/hub",
-  "/add",
-  "/vendor",
-  "/recon",
-  "/login",
-  "/onboarding",
-] as const;
-
-export function isProductPath(pathname: string): boolean {
-  return PRODUCT_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(prefix + "/"),
-  );
-}

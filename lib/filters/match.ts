@@ -1,22 +1,30 @@
 import type { FilterDef } from "@/lib/constants/vendor-filters";
 
 /**
- * Client-side twin of the `vendor_filter_rank` SQL function (migration 0033).
+ * Attribute matching for the Explore filters. **This is the only
+ * implementation** — matching is entirely client-side.
  *
- * The map filters server-side — it has to, because `vendors_in_bbox` caps a
- * fetch and would otherwise filter an arbitrary sample. This module exists for
- * the surfaces that never touch that RPC (the Hub) and as the executable
- * specification the SQL is tested against: `scripts/test-filter-match.mjs` runs
- * this over the real dataset, so a semantic change here that is not mirrored in
- * the migration shows up as a diff in the counts.
+ * There is no SQL twin to keep in step, despite what an older comment here
+ * claimed: `vendor_filter_rank` was never shipped, and `vendors_in_bbox` takes
+ * no `p_filters`. Migration `0033` sets out why the RPC sends attributes rather
+ * than matching on them — the map caches a fetched area and skips refetching
+ * while panning inside it, so a filter-specific row set would strand stale pins
+ * on screen.
  *
- * **Keep the two in lockstep.** If you change a rule here, change 0033.
+ * `scripts/test-filter-match.mjs` runs this over the real 2,163-vendor dataset
+ * and is the only executable check on the rules. Run it after any change here.
+ *
+ * **The one rule everything else follows: silence NEVER excludes.** A vendor is
+ * only ruled out by positively contradicting a filter. Missing data means
+ * nobody wrote the fact down, so it demotes the vendor into the list view's
+ * partial tier — under its own divider, graded by how much of the ask it did
+ * meet — where the couple can still see it and judge for themselves.
  */
 
-/** Wire format sent as the RPC `p_filters` argument. */
+/** One selected filter, built from the UI state by `buildSelection`. */
 export type FilterSpec =
-  | { kind: "multi"; values: string[]; rare?: boolean }
-  | { kind: "bool"; value: boolean; rare?: boolean }
+  | { kind: "multi"; values: string[] }
+  | { kind: "bool"; value: boolean }
   | {
       kind: "range";
       mode: "point" | "overlap";
@@ -25,9 +33,11 @@ export type FilterSpec =
       min?: number;
       max?: number;
       basis?: string;
-      rare?: boolean;
       season?: string;
       day?: string;
+      /** Multipliers converting an off-`basis` quote onto `basis`, by the
+       * vendor's own `price_basis`. See `FilterDef.basisScale`. */
+      scale?: Record<string, number>;
     };
 
 export type FilterSelection = Record<string, FilterSpec>;
@@ -44,15 +54,59 @@ export type VendorFilters = Record<string, unknown> | null | undefined;
  */
 export type FilterSelections = Partial<Record<string, FilterSelection>>;
 
+/**
+ * A rank plus the arithmetic behind it: how many of the active filters the
+ * vendor was SILENT on, and how many were active at all.
+ *
+ * `filterRank` collapses this to the three-way verdict, which is all the pin
+ * dimming and the divider need. The list view needs the counts too, so it can
+ * order the partial tier by how much of the couple's ask a vendor actually met.
+ */
+export interface FilterMatchDetail {
+  rank: -1 | 0 | 1;
+  /** Filters this vendor says nothing about. Always 0 when `rank` is 1. */
+  unknown: number;
+  /** Filters active for this vendor's type. 0 means the type is unfiltered. */
+  active: number;
+}
+
+/**
+ * The share of the active filters a vendor actually matched, 0..1.
+ *
+ * Deliberately a FRACTION rather than a count of misses, because a mixed-type
+ * search is one query: a venue judged on 3 attributes and a photographer judged
+ * on 2 are not comparable by "missing 1" (that is 67% against 50%), and the
+ * feed interleaves both. With a single type filtered — the common case — the
+ * two orderings are identical, since every vendor shares the same denominator.
+ *
+ * An unfiltered type scores 1: nothing was asked, so nothing is missing.
+ */
+export function matchedFraction(detail: FilterMatchDetail): number {
+  return detail.active === 0
+    ? 1
+    : (detail.active - detail.unknown) / detail.active;
+}
+
 /** Rank a vendor against its OWN type's filters. */
 export function filterRankFor(
   vendorType: string,
   filters: VendorFilters,
   selections: FilterSelections | undefined,
 ): -1 | 0 | 1 {
+  return filterMatchFor(vendorType, filters, selections).rank;
+}
+
+/** As `filterRankFor`, but keeping the counts behind the verdict. */
+export function filterMatchFor(
+  vendorType: string,
+  filters: VendorFilters,
+  selections: FilterSelections | undefined,
+): FilterMatchDetail {
   const sel = selections?.[vendorType];
-  if (!sel || Object.keys(sel).length === 0) return 1;
-  return filterRank(filters, sel);
+  if (!sel || Object.keys(sel).length === 0) {
+    return { rank: 1, unknown: 0, active: 0 };
+  }
+  return filterMatch(filters, sel);
 }
 
 /** Whether any type carries a filter at all — lets callers skip the work. */
@@ -77,19 +131,32 @@ const OPEN_HI = 1_000_000_000;
  * -1 excluded (positively contradicts), 0 partial (silent on something),
  * 1 full match. Silence demotes rather than excludes — coverage is low mostly
  * because nobody wrote the fact down, not because the vendor lacks the thing.
- * A `rare` filter inverts that: there, silence really does mean no.
+ * There is no exception to that: see the module header.
  */
 export function filterRank(
   filters: VendorFilters,
   selection: FilterSelection,
 ): -1 | 0 | 1 {
-  const keys = Object.keys(selection);
-  if (keys.length === 0) return 1;
-  if (!filters) {
-    return keys.some((k) => selection[k].rare) ? -1 : 0;
-  }
+  return filterMatch(filters, selection).rank;
+}
 
-  let unknown = false;
+/**
+ * As `filterRank`, but counting the silences instead of collapsing them to a
+ * flag. `unknown` rises by at most 1 per filter — every branch that notices a
+ * silence also ends that filter's turn — so it can never exceed `active`.
+ */
+export function filterMatch(
+  filters: VendorFilters,
+  selection: FilterSelection,
+): FilterMatchDetail {
+  const keys = Object.keys(selection);
+  const active = keys.length;
+  if (active === 0) return { rank: 1, unknown: 0, active: 0 };
+  // No attributes at all: silent on every one of them. Bottom of the partial
+  // tier, since it met none of the ask, but still visible.
+  if (!filters) return { rank: 0, unknown: active, active };
+
+  let unknown = 0;
 
   for (const key of keys) {
     const spec = selection[key];
@@ -97,10 +164,9 @@ export function filterRank(
     if (spec.kind === "multi") {
       const v = filters[key];
       if (!Array.isArray(v) || v.length === 0) {
-        if (spec.rare) return -1;
-        unknown = true;
+        unknown++;
       } else if (!v.some((x) => spec.values.includes(String(x)))) {
-        return -1;
+        return { rank: -1, unknown, active };
       }
       continue;
     }
@@ -108,20 +174,29 @@ export function filterRank(
     if (spec.kind === "bool") {
       const v = filters[key];
       if (typeof v !== "boolean") {
-        if (spec.rare) return -1;
-        unknown = true;
+        unknown++;
       } else if (v !== spec.value) {
-        return -1;
+        return { rank: -1, unknown, active };
       }
       continue;
     }
 
     // range
+    //
+    // An off-basis quote is either convertible or incomparable. A venue quoting
+    // per person can be put on the package axis by assuming a guest count (the
+    // sheet states the assumption in so many words), so it is scaled and then
+    // judged normally. A caterer's per-person rate against a per-package slider
+    // has no such factor, and reads as silence rather than as a miss.
     const basis = filters["price_basis"];
+    let scale = 1;
     if (spec.basis && typeof basis === "string" && basis !== spec.basis) {
-      // Another unit is not comparable, so it reads as silence, not a miss.
-      unknown = true;
-      continue;
+      const factor = spec.scale?.[basis];
+      if (factor === undefined) {
+        unknown++;
+        continue;
+      }
+      scale = factor;
     }
 
     let lo = num(filters[spec.lo]);
@@ -147,9 +222,16 @@ export function filterRank(
     }
 
     if (lo === undefined && hi === undefined) {
-      if (spec.rare) return -1;
-      unknown = true;
+      unknown++;
       continue;
+    }
+
+    // Onto the filter's axis. Applied after the tier lookup because a tier is
+    // quoted in the vendor's own basis too, and before the open-ended sentinel
+    // below, which is not a price and must not be multiplied.
+    if (scale !== 1) {
+      if (lo !== undefined) lo *= scale;
+      if (hi !== undefined) hi *= scale;
     }
 
     const vLo = (lo ?? hi) as number;
@@ -165,17 +247,17 @@ export function filterRank(
 
     if (spec.mode === "point") {
       if ((spec.min != null && vLo < spec.min) || (spec.max != null && vLo > spec.max)) {
-        return -1;
+        return { rank: -1, unknown, active };
       }
     } else if (
       (spec.max != null && vLo > spec.max) ||
       (spec.min != null && vHi < spec.min)
     ) {
-      return -1;
+      return { rank: -1, unknown, active };
     }
   }
 
-  return unknown ? 0 : 1;
+  return { rank: unknown ? 0 : 1, unknown, active };
 }
 
 function num(v: unknown): number | undefined {
@@ -197,9 +279,9 @@ export function buildSelection(
     if (v == null) continue;
 
     if (d.kind === "multi" && Array.isArray(v) && v.length) {
-      out[d.key] = { kind: "multi", values: v as string[], ...(d.rare && { rare: true }) };
+      out[d.key] = { kind: "multi", values: v as string[] };
     } else if (d.kind === "bool" && v === true) {
-      out[d.key] = { kind: "bool", value: true, ...(d.rare && { rare: true }) };
+      out[d.key] = { kind: "bool", value: true };
     } else if (d.kind === "range" && typeof v === "object") {
       const r = v as { min?: number; max?: number };
       if (r.min == null && r.max == null) continue;
@@ -211,6 +293,7 @@ export function buildSelection(
         ...(r.min != null && { min: r.min }),
         ...(r.max != null && { max: r.max }),
         ...(d.basis && { basis: d.basis }),
+        ...(d.basisScale && { scale: d.basisScale }),
         ...(d.rescaledBy === "date_context" && dateContext?.season && { season: dateContext.season }),
         ...(d.rescaledBy === "date_context" && dateContext?.day && { day: dateContext.day }),
       };

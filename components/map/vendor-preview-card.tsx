@@ -7,6 +7,7 @@ import { MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
 import { formatVendorLocality } from "@/lib/vendor-locality";
+import { sortReconEntries } from "@/lib/recon-sort";
 import { cn } from "@/lib/utils";
 
 /**
@@ -61,6 +62,11 @@ interface ReconRow {
   price_text: string | null;
   price_details: string | null;
   notes: string | null;
+  // Read by sortReconEntries — the collected date is the recency it orders on,
+  // with created_at as the tiebreak and the fallback for pre-migration rows.
+  recon_collected_month: number | null;
+  recon_collected_year: number | null;
+  created_at: string | null;
   media: { thumb_path: string | null; storage_path: string }[] | null;
 }
 
@@ -73,19 +79,46 @@ interface ReconRow {
  *
  * The identity check is `getClaims()` — a local JWT verify, no round trip on a
  * project with asymmetric signing keys. Explore is public, so a signed-out
- * viewer is normal: `viewerId` is simply null and the sort/tag are no-ops.
+ * viewer is normal: `viewerId` is simply null and the "mine first" key and the
+ * tag are both no-ops (the price and recency keys still apply).
  */
+/** Ceiling on the per-session preview cache before it is dropped wholesale. */
+const PREVIEW_CACHE_MAX = 600;
+
 export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
-  const [items, setItems] = React.useState<VendorPreview[] | null>(null);
+  // Previews already fetched this session, keyed by vendor id.
+  //
+  // This used to be plain state that the effect reset to null on every change
+  // of the id list, which made the feed unusable in two ways. The whole list
+  // blanked to a spinner whenever the set shifted — including when the caller
+  // merely GREW it, so paging in more rows threw away everything on screen —
+  // and every fetch re-asked for vendors it already had. Caching by id means a
+  // request only ever covers ids genuinely not seen yet.
+  // Split deliberately across state and a ref, because the two are read at
+  // different times. `cache` holds the data the render reads, so it must be
+  // state (a ref cannot be read during render). `fetchedRef` is bookkeeping the
+  // EFFECT reads to work out what is missing — keeping it in a ref is what lets
+  // the effect depend on `idsKey` alone instead of on the cache it just wrote,
+  // which would loop.
+  const [cache, setCache] = React.useState<ReadonlyMap<string, VendorPreview>>(
+    () => new Map(),
+  );
+  const fetchedRef = React.useRef(new Set<string>());
 
   // Stable key so the fetch effect doesn't re-run on array identity changes.
   const idsKey = ids.join(",");
 
   React.useEffect(() => {
     let cancelled = false;
-    const idList = idsKey ? idsKey.split(",") : [];
+    const wanted = idsKey ? idsKey.split(",") : [];
+    // Only the ids we have never fetched. This is what keeps a "load 20 more"
+    // request proportional to the page rather than to the whole list.
+    const idList = wanted.filter((id) => !fetchedRef.current.has(id));
+    // Nothing new to ask for: the render below already derives from the cache,
+    // so there is no state to set here (and setting it synchronously in an
+    // effect would be a cascading render).
+    if (idList.length === 0) return;
     (async () => {
-      setItems(null);
       const supabase = createClient();
       const [vendorsRes, reconRes, claimsRes] = await Promise.all([
         supabase
@@ -99,7 +132,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         supabase
           .from("recon_entries")
           .select(
-            "vendor_id, author_id, price_text, price_details, notes, media:recon_media(thumb_path, storage_path)",
+            "vendor_id, author_id, price_text, price_details, notes, recon_collected_month, recon_collected_year, created_at, media:recon_media(thumb_path, storage_path)",
           )
           .eq("status", "active")
           .in("vendor_id", idList)
@@ -115,13 +148,19 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
       const vendorById = new Map<string, VendorLite>();
       for (const v of vendors) vendorById.set(v.id, v);
 
-      // Tally active recon counts, capture the first recon thumbnail per vendor,
-      // and collect text previews (newest first — the query orders by created_at
-      // desc, matching the vendor page). Entries with no text get no slide.
+      // Sorted ONCE over the flat result, before anything is grouped, so the
+      // count, the fallback thumbnail and the slides all follow one order — and
+      // it is the same order the vendor page uses. Bucketing by vendor_id below
+      // preserves the relative order inside each vendor's rows, which is the
+      // only ordering that matters here.
+      const ordered = sortReconEntries(recons, viewerId);
+
+      // Tally active recon counts, capture the leading entry's thumbnail per
+      // vendor, and collect text previews. Entries with no text get no slide.
       const counts = new Map<string, number>();
       const reconThumb = new Map<string, string>();
       const slidesByVendor = new Map<string, ReconSlide[]>();
-      for (const row of recons) {
+      for (const row of ordered) {
         counts.set(row.vendor_id, (counts.get(row.vendor_id) ?? 0) + 1);
         if (!reconThumb.has(row.vendor_id)) {
           const first = row.media?.[0];
@@ -146,15 +185,6 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
             isMine: !!viewerId && row.author_id === viewerId,
           });
           slidesByVendor.set(row.vendor_id, list);
-        }
-      }
-
-      // Surface the viewer's own recon first, matching how the vendor page
-      // orders its entry list. sort() is stable, so everything keeps its
-      // created_at (newest-first) order within the "mine" / "others" groups.
-      if (viewerId) {
-        for (const list of slidesByVendor.values()) {
-          list.sort((a, b) => Number(b.isMine) - Number(a.isMine));
         }
       }
 
@@ -183,14 +213,39 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         ];
       });
 
-      if (!cancelled) setItems(built);
+      if (cancelled) return;
+      // Mark every id we ASKED for, not just the ones that came back: a vendor
+      // row that is gone must not be re-requested on every subsequent render.
+      for (const id of idList) fetchedRef.current.add(id);
+      setCache((prev) => {
+        // Bound the session cache. Panning a map for a while would otherwise
+        // accumulate every vendor ever previewed; dropping it wholesale is fine
+        // because the next render simply refetches the ids on screen.
+        const overflowing = prev.size + built.length > PREVIEW_CACHE_MAX;
+        if (overflowing) fetchedRef.current = new Set(idList);
+        const next = overflowing
+          ? new Map<string, VendorPreview>()
+          : new Map(prev);
+        for (const item of built) next.set(item.id, item);
+        return next;
+      });
     })();
     return () => {
       cancelled = true;
     };
   }, [idsKey]);
 
-  return items;
+  return React.useMemo(() => {
+    const wanted = idsKey ? idsKey.split(",") : [];
+    const built = wanted.flatMap((id) => cache.get(id) ?? []);
+    // Null (the caller's spinner) only while we have NOTHING to show. Once any
+    // row has landed the feed renders what it has and fills in the rest as it
+    // arrives, which is what makes paging feel additive instead of destructive.
+    // An id with no cache entry is either still in flight or a vendor row that
+    // is gone; both correctly render as absent rather than as a gap.
+    if (built.length === 0 && wanted.length > 0) return null;
+    return built;
+  }, [idsKey, cache]);
 }
 
 /**

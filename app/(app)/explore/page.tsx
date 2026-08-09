@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   VendorMap,
+  type ClusterEntry,
   type ClusterOpenPayload,
   type VendorOpenPayload,
   type VisibleVendorsPayload,
@@ -32,8 +33,10 @@ import {
   VENDOR_TYPES,
   type VendorType,
 } from "@/lib/constants/categories";
-import { BrandLockup } from "@/components/brand-lockup";
+import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 import { ProfileMenu } from "@/components/profile-menu";
+import { LANDING_HREF } from "@/lib/landing/nav";
 import { cn } from "@/lib/utils";
 
 interface GeocodeSuggestion {
@@ -90,6 +93,28 @@ function parseTypeList(raw: unknown): VendorType[] | null {
   return clean.length ? [...new Set(clean)] : null;
 }
 
+/**
+ * Keep only the entries of a type-keyed map whose type is still selected.
+ *
+ * Used at both ends of the same rule: pruning in memory when a category is
+ * deselected, and pruning again when the persisted payload is read back, so a
+ * filter can never outlive the category it belongs to. Takes `unknown` because
+ * one caller is a `JSON.parse` result — a malformed payload yields `{}` rather
+ * than throwing, matching how `parseTypeList` degrades.
+ */
+function pickTypes<T>(
+  raw: unknown,
+  keep: readonly VendorType[],
+): Partial<Record<VendorType, T>> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const allowed = new Set<string>(keep);
+  const out: Partial<Record<VendorType, T>> = {};
+  for (const [t, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (allowed.has(t) && v && typeof v === "object") out[t as VendorType] = v as T;
+  }
+  return out;
+}
+
 export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
@@ -101,7 +126,10 @@ export default function ExplorePage() {
   const [locating, setLocating] = useState(false);
   // The open cluster list (null = closed). Opened on a cluster tap, or restored
   // when returning from a vendor page (?restore=1).
-  const [cluster, setCluster] = useState<{ ids: string[]; vendorType: VendorType } | null>(null);
+  const [cluster, setCluster] = useState<{
+    entries: ClusterEntry[];
+    vendorType: VendorType;
+  } | null>(null);
   // The single vendor whose peek card is open (null = closed). Opened on a pin
   // tap, restored on return from the vendor page (?restore=1) like the cluster.
   const [pin, setPin] = useState<{ id: string; vendorType: VendorType } | null>(null);
@@ -128,11 +156,24 @@ export default function ExplorePage() {
     Partial<Record<VendorType, DateContext>>
   >({});
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  // Latched once the filter sheet is first opened, and never cleared for the
+  // session. The per-vendor `filters` attributes are two thirds of the map
+  // payload and most sessions never filter at all, so migration 0034 moved them
+  // out of the pin query — this is what tells the map to go and get them. It
+  // latches rather than tracking `filterSheetOpen` so closing the sheet does not
+  // throw away attributes that are already in hand.
+  const [filtersWanted, setFiltersWanted] = useState(false);
   // Map or list. The list is a VIEW, not a modal: that is what lets it render
   // live off `visible.entries` instead of the frozen snapshot the old bottom
   // sheet needed (a modal list cannot reshuffle under a scroll, so it had to be
   // pinned at open time). The map stays MOUNTED underneath either way — see the
   // render — so toggling never re-inits MapLibre or refetches.
+  //
+  // Starts on the map so the first client render matches the server; a persisted
+  // choice is applied after mount (below), for the same hydration reason the
+  // type filter is. It cannot use the lazy-initializer trick `initialView` uses
+  // — that one is only ever read imperatively by MapLibre, while this drives
+  // what renders, so a "list" initializer would diff against the server HTML.
   const [view, setView] = useState<"map" | "list">("map");
   // Rows the map currently holds, so the sheet can rescale its histograms
   // against what is actually in view.
@@ -149,6 +190,11 @@ export default function ExplorePage() {
   }, [selectedTypes, filterStates, dateContexts]);
 
   const activeFilterCount = countSelections(filterSelections);
+  // Vendors on screen that match every filter they were judged against. The
+  // rest are `visible.partial`: on the map, under the list's divider, but
+  // silent on something filtered for. Same arithmetic the filter sheet's footer
+  // does, over the same payload, so the pill and the sheet cannot disagree.
+  const matchedCount = Math.max(0, visible.total - visible.partial);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
@@ -178,7 +224,10 @@ export default function ExplorePage() {
     try {
       sessionStorage.setItem(
         "wr:cluster",
-        JSON.stringify({ ids: payload.ids, vendorType: payload.vendorType }),
+        JSON.stringify({
+          entries: payload.entries,
+          vendorType: payload.vendorType,
+        }),
       );
       // Fresh cluster → open at the top (drop any saved feed scroll position).
       sessionStorage.removeItem("wr:clusterScroll");
@@ -189,7 +238,7 @@ export default function ExplorePage() {
       // only reopen-on-back is lost.
     }
     setPin(null);
-    setCluster({ ids: payload.ids, vendorType: payload.vendorType });
+    setCluster({ entries: payload.entries, vendorType: payload.vendorType });
   }, []);
 
   // A single pin tap peeks the vendor rather than navigating — persisted the same
@@ -228,25 +277,109 @@ export default function ExplorePage() {
     [],
   );
 
+  // Persist the ATTRIBUTE filters per-tab, next to the type selection and the
+  // map view, so the whole filter set survives a round trip to a vendor page.
+  // The two maps are written as one payload because they are read back as one:
+  // a date context is meaningless without the price range it re-scales.
+  //
+  // Both are plain JSON — FilterState holds string arrays, booleans and
+  // {min,max} objects; DateContext holds two strings — so there is nothing here
+  // that needs a custom serializer.
+  const persistFilters = useCallback(
+    (
+      states: Partial<Record<VendorType, FilterState>>,
+      dates: Partial<Record<VendorType, DateContext>>,
+    ) => {
+      try {
+        sessionStorage.setItem(
+          "wr:vendorFilters",
+          JSON.stringify({ states, dateContexts: dates }),
+        );
+      } catch {
+        // sessionStorage unavailable (e.g. private mode) — the filters still
+        // apply this session; only restore-on-return is lost.
+      }
+    },
+    [],
+  );
+
   // Update the type filter and persist it per-tab, so it survives a round trip to
   // a vendor page (restored on mount, below) just like the map view.
-  const updateSelectedTypes = useCallback((next: VendorType[]) => {
-    setSelectedTypes(next);
-    // Drop the filters of any category that was just DESELECTED, and keep the
-    // rest. Clearing everything on any change would throw away a venue filter
-    // the moment a photographer category is added alongside it.
-    const keep = new Set(next);
-    setFilterStates((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([t]) => keep.has(t as VendorType))),
-    );
-    setDateContexts((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([t]) => keep.has(t as VendorType))),
-    );
+  const updateSelectedTypes = useCallback(
+    (next: VendorType[]) => {
+      // Drop the filters of any category that was just DESELECTED, and keep the
+      // rest. Clearing everything on any change would throw away a venue filter
+      // the moment a photographer category is added alongside it.
+      //
+      // Computed eagerly rather than inside a functional update: the pruned maps
+      // have to be persisted as well as set, and a store write inside an updater
+      // would run twice under StrictMode.
+      const nextStates = pickTypes<FilterState>(filterStates, next);
+      const nextDates = pickTypes<DateContext>(dateContexts, next);
+      setSelectedTypes(next);
+      setFilterStates(nextStates);
+      setDateContexts(nextDates);
+      try {
+        sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
+      } catch {
+        // sessionStorage unavailable — the filter still applies this session.
+      }
+      persistFilters(nextStates, nextDates);
+    },
+    [filterStates, dateContexts, persistFilters],
+  );
+
+  const updateFilterState = useCallback(
+    (t: VendorType, next: FilterState) => {
+      const merged = { ...filterStates, [t]: next };
+      setFilterStates(merged);
+      persistFilters(merged, dateContexts);
+    },
+    [filterStates, dateContexts, persistFilters],
+  );
+
+  const updateDateContext = useCallback(
+    (t: VendorType, next: DateContext) => {
+      const merged = { ...dateContexts, [t]: next };
+      setDateContexts(merged);
+      persistFilters(filterStates, merged);
+    },
+    [filterStates, dateContexts, persistFilters],
+  );
+
+  const clearAllFilters = useCallback(() => {
+    setFilterStates({});
+    setDateContexts({});
+    persistFilters({}, {});
+  }, [persistFilters]);
+
+  // Persist the map/list choice per-tab, like the filters and the map view.
+  // Tapping a card in the list navigates to that vendor, so coming back to the
+  // map would drop the couple somewhere they never chose to be — and it strands
+  // the scroll position VendorFeed already saves under `wr:screenScroll`, which
+  // is a one-shot restore that only fires while the feed is mounted.
+  const updateView = useCallback((next: "map" | "list") => {
+    setView(next);
     try {
-      sessionStorage.setItem("wr:typeFilter", JSON.stringify(next));
+      sessionStorage.setItem("wr:view", next);
     } catch {
-      // sessionStorage unavailable — the filter still applies this session.
+      // sessionStorage unavailable — the toggle still works this session.
     }
+  }, []);
+
+  // Apply the persisted view after mount. Deferred a tick for the same reason
+  // the type filter is: the first client render has to match the server's "map".
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let saved: string | null = null;
+    try {
+      saved = sessionStorage.getItem("wr:view");
+    } catch {
+      // sessionStorage unavailable — stay on the map
+    }
+    if (saved !== "list") return;
+    const t = setTimeout(() => setView("list"), 0);
+    return () => clearTimeout(t);
   }, []);
 
   // Apply the type filter after mount, from a `?types=` deeplink if there is
@@ -261,12 +394,14 @@ export default function ExplorePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     let restored: VendorType[] | null = null;
+    let fromDeeplink = false;
     try {
       const fromUrl = parseTypeList(
         new URLSearchParams(window.location.search).get("types"),
       );
       if (fromUrl) {
         restored = fromUrl;
+        fromDeeplink = true;
       } else {
         const raw = sessionStorage.getItem("wr:typeFilter");
         if (raw) restored = parseTypeList(JSON.parse(raw) as unknown);
@@ -274,10 +409,49 @@ export default function ExplorePage() {
     } catch {
       // malformed payload — fall back to showing all
     }
+
+    // The attribute filters ride along with the type selection they were set
+    // under, pruned to it — a persisted venue price range is meaningless once
+    // venues are no longer selected.
+    //
+    // A `?types=` deeplink takes none of them, and CLEARS the stored payload.
+    // The link is an explicit request from outside the app for a category, and
+    // quietly re-applying a leftover $6k-$8k range would land that visitor on an
+    // empty map. Dropping the payload (rather than just ignoring it) is what
+    // stops it coming back on the next return trip, which carries no `?types=`.
+    let restoredStates: Partial<Record<VendorType, FilterState>> = {};
+    let restoredDates: Partial<Record<VendorType, DateContext>> = {};
+    try {
+      if (fromDeeplink) {
+        sessionStorage.removeItem("wr:vendorFilters");
+      } else if (restored) {
+        const raw = sessionStorage.getItem("wr:vendorFilters");
+        if (raw) {
+          const d = JSON.parse(raw) as { states?: unknown; dateContexts?: unknown };
+          restoredStates = pickTypes<FilterState>(d.states, restored);
+          restoredDates = pickTypes<DateContext>(d.dateContexts, restored);
+        }
+      }
+    } catch {
+      // malformed payload — fall back to no attribute filters
+    }
+
     if (!restored) return;
     const next = restored;
     const t = setTimeout(() => {
       setSelectedTypes(next);
+      setFilterStates(restoredStates);
+      setDateContexts(restoredDates);
+      // A RESTORED attribute filter is the one path to an active selection that
+      // never opens the filter sheet, so it has to latch `filtersWanted` itself.
+      // Without this the couple returns from a vendor page with their filter
+      // chips still lit, while the map holds no attributes to rank against —
+      // every vendor scores 1 and the filter silently does nothing until the
+      // sheet is opened again. Type-only selections need no attributes, so this
+      // deliberately checks for a non-empty per-type state rather than for
+      // `next.length`.
+      if (Object.values(restoredStates).some((s) => s && Object.keys(s).length))
+        setFiltersWanted(true);
       // Persist it like a tapped chip, so it survives the round trip to a
       // vendor page — which returns via ?restore=1 and drops the query string.
       try {
@@ -285,9 +459,12 @@ export default function ExplorePage() {
       } catch {
         // sessionStorage unavailable — the filter still applies this session.
       }
+      persistFilters(restoredStates, restoredDates);
     }, 0);
     return () => clearTimeout(t);
-  }, []);
+    // Still mount-only: persistFilters is a useCallback([]), so its identity
+    // never changes and this cannot re-run. Listed rather than suppressed.
+  }, [persistFilters]);
 
   // On a restore mount, reopen whichever preview was showing — the cluster
   // sheet, the on-screen results list, or a single pin's card — from its saved
@@ -298,14 +475,29 @@ export default function ExplorePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!new URLSearchParams(window.location.search).has("restore")) return;
-    let restoredCluster: { ids: string[]; vendorType: VendorType } | null = null;
+    let restoredCluster: {
+      entries: ClusterEntry[];
+      vendorType: VendorType;
+    } | null = null;
     let restoredPin: { id: string; vendorType: VendorType } | null = null;
     try {
       const raw = sessionStorage.getItem("wr:cluster");
       if (raw) {
-        const d = JSON.parse(raw) as { ids?: string[]; vendorType?: VendorType };
-        if (d.ids?.length && d.vendorType) {
-          restoredCluster = { ids: d.ids, vendorType: d.vendorType };
+        const d = JSON.parse(raw) as {
+          entries?: ClusterEntry[];
+          // Pre-2026-08-06 payloads carried bare ids. A tab open across the
+          // deploy still restores, with every row read as a full match — which
+          // is what it meant before ranks were persisted.
+          ids?: string[];
+          vendorType?: VendorType;
+        };
+        const entries = d.entries?.length
+          ? d.entries
+          : d.ids?.length
+            ? d.ids.map((id) => ({ id, rank: 1 as const }))
+            : null;
+        if (entries && d.vendorType) {
+          restoredCluster = { entries, vendorType: d.vendorType };
         }
       }
       const rawPin = sessionStorage.getItem("wr:pin");
@@ -491,6 +683,7 @@ export default function ExplorePage() {
           initialView={initialView}
           selectedTypes={selectedTypes}
           filterSelections={filterSelections}
+          withFilters={filtersWanted}
           onVisibleVendorsChange={setVisible}
           onVendorsChange={setMapVendors}
         />
@@ -516,7 +709,7 @@ export default function ExplorePage() {
       {/* Cluster list feed (portals to <body>; opens on a cluster tap) */}
       {cluster && (
         <ClusterListSheet
-          ids={cluster.ids}
+          entries={cluster.entries}
           vendorType={cluster.vendorType}
           onClose={() => setCluster(null)}
         />
@@ -525,9 +718,36 @@ export default function ExplorePage() {
       {/* Everything on screen, as one feed (portals to <body>; opens on the
           results pill). Same sheet as the cluster feed, but mixed-type. */}
 
-      {/* Search bar + autocomplete dropdown, with the account control beside it */}
-      <div className="relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">
-        <div className="flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
+      {/* Brand mark, search bar, account control. The mark is the route back to
+          the landing page: it used to be a wordmark pill in the bottom-left
+          corner, which read as decoration rather than a control (Kiara,
+          2026-08-04). Top-left next to the search bar is where a logo is
+          expected to be clickable. LANDING_HREF, not "/", or the first-visit
+          gate bounces the visitor straight back here.
+
+          Click-through row, controls opt back in — same rule as every other
+          overlay here. The row must NOT take pointer events as a whole: it is a
+          full-width band across the top of the map, and the gaps between the
+          three controls are map the couple can still pan. */}
+      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">
+        <Link
+          href={LANDING_HREF}
+          aria-label="About Wedding Recon"
+          className="pointer-events-auto flex size-9 shrink-0 items-center justify-center rounded-full border bg-background/95 shadow-md backdrop-blur-sm transition-opacity hover:opacity-80"
+        >
+          <BrandMark className="size-5" />
+        </Link>
+        {/* min-w-0 is load-bearing, not tidying. This is a flex-1 item, so its
+            automatic minimum size is its MIN-CONTENT — and the suggestion rows
+            below are whitespace-nowrap (truncate), so the longest one ("Denver,
+            Denver County, Colorado, 80202, United States") became a floor the
+            box could not shrink past. It grew to 398px in a 390px viewport and
+            pushed the profile icon clean off the screen. The truncate classes
+            cannot save it: they only clip once the width is definite, and
+            without this the width is whatever the text demands. Only visible
+            with the dropdown OPEN, which is why the resting search bar looks
+            fine. */}
+        <div className="pointer-events-auto min-w-0 flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
           <form
             onSubmit={handleSearch}
             className="flex items-center gap-2 px-3 py-2"
@@ -647,7 +867,7 @@ export default function ExplorePage() {
             )}
         </div>
 
-        <ProfileMenu className="shrink-0" />
+        <ProfileMenu className="pointer-events-auto shrink-0" />
       </div>
 
       {/* One control row: what to show, how many there are, and which view.
@@ -662,7 +882,15 @@ export default function ExplorePage() {
         <FilterButton
           selectedTypes={selectedTypes}
           activeCount={activeFilterCount}
-          onClick={() => setFilterSheetOpen(true)}
+          onClick={() => {
+            // Opening the sheet is the moment this session needs the per-vendor
+            // filter attributes, which the pin query no longer carries. Setting
+            // this here (rather than on the first chip tap) means the fetch
+            // overlaps the couple reading the sheet, so the attributes are
+            // normally in hand before anything can be selected.
+            setFiltersWanted(true);
+            setFilterSheetOpen(true);
+          }}
           className="pointer-events-auto max-w-[42%] [&>span]:truncate"
         />
         <span className="flex-1" aria-hidden />
@@ -674,14 +902,30 @@ export default function ExplorePage() {
         <span
           // aria-live so a screen reader hears the count settle after a pan.
           aria-live="polite"
+          // The visible text has to stay short — this chip shares a row with the
+          // filter button and the view toggle inside a 390px viewport — so the
+          // full sentence goes to the label instead of being truncated away.
+          aria-label={
+            visible.partial > 0
+              ? `${matchedCount} of ${visible.total} vendors on screen match your filters. ${visible.partial} are partial matches, missing some information.`
+              : undefined
+          }
           className="min-w-0 shrink truncate rounded-full border border-border bg-background/95 px-2.5 py-1 text-center text-[13px] font-medium shadow-sm backdrop-blur"
         >
-          {visible.total === 1 ? "1 result" : `${visible.total} results`}
+          {/* "N results" was counting the partial tier as results, so the map
+              claimed 126 where the filter sheet said 5 (Kiara, 2026-08-06).
+              Both numbers now, which is the only reading that cannot conflict
+              with the sheet's footer, the list's divider, or the pins. */}
+          {visible.partial > 0
+            ? `${matchedCount} of ${visible.total}`
+            : visible.total === 1
+              ? "1 result"
+              : `${visible.total} results`}
         </span>
         <span className="flex-1" aria-hidden />
         <ViewToggle
           view={view}
-          onChange={setView}
+          onChange={updateView}
           className="pointer-events-auto"
         />
       </div>
@@ -715,16 +959,9 @@ export default function ExplorePage() {
           visiblePartial={visible.partial}
           states={filterStates}
           dateContexts={dateContexts}
-          onChangeType={(t, next) =>
-            setFilterStates((prev) => ({ ...prev, [t]: next }))
-          }
-          onDateContextChange={(t, next) =>
-            setDateContexts((prev) => ({ ...prev, [t]: next }))
-          }
-          onClearAll={() => {
-            setFilterStates({});
-            setDateContexts({});
-          }}
+          onChangeType={updateFilterState}
+          onDateContextChange={updateDateContext}
+          onClearAll={clearAllFilters}
           onClose={() => setFilterSheetOpen(false)}
         />
       )}
@@ -738,9 +975,14 @@ export default function ExplorePage() {
           Hidden in list view: these are map controls (a locate button and the
           basemap-anchored brand mark), and a pin peek describes a pin nobody
           can see. */}
-      <div className={cn("relative z-10 mt-auto", view === "list" && "hidden")}>
+      <div
+        className={cn(
+          "pointer-events-none relative z-10 mt-auto",
+          view === "list" && "hidden",
+        )}
+      >
         {pin && (
-          <div className="mx-auto w-full max-w-[480px] px-3">
+          <div className="pointer-events-auto mx-auto w-full max-w-[480px] px-3">
             <VendorPinPreview
               vendorId={pin.id}
               vendorType={pin.vendorType}
@@ -749,18 +991,21 @@ export default function ExplorePage() {
           </div>
         )}
 
-        {/* Control row, lifted clear of the map attribution along the bottom
-            edge: quiet brand mark on the left, locate button right. */}
-        <div className="flex items-end justify-between px-3 pb-9 pt-3">
-          <div className="inline-flex items-center rounded-full bg-background/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
-            <BrandLockup size="sm" />
-          </div>
+        {/* Locate button, lifted clear of the map attribution along the bottom
+            edge. The brand pill that used to sit opposite it moved to the top
+            bar, so this row is just the one control now.
+
+            The row stays click-through and only the button takes taps, which
+            also settles the long-standing complaint that this full-width row
+            ate every map tap in its ~90px band — a pin sitting down there could
+            not be tapped at all. */}
+        <div className="flex items-end justify-end px-3 pb-9 pt-3">
           <button
             type="button"
             onClick={handleLocate}
             disabled={locating}
             aria-label="Center map on my location"
-            className="flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
+            className="pointer-events-auto flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
           >
             {locating ? (
               <Loader2 size={20} className="animate-spin" aria-hidden />

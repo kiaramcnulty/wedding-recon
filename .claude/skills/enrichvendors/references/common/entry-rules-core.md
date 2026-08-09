@@ -19,7 +19,7 @@
 
 ## price_text + price_details — REQUIRED on every entry
 - `price_text`: compact headline, e.g. "$3.5k-$8k depending on season/day", "starts
-  around $30pp for buffet", "Quote only".
+  around $30pp for buffet", "No quote found".
 - `price_details`: the shape — packages/tiers, minimums, deposits, per-person or hourly
   rates, add-ons, what's included (specifics per type rules).
 - **Contract minimums are MUST-SURFACE — if any source states one, DEFINITELY call it out
@@ -31,11 +31,27 @@
   minimum is the hidden cost that blows a budget, so never bury it or leave a sourced one
   out. Attribute it like any other fact; never invent, round up, or estimate a minimum no
   source states.
-- No published pricing (common — many say "inquire"): `price_text` = `Quote only`,
-  `price_details` honestly says what you checked and that pricing is on inquiry; then let
-  `notes` lead with services/style/specialties instead. NEVER invent numbers, NEVER
-  extrapolate a market rate onto a specific vendor. Hedged variations of SOURCED ranges
-  only, with the hedge framed ("no formal quote - going off their published table...").
+- **If you have a number ANYWHERE, you have a price data point — lead with it.** A
+  headline that says pricing is quote-only while the same entry states a figure
+  contradicts itself: "Quote only but The Knot says $8k" is two claims, and the second one
+  is the useful one. Write "The Knot lists $8k" and drop the quote-only framing. This holds
+  however soft the number is (a directory listing, a review, a reddit comment) — hedge it
+  and name the source, but do not bury it under a headline that says there is no price.
+  `upload.mjs` HARD-FAILS a price field that does both.
+- No pricing found at all (common — many say "inquire"): `price_text` says so in plain
+  words, `price_details` honestly says what you checked and that pricing is on inquiry;
+  then let `notes` lead with services/style/specialties instead. NEVER invent numbers,
+  NEVER extrapolate a market rate onto a specific vendor. Hedged variations of SOURCED
+  ranges only, with the hedge framed ("no formal quote, going off their published
+  table...").
+- **Do NOT write "Quote only"** (retired 2026-08-07). It reads as a category label rather
+  than as something a couple would say, and it was being written on entries that stated a
+  price anyway. Use one of these, and VARY it across entries so a page of recon does not
+  read as one template: **"No quote provided" / "No quote found" / "Didn't get a quote"**.
+  Any of "no published pricing", "they would not give a number over email", or whatever
+  the honest specific is, is also fine and better than a formula. Note these stay true even
+  when `price_details` cites a third-party figure — they say what WE got, not that no
+  price exists anywhere. `upload.mjs` rewords a stray "quote only" at insert.
 
 ## Dates (recon_collected_month/year)
 - Use each entry's pre-assigned `date=M/YYYY` from the block.

@@ -7,10 +7,24 @@
       • "Magic Link"      (used when an existing user signs in)
       • "Confirm signup"  (used for a brand-new user's first sign-in)
     so every sign-in email looks the same. Both templates expose the same
-    {{ .TokenHash }} variable, so this markup works unchanged in each.
+    {{ .Token }} and {{ .TokenHash }} variables, so this markup works unchanged
+    in each. If you only update one, brand-new accounts silently get an email
+    with no code in it — paste into both.
 
   Suggested subject line:
-    Your Wedding Recon sign-in link
+    Your Wedding Recon sign-in code
+
+  Why the email carries BOTH a numeric code and a link:
+    The code is the primary credential and the link is the convenience. A link
+    is opened by the mail client in the DEFAULT BROWSER, and on iOS an installed
+    home-screen PWA is a separate cookie/storage container from Safari — so a
+    link sign-in succeeds in the browser and leaves the app itself logged out,
+    with nothing fixable at the redirect layer. {{ .Token }} lets someone finish
+    inside whatever context they started in (components/auth/otp-code-form.tsx
+    verifies it client-side). Same story for in-app browsers and for typing your
+    email on a phone but opening the mail on a laptop.
+    Both credentials verify the SAME OTP, so whichever is used first wins and
+    the other goes stale. Do not remove one without moving its callers.
 
   Why the link is {{ .SiteURL }}/auth/callback?token_hash=…&type=email and NOT
   {{ .ConfirmationURL }}:
@@ -52,24 +66,44 @@
         <tr>
           <td style="padding:24px 32px 8px 32px;">
             <h1 style="margin:0 0 12px 0;font-size:18px;font-weight:600;color:#1a1a1a;">
-              Your sign-in link
+              Your sign-in code
             </h1>
-            <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#555;">
-              Tap the button below to log in to Wedding Recon. This link signs
-              you in (or creates your account if you're new) and expires in
-              about an hour. If you didn't request it, you can safely ignore
-              this email.
+            <p style="margin:0 0 8px 0;font-size:14px;line-height:1.6;color:#555;">
+              Enter this code in Wedding Recon to log in (or to create your
+              account if you're new). It expires in about an hour. If you didn't
+              request it, you can safely ignore this email.
             </p>
           </td>
         </tr>
 
-        <!-- CTA button -->
+        <!-- Sign-in code — the primary credential. Works everywhere, including
+             the installed app, because it is typed where the sign-in started.
+             letter-spacing pads the right of the last glyph, so the left padding
+             is bumped to keep the digits optically centred. -->
         <tr>
-          <td align="center" style="padding:0 32px 8px 32px;">
+          <td align="center" style="padding:8px 32px 4px 32px;">
+            <div style="display:inline-block;background-color:#F1EFE8;border:1px solid #E6E3D9;border-radius:12px;padding:14px 22px 14px 30px;font-size:30px;font-weight:700;letter-spacing:8px;color:#1a1a1a;font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;">
+              {{ .Token }}
+            </div>
+          </td>
+        </tr>
+
+        <!-- Link alternative. Deliberately demoted below the code and labelled
+             with where it opens: in the installed app it signs you in in the
+             browser instead, which reads as the link being broken. -->
+        <tr>
+          <td align="center" style="padding:20px 32px 8px 32px;">
+            <p style="margin:0 0 10px 0;font-size:13px;color:#888780;">
+              On this device in a web browser? You can just tap:
+            </p>
             <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email"
                style="display:inline-block;background-color:#1D9E75;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 28px;border-radius:12px;">
               Log in to Wedding Recon
             </a>
+            <p style="margin:10px 0 0 0;font-size:12px;line-height:1.5;color:#a8a59c;">
+              If you started signing in from the Wedding Recon app on your home
+              screen, use the code above — this link opens your browser instead.
+            </p>
           </td>
         </tr>
 

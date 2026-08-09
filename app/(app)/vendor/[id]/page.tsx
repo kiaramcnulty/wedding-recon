@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -16,6 +17,7 @@ import {
   type VendorType,
 } from "@/lib/constants/categories";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
+import { sortReconEntries } from "@/lib/recon-sort";
 import { VendorMapPreview } from "@/components/vendor/vendor-map-preview";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { VendorPhotos } from "@/components/vendor/vendor-photos";
@@ -52,6 +54,22 @@ interface VendorPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+/**
+ * The vendor row, fetched at most ONCE per request.
+ *
+ * generateMetadata and the page component both need it, and they used to issue
+ * a query each — two Supabase round trips for one row, on every vendor page
+ * view. React's `cache()` dedupes within a single request render, so the second
+ * caller gets the first one's promise. It has to be the full `select("*")` the
+ * page needs (metadata reads three of those columns), which is why metadata now
+ * over-fetches slightly: one wider query beats two narrow ones when the cost is
+ * a network round trip, not bytes.
+ */
+const getVendor = cache(async (id: string) => {
+  const supabase = await createClient();
+  return supabase.from("vendors").select("*").eq("id", id).single();
+});
+
 // Per-vendor social metadata: a shared /vendor/[id] link (SMS, X, etc.) should
 // preview with the vendor's name + a real description, not the static root
 // title. The brand og:image (app/opengraph-image.png) is inherited from the
@@ -60,12 +78,7 @@ export async function generateMetadata({
   params,
 }: VendorPageProps): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: vendor } = await supabase
-    .from("vendors")
-    .select("name, city, vendor_type")
-    .eq("id", id)
-    .single();
+  const { data: vendor } = await getVendor(id);
 
   if (!vendor) {
     return { title: "Vendor not found" };
@@ -115,7 +128,8 @@ export default async function VendorPage({
   // signing keys; falls back to a network check otherwise — never slower than
   // the getUser() it replaces, and it runs in parallel here regardless).
   const [vendorRes, claimsRes, entriesRes] = await Promise.all([
-    supabase.from("vendors").select("*").eq("id", id).single(),
+    // Deduped with generateMetadata's fetch via React cache() — see getVendor.
+    getVendor(id),
     supabase.auth.getClaims(),
     supabase
       .from("recon_entries")
@@ -176,16 +190,10 @@ export default async function VendorPage({
 
   const rawList = (entriesRes.data ?? []) as ReconEntryWithDetails[];
 
-  // Surface the current user's own entry first. sort() is stable, so entries
-  // keep their created_at (newest-first) order within the "mine" / "others"
-  // groups.
-  const entries = userId
-    ? [...rawList].sort((a, b) => {
-        const aMine = a.author_id === userId ? 0 : 1;
-        const bMine = b.author_id === userId ? 0 : 1;
-        return aMine - bMine;
-      })
-    : rawList;
+  // Your own entry first, then entries that state a price, then most recently
+  // collected. Shared with the preview card's carousel so the entry a card
+  // leads with is the entry this page leads with — see lib/recon-sort.ts.
+  const entries = sortReconEntries(rawList, userId);
 
   // Media for the carousel: thumbnails inline, full opened in the lightbox so
   // the carousel itself stays cheap on egress.

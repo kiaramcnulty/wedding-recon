@@ -45,6 +45,31 @@ export interface Vendor {
    * matchable values only.
    */
   filters?: Record<string, unknown> | null;
+  /**
+   * Whether this vendor's pin sits on a city/region centroid rather than a
+   * street address — the dashed pin outline. Computed server-side by the
+   * `vendors_in_bbox` RPC (migration 0034) so the map payload can drop the
+   * three columns `isApproximateLocation()` would otherwise need.
+   *
+   * Present only on rows from that RPC, and only once 0034 is applied; every
+   * other caller leaves it undefined and uses the client-side heuristic in
+   * `lib/map/vendor-location.ts`, which is its deliberate twin.
+   */
+  approximate?: boolean;
+  /**
+   * Whether this vendor has an extracted price, and whether its card will draw
+   * a photo — the first two keys the Explore list view orders on, ahead of
+   * distance. Both are computed server-side by `vendors_in_bbox` (migration
+   * `0035`), because the sort runs over the whole viewport before the feed
+   * pages it, so they cannot come from the per-card fetch.
+   *
+   * Undefined on rows from anywhere else, and on every row until `0035` is
+   * applied. The comparator tests `=== true`, so a missing flag is false for
+   * all rows alike and both keys quietly become no-ops rather than throwing the
+   * order away.
+   */
+  has_price?: boolean;
+  has_photo?: boolean;
 }
 
 /**
