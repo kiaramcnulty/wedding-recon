@@ -16,7 +16,7 @@
  * clause to append - so the edit shape is most of what makes this pass cheap.
  */
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { workdir, readJsonl, arg } from "./lib.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
@@ -46,10 +46,23 @@ const MAX_TOKENS = Number(arg("max-tokens", 48000));
 // than the first N, so the pilot is not all one city or one seeding batch.
 const LIMIT = Number(arg("limit", 0));
 
+// Optional targeted re-run: build calls for only the vendor ids in this file
+// (one per line). Used to retry the vendors a prior run dropped, without
+// re-drafting the whole corpus. --calls-out keeps those call files in their own
+// subdir so they do not overwrite the main run.
+const IDS_FILE = arg("ids-file");
+const CALLS_OUT = arg("calls-out", "calls");
+
 const dir = workdir(WORK);
 let rows = readJsonl(join(dir, "vendors.jsonl")).filter(
   (r) => !ONLY || r.vendor_type === ONLY,
 );
+if (IDS_FILE) {
+  const wanted = new Set(
+    readFileSync(IDS_FILE, "utf8").split("\n").map((s) => s.trim()).filter(Boolean),
+  );
+  rows = rows.filter((r) => wanted.has(r.id));
+}
 if (LIMIT > 0 && rows.length > LIMIT) {
   const step = rows.length / LIMIT;
   rows = Array.from({ length: LIMIT }, (_, i) => rows[Math.floor(i * step)]);
@@ -143,8 +156,11 @@ the right home for the fact.
 
 OUTPUT
 
-One JSON object per vendor, one per line, nothing else - no prose, no markdown
-fence. Emit only what changes; omit empty arrays.
+Emit EXACTLY ONE JSON object per vendor listed, one per line, nothing else - no
+prose, no markdown fence. Every vendor gets a line even when there is nothing to
+do: for a vendor with no edits, no writes, no contradictions, emit the bare
+{"vendor_id":"<id>"}. Do NOT skip a vendor. Within an object, omit the arrays
+that are empty.
 
 {"vendor_id":"<id>",
  "recon_edits":[{"entry_id":"<id>","field":"notes","append":"<clause>","documents":["<tag key>"]}],
@@ -162,7 +178,7 @@ no number, because it gets compared on the wrong axis - skip it instead.`;
 const byType = {};
 for (const r of rows) (byType[r.vendor_type] ??= []).push(r);
 
-mkdirSync(join(dir, "calls"), { recursive: true });
+mkdirSync(join(dir, CALLS_OUT), { recursive: true });
 
 let n = 0;
 let vendors = 0;
@@ -199,7 +215,7 @@ for (const [type, list] of Object.entries(byType)) {
       .join("\n\n");
 
     writeFileSync(
-      join(dir, "calls", `${id}.json`),
+      join(dir, CALLS_OUT, `${id}.json`),
       JSON.stringify(
         {
           custom_id: id,
@@ -223,7 +239,7 @@ for (const [type, list] of Object.entries(byType)) {
   }
 }
 
-writeFileSync(join(dir, "calls/manifest.json"), JSON.stringify(manifest, null, 2));
-console.log(`\n${n} call files covering ${vendors} vendors -> ${join(dir, "calls")}`);
+writeFileSync(join(dir, CALLS_OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
+console.log(`\n${n} call files covering ${vendors} vendors -> ${join(dir, CALLS_OUT)}`);
 for (const [type, list] of Object.entries(byType))
   console.log(`  ${type.padEnd(10)} ${list.length}`);
