@@ -116,7 +116,7 @@ for (const row of accepted) {
   if (row.filter_writes.length) {
     const { data: live, error: readErr } = await db
       .from("vendors")
-      .select("filters,filters_meta")
+      .select("filters,filters_meta,filters_source")
       .eq("id", row.vendor_id)
       .single();
     if (readErr) {
@@ -153,9 +153,16 @@ for (const row of accepted) {
           `  ${v.name}: ${row.filter_writes.map((w) => `${w.key}=${JSON.stringify(w.value)}`).join(", ")}`,
         );
       } else {
+        // Bump the ROW-level source too, not just the per-key meta. That column
+        // is what backfill-vendor-filters.mjs gates on: it re-derives and
+        // overwrites any row still marked extraction, so a recon tag left on an
+        // extraction-labelled row is clobbered on the next backfill. Precedence
+        // is manual over recon over extraction, so a row a human set (manual) is
+        // never downgraded.
+        const nextSource = live.filters_source === "manual" ? "manual" : "recon";
         const { error } = await db
           .from("vendors")
-          .update({ filters, filters_meta: meta, filters_updated_at: stamp })
+          .update({ filters, filters_meta: meta, filters_source: nextSource, filters_updated_at: stamp })
           .eq("id", row.vendor_id);
         if (error) {
           console.error(`  vendor ${row.vendor_id}: ${error.message}`);
