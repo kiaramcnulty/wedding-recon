@@ -68,3 +68,8 @@ next-env.d.ts
 
 # enrichvendors skill working artifacts
 /data/enrichvendors/
+
+# filter/recon reconciliation working artifacts (snapshots, call files, batch
+# results). The snapshots are the local undo record; they are point-in-time
+# operational output, not source, so they stay out of the repo like the above.
+/data/reconcile/
