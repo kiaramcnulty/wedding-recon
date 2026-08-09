@@ -3,7 +3,11 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
+import {
+  VENDOR_TYPES,
+  ALL_VENDOR_TYPES,
+  type VendorType,
+} from "@/lib/constants/categories";
 import { type Vendor } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -29,13 +33,21 @@ const MAP_STYLE_URL =
 const DEFAULT_CENTER: [number, number] = [-104.9903, 39.7392];
 const DEFAULT_ZOOM = 9;
 const DEBOUNCE_MS = 150;
-// Upper bound on pins per fetch. vendors_in_bbox has no ORDER BY, so if a fetch
-// box holds more than this, Postgres returns an arbitrary subset and whole
-// pockets silently drop out. Pins now render on the GPU via clustered symbol
-// layers (not DOM markers), so a high cap is cheap — keep it well above any
-// single launched region's vendor count. Genuinely dense multi-metro views would
-// want server-side clustering (PostGIS), out of scope here.
-const MAX_ROWS = 5000;
+// PostgREST caps EVERY response at this many rows (Supabase `db-max-rows`), and
+// the RPC's own max_rows argument cannot lift it — ask for 5000 and you still
+// get 1000, with no error and no indication it happened. Because
+// vendors_in_bbox has no ORDER BY, which 1000 is arbitrary.
+//
+// That silently broke the map at scale: a single untyped request for all 2069
+// mappable Colorado vendors came back with 1000 rows, of which only 330 were
+// venues out of 678 — so a zoomed-out cluster bubble read 330 and every count
+// built on it was wrong (Kiara, 2026-08-05). Hence the per-type fetch below:
+// each vendor type is far under the ceiling on its own.
+const POSTGREST_MAX_ROWS = 1000;
+
+// Rows requested per type. Kept just under the ceiling so a full response is a
+// reliable signal that the type was truncated rather than merely large.
+const MAX_ROWS_PER_TYPE = POSTGREST_MAX_ROWS - 1;
 
 // Fetch beyond the viewport so small pans land inside already-fetched area.
 const BBOX_PAD_FACTOR = 0.5; // half a viewport-span extra on each side
@@ -491,29 +503,59 @@ export function VendorMap({
     const min_lat = Math.max(south - latPad, -85);
     const max_lat = Math.min(north + latPad, 85);
 
-    const { data, error } = await supabase.rpc("vendors_in_bbox", {
-      min_lng,
-      min_lat,
-      max_lng,
-      max_lat,
-      max_rows: MAX_ROWS,
-    });
+    // One request PER TYPE, in parallel, rather than one for everything.
+    //
+    // A single request cannot exceed POSTGREST_MAX_ROWS, and the corpus is
+    // already twice that, so an untyped fetch silently lost more than half the
+    // map. Split per type and every request sits well under the ceiling
+    // (the largest type is venues at 678 statewide), the split is deterministic
+    // instead of an arbitrary truncation, and it maps one-to-one onto the
+    // per-type sources the map already keeps.
+    //
+    // Deliberately NOT client-side pagination of the untyped query: paging with
+    // LIMIT/OFFSET over a query with no ORDER BY may repeat or skip rows
+    // between pages, which would duplicate or drop pins.
+    // ALL_VENDOR_TYPES, not VENDOR_TYPES: the selectable list omits the legacy
+    // `music` value, and iterating it would drop a straggler music row that the
+    // old untyped fetch picked up (bucketType renders it as an "other" pin).
+    const responses = await Promise.all(
+      ALL_VENDOR_TYPES.map((t) =>
+        supabase.rpc("vendors_in_bbox", {
+          min_lng,
+          min_lat,
+          max_lng,
+          max_lat,
+          p_types: [t],
+          max_rows: MAX_ROWS_PER_TYPE,
+        }),
+      ),
+    );
 
-    if (error) {
-      console.error("[VendorMap] vendors_in_bbox error:", error.message);
+    const failed = responses.find((r) => r.error);
+    if (failed?.error) {
+      console.error("[VendorMap] vendors_in_bbox error:", failed.error.message);
       return null; // keep existing pins and coverage — stale beats blank
     }
 
-    const vendors = (data ?? []) as Vendor[];
+    const vendors = responses.flatMap((r) => (r.data ?? []) as Vendor[]);
 
-    // A truncated result (hit MAX_ROWS) means the padded area is only partially
-    // known — zooming into it could reveal vendors we never received, so only a
-    // complete result is safe to treat as covered. An empty area is complete,
-    // so cover it too (otherwise panning an empty region refetches forever).
-    coverageRef.current =
-      vendors.length < MAX_ROWS
-        ? { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat }
-        : null;
+    // If ANY type came back full it was truncated, so this area is only
+    // partially known — zooming in could reveal vendors we never received.
+    // Leaving coverage null makes the next move refetch a smaller box and pick
+    // up the rest, which degrades honestly instead of caching a half-map.
+    const truncated = responses.some(
+      (r) => (r.data?.length ?? 0) >= MAX_ROWS_PER_TYPE,
+    );
+    if (truncated) {
+      console.warn(
+        "[VendorMap] a vendor type hit the row ceiling; area left uncached",
+      );
+    }
+    // An empty area is complete, so cover it too (otherwise panning an empty
+    // region refetches forever).
+    coverageRef.current = truncated
+      ? null
+      : { minLng: min_lng, minLat: min_lat, maxLng: max_lng, maxLat: max_lat };
 
     return vendors;
   }, [supabase]);
