@@ -139,6 +139,7 @@ export default function ExplorePage() {
     total: 0,
     partial: 0,
     entries: [],
+    capped: false,
   });
   // Selected vendor-type filter (empty = show all). Starts empty so the first
   // client render matches the server; any persisted selection is restored after
@@ -195,6 +196,16 @@ export default function ExplorePage() {
   // silent on something filtered for. Same arithmetic the filter sheet's footer
   // does, over the same payload, so the pill and the sheet cannot disagree.
   const matchedCount = Math.max(0, visible.total - visible.partial);
+  // A capped fetch makes the on-screen count a FLOOR, not a count: a vendor type
+  // hit the per-type row ceiling, so rows exist that were never fetched. Shown
+  // as "N+" rather than a bare N, because a precise-looking number that is
+  // quietly short is the exact failure this path was built to stop. The number
+  // stays the real count rather than a flat "1,000+" — other types come back
+  // whole, so the true floor is usually well above the ceiling itself.
+  const countedTotal = `${visible.total}${visible.capped ? "+" : ""}`;
+  const cappedNote = visible.capped
+    ? " There are more than shown; zoom in for the full list."
+    : "";
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressFetchRef = useRef(false);
 
@@ -907,8 +918,10 @@ export default function ExplorePage() {
           // full sentence goes to the label instead of being truncated away.
           aria-label={
             visible.partial > 0
-              ? `${matchedCount} of ${visible.total} vendors on screen match your filters. ${visible.partial} are partial matches, missing some information.`
-              : undefined
+              ? `${matchedCount} of ${countedTotal} vendors on screen match your filters. ${visible.partial} are partial matches, missing some information.${cappedNote}`
+              : visible.capped
+                ? `At least ${visible.total} vendors on screen.${cappedNote}`
+                : undefined
           }
           className="min-w-0 shrink truncate rounded-full border border-border bg-background/95 px-2.5 py-1 text-center text-[13px] font-medium shadow-sm backdrop-blur"
         >
@@ -917,10 +930,10 @@ export default function ExplorePage() {
               Both numbers now, which is the only reading that cannot conflict
               with the sheet's footer, the list's divider, or the pins. */}
           {visible.partial > 0
-            ? `${matchedCount} of ${visible.total}`
-            : visible.total === 1
+            ? `${matchedCount} of ${countedTotal}`
+            : visible.total === 1 && !visible.capped
               ? "1 result"
-              : `${visible.total} results`}
+              : `${countedTotal} results`}
         </span>
         <span className="flex-1" aria-hidden />
         <ViewToggle

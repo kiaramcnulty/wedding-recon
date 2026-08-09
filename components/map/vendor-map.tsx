@@ -469,6 +469,13 @@ export interface VisibleVendorsPayload {
   total: number;
   partial: number;
   entries: VisibleVendor[];
+  /**
+   * True when the last fetch hit the per-type row ceiling, which makes `total`
+   * a LOWER BOUND rather than the count. Callers should mark it as such — an
+   * exact-looking number that is quietly short is the failure this whole path
+   * exists to stop.
+   */
+  capped: boolean;
 }
 
 interface VendorMapProps {
@@ -603,6 +610,9 @@ export function VendorMap({
   // Identity of the last emitted visible set, so an idle pan that changes
   // nothing doesn't push a new array (and a re-render) at the page.
   const lastVisibleKeyRef = useRef<string | null>(null);
+  // Whether the rows currently held came from a truncated fetch. Read by
+  // reportVisibleVendors so the count can present itself as a floor.
+  const cappedRef = useRef(false);
   // Area covered by the last *complete* fetch. When the viewport stays inside
   // it, the pins on the map are already correct — skip the refetch.
   const coverageRef = useRef<ViewportBbox | null>(null);
@@ -776,6 +786,7 @@ export function VendorMap({
         );
       }
       coverageRef.current = truncated ? null : box;
+      cappedRef.current = truncated;
 
       // Migration 0034 moved `filters` out of this payload (two thirds of its
       // bytes, read only by the filter sheet). Pre-0034 the rows still carry it
@@ -877,10 +888,11 @@ export function VendorMap({
       .map(({ id, vendorType, rank }) => ({ id, vendorType, rank }));
     const partial = inView.reduce((n, e) => n + (e.rank === 0 ? 1 : 0), 0);
 
-    const key = `${inView.length}|${partial}|${entries.map((e) => e.id).join(",")}`;
+    const capped = cappedRef.current;
+    const key = `${inView.length}|${partial}|${capped}|${entries.map((e) => e.id).join(",")}`;
     if (key === lastVisibleKeyRef.current) return; // nothing changed
     lastVisibleKeyRef.current = key;
-    notify({ total: inView.length, partial, entries });
+    notify({ total: inView.length, partial, entries, capped });
   }, []);
 
   /** Push vendor rows into the per-type clustered sources. */
