@@ -32,7 +32,10 @@ const ONLY = arg("only");
 const db = serviceClient();
 const dir = workdir(WORK);
 
-let accepted = readJsonl(join(dir, "accepted-fix.jsonl"));
+// --accepted points at a hand-filtered subset (e.g. only the removals whose
+// number is absent from their own quote). Defaults to the full gated set.
+const ACCEPTED = arg("accepted", "accepted-fix.jsonl");
+let accepted = readJsonl(join(dir, ACCEPTED));
 if (ONLY) accepted = accepted.filter((r) => r.verdict === ONLY);
 const vendors = new Map(readJsonl(join(dir, "vendors.jsonl")).map((v) => [v.id, v]));
 
