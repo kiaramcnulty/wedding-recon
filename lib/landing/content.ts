@@ -49,7 +49,7 @@ export const META = {
    * Current length is 58, so it displays in full. Keep it under 60.
    */
   title:
-    "Wedding Recon - Colorado wedding vendor intel from couples",
+    "Wedding Recon - aggregated Colorado wedding vendor intels",
   /**
    * The gray paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
@@ -58,7 +58,7 @@ export const META = {
    * line fall outside it.
    */
   description:
-    "See quotes and insights from real Colorado couples for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Manage and share your own quotes and notes in one central planning hub. Free, no account needed to explore vendors.",
+    "See quotes and insights for 10+ wedding vendor types: venues, catering, photography, florists, music and more. Manage and share your own quotes and notes in one central planning hub. Free, no account needed to explore vendors.",
   /** Shorter title used for link previews (iMessage, X, Facebook). */
   socialTitle: "Wedding Recon - real Colorado wedding vendor prices and intel",
 } as const;
@@ -83,7 +83,7 @@ export const HERO = {
   /** The one <h1> on the page. Keep it short enough to sit on two lines. */
   heading: "Real prices & intel from real Colorado weddings.",
   subheading:
-    "Wedding Recon is a community of couples sharing their firsthand quotes, intel and experiences with florists, hotel blocks, photographers and other vendors. So you can find great-fit, in-budget vendors for your perfect day.",
+    "Wedding Recon is a collection of firsthand quotes, intel and experiences with florists, hotel blocks, photographers and other vendors - aggregated from couples and sources all across the web. So you can find great-fit, in-budget vendors for your perfect day.",
   primaryCta: "Explore Colorado vendors",
   reassurance: "Free to use. No account needed to explore vendors.",
 } as const;
@@ -231,13 +231,13 @@ export interface ProblemSolution {
  */
 export const PROBLEM_SOLUTIONS: ProblemSolution[] = [
   {
-    problem: "Pricing for vendors is rarely available online",
+    problem: "Vendor pricing can be a witch hunt",
     quote: {
       text: "This would have saved me so much time and heartache... all the florists I was referred to had minimum spend of over $20k. I would have never bothered going to their site in the first place",
       name: "Erika",
       context: "married 2025, South Denver",
     },
-    solution: "Filterable pricing from real couples' quotes and invoices",
+    solution: "Filterable pricing from real couples' quotes and online pricing packages",
     icon: DollarSign,
   },
   {
@@ -447,7 +447,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Where do the prices come from?",
     answer:
-      "From other couples. Each entry records what one couple was quoted, when they collected it, and how - online research, a call, or an in-person visit. We aggregate those entries and make sense of them specific to the type of vendor to create filterable ranges.",
+      "From other couples and from vendor sources all across the internet. Each entry records what one couple was quoted, when they collected it, and how - online research, a call, or an in-person visit. We aggregate those entries and make sense of them specific to the type of vendor to create filterable ranges.",
     link: { href: "/terms", label: "Read the full disclaimer" },
   },
   {
@@ -505,7 +505,7 @@ export const FOOTER = {
   contactLabel: "Contact",
   /** Appears after "© <year> Wedding Recon." at the very bottom. */
   disclaimer:
-    "Recon entries are personal experiences shared by couples, not verified facts - always confirm pricing and details with the vendor.",
+    "Recon entries are personal experiences shared by couples or aggregated online, not verified facts - always confirm pricing and details with the vendor.",
 } as const;
 
 export const CONTACT_EMAIL = "kiaramcnulty@gmail.com";
