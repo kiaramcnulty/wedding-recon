@@ -49,7 +49,7 @@ export const META = {
    * Current length is 58, so it displays in full. Keep it under 60.
    */
   title:
-    "Wedding Recon - aggregated Colorado wedding vendor intels",
+    "Wedding Recon - aggregated Colorado wedding vendor intel & pricing",
   /**
    * The gray paragraph under the headline in Google results, and the preview
    * text when the link is shared. Google shows roughly 155 characters.
@@ -81,7 +81,7 @@ export const HERO = {
   /** Small green pill above the headline. */
   eyebrow: "Colorado wedding vendors",
   /** The one <h1> on the page. Keep it short enough to sit on two lines. */
-  heading: "Real prices & intel from real Colorado weddings.",
+  heading: "Real prices & intel from Colorado weddings, on 2,000+ vendors.",
   subheading:
     "Wedding Recon is a collection of firsthand quotes, intel and experiences with florists, hotel blocks, photographers and other vendors - aggregated from couples and sources all across the web. So you can find great-fit, in-budget vendors for your perfect day.",
   primaryCta: "Explore Colorado vendors",
