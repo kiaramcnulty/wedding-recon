@@ -226,6 +226,13 @@ function gateFilters(vid, obj) {
     if (!isDesc) {
       if (!quote) { errs.push(`${v?.name} [${key}]: no quote - every tag must cite the recon sentence that documents it`); continue; }
       if (!prose.includes(NORM(quote))) { errs.push(`${v?.name} [${key}]: quote not found in this vendor's recon - a tag cannot exist without prose documenting it ("${String(quote).slice(0, 50)}")`); continue; }
+      // For a number, the cited sentence must actually STATE the number, not just
+      // be a real sentence. Stops a lazy citation pointing capacity_max at the
+      // price sentence. Comma-insensitive so "200" matches "2,00" -> normalize both.
+      if (typeof value === 'number') {
+        const nums = (NORM(quote).match(/\d[\d,.]*/g) || []).map((s) => s.replace(/,/g, ''));
+        if (!nums.includes(String(value))) { errs.push(`${v?.name} [${key}]=${value}: the number is not in its own quote ("${String(quote).slice(0, 50)}") - cite the sentence that states it`); continue; }
+      }
     }
     out[key] = { value, quote: quote ?? null };
   }
