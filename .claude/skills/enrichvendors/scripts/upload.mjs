@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { parseCSV, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
 import { etype } from './etype.mjs';
+import { VENDOR_FILTERS } from '../../../../lib/constants/vendor-filters.ts';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -170,11 +171,84 @@ if (dupWarnings.size) console.log('WARNING — near-duplicate phrasing across en
 
 // Verify vendors exist and (author, vendor) pairs aren't already uploaded.
 const vendorIds = [...new Set(recons.map((r) => r.vendor_id))];
-const { data: vendors, error: vErr } = await supabase.from('vendors').select('id, name').in('id', vendorIds);
+const { data: vendors, error: vErr } = await supabase.from('vendors').select('id, name, vendor_type, filters_source').in('id', vendorIds);
 if (vErr) { console.error('DB read failed:', vErr.message); process.exit(1); }
 const known = new Set((vendors || []).map((v) => v.id));
+const vendorById = new Map((vendors || []).map((v) => [v.id, v]));
 const missingVendors = vendorIds.filter((id) => !known.has(id));
 if (missingVendors.length) { console.error('unknown vendor_ids:\n' + missingVendors.join('\n')); process.exit(1); }
+
+// ── Filter tags — the structured half, gated against the recon prose ───────────
+// The HARD RULE (draft-contract.md): a tag may exist only if a sentence in this
+// vendor's recon documents it. We enforce it mechanically here — every tag's
+// quote must be a verbatim substring of the prose being uploaded — so a tag the
+// couple would not find on the card cannot reach the database. Values are checked
+// against VENDOR_FILTERS. Absent for old runs (no filters file) -> nothing happens.
+const NORM = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+const DESCRIPTOR = /^(price_basis|price_kind|price_confidence)$/;   // describe a price, ride on its sentence, need no quote
+const csvBase = (argValue('csv') || 'recons.csv');
+const filtersPath = path.join(workdir, argValue('filters') || csvBase.replace(/^recons/, 'filters').replace(/\.csv$/, '.jsonl'));
+
+// The full recon prose per vendor (all its rows), normalized once — this is what
+// a tag's quote must appear in. Built from the CSV being uploaded.
+const proseByVid = new Map();
+for (const r of recons) {
+  const prev = proseByVid.get(r.vendor_id) || '';
+  proseByVid.set(r.vendor_id, prev + ' ' + NORM([r.notes, r.price_text, r.price_details].join(' ')));
+}
+
+function gateFilters(vid, obj) {
+  const v = vendorById.get(vid);
+  const defs = Object.fromEntries((VENDOR_FILTERS[v?.vendor_type] || []).map((d) => [d.key, d]));
+  const rangeKeys = new Set();
+  for (const d of Object.values(defs)) if (d.kind === 'range') { rangeKeys.add(d.lo ?? d.key); if (d.hi) rangeKeys.add(d.hi); }
+  const prose = proseByVid.get(vid) || '';
+  const out = {}, errs = [];
+  for (const [key, spec] of Object.entries(obj)) {
+    const value = spec && typeof spec === 'object' && 'value' in spec ? spec.value : spec;
+    const quote = spec && typeof spec === 'object' ? spec.quote : undefined;
+    const def = defs[key];
+    const isRange = rangeKeys.has(key), isDesc = DESCRIPTOR.test(key);
+    if (!def && !isRange && !isDesc) { errs.push(`${v?.name} [${key}]: not an attribute of vendor type ${v?.vendor_type}`); continue; }
+    // value shape
+    if (def?.kind === 'multi') {
+      const allowed = new Set(def.options.map((o) => o.value));
+      const vals = Array.isArray(value) ? value : [value];
+      const bad = vals.filter((x) => !allowed.has(String(x)));
+      if (!vals.length || bad.length) { errs.push(`${v?.name} [${key}]: value(s) not allowed: ${bad.join(', ') || '(empty)'}`); continue; }
+    } else if (def?.kind === 'bool') {
+      if (typeof value !== 'boolean') { errs.push(`${v?.name} [${key}]: expected true/false`); continue; }
+    } else if (!isDesc && (typeof value !== 'number' || !Number.isFinite(value))) {
+      errs.push(`${v?.name} [${key}]: expected a number`); continue;
+    }
+    // THE HARD RULE: the fact must live in the recon. Descriptor keys ride on the
+    // priced sentence and carry no quote of their own.
+    if (!isDesc) {
+      if (!quote) { errs.push(`${v?.name} [${key}]: no quote - every tag must cite the recon sentence that documents it`); continue; }
+      if (!prose.includes(NORM(quote))) { errs.push(`${v?.name} [${key}]: quote not found in this vendor's recon - a tag cannot exist without prose documenting it ("${String(quote).slice(0, 50)}")`); continue; }
+    }
+    out[key] = { value, quote: quote ?? null };
+  }
+  return { out, errs };
+}
+
+const gatedFilters = new Map();   // vid -> {key: {value, quote}}
+let filterErrs = [];
+if (fs.existsSync(filtersPath)) {
+  const frows = fs.readFileSync(filtersPath, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  for (const fr of frows) {
+    if (!known.has(fr.vendor_id)) continue;
+    if (vendorById.get(fr.vendor_id)?.filters_source === 'manual') continue;   // never clobber a hand edit
+    const { out, errs } = gateFilters(fr.vendor_id, fr.filters);
+    filterErrs.push(...errs);
+    if (Object.keys(out).length) gatedFilters.set(fr.vendor_id, out);
+  }
+  if (filterErrs.length) {
+    console.error(`FILTER GATE — ${filterErrs.length} problems (fix the drafts and re-merge; nothing written):\n  ` + filterErrs.join('\n  '));
+    process.exit(1);
+  }
+  console.log(`filter tags gated: ${gatedFilters.size} vendors will get filters written`);
+}
 
 const botIds = bots.map((b) => b.user_id).filter(Boolean);
 const { data: existing } = await selectAll(() => supabase.from('recon_entries').select('author_id, vendor_id').order('id').in('author_id', botIds.length ? botIds : ['00000000-0000-0000-0000-000000000000']));
@@ -277,6 +351,30 @@ for (const r of toInsert) {
     if (mErr) { console.error(`MEDIA ROW FAILED for ${r.venue}: ${mErr.message}`); process.exit(1); }
     media++;
   }
+}
+
+// ── Write filter tags (after the recon they cite is in) ───────────────────────
+// Merged with the vendor's current filters so an attribute another run already
+// set is preserved; a manual row was skipped at the gate. filters_meta records
+// the recon quote as evidence and filters_source flips to recon so a re-run of
+// the extraction backfill cannot clobber these (precedence manual>recon>extraction).
+let filtersWritten = 0;
+if (APPLY && gatedFilters.size) {
+  for (const [vid, tags] of gatedFilters) {
+    const { data: live } = await supabase.from('vendors').select('filters, filters_meta, filters_source').eq('id', vid).single();
+    if (live?.filters_source === 'manual') continue;
+    const filters = { ...(live?.filters || {}) }, meta = { ...(live?.filters_meta || {}) }, stamp = new Date().toISOString();
+    for (const [key, { value, quote }] of Object.entries(tags)) {
+      filters[key] = Array.isArray(value) && Array.isArray(filters[key]) ? [...new Set([...filters[key], ...value])] : value;
+      meta[key] = quote ? { source: 'recon', updated_at: stamp, quote } : { source: 'recon', updated_at: stamp };
+    }
+    const { error } = await supabase.from('vendors').update({ filters, filters_meta: meta, filters_source: 'recon', filters_updated_at: stamp }).eq('id', vid);
+    if (error) { console.error(`FILTER WRITE FAILED for ${vendorById.get(vid)?.name}: ${error.message}`); process.exit(1); }
+    filtersWritten++;
+  }
+  console.log(`filter tags written to ${filtersWritten} vendors`);
+} else if (gatedFilters.size) {
+  console.log(`(dry run) would write filter tags to ${gatedFilters.size} vendors`);
 }
 
 // ── Verify ────────────────────────────────────────────────────────────────────

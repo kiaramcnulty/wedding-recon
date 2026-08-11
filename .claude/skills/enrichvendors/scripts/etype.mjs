@@ -5,6 +5,35 @@
 // so old venue batch artifacts keep working.
 import pathMod from 'node:path';
 import { argValue } from '../../launchvendors/scripts/lib.mjs';
+import { VENDOR_FILTERS } from '../../../../lib/constants/vendor-filters.ts';
+
+// Which VENDOR_FILTERS type(s) a run's profile covers. 1:1 with profile.key for
+// every type except music, which enriches both dj and band vendors together, so
+// both vocabularies get inlined and the worker picks per vendor from the dossier.
+const FILTER_TYPES = { music: ['dj', 'band'] };
+
+// Render a vendor type's allowed filter keys + values for the call-file header,
+// so a worker knows exactly what it may tag and with what values. Generated from
+// VENDOR_FILTERS (the single source of truth the app and matcher also read), so
+// the vocabulary shown to workers can never drift from what upload accepts.
+function renderVocab(ftype) {
+  const defs = VENDOR_FILTERS[ftype] || [];
+  const lines = defs.map((d) => {
+    if (d.kind === 'multi') return `- ${d.key} (choose any that apply) values: ${d.options.map((o) => o.value).join(', ')}`;
+    if (d.kind === 'bool') return `- ${d.key} (true or false)`;
+    const bound = `${d.lo ?? d.key}${d.hi ? ` / ${d.hi}` : ''}`;
+    return `- ${d.key} (number range, keys ${bound}${d.basis ? `, basis "${d.basis}"` : ''})`;
+  });
+  return `Vendor type "${ftype}":\n${lines.join('\n')}`;
+}
+
+// The FILTER VOCABULARY block appended to a call file for a given profile key.
+export function filterVocab(profileKey) {
+  const types = FILTER_TYPES[profileKey] || [profileKey];
+  const known = types.filter((t) => VENDOR_FILTERS[t]);
+  if (!known.length) return '';
+  return `## FILTER VOCABULARY — the only tag keys and values upload will accept\n\n${known.map(renderVocab).join('\n\n')}`;
+}
 
 const BASE_HEADERS = ['venue', 'vendor_id', 'recon_type', 'month', 'year', 'price_text', 'price_details', 'notes', 'photos', 'sources', 'bot'];
 const refsFor = (type) => ['common/draft-contract.md', 'common/entry-rules-core.md', `${type}/type-rules.md`, 'voice-cards.md'];

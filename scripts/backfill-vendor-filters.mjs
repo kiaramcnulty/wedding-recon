@@ -2,6 +2,12 @@
 /**
  * Backfill vendors.filters from the measured extraction dataset.
  *
+ * NOTE (2026-08-09): live filter population now happens IN /enrichvendors — the
+ * draft worker emits tags alongside the recon, gated so every tag is documented
+ * in the prose (see docs/enrich-filter-emission.md). This script is now for the
+ * one-time historical backfill and for regenerating the slider histograms
+ * (`--hist-only`), NOT the ongoing source of filters for new regions.
+ *
  *   node scripts/backfill-vendor-filters.mjs [--dry] [--limit N]
  *   node scripts/backfill-vendor-filters.mjs --hist-only   (no DB, no creds)
  *
