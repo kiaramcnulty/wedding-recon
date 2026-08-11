@@ -200,6 +200,8 @@ node --env-file=.env.local .claude/skills/enrichvendors/scripts/bots.mjs <workdi
 
 Show the dry-run summary; get an **explicit yes** before `--apply` (a user may pre-authorize an unattended run — record that authorization before starting). Idempotent by `(author_id, vendor_id)`; `created_at` auto-backdates.
 
+**Upload also writes `vendors.filters`** from the tags the draft worker emitted (side file `filters-<id>.jsonl`, produced by `merge`), so a region gets the structured filter attributes AND the recon in one pass — the two stores are equivalent by construction and no separate reconciliation is needed (see `docs/enrich-filter-emission.md`). Every tag is gated against the recon prose: a tag whose quote is not a verbatim substring of the vendor's `notes`/`price_text`/`price_details` **hard-fails the upload**, the same as a banned phrase. Values are checked against `VENDOR_FILTERS`. A vendor already marked `filters_source='manual'` is skipped; existing multi-value lists are unioned, never replaced. Requires migration `0037` (`filters_meta`).
+
 ```
 node --env-file=.env.local .claude/skills/enrichvendors/scripts/upload.mjs <workdir> --type <type> --roster <roster> --csv recons-<id>.csv --apply
 node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> verify --type <type> --roster <roster> --csv recons-<id>.csv [--fix-gaps]

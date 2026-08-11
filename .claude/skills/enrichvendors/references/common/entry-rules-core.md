@@ -81,6 +81,19 @@
   Unsourced criticism of a real business is worse than none; every wart traces to a named
   source in `sources`, exactly like every other fact.
 
+## Filter tags — write them, and every tag MUST live in the recon (hard rule)
+Each vendor also gets structured filter tags (the queryable half of the same facts;
+full rules + output schema in `common/draft-contract.md`, allowed values in the call
+file's FILTER VOCABULARY block). Two non-negotiables:
+- **Tag as many attributes as the research genuinely supports** — the tags are what
+  put a vendor in front of couples who filter, so completeness matters.
+- **A tag may exist ONLY if the recon prose documents it.** Every tag cites a
+  verbatim sentence from this vendor's `notes`/`price_text`/`price_details`; the
+  upload gate hard-fails any tag whose quote is not in the prose. If you cannot
+  point to a sentence a couple would read, write the fact into the prose or drop
+  the tag. Never a tag the reader would not find on the card, and never a `false`
+  or empty list from silence (that removes the vendor from a search).
+
 ## Other fields
 - `venue` column = the vendor's business name (historical column name, all types).
 - `vendor_id`: copy VERBATIM from your call file's block. Never guess.

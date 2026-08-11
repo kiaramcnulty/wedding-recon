@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { norm, parseCSV, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
-import { etype, researchDirs } from './etype.mjs';
+import { etype, researchDirs, filterVocab } from './etype.mjs';
 
 const workdir = process.argv[2];
 const cmd = process.argv[3];
@@ -147,6 +147,7 @@ function readWorkerRows(prefix) {
     process.exit(1);
   }
   const perFile = [];
+  const filters = [];   // {vendor_id, filters} from each vendor's entry-1 row; side-channel, see draft-contract.md
   for (const f of files) {
     const rows = [], problems = [];
     fs.readFileSync(path.join(draftsDir, f), 'utf8').split('\n').forEach((l, idx) => {
@@ -156,11 +157,14 @@ function readWorkerRows(prefix) {
         const o = JSON.parse(t);
         if (o && typeof o === 'object' && '_flags' in o) return; // API-mode flags line (draft.mjs collects these)
         rows.push(HEADERS.map((h) => String(o[h] ?? '').replace(/\r?\n/g, ' ').trim()));
+        // The `filters` object rides on a vendor's first row only; it is NOT a
+        // HEADERS column, so it stays out of the CSV and travels in filters.jsonl.
+        if (o.vendor_id && o.filters && typeof o.filters === 'object') filters.push({ vendor_id: o.vendor_id, filters: o.filters });
       } catch { problems.push(`${f}:${idx + 1}: unparseable JSON line`); }
     });
     perFile.push({ file: f, rows, problems });
   }
-  return { perFile };
+  return { perFile, filters };
 }
 function loadCsvRecons(csvName) {
   const rows = parseCSV(fs.readFileSync(path.join(workdir, csvName), 'utf8'));
@@ -332,8 +336,10 @@ async function cmdBatch() {
   // call files: header (contract + core rules + type rules + voice cards, inlined ONCE
   // per call) + one block per vendor carrying its per-entry bot/date assignments
   const refDir = '.claude/skills/enrichvendors/references';
-  const header = profile.refs
-    .map((f) => fs.readFileSync(path.join(refDir, f), 'utf8')).join('\n\n---\n\n');
+  const header = [
+    profile.refs.map((f) => fs.readFileSync(path.join(refDir, f), 'utf8')).join('\n\n---\n\n'),
+    filterVocab(profile.key),   // the tag keys + values the worker may emit; see draft-contract.md "Filter tags"
+  ].filter(Boolean).join('\n\n---\n\n');
   fs.mkdirSync(draftsDir, { recursive: true });
   const nCalls = Math.ceil(picked.length / perCall);
   let maxTok = 0;
@@ -434,7 +440,7 @@ function cmdMerge() {
     if (!botsByVid.has(m.vendor_id)) botsByVid.set(m.vendor_id, []);
     botsByVid.get(m.vendor_id).push(m.bot);
   }
-  const { perFile } = readWorkerRows(`${batch}-worker-`);
+  const { perFile, filters } = readWorkerRows(`${batch}-worker-`);
   if (!perFile.length) { console.error('no worker JSONL files found'); process.exit(1); }
 
   const iBot = HEADERS.indexOf('bot');
@@ -468,6 +474,19 @@ function cmdMerge() {
   const text = out.map((row) => row.map(csvEsc).join(',')).join('\n') + '\n';
   fs.writeFileSync(path.join(workdir, csvName), text);
   fs.writeFileSync(path.join(workdir, `recons-${batch}.backup.csv`), text);
+
+  // Filter tags travel beside the CSV, keyed to only the vendors that survived the
+  // merge above (a filter row for a dropped/renamed vendor is discarded). upload.mjs
+  // gates each tag against the vendor's inserted recon prose before writing it.
+  const keptVids = new Set(out.slice(1).map((r) => (r[1] ?? '').trim()));
+  const filterRows = filters.filter((f) => keptVids.has(f.vendor_id));
+  const fPath = path.join(workdir, `filters-${batch}.jsonl`);
+  if (filterRows.length) {
+    fs.writeFileSync(fPath, filterRows.map((f) => JSON.stringify(f)).join('\n') + '\n');
+    console.log(`filter tags: ${filterRows.length} vendors -> ${path.basename(fPath)}`);
+  } else if (fs.existsSync(fPath)) {
+    fs.rmSync(fPath); // stale from a prior run
+  }
 
   const { recons } = loadCsvRecons(csvName);
   // "States a price" is the MONEY test over BOTH price columns — the same question
