@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { captureServer } from "@/lib/analytics/posthog-server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRegion } from "@/lib/normalize-region";
 import type { VendorType, ReconType } from "@/lib/constants/categories";
@@ -197,6 +198,16 @@ export async function createRecon(input: CreateReconInput) {
     .from("saved_vendors")
     .upsert({ user_id: user.id, vendor_id: vendorId }, { onConflict: "user_id,vendor_id" });
 
-  // ── 5. Redirect to vendor page ────────────────────────────────────────────
+  // ── 5. Conversion event ───────────────────────────────────────────────────
+  // Server-side: the redirect() below throws NEXT_REDIRECT, so there is no
+  // client "resolved successfully" moment to hook, and a server event can't be
+  // ad-blocked. This is the single choke point for BOTH the normal submit and
+  // the guest-resume path (both call createRecon). No-ops without a PostHog key.
+  await captureServer(user.id, "recon_saved", {
+    vendor_type: input.vendorType,
+    photo_count: input.media?.length ?? 0,
+  });
+
+  // ── 6. Redirect to vendor page ────────────────────────────────────────────
   redirect(`/vendor/${vendorId}`);
 }

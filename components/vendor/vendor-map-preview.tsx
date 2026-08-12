@@ -41,6 +41,7 @@ const IDLE_TIMEOUT_MS = 2000;
 const FALLBACK_DELAY_MS = 600;
 
 interface VendorMapPreviewProps {
+  vendorId: string;
   lng: number;
   lat: number;
   vendorType: string;
@@ -53,6 +54,7 @@ interface VendorMapPreviewProps {
 }
 
 export function VendorMapPreview({
+  vendorId,
   lng,
   lat,
   vendorType,
@@ -231,6 +233,7 @@ export function VendorMapPreview({
             query,
           )}&output=embed`}
           overlayTitle="Google Maps"
+          track={{ kind: "maps", vendorId }}
           aria-label={`Open ${name} in Google Maps`}
           // Chip pinned TOP-right, not bottom-right: MapLibre's compact
           // attribution collapses to an "i" only on a narrow map and expands to

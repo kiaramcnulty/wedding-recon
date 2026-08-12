@@ -2,6 +2,7 @@
 
 import { Share } from "lucide-react";
 import { toast } from "sonner";
+import { captureClient } from "@/lib/analytics/posthog";
 import { Button } from "@/components/ui/button";
 import type { VendorType } from "@/lib/constants/categories";
 import { CATEGORIES } from "@/lib/constants/categories";
@@ -18,6 +19,11 @@ export function ShareButton({ vendorId, vendorType, name }: ShareButtonProps) {
   const shareText = `Check out ${name} — a ${categoryLabel} vendor on Wedding Recon!`;
 
   async function handleShare() {
+    // Count the intent to share. navigator.share resolving does not reliably
+    // mean a share completed (some browsers resolve regardless; a cancel
+    // rejects), so the click is the honest signal.
+    captureClient("share_clicked", { vendor_id: vendorId });
+
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({ text: shareText, url });

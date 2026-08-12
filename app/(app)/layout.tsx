@@ -1,3 +1,4 @@
+import { IdentifyUser } from "@/components/analytics/identify-user";
 import { BottomNav } from "@/components/bottom-nav";
 import { MarkVisited } from "@/components/mark-visited";
 import { ResumePublishWatcher } from "@/components/resume-publish-watcher";
@@ -10,6 +11,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           the middleware because a Next prefetch of a product link is a real
           request but not a real visit - see components/mark-visited.tsx. */}
       <MarkVisited />
+      {/* Links anonymous browsing to the account in PostHog once signed in. */}
+      <IdentifyUser />
       <ResumePublishWatcher />
       <main className="flex flex-1 flex-col">{children}</main>
       <BottomNav />

@@ -273,7 +273,7 @@ export default async function VendorPage({
 
           {/* Action buttons */}
           <div className="flex shrink-0 items-center gap-2">
-            <SaveButton vendorId={vendor.id} />
+            <SaveButton vendorId={vendor.id} vendorType={vendor.vendor_type} />
             <ShareButton
               vendorId={vendor.id}
               vendorType={vendor.vendor_type}
@@ -300,6 +300,7 @@ export default async function VendorPage({
                     `${vendor.name} ${addressParts}`,
                   )}&output=embed`}
                   overlayTitle="Google Maps"
+                  track={{ kind: "maps", vendorId: vendor.id }}
                   className="flex items-center gap-1 hover:text-foreground transition-colors"
                 >
                   {addressParts}
@@ -318,6 +319,7 @@ export default async function VendorPage({
                 <ExternalLink
                   href={vendor.website}
                   embed={{ vendorId: vendor.id, kind: "website" }}
+                  track={{ kind: "website", vendorId: vendor.id }}
                   className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
                 >
                   <Globe className="size-3.5 shrink-0" />
@@ -329,6 +331,7 @@ export default async function VendorPage({
                 // plain new-tab link (embed defaults to false).
                 <ExternalLink
                   href={`https://www.instagram.com/${vendor.instagram}`}
+                  track={{ kind: "instagram", vendorId: vendor.id }}
                   className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
                 >
                   <InstagramIcon className="size-3.5 shrink-0" />
@@ -369,6 +372,7 @@ export default async function VendorPage({
       {fixedLocation && coords && (
         <div className="mt-4">
           <VendorMapPreview
+            vendorId={vendor.id}
             lng={coords.lng}
             lat={coords.lat}
             vendorType={vendor.vendor_type}

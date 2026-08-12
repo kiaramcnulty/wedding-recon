@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ExternalOverlay } from "@/components/external-overlay";
+import { captureClient } from "@/lib/analytics/posthog";
 
 /** Which vendor field /api/embed-check should test. */
 export type EmbedCheckKind = "website";
@@ -21,6 +22,13 @@ interface ExternalLinkProps extends React.ComponentPropsWithoutRef<"a"> {
   embedSrc?: string;
   /** Overlay header label; defaults to the destination's hostname. */
   overlayTitle?: string;
+  /**
+   * When set, a click fires the `vendor_link_out` analytics event with this
+   * kind + vendor id. Explicit and opt-in: this is the app-wide external-link
+   * component, so it must not become an *implicit* "all vendor links" tracker —
+   * only the callers on vendor surfaces pass it.
+   */
+  track?: { kind: "website" | "instagram" | "maps"; vendorId: string };
 }
 
 /**
@@ -35,6 +43,7 @@ export function ExternalLink({
   embed,
   embedSrc,
   overlayTitle,
+  track,
   onClick,
   children,
   ...anchorProps
@@ -59,6 +68,14 @@ export function ExternalLink({
 
   function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
     onClick?.(e);
+    // Count the outbound click regardless of whether it opens the overlay or a
+    // new tab — either way the user chose to visit the vendor's own presence.
+    if (track) {
+      captureClient("vendor_link_out", {
+        kind: track.kind,
+        vendor_id: track.vendorId,
+      });
+    }
     // Only take over an unmodified left click; anything else (cmd/ctrl/shift-
     // click, middle-click) keeps its native meaning. A still-pending check
     // (checked === null) falls through to the plain new-tab link — no dead ends.

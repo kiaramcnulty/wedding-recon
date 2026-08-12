@@ -4,15 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import { toast } from "sonner";
+import { captureClient } from "@/lib/analytics/posthog";
+import type { VendorType } from "@/lib/constants/categories";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface SaveButtonProps {
   vendorId: string;
+  vendorType: VendorType;
 }
 
-export function SaveButton({ vendorId }: SaveButtonProps) {
+export function SaveButton({ vendorId, vendorType }: SaveButtonProps) {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -60,6 +63,9 @@ export function SaveButton({ vendorId }: SaveButtonProps) {
         } else {
           setSaved(true);
           toast("Saved to your hub!");
+          // Only the save (insert) direction counts as intent — not the unsave
+          // branch above, and not the implicit auto-save createRecon does.
+          captureClient("vendor_saved", { vendor_type: vendorType });
         }
       }
     } finally {
