@@ -1,0 +1,109 @@
+name: filter-recon-daily
+
+# Daily on-write filter reconciliation. A DB trigger (migration 0038) stamps
+# vendors.filters_dirty_at whenever recon changes; this reconciles the tags for
+# the stamped vendors from all of their active recon entries, on the Batch API.
+# See docs/filter-recon-on-write.md.
+#
+# SHIPPED DISABLED ON PURPOSE. The schedule is commented out and the default run
+# is a dry run. This mutates user-visible data on model judgment and the snapshot
+# is the only undo, so it must be piloted by hand first (run it with dry_run=true,
+# read the report artifact, then a small real run) before the cron is enabled.
+#
+# Requires repo secrets: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+# ANTHROPIC_BATCH_API_KEY (same set the SessionStart hook reads).
+
+on:
+  # Uncomment to enable the daily run once the pipeline is trusted by hand.
+  # schedule:
+  #   - cron: "40 9 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (report only, write nothing)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: filter-recon-daily
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: npm install --no-audit --no-fund
+
+      - name: Build .env.local from secrets
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_BATCH_API_KEY: ${{ secrets.ANTHROPIC_BATCH_API_KEY }}
+        run: |
+          umask 077
+          : > .env.local
+          for v in NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY ANTHROPIC_BATCH_API_KEY; do
+            val="${!v:-}"
+            if [ -z "$val" ]; then echo "::error::$v secret is not set"; exit 1; fi
+            printf '%s=%s\n' "$v" "$val" >> .env.local
+          done
+
+      - name: Reconcile dirty vendors
+        run: |
+          set -euo pipefail
+          WORK="daily-$(date -u +%Y%m%d-%H%M)"
+          echo "WORK=$WORK" >> "$GITHUB_ENV"
+          DIR="data/reconcile/$WORK"
+
+          node scripts/reconcile/daily-export.mjs --work "$WORK"
+
+          # No dirty vendors -> vendors.jsonl has no objects. Stop cleanly rather
+          # than letting `batch submit` fail on an empty call set.
+          if ! grep -q '{' "$DIR/vendors.jsonl"; then
+            echo "Nothing dirty. Done."
+            exit 0
+          fi
+
+          node scripts/reconcile/daily-build-calls.mjs --work "$WORK"
+          node scripts/reconcile/batch.mjs submit --work "$WORK"
+
+          # Poll until the batch ends, capped so a stuck batch cannot hang the job.
+          # If it does not end in time, leave the vendors dirty; the next run
+          # re-exports them. (Manual-only for now, so a rare abandoned batch is
+          # acceptable; wire a resumable collect before enabling the cron at scale.)
+          ended=""
+          for _ in $(seq 1 60); do
+            if node scripts/reconcile/batch.mjs status --work "$WORK" | grep -q ': ended'; then
+              ended=1; break
+            fi
+            sleep 60
+          done
+          if [ -z "$ended" ]; then
+            echo "::warning::batch did not end within the poll window; vendors stay dirty"
+            exit 0
+          fi
+
+          node scripts/reconcile/batch.mjs collect --work "$WORK"
+
+          if [ "${{ inputs.dry_run }}" = "false" ]; then
+            node scripts/reconcile/daily-apply.mjs --work "$WORK" --apply
+          else
+            node scripts/reconcile/daily-apply.mjs --work "$WORK"
+          fi
+
+      - name: Upload run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: filter-recon-report
+          path: |
+            data/reconcile/${{ env.WORK }}/report.md
+            data/reconcile/${{ env.WORK }}/export-report.txt
+          if-no-files-found: ignore

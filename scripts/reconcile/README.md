@@ -73,3 +73,29 @@ node scripts/reconcile/apply.mjs       --work co-full --apply
 
 Pilot a small `--type ... --limit 60` slice and read the report by hand before a
 full run. Working artifacts land in `data/reconcile/<work>/` (gitignored).
+
+## On-write reconcile (the `daily-*` scripts)
+
+A separate, **tags-only** flow that keeps `vendors.filters` in agreement with
+recon on an ongoing basis, instead of a one-off region sweep. A DB trigger
+(migration `0038`) stamps `vendors.filters_dirty_at` whenever recon changes
+(insert/update/delete, human or bot); a daily batch reconciles the stamped
+vendors from **all** of their active entries. It writes tags only and never edits
+a recon entry, so a couple's own entry is a valid source. See
+`docs/filter-recon-on-write.md`.
+
+```sh
+node scripts/reconcile/daily-export.mjs     --work daily-20260812   # dirty vendors + snapshot + watermark
+node scripts/reconcile/daily-build-calls.mjs --work daily-20260812  # tags-only contract -> calls/
+node scripts/reconcile/batch.mjs submit  --work daily-20260812      # shared driver, unchanged
+node scripts/reconcile/batch.mjs status  --work daily-20260812      # until "ended"
+node scripts/reconcile/batch.mjs collect --work daily-20260812
+node scripts/reconcile/daily-apply.mjs   --work daily-20260812          # dry run: writes report.md
+node scripts/reconcile/daily-apply.mjs   --work daily-20260812 --apply
+```
+
+Each write is classified create / extend / overwrite / retract (agree writes
+nothing). A contradiction is resolved human-over-bot then by weight of evidence,
+applied, and called out in `report.md` for review; `restore.mjs --work <name>
+--apply` is the undo. `.github/workflows/filter-recon-daily.yml` runs the whole
+sequence (shipped disabled — manual dispatch, dry-run default).

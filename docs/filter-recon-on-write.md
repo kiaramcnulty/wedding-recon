@@ -1,7 +1,23 @@
 # Filters reconcile on every recon write
 
-**Status: PLAN (2026-08-12, Kiara). Not built.** Agreed shape after a design
-pass; this is the spec to implement against.
+**Status: BUILT (2026-08-12), pending a credentialed pilot.** Code is on branch
+`claude/filter-tags-vendor-entries-2ewmy5`. The daily Action is shipped
+**disabled** (manual dispatch, dry-run default, cron commented) — it mutates
+user-visible data on model judgment and the snapshot is the only undo, so it must
+be piloted by hand before the cron is enabled.
+
+**Scope: TAGS ONLY.** This loop writes `vendors.filters` from recon and never
+edits a recon entry. That is the whole of what was asked (create / agree / extend
+/ contradict on the *tags*), and it is why a couple's own human-authored entry is
+a first-class input here — we read it, we never rewrite it. Documenting a tag
+back into prose (Direction A) and finding facts neither store holds stay with the
+separate offline pass (`scripts/reconcile/export.mjs` …), which is unchanged.
+
+**As built:** migration `0038` (trigger) + three scripts that reuse the existing
+`lib.mjs` plumbing and the `batch.mjs` Batch-API driver verbatim —
+`daily-export.mjs`, `daily-build-calls.mjs`, `daily-apply.mjs` — plus
+`.github/workflows/filter-recon-daily.yml`. The merged offline reconcile pass and
+enrich's inline filter emission are untouched.
 
 ## Goal
 
@@ -44,35 +60,46 @@ through the same authoritative pass.
   coalesces to one row per vendor no matter how many entries an enrich upload
   inserts.
 - Trigger is on `recon_entries`, writes `vendors` — no loop, since the
-  reconciler writes `vendors.filters*`, never `recon_entries` structure the
-  trigger keys on. (It *does* edit bot prose in Direction A; that fires the
-  trigger again, converges on the next run, and is harmless — the entry it just
-  wrote already matches the tag.)
-- Idempotent DDL per repo convention; hand-applied.
+  reconciler writes only `vendors.filters*` and never touches `recon_entries`
+  (tags-only scope). So a reconcile run cannot re-fire its own trigger.
+- Idempotent DDL, apostrophe-free comments, hand-applied — as built in
+  `supabase/migrations/0038_recon_marks_filters_dirty.sql`.
 
 **Why a trigger, not app code:** app code in the Server Actions would miss
 script- and enrich-created entries. The requirement is *any* recon write; the
 trigger is the one place that sees all of them.
 
-## 2. Selection — `export.mjs --dirty`
+## 2. Selection — `daily-export.mjs`
 
-Add a `--dirty` mode to `export.mjs` that selects `vendors where
-filters_dirty_at is not null` instead of a type/region. Everything downstream is
-unchanged: it snapshots each dirty vendor's `filters`/`filters_meta` and all
-active entries (the snapshot is the only undo), then writes the pass input.
+`daily-export.mjs` selects `vendors where filters_dirty_at is not null` (not a
+type/region), snapshots each one's `filters`/`filters_meta` and all active
+entries (the snapshot is the only undo), and writes the pass input. Unlike the
+offline `export.mjs` it is **not edit-only**: a human-only vendor is exported and
+reconciled, since Direction-B tag writes read human entries too. A dirty vendor
+whose last entry was just deleted is exported with an empty entry list — a
+retract candidate.
 
-Record the max `filters_dirty_at` seen. After a successful apply, clear only
-`filters_dirty_at <= that watermark`, so an entry that arrives mid-run keeps a
-newer timestamp and survives to tomorrow. No entry is lost, none double-processed.
+It records the max `filters_dirty_at` seen to `watermark.json`. `daily-apply.mjs`
+clears the flag only where `filters_dirty_at <= that watermark`, so an entry that
+arrives mid-run keeps a newer timestamp and survives to the next run. No entry is
+lost, none double-processed.
 
-## 3. Recompute-from-all (the model call)
+## 3. Recompute-from-all (the model call) — `daily-build-calls.mjs`
 
 Per dirty vendor, one Batch call given: the type's `VENDOR_FILTERS` vocabulary
-(keys, kinds, allowed values — reuse `build-calls.mjs vocabulary()`), the
-current `filters` + their `filters_meta` evidence, and **all** active recon
-entries, each tagged with its author's `is_bot`. The model returns the
-reconciled tag set, a verbatim evidence quote per tag, and **classifies every
-change** as create / agree / extend / contradict.
+(keys, kinds, allowed values), the current `filters` with each key's
+`filters_meta.source` shown (a `manual` key is rendered **LOCKED**), and **all**
+active recon entries, each labelled HUMAN or BOT. The model returns a per-vendor
+JSON object classifying every change as **create / extend / overwrite / retract**
+(agree = emit nothing), each write carrying `op`, `value`, a verbatim `quote`,
+and the `entry_id` it came from; an overwrite also carries `human_support` /
+`bot_support`. Call files land in `<work>/calls/` and run through `batch.mjs`
+(submit / status / collect) unchanged.
+
+Recompute-from-all is what makes extend, delete-retraction and evidence-counting
+fall out in one idempotent, order-independent judgment. It is **not** "regenerate
+tags from scratch and discard anything not re-derived" — see the retention rule
+below.
 
 Recompute-from-all is what makes extend, delete-retraction and evidence-counting
 fall out in one idempotent, order-independent judgment. It is **not** "regenerate
@@ -103,48 +130,53 @@ entry supports it. Extraction-sourced tags with no prose support predate the
 invariant and are left alone. State this in the call; do not let "recompute" read
 as "drop anything the current prose doesn't say."
 
-### Hard rules carried over (unchanged)
+### Hard rules carried over
 
-Never write `false`/`[]` from silence; only ever edit/author recon under a bot
-account; skip any **per-key** `filters_meta.source = 'manual'` (0037 provenance
-means one hand-edited tag no longer freezes the whole vendor); every tag write
-carries a verbatim quote checked mechanically by the gate; all prose passes the
-existing `upload.mjs` gates. Prose-only — **no web research** in this loop (that
-is the separate expensive pass, out of scope), which is what keeps the daily cost
-in cents.
+Never write `false`/`[]` from silence (the gate flags any `false` for review);
+skip any **per-key** `filters_meta.source = 'manual'` — and skip a whole vendor
+whose row-level `filters_source = 'manual'` — so a hand edit is never clobbered
+(0037 provenance means one manual tag no longer freezes the vendor); every tag
+write carries a verbatim quote, checked mechanically as a substring of the cited
+entry, so invented evidence fails. **No web research** in this loop (that is the
+separate expensive pass, out of scope), which keeps the daily cost in cents.
 
-## 4. Apply — reuse `apply.mjs`
+## 4. Apply — `daily-apply.mjs`
 
-`apply.mjs` already merges against a fresh row read and skips manual. It sets
-`filters`, `filters_meta` (`{key: {source:'recon', updated_at, quote}}`),
-`filters_source='recon'`, `filters_updated_at`. Add the `filters_dirty_at`
-compare-and-clear from §2. Resumable via `applied.jsonl` as today.
+Validates each write (value in the type's vocabulary, price has a basis, quote
+verbatim in its entry), then merges against a **fresh** row read so a value that
+changed since the export is not clobbered: **create** sets an absent key,
+**extend** unions a list or widens a range (min key down / max key up, derived
+from the def), **overwrite** replaces, **retract** deletes the key and its meta.
+It sets `filters_meta` (`{key: {source:'recon', updated_at, quote}}`),
+`filters_source='recon'`, `filters_updated_at`, and does the `filters_dirty_at`
+compare-and-clear from §2. Dry run by default; `--apply` to write; resumable via
+`applied.jsonl`.
 
 ## 5. Contradictions: apply, alert, undo (decided)
 
-Contradictions are **applied automatically** (not queued), because Kiara wants
-the map correct without a human in the loop — but each one is recorded so it can
-be reviewed and reverted:
+Contradictions are **applied automatically** (not queued) — but each is recorded
+for review and revert:
 
-- Every run writes a report to `data/reconcile/daily/<date>/report.md` (a
-  document Kiara can open). All changes are listed; **contradictions are a
-  called-out section at the top** with vendor, key, old → new, the winning
-  evidence and the losing evidence, and the exact `restore.mjs` command to undo
-  that vendor.
-- Undo is the existing snapshot: `restore.mjs --work daily-<date> --apply`
-  reverts filters + prose to the pre-run state (per-vendor or whole run).
-- The daily runner surfaces the report (GitHub Action job summary + the committed
-  dated file), so a wrong overturn is one revert away rather than silent.
+- Each run writes `data/reconcile/<work>/report.md` (a document you can open, and
+  the Action uploads it as an artifact). **Contradictions are a called-out
+  `REVIEW THESE` section** with vendor, key, old → new, the `human N vs bot N`
+  counts, the note, and the winning evidence quote. Retractions and explicit
+  `false` writes get their own sections; rejected writes are listed too.
+- Undo is the snapshot: `node scripts/reconcile/restore.mjs --work <work> --apply`
+  reverts filters to the pre-run state. The report prints this command up top.
 
-## 6. Where it runs
+## 6. Where it runs — `.github/workflows/filter-recon-daily.yml`
 
-A scheduled GitHub Action (`.github/workflows/filter-recon-daily.yml`, alongside
-`keepalive.yml`), using the same repo secrets the SessionStart hook reads
-(`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-`ANTHROPIC_BATCH_API_KEY`). It runs export → build-calls → batch submit → poll
-status → collect → gate → apply → clear-dirty → write report. The Batch API is
-async; if a batch has not `ended` inside the poll window, collect+apply defer to
-the next run (the vendors stay dirty), so the job never blocks.
+Reuses the repo secrets the SessionStart hook reads (`NEXT_PUBLIC_SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_BATCH_API_KEY`). Runs daily-export →
+daily-build-calls → batch submit → poll status → collect → daily-apply →
+clear-dirty, and uploads the report artifact. The Batch API is async; if a batch
+has not `ended` in the poll window the job exits leaving the vendors dirty, so
+the next run re-exports them.
+
+**Shipped disabled:** `workflow_dispatch` only, cron commented out, `dry_run`
+input defaulting **true**. Pilot by hand (dry run → read the report → a small
+`--apply`) before uncommenting the schedule.
 
 ## 7. What does NOT change
 
@@ -153,22 +185,30 @@ the next run (the vendors stay dirty), so the job never blocks.
 - Enrich `upload.mjs`: untouched (two-writer decision).
 - The matcher, the RPCs (`0034`/`0035`), the Explore UI: untouched — they read
   `vendors.filters` and don't care who wrote it.
-- `scripts/reconcile/` phase order and gates: reused, not rewritten. The only new
-  code is the `--dirty` selector, the classification in the call/gate, the
-  compare-and-clear, the daily runner, and migration `0038`.
+- `scripts/reconcile/` offline pass (`export`/`build-calls`/`gate`/`apply`/
+  `restore`) and its phase order: reused where generic (`lib.mjs`, `batch.mjs`,
+  `restore.mjs`), otherwise left alone. The new code is migration `0038`, the
+  three `daily-*` scripts, and the workflow.
 
-## 8. Build order / validation
+## 8. Validation
 
-1. Migration `0038` + trigger; hand-apply; verify a recon insert stamps
-   `filters_dirty_at` and a delete stamps the right vendor.
-2. `export.mjs --dirty` + compare-and-clear.
-3. Classification in build-calls + gate (create/agree/extend/contradict, the
-   resolution and retention rules).
-4. Report writer + wire `restore.mjs` per-run.
-5. Pilot: hand-dirty ~10 vendors across two types, run the whole pipeline
-   locally, read the report, deliberately plant a contradiction and confirm it
-   applies **and** is called out **and** reverts cleanly with `restore`.
-6. Daily Action last, once the pipeline is trusted by hand.
+Done in this build:
+- Migration `0038` is lexer-safe (apostrophes only inside the one string
+  literal, none in `--` comments — the Supabase-editor footgun).
+- The three scripts pass `node --check`.
+- An offline dry-run against a fabricated venue fixture exercised every path:
+  extend (range widen + list union), overwrite (reported as a contradiction with
+  the vote counts + evidence), retract, a **manual-locked** key refused, and an
+  **invented-evidence** write rejected. All behaved correctly.
 
-Pilot before the Action is live: this auto-mutates user-visible data daily, and
-the snapshot is the only undo.
+Still required before enabling the cron (needs the three secrets — this container
+has none):
+1. Hand-apply `0038`; confirm a recon insert stamps `filters_dirty_at` and a
+   delete stamps the right vendor.
+2. Trigger the Action with `dry_run=true` on a small dirty set; read the report
+   artifact.
+3. A small `--apply`, verify in the DB, and confirm `restore.mjs` reverts it.
+4. Only then uncomment the `schedule` in the workflow.
+
+This auto-mutates user-visible data on model judgment; the snapshot is the only
+undo.
