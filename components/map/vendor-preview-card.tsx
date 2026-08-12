@@ -8,6 +8,9 @@ import { createClient } from "@/lib/supabase/client";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
 import { formatVendorLocality } from "@/lib/vendor-locality";
 import { sortReconEntries } from "@/lib/recon-sort";
+import type { FilterSelection, VendorFilters } from "@/lib/filters/match";
+import { vendorTags } from "@/lib/filters/vendor-tags";
+import { VendorTagPreview } from "@/components/vendor/vendor-tags";
 import { cn } from "@/lib/utils";
 
 /**
@@ -44,6 +47,8 @@ export interface VendorPreview {
   photoCandidates: string[];
   /** Text previews of the vendor's recon entries (newest first, text-less entries skipped). */
   slides: ReconSlide[];
+  /** The vendor's raw filter attributes, for the tag pills. */
+  filters: VendorFilters;
 }
 
 /** Minimal row shapes for the on-tap detail fetch (client queries are untyped). */
@@ -55,6 +60,7 @@ interface VendorLite {
   city: string | null;
   region: string | null;
   address_text: string | null;
+  filters: VendorFilters;
 }
 interface ReconRow {
   vendor_id: string;
@@ -126,7 +132,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
           // city/region/address_text feed the "City, ST" subtitle — three small
           // text columns on rows already being fetched, so no extra round trip.
           .select(
-            "id, name, google_photos, google_place_id, city, region, address_text",
+            "id, name, google_photos, google_place_id, city, region, address_text, filters",
           )
           .in("id", idList),
         supabase
@@ -209,6 +215,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
             reconCount: counts.get(id) ?? 0,
             photoCandidates: candidates,
             slides: slidesByVendor.get(id) ?? [],
+            filters: v.filters ?? null,
           },
         ];
       });
@@ -259,6 +266,7 @@ export function VendorPreviewCard({
   href,
   onNavigate,
   showCategoryPill = true,
+  selection,
   action,
   className,
 }: {
@@ -281,6 +289,12 @@ export function VendorPreviewCard({
   /** Hidden in the Hub, where cards already sit under a category accordion. */
   showCategoryPill?: boolean;
   /**
+   * The couple's active filters for THIS vendor's type, if any. Only reorders
+   * the tag pills (matched ones float first); never adds or removes one. The
+   * surfaces without a filter notion (the Hub) pass nothing.
+   */
+  selection?: FilterSelection;
+  /**
    * Optional trailing control (the Hub's edit/add button). Rendered as a
    * SIBLING of the main button, never inside it — nesting an interactive
    * element in a button is invalid and swallows its taps.
@@ -291,6 +305,10 @@ export function VendorPreviewCard({
   const router = useRouter();
   const category = CATEGORIES[vendorType];
   const CategoryIcon = category.icon;
+  const tags = React.useMemo(
+    () => vendorTags(vendorType, item.filters, selection),
+    [vendorType, item.filters, selection],
+  );
 
   /** Same destination as the Link, for the carousel below it. */
   const go = () => {
@@ -351,6 +369,9 @@ export function VendorPreviewCard({
             <span className="text-xs text-muted-foreground">
               {reconLabel(item.reconCount)}
             </span>
+            {/* One clipped line of filter tags, inside the tap box. Hidden
+                entirely when the vendor has no known facets. */}
+            {tags.length > 0 && <VendorTagPreview tags={tags} className="mt-0.5" />}
           </div>
         </Link>
         {action && (

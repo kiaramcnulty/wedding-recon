@@ -18,6 +18,8 @@ import {
 } from "@/lib/constants/categories";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
 import { sortReconEntries } from "@/lib/recon-sort";
+import { vendorTags } from "@/lib/filters/vendor-tags";
+import { VendorTagList } from "@/components/vendor/vendor-tags";
 import { VendorMapPreview } from "@/components/vendor/vendor-map-preview";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { VendorPhotos } from "@/components/vendor/vendor-photos";
@@ -222,6 +224,11 @@ export default async function VendorPage({
         ),
       ].slice(0, 3);
 
+  // Full list of the vendor's filter attributes as pills — the same facets the
+  // Explore filter sheet is built from. No active selection on this page, so
+  // they render in importance order (see lib/filters/vendor-tags.ts).
+  const tags = vendorTags(vendor.vendor_type, vendor.filters);
+
   const category = CATEGORIES[vendor.vendor_type as VendorType];
   const CategoryIcon = category?.icon ?? MapPin;
   const colorHex = category?.colorHex ?? "#888780";
@@ -332,6 +339,14 @@ export default async function VendorPage({
           )}
         </div>
       </div>
+
+      {/* Filter tags — the vendor's attributes as pills, wrapping across as many
+          lines as needed. Hidden when nothing has been extracted for it. */}
+      {tags.length > 0 && (
+        <div className="mt-4 px-4">
+          <VendorTagList tags={tags} />
+        </div>
+      )}
 
       {/* All photos in ONE strip — recon first, then Google (badged per tile,
           bytes proxied from cached references). Two stacked strips plus the map

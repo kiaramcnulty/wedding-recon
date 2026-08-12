@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { type VendorType } from "@/lib/constants/categories";
+import type { FilterSelections } from "@/lib/filters/match";
 import {
   VendorPreviewCard,
   useVendorPreviews,
@@ -54,6 +55,7 @@ export function VendorFeed({
   entries,
   scrollKey,
   footnote,
+  selections,
   className,
   scrollRef: externalScrollRef,
 }: {
@@ -63,6 +65,8 @@ export function VendorFeed({
   scrollKey: string;
   /** Rendered under the last card — e.g. a note that the feed was capped. */
   footnote?: string;
+  /** Active attribute filters per type, so each card's matched tags sort first. */
+  selections?: FilterSelections;
   className?: string;
   /**
    * Lets a host observe the scroll container. The bottom-sheet needs it: its
@@ -238,6 +242,7 @@ export function VendorFeed({
                     vendorType={typeById.get(item.id) ?? "other"}
                     href={vendorHref(item.id)}
                     onNavigate={rememberScroll}
+                    selection={selections?.[typeById.get(item.id) ?? "other"]}
                   />
                 </li>
               </React.Fragment>

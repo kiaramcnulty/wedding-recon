@@ -4,11 +4,14 @@ import * as React from "react";
 import { CATEGORY_PLURAL, type VendorType } from "@/lib/constants/categories";
 import { VendorListSheet } from "@/components/map/vendor-list-sheet";
 import { type ClusterEntry } from "@/components/map/vendor-map";
+import type { FilterSelections } from "@/lib/filters/match";
 
 interface ClusterListSheetProps {
   /** Vendors in the tapped cluster, full matches first (see ClusterOpenPayload). */
   entries: ClusterEntry[];
   vendorType: VendorType;
+  /** Active attribute filters per type, forwarded to the feed's cards. */
+  selections?: FilterSelections;
   onClose: () => void;
 }
 
@@ -22,6 +25,7 @@ interface ClusterListSheetProps {
 export function ClusterListSheet({
   entries,
   vendorType,
+  selections,
   onClose,
 }: ClusterListSheetProps) {
   // Passing `rank` through is what lets this feed draw the partial-tier divider
@@ -50,6 +54,7 @@ export function ClusterListSheet({
       entries={rows}
       heading={heading}
       scrollKey="wr:clusterScroll"
+      selections={selections}
       onClose={onClose}
     />
   );

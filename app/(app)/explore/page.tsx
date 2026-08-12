@@ -722,6 +722,7 @@ export default function ExplorePage() {
         <ClusterListSheet
           entries={cluster.entries}
           vendorType={cluster.vendorType}
+          selections={filterSelections}
           onClose={() => setCluster(null)}
         />
       )}
@@ -953,6 +954,7 @@ export default function ExplorePage() {
           <VendorFeed
             entries={visible.entries}
             scrollKey="wr:screenScroll"
+            selections={filterSelections}
             className="flex-1"
             footnote={
               visible.entries.length < visible.total
@@ -999,6 +1001,7 @@ export default function ExplorePage() {
             <VendorPinPreview
               vendorId={pin.id}
               vendorType={pin.vendorType}
+              selection={filterSelections[pin.vendorType]}
               onClose={closePin}
             />
           </div>
