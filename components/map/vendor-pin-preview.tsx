@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X, Loader2 } from "lucide-react";
 import { type VendorType } from "@/lib/constants/categories";
+import type { FilterSelection } from "@/lib/filters/match";
 import {
   VendorPreviewCard,
   useVendorPreviews,
@@ -11,6 +12,8 @@ import {
 interface VendorPinPreviewProps {
   vendorId: string;
   vendorType: VendorType;
+  /** Active attribute filters for this vendor's type, so matched tags sort first. */
+  selection?: FilterSelection;
   onClose: () => void;
 }
 
@@ -27,6 +30,7 @@ interface VendorPinPreviewProps {
 export function VendorPinPreview({
   vendorId,
   vendorType,
+  selection,
   onClose,
 }: VendorPinPreviewProps) {
   const items = useVendorPreviews([vendorId]);
@@ -134,6 +138,7 @@ export function VendorPinPreview({
         <VendorPreviewCard
           item={item}
           vendorType={vendorType}
+          selection={selection}
           // `from` returns the back button to the map with this peek reopened.
           href={`/vendor/${item.id}?from=${encodeURIComponent("/explore?restore=1")}`}
           className="shadow-xl"

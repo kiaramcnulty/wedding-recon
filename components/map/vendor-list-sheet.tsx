@@ -4,6 +4,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { VendorFeed, type VendorListEntry } from "@/components/map/vendor-feed";
+import type { FilterSelections } from "@/lib/filters/match";
 
 export type { VendorListEntry };
 
@@ -16,6 +17,8 @@ interface VendorListSheetProps {
   scrollKey: string;
   /** Rendered under the last card — e.g. a note that the feed was capped. */
   footnote?: string;
+  /** Active attribute filters per type, forwarded to the feed's cards. */
+  selections?: FilterSelections;
   onClose: () => void;
 }
 
@@ -37,6 +40,7 @@ export function VendorListSheet({
   heading,
   scrollKey,
   footnote,
+  selections,
   onClose,
 }: VendorListSheetProps) {
   const sheetRef = React.useRef<HTMLDivElement>(null);
@@ -170,6 +174,7 @@ export function VendorListSheet({
           entries={entries}
           scrollKey={scrollKey}
           footnote={footnote}
+          selections={selections}
           scrollRef={scrollRef}
           className="flex-1"
         />
