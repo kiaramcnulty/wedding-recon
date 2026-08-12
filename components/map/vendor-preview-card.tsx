@@ -321,7 +321,12 @@ export function VendorPreviewCard({
     // a div: link row on top, swipeable previews below.
     <div
       className={cn(
-        "overflow-hidden rounded-xl border bg-card transition-colors hover:bg-muted/40",
+        // hover must stay OPAQUE: the single-pin peek card floats directly over
+        // the map, so a translucent hover (bg-muted/40) let the basemap's roads
+        // and town labels bleed through and made the card unreadable on web
+        // (reported 2026-08-12). --muted is oklch(0.97 0 0), a near-white that
+        // reads as the same subtle tint the /40 intended, but fully opaque.
+        "overflow-hidden rounded-xl border bg-card transition-colors hover:bg-muted",
         className,
       )}
     >
