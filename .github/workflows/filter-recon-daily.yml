@@ -13,10 +13,16 @@ name: filter-recon-daily
 # yet. This mutates user-visible data on model judgment and the snapshot is the
 # only undo, so read the report artifact after the first few real runs.
 #
-# A scheduled run gets NO inputs context, so inputs.dry_run is empty and the
-# apply step takes its else branch - i.e. the cron DRY RUNS and writes nothing
-# until that condition is changed. Deliberate for now: it banks a daily report
-# to read before any unattended write.
+# The cron WRITES (Kiara, 2026-08-13). A scheduled run gets no inputs context,
+# so the apply test is inverted - apply is the default and only an explicit
+# dry_run=true holds back. A run you trigger by hand still defaults to a dry run;
+# only the unattended schedule writes.
+#
+# So: from 09:40 UTC daily, vendors.filters is updated from recon on model
+# judgment with no human in front of it. If one looks wrong, the run workdir
+# holds a pre-run snapshot and restore.mjs reverts it - but that workdir lives on
+# the runner, so PULL THE filter-recon-report ARTIFACT before it expires if a run
+# writes something you want to inspect or undo.
 #
 # Requires repo secrets: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 # ANTHROPIC_BATCH_API_KEY (same set the SessionStart hook reads). Scheduled runs
@@ -110,10 +116,17 @@ jobs:
 
           node scripts/reconcile/batch.mjs collect --work "$WORK"
 
-          if [ "${{ inputs.dry_run }}" = "false" ]; then
-            node scripts/reconcile/daily-apply.mjs --work "$WORK" --apply
-          else
+          # A scheduled run carries no inputs context, so inputs.dry_run is the
+          # empty string. The test is therefore inverted deliberately: apply is
+          # the default and only an explicit dry_run=true holds back. Written the
+          # other way round (= "false") the cron would quietly never write, which
+          # is the failure that hides - a green job every morning that did nothing.
+          # workflow_dispatch still defaults dry_run to true, so a run YOU trigger
+          # is still the safe one; only the unattended schedule writes.
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
             node scripts/reconcile/daily-apply.mjs --work "$WORK"
+          else
+            node scripts/reconcile/daily-apply.mjs --work "$WORK" --apply
           fi
 
       - name: Upload run report
@@ -121,7 +134,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: filter-recon-report
+          # The snapshot is not a nice-to-have here: it is the ONLY undo, and the
+          # runner is destroyed when the job ends. Without it in the artifact, a
+          # scheduled run that writes something wrong cannot be reverted at all -
+          # restore.mjs reads snapshot/vendors-filters.jsonl and
+          # snapshot/recon-entries.jsonl and there is nowhere else to get them.
+          # To undo a run: download this artifact into data/reconcile/<WORK>/ and
+          # run `node scripts/reconcile/restore.mjs --work <WORK> --apply`.
+          # It is small - 24 KB for the 8-vendor pilot.
+          # applied.jsonl says what was written, results.jsonl says why.
           path: |
             data/reconcile/${{ env.WORK }}/report.md
             data/reconcile/${{ env.WORK }}/export-report.txt
+            data/reconcile/${{ env.WORK }}/applied.jsonl
+            data/reconcile/${{ env.WORK }}/results.jsonl
+            data/reconcile/${{ env.WORK }}/snapshot/**
+          retention-days: 90
           if-no-files-found: ignore
