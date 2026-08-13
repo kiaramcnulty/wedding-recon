@@ -20,6 +20,13 @@
  *               wrong overturn can be reverted with restore.mjs.
  *   retract   - remove a tag whose only supporting entry is gone
  *
+ * The model can also decline. An ambiguity it could not settle comes back under
+ * "skipped": the tag is left exactly as it is and nothing is written. That is the
+ * contract working, not failing - but it is the one signal a run produces that
+ * only a person can act on, so it gets its own report section (and lands in
+ * applied.jsonl as model_skips). Kept apart from "Rejected writes", which are
+ * validation failures - a bad write the gate caught, not a call the model made.
+ *
  * Every write must carry a quote that appears verbatim in the entry it cites;
  * fabricated evidence fails mechanically. Keys whose provenance is manual are
  * never touched (per-key, migration 0037), and a whole vendor whose row-level
@@ -83,9 +90,12 @@ const norm = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
 
 // --- build the plan (validation happens here, no DB writes yet) -------------
 
-const plan = new Map(); // vendor_id -> { sets:[{key,value,op}], deletes:[key], changes:[…], errs:[] }
+const plan = new Map(); // vendor_id -> { sets:[{key,value,op}], deletes:[key], changes:[…], skips:[…], errs:[] }
 const processed = new Set();
-const stats = { create: 0, extend: 0, overwrite: 0, retract: 0, falseWrites: 0, rejected: 0, skippedManual: 0 };
+// modelSkips and skippedManual are different things and must never be added up:
+// a model skip is one ambiguous TAG the model declined to settle; skippedManual
+// is a whole VENDOR left alone because its row-level filters_source is manual.
+const stats = { create: 0, extend: 0, overwrite: 0, retract: 0, falseWrites: 0, rejected: 0, modelSkips: 0, skippedManual: 0 };
 
 for (const r of results) {
   const v = vendors.get(r.vendor_id);
@@ -100,6 +110,7 @@ for (const r of results) {
   const sets = [];
   const deletes = [];
   const changes = [];
+  const skips = [];
   const errs = [];
 
   for (const w of r.writes ?? []) {
@@ -188,8 +199,18 @@ for (const r of results) {
     changes.push({ key: rt.key, op: "retract", old: v.filters?.[rt.key] ?? null, reason: rt.reason });
   }
 
+  // Abstentions. Nothing is validated and nothing is written - a skip IS the
+  // absence of a write - so this only has to survive as far as the report. The
+  // current value rides along because the ambiguity is always recon-vs-tag, and
+  // the tag is what the reader would otherwise go and look up.
+  for (const sk of r.skipped ?? []) {
+    const key = sk?.key ?? "(unspecified)";
+    skips.push({ key, why: sk?.why ?? "", current: v.filters?.[key] ?? null });
+    stats.modelSkips++;
+  }
+
   if (errs.length) stats.rejected += errs.length;
-  plan.set(r.vendor_id, { sets, deletes, changes, errs, vendor: v });
+  plan.set(r.vendor_id, { sets, deletes, changes, skips, errs, vendor: v });
 }
 
 // --- apply (fresh read + merge) --------------------------------------------
@@ -260,7 +281,12 @@ for (const vid of processed) {
       await db.from("vendors").update({ filters_dirty_at: null }).eq("id", vid).lte("filters_dirty_at", watermark);
       clearedDirty++;
     }
-    appendFileSync(logPath, JSON.stringify({ vendor_id: vid, skipped: "manual" }) + "\n");
+    // Log any model skips here too, even though this vendor's tags are the
+    // human's either way: the report counts them, so a log that dropped them
+    // would disagree with it for no reason a reader could work out.
+    const manualLine = { vendor_id: vid, skipped: "manual" };
+    if (p.skips.length) manualLine.model_skips = p.skips;
+    appendFileSync(logPath, JSON.stringify(manualLine) + "\n");
     continue;
   }
 
@@ -284,7 +310,12 @@ for (const vid of processed) {
     clearedDirty++;
   }
 
-  appendFileSync(logPath, JSON.stringify({ vendor_id: vid, sets: p.sets.length, deletes: p.deletes.length }) + "\n");
+  const logLine = { vendor_id: vid, sets: p.sets.length, deletes: p.deletes.length };
+  // Deliberately NOT the key "skipped": the manual branch above already writes
+  // {"skipped":"manual"} as a string, and one file carrying both a string and an
+  // array under one key cannot be queried across runs, which is the whole point.
+  if (p.skips.length) logLine.model_skips = p.skips;
+  appendFileSync(logPath, JSON.stringify(logLine) + "\n");
 }
 
 // --- report -----------------------------------------------------------------
@@ -292,6 +323,7 @@ for (const vid of processed) {
 const overwrites = [];
 const retractions = [];
 const falses = [];
+const modelSkips = [];
 const rejections = [];
 for (const [, p] of plan) {
   const v = p.vendor;
@@ -307,6 +339,13 @@ for (const [, p] of plan) {
     if (c.value === false)
       falses.push(`- **${v.name}** (${v.vendor_type}) \`${c.key}\` set false${c.note ? ` - ${c.note}` : ""}: "${c.quote}"`);
   }
+  for (const s of p.skips)
+    modelSkips.push(
+      `- **${v.name}** (${v.vendor_type}) \`${s.key}\` - ` +
+        `${s.current === null ? "no current tag" : `tag left at ${JSON.stringify(s.current)}`}\n` +
+        `  why: ${s.why || "(no reason given)"}\n` +
+        `  vendor: \`${v.id}\``,
+    );
   for (const e of p.errs) rejections.push(`- ${e}`);
 }
 
@@ -321,6 +360,7 @@ const report = [
     `No result (stay dirty, retry next run): ${noResult.length}.`,
   "",
   `Writes: create ${stats.create}, extend ${stats.extend}, overwrite ${stats.overwrite}, retract ${stats.retract}. ` +
+    `Model skips (ambiguous, nothing written): ${stats.modelSkips}. ` +
     `Rejected on validation: ${stats.rejected}. Manual vendors skipped: ${stats.skippedManual}.`,
   APPLY ? `Rows written: ${wrote}. Dirty flags cleared: ${clearedDirty}.` : `(dry run - nothing written)`,
   "",
@@ -346,6 +386,15 @@ const report = [
   `## Explicit false writes (${falses.length}) - each removes the vendor from that filter`,
   "",
   ...(falses.length ? falses : ["_none_"]),
+  "",
+  `## Model skips (${modelSkips.length}) - ambiguous, needs a human look`,
+  "",
+  "The recon said something about this tag that the model could not settle against",
+  "the current value, so it left the tag alone rather than guess. Nothing was",
+  "written. These are not errors - they are the run's open questions, and the tag",
+  "sitting in the DB may well be the wrong one.",
+  "",
+  ...(modelSkips.length ? modelSkips : ["_none_"]),
   "",
   `## Rejected writes (${rejections.length}) - reported, not applied`,
   "",

@@ -162,6 +162,12 @@ for review and revert:
   `REVIEW THESE` section** with vendor, key, old → new, the `human N vs bot N`
   counts, the note, and the winning evidence quote. Retractions and explicit
   `false` writes get their own sections; rejected writes are listed too.
+- **Model skips get their own section as well** — an ambiguity the model refused
+  to settle, so it left the tag alone. Counted separately in the stats line and
+  kept apart from rejected writes: a rejection is a bad write the gate caught, a
+  skip is a judgment call, and it is the only thing in the report that asks the
+  reader for a decision rather than a check. Also logged to `applied.jsonl` as
+  `model_skips`, so they can be queried across runs.
 - Undo is the snapshot: `node scripts/reconcile/restore.mjs --work <work> --apply`
   reverts filters to the pre-run state. The report prints this command up top.
 

@@ -67,7 +67,9 @@ node scripts/reconcile/daily-apply.mjs       --work "$WORK"   # DRY RUN - writes
 Read `data/reconcile/$WORK/report.md`. Confirm: create/extend/overwrite/retract
 counts look sane; **contradictions in the REVIEW section** cite real evidence and
 the human-over-bot resolution is right; no manual key was touched; rejected writes
-are genuinely bad evidence. Only then:
+are genuinely bad evidence. Read **model skips** too - those are the tags the model
+refused to guess at, so they are the run's open questions rather than its failures,
+and each one is a tag in the DB that may be wrong. Only then:
 
 ```sh
 node scripts/reconcile/daily-apply.mjs --work "$WORK" --apply
