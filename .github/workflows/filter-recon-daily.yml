@@ -5,18 +5,26 @@ name: filter-recon-daily
 # the stamped vendors from all of their active recon entries, on the Batch API.
 # See docs/filter-recon-on-write.md.
 #
-# SHIPPED DISABLED ON PURPOSE. The schedule is commented out and the default run
-# is a dry run. This mutates user-visible data on model judgment and the snapshot
-# is the only undo, so it must be piloted by hand first (run it with dry_run=true,
-# read the report artifact, then a small real run) before the cron is enabled.
+# The schedule is ENABLED (Kiara, 2026-08-13), after a hand pilot on 8 vendors
+# proved the trigger, the export/build/submit/collect path and the apply. Note
+# what that pilot did NOT exercise: it produced zero writes, so create/extend/
+# overwrite/retract and a real restore are still unproven in anger, as is the
+# per-key manual (LOCKED) guard - no manual-provenance key exists in the corpus
+# yet. This mutates user-visible data on model judgment and the snapshot is the
+# only undo, so read the report artifact after the first few real runs.
+#
+# A scheduled run gets NO inputs context, so inputs.dry_run is empty and the
+# apply step takes its else branch - i.e. the cron DRY RUNS and writes nothing
+# until that condition is changed. Deliberate for now: it banks a daily report
+# to read before any unattended write.
 #
 # Requires repo secrets: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-# ANTHROPIC_BATCH_API_KEY (same set the SessionStart hook reads).
+# ANTHROPIC_BATCH_API_KEY (same set the SessionStart hook reads). Scheduled runs
+# only fire from the DEFAULT branch, so this has no effect until it is on main.
 
 on:
-  # Uncomment to enable the daily run once the pipeline is trusted by hand.
-  # schedule:
-  #   - cron: "40 9 * * *"
+  schedule:
+    - cron: "40 9 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -31,7 +39,10 @@ concurrency:
 jobs:
   reconcile:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # Must exceed the batch poll window below (150 min) plus setup, or the job is
+    # killed mid-poll and the batch is abandoned - the exact loop that window is
+    # sized to avoid.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -76,10 +87,17 @@ jobs:
 
           # Poll until the batch ends, capped so a stuck batch cannot hang the job.
           # If it does not end in time, leave the vendors dirty; the next run
-          # re-exports them. (Manual-only for now, so a rare abandoned batch is
-          # acceptable; wire a resumable collect before enabling the cron at scale.)
+          # re-exports them - but note that also means it SUBMITS A FRESH BATCH,
+          # so a window shorter than the real batch latency is a loop that pays
+          # for a batch every day and collects none of them. The hand pilot on
+          # 2026-08-12 took ~70 minutes end to end for two calls, so 60 was under
+          # the observed latency. Public repo, so runner minutes are free and the
+          # generous window costs nothing; the poll exits as soon as it ends, and
+          # a day with nothing dirty leaves the job in seconds.
+          # A resumable collect (submit one day, collect the next) is still the
+          # right fix if batch latency ever exceeds this window routinely.
           ended=""
-          for _ in $(seq 1 60); do
+          for _ in $(seq 1 150); do
             if node scripts/reconcile/batch.mjs status --work "$WORK" | grep -q ': ended'; then
               ended=1; break
             fi
