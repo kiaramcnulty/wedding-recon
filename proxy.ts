@@ -15,7 +15,12 @@ export const config = {
     /*
      * Match all request paths except static assets and image files so the auth
      * session stays fresh on navigations and API calls.
+     *
+     * `api/vendor-photo` and `api/map/vendors` are excluded on purpose: both are
+     * public, cookie-free, edge-cached endpoints, and running the session
+     * refresh over them would attach a Set-Cookie that makes the response
+     * uncacheable (see app/api/map/vendors/route.ts).
      */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|api/vendor-photo|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|api/vendor-photo|api/map/vendors|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
