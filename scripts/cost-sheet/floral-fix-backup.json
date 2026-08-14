@@ -1,0 +1,74 @@
+[
+  {
+    "id": "dec4d3a2-7a3c-4792-b499-9b4086a58a4b",
+    "name": "Garden Sweet",
+    "filters": {
+      "style": [
+        "native_seasonal"
+      ],
+      "price_min": 20,
+      "price_kind": "single_figure",
+      "price_basis": "package",
+      "price_quote": "One $20 cup of stems made 3 good size bouquets.",
+      "engagement_model": [
+        "a_la_carte"
+      ],
+      "price_confidence": "inferred",
+      "delivers_installs": false
+    }
+  },
+  {
+    "id": "c53c5049-4663-4af8-b59c-e85b003acb6f",
+    "name": "Bonnie Brae Flowers Inc.",
+    "filters": {
+      "style": [
+        "classic"
+      ],
+      "price_max": 275,
+      "price_min": 27.5,
+      "price_kind": "range",
+      "price_basis": "package",
+      "price_quote": "Pink Roses to Carry $27.50 ... Rose & Stephanotis Bouquet $275.00",
+      "engagement_model": [
+        "full_service",
+        "a_la_carte"
+      ],
+      "price_confidence": "published",
+      "delivers_installs": true
+    }
+  },
+  {
+    "id": "ba486a38-3caa-49d4-839d-de0ca6126375",
+    "name": "Ladybird Poppy",
+    "filters": {
+      "price_min": 85,
+      "price_kind": "single_figure",
+      "price_basis": "per_person",
+      "price_quote": "Our floral design workshops are $85 per person",
+      "engagement_model": [
+        "a_la_carte"
+      ],
+      "price_confidence": "published",
+      "delivers_installs": true
+    }
+  },
+  {
+    "id": "4dd5d646-088a-437c-b210-702d90b297c5",
+    "name": "Buckley House of Flowers",
+    "filters": {
+      "style": [
+        "garden_organic"
+      ],
+      "price_min": 175,
+      "price_kind": "starting_at",
+      "price_basis": "package",
+      "price_quote": "Bridal Bouquet $ 175.00+",
+      "engagement_model": [
+        "full_service",
+        "a_la_carte"
+      ],
+      "price_confidence": "published",
+      "delivers_installs": true
+    }
+  }
+]
