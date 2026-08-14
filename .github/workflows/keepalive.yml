@@ -21,30 +21,62 @@ jobs:
             exit 0
           fi
 
-          # -L is load-bearing: the apex domain answers with a 308 to the
-          # canonical host, and curl does NOT follow redirects by default. This
-          # check sat green for weeks while every request stopped at the
-          # redirect and Supabase was never actually touched.
-          body="$(mktemp)"
-          # Status and final URL come from the SAME request — a second curl
-          # would double the work and could even report a different outcome.
-          read -r code final < <(
-            curl -sSL --max-time 30 -o "$body" -w '%{http_code} %{url_effective}' "$URL"
-            echo
-          )
-          echo "HTTP $code (final URL: $final)"
-          cat "$body"; echo
+          # Retry before failing. A genuine free-tier PAUSE (or a dead
+          # deployment) persists across every attempt, so this still fails
+          # loudly for the thing the cron exists to catch. What it rides out is
+          # a MOMENTARY blip -- a DB restart, brief Supabase maintenance -- that
+          # happens to land on the one minute a day this runs. Tune the two
+          # knobs together: attempts x gap is the window of downtime tolerated
+          # (5 x 15s ~= 60s, comfortably longer than a normal DB restart).
+          attempts=5
+          gap=15
+          last_err=""
 
-          # Assert on the payload, not just the status. A redirect, an error
-          # page, or a 200 whose body reports db:"error" all have to fail --
-          # the entire purpose is proving a real query reached Supabase, which
-          # is what stops the free tier pausing.
-          if [ "$code" != "200" ]; then
-            echo "::error::expected HTTP 200 from the health endpoint, got $code"
-            exit 1
-          fi
-          if ! grep -q '"db":"ok"' "$body"; then
-            echo "::error::health endpoint responded but did not report db ok"
-            exit 1
-          fi
-          echo "Keep-alive OK - a real Supabase query was served."
+          check() {
+            local body code final
+            # -L is load-bearing: the apex domain answers with a 308 to the
+            # canonical host, and curl does NOT follow redirects by default.
+            # This check sat green for weeks while every request stopped at the
+            # redirect and Supabase was never actually touched.
+            body="$(mktemp)"
+            # Status and final URL come from the SAME request -- a second curl
+            # would double the work and could even report a different outcome.
+            read -r code final < <(
+              curl -sSL --max-time 30 -o "$body" -w '%{http_code} %{url_effective}' "$URL"
+              echo
+            )
+            echo "HTTP $code (final URL: $final)"
+            cat "$body"; echo
+
+            # Assert on the payload, not just the status. A redirect, an error
+            # page, or a 200 whose body reports db:"error" all have to fail --
+            # the entire purpose is proving a real query reached Supabase, which
+            # is what stops the free tier pausing.
+            if [ "$code" != "200" ]; then
+              last_err="expected HTTP 200 from the health endpoint, got $code"
+              return 1
+            fi
+            if ! grep -q '"db":"ok"' "$body"; then
+              last_err="health endpoint responded but did not report db ok"
+              return 1
+            fi
+            return 0
+          }
+
+          for i in $(seq 1 "$attempts"); do
+            echo "Attempt $i of $attempts:"
+            if check; then
+              echo "Keep-alive OK - a real Supabase query was served."
+              exit 0
+            fi
+            if [ "$i" -lt "$attempts" ]; then
+              echo "  -> $last_err; retrying in ${gap}s"
+              sleep "$gap"
+            fi
+          done
+
+          # Every attempt failed across the whole window -- a transient blip
+          # would have cleared by now, so this is very likely the project
+          # actually being unreachable or paused.
+          echo "::error::keep-alive failed after $attempts attempts: $last_err"
+          exit 1
