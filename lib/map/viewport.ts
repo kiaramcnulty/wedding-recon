@@ -94,3 +94,49 @@ export function padBbox(box: ViewportBbox, factor: number): ViewportBbox {
     maxLat: Math.min(box.maxLat + latPad, 85),
   };
 }
+
+/**
+ * How many grid cells a fetched box should span. Smaller means a finer grid:
+ * less over-fetch, but fewer viewports snap together, so fewer cross-visitor
+ * cache hits. Four keeps the extra area modest on top of the padding the caller
+ * already applied.
+ */
+const SNAP_TARGET_CELLS = 4;
+
+/** Round to a "nice" 1/2/5 x 10^k value so a small change in `x` keeps one step. */
+function niceStep(x: number): number {
+  if (!(x > 0)) return 1;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(x)));
+  const f = x / magnitude; // in [1, 10)
+  const nice = f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10;
+  return nice * magnitude;
+}
+
+/** Kill float noise (…0000001) so grid-aligned coords serialize to one string. */
+const round6 = (v: number): number => Math.round(v * 1e6) / 1e6;
+
+/**
+ * Snap a box OUTWARD to a shared lng/lat grid, so nearby viewports — different
+ * device widths on the same default view, a small pan — resolve to the SAME box
+ * and therefore the same request URL.
+ *
+ * This is what makes an edge cache in front of the pin query worth anything:
+ * without it every viewport is a unique float bbox, the CDN cache key never
+ * repeats, and the hit rate is ~0%. With it, a wave of visitors all landing on
+ * the default Denver view collapses to one cached response instead of one DB
+ * query each — the exact shape of the 2026-08-14 traffic spike.
+ *
+ * The step scales with the box (a fixed-degree grid would be far too coarse when
+ * zoomed in), and the result always CONTAINS the input, so the map still gets
+ * every pin in view — it just fetches a slightly larger, grid-aligned area.
+ */
+export function snapBbox(box: ViewportBbox): ViewportBbox {
+  const span = Math.max(box.maxLng - box.minLng, box.maxLat - box.minLat);
+  const step = niceStep(span / SNAP_TARGET_CELLS);
+  return {
+    minLng: round6(Math.floor(box.minLng / step) * step),
+    minLat: round6(Math.max(Math.floor(box.minLat / step) * step, -85)),
+    maxLng: round6(Math.ceil(box.maxLng / step) * step),
+    maxLat: round6(Math.min(Math.ceil(box.maxLat / step) * step, 85)),
+  };
+}

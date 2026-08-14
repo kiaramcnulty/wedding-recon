@@ -16,7 +16,7 @@ import {
   clusterImageId,
 } from "@/lib/map/pin-images";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
-import { bboxForView, padBbox, type ViewportBbox } from "@/lib/map/viewport";
+import { bboxForView, padBbox, snapBbox, type ViewportBbox } from "@/lib/map/viewport";
 import { mapWithConcurrency, withRpcRetry } from "@/lib/map/rpc-fanout";
 import {
   filterRankFor,
@@ -66,6 +66,46 @@ const BBOX_PAD_FACTOR = 0.5; // half a viewport-span extra on each side
 // the map fills quickly. Tunable: lower is gentler on the DB, higher fills the
 // map in fewer waves. See lib/map/rpc-fanout.ts.
 const RPC_CONCURRENCY = 4;
+
+/**
+ * Fetch one vendor type's pins for a box through the edge-cached route
+ * (`/api/map/vendors`) instead of calling `vendors_in_bbox` from the browser.
+ *
+ * Returns the SAME `{ data, error, status }` shape supabase-js gives, so it
+ * drops straight into `withRpcRetry`/`mapWithConcurrency` and the rest of
+ * fetchBbox is unchanged. `credentials: "omit"` keeps the request cookie-free so
+ * the Vercel edge caches one copy across visitors (see the route + snapBbox); a
+ * network failure comes back as status 0 so the retry treats it as transient.
+ */
+async function fetchVendorsInBbox(
+  box: ViewportBbox,
+  type: VendorType,
+  maxRows: number,
+): Promise<{ data: Vendor[] | null; error: { message: string } | null; status: number }> {
+  const params = new URLSearchParams({
+    min_lng: String(box.minLng),
+    min_lat: String(box.minLat),
+    max_lng: String(box.maxLng),
+    max_lat: String(box.maxLat),
+    type,
+    max_rows: String(maxRows),
+  });
+  try {
+    const res = await fetch(`/api/map/vendors?${params.toString()}`, {
+      credentials: "omit",
+    });
+    if (!res.ok) {
+      return { data: null, error: { message: `map vendors ${res.status}` }, status: res.status };
+    }
+    return { data: (await res.json()) as Vendor[], error: null, status: res.status };
+  } catch (e) {
+    return {
+      data: null,
+      error: { message: e instanceof Error ? e.message : String(e) },
+      status: 0,
+    };
+  }
+}
 
 // Clustering is per GeoJSON source and can't segment by a property, so each
 // vendor type gets its OWN clustered source + layers. That yields per-type
@@ -776,13 +816,11 @@ export function VendorMap({
    * downloaded — instead of inside `map.on("load")`. See the init effect.
    */
   const fetchBbox = useCallback(
-    async (box: ViewportBbox): Promise<Vendor[] | null> => {
-      const args = {
-        min_lng: box.minLng,
-        min_lat: box.minLat,
-        max_lng: box.maxLng,
-        max_lat: box.maxLat,
-      };
+    async (rawBox: ViewportBbox): Promise<Vendor[] | null> => {
+      // Snap to a shared grid so nearby viewports resolve to one cacheable URL
+      // (see snapBbox). This snapped box is what we fetch AND record as covered,
+      // so the client's own coverage cache and the edge cache agree on the area.
+      const box = snapBbox(rawBox);
 
       // One request PER TYPE, in parallel, rather than one for everything.
       //
@@ -803,14 +841,7 @@ export function VendorMap({
       const responses = await mapWithConcurrency(
         ALL_VENDOR_TYPES,
         RPC_CONCURRENCY,
-        (t) =>
-          withRpcRetry(() =>
-            supabase.rpc("vendors_in_bbox", {
-              ...args,
-              p_types: [t],
-              max_rows: MAX_ROWS_PER_TYPE,
-            }),
-          ),
+        (t) => withRpcRetry(() => fetchVendorsInBbox(box, t, MAX_ROWS_PER_TYPE)),
       );
 
       const failed = responses.find((r) => r.error);
@@ -857,7 +888,7 @@ export function VendorMap({
 
       return vendors;
     },
-    [supabase, fetchFiltersFor],
+    [fetchFiltersFor],
   );
 
   /**
