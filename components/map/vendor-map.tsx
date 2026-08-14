@@ -17,6 +17,7 @@ import {
 } from "@/lib/map/pin-images";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
 import { bboxForView, padBbox, type ViewportBbox } from "@/lib/map/viewport";
+import { mapWithConcurrency, withRpcRetry } from "@/lib/map/rpc-fanout";
 import {
   filterRankFor,
   filterMatchFor,
@@ -55,6 +56,16 @@ const MAX_ROWS_PER_TYPE = POSTGREST_MAX_ROWS - 1;
 
 // Fetch beyond the viewport so small pans land inside already-fetched area.
 const BBOX_PAD_FACTOR = 0.5; // half a viewport-span extra on each side
+
+// Max per-type bbox RPCs in flight at once. The map fans a bbox query out to one
+// call per vendor type (~12); running them all through `Promise.all` meant a
+// single map load demanded ~12 concurrent Postgres connections, and on the
+// free-tier pooler a few simultaneous visitors exhausted the pool → every
+// request 503, blank map for everyone (Reddit traffic spike, 2026-08-14). 4
+// caps one visitor's peak connection demand while still overlapping enough that
+// the map fills quickly. Tunable: lower is gentler on the DB, higher fills the
+// map in fewer waves. See lib/map/rpc-fanout.ts.
+const RPC_CONCURRENCY = 4;
 
 // Clustering is per GeoJSON source and can't segment by a property, so each
 // vendor type gets its OWN clustered source + layers. That yields per-type
@@ -698,17 +709,20 @@ export function VendorMap({
       // a vendor missing from the result is indistinguishable from one that
       // genuinely has no attributes, so half the corpus would look
       // attribute-less and sink into the partial tier for no reason.
-      const responses = await Promise.all(
-        ALL_VENDOR_TYPES.map((t) =>
-          supabase.rpc("vendor_filters_in_bbox", {
-            min_lng: box.minLng,
-            min_lat: box.minLat,
-            max_lng: box.maxLng,
-            max_lat: box.maxLat,
-            p_types: [t],
-            max_rows: MAX_ROWS_PER_TYPE,
-          }),
-        ),
+      const responses = await mapWithConcurrency(
+        ALL_VENDOR_TYPES,
+        RPC_CONCURRENCY,
+        (t) =>
+          withRpcRetry(() =>
+            supabase.rpc("vendor_filters_in_bbox", {
+              min_lng: box.minLng,
+              min_lat: box.minLat,
+              max_lng: box.maxLng,
+              max_lat: box.maxLat,
+              p_types: [t],
+              max_rows: MAX_ROWS_PER_TYPE,
+            }),
+          ),
       );
 
       const failed = responses.find((r) => r.error);
@@ -786,14 +800,17 @@ export function VendorMap({
       // ALL_VENDOR_TYPES, not VENDOR_TYPES: the selectable list omits the legacy
       // `music` value, and iterating it would drop a straggler music row that
       // the untyped fetch used to pick up (bucketType draws it as "other").
-      const responses = await Promise.all(
-        ALL_VENDOR_TYPES.map((t) =>
-          supabase.rpc("vendors_in_bbox", {
-            ...args,
-            p_types: [t],
-            max_rows: MAX_ROWS_PER_TYPE,
-          }),
-        ),
+      const responses = await mapWithConcurrency(
+        ALL_VENDOR_TYPES,
+        RPC_CONCURRENCY,
+        (t) =>
+          withRpcRetry(() =>
+            supabase.rpc("vendors_in_bbox", {
+              ...args,
+              p_types: [t],
+              max_rows: MAX_ROWS_PER_TYPE,
+            }),
+          ),
       );
 
       const failed = responses.find((r) => r.error);
