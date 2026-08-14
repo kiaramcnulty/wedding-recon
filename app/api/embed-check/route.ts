@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { toEmbedSrc } from "@/lib/embed-url";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,13 @@ function headersAllowFraming(headers: Headers): boolean {
 async function checkUrl(url: string): Promise<boolean> {
   let parsed: URL;
   try {
-    parsed = new URL(url);
+    // Probe the *same* https URL the iframe will load — not the stored http one.
+    // Following the stored http URL's redirect here reports the destination as
+    // frameable, but the browser blocks the http frame as mixed content before
+    // that redirect ever runs, leaving the overlay spinner stuck. Testing https
+    // keeps the answer in sync: an http-only site fails here and falls back to a
+    // plain new-tab link (which correctly uses the original http href).
+    parsed = new URL(toEmbedSrc(url));
   } catch {
     return false;
   }

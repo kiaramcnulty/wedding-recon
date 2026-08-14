@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ExternalOverlay } from "@/components/external-overlay";
+import { toEmbedSrc } from "@/lib/embed-url";
 import { captureClient } from "@/lib/analytics/posthog";
 
 /** Which vendor field /api/embed-check should test. */
@@ -108,7 +109,9 @@ export function ExternalLink({
       {open && (
         <ExternalOverlay
           href={href}
-          embedSrc={embedSrc ?? href}
+          // The frame must load https on the https app or it's blocked as mixed
+          // content and never fires `load` (see toEmbedSrc). href stays as-is.
+          embedSrc={toEmbedSrc(embedSrc ?? href)}
           title={overlayTitle}
           onClose={() => setOpen(false)}
         />

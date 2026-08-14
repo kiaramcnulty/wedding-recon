@@ -4,6 +4,11 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { ExternalLink as ExternalLinkIcon, Loader2, X } from "lucide-react";
 
+// If the frame hasn't fired `load` by now, stop showing a bare spinner and
+// surface the new-tab escape hatch. A merely-slow site still resolves to the
+// real page — this only replaces the *spinner*, and both are gated on !loaded.
+const FRAME_LOAD_TIMEOUT_MS = 6000;
+
 interface ExternalOverlayProps {
   /** Real destination — used by the header's "open in new tab" escape hatch. */
   href: string;
@@ -29,7 +34,14 @@ export function ExternalOverlay({
   onClose,
 }: ExternalOverlayProps) {
   const [loaded, setLoaded] = React.useState(false);
+  const [slow, setSlow] = React.useState(false);
   const closeRef = React.useRef<HTMLButtonElement>(null);
+
+  React.useEffect(() => {
+    if (loaded) return;
+    const t = setTimeout(() => setSlow(true), FRAME_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [loaded]);
 
   const label = React.useMemo(() => {
     if (title) return title;
@@ -95,11 +107,29 @@ export function ExternalOverlay({
 
         {/* Embedded site */}
         <div className="relative flex-1 bg-white">
-          {!loaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
+          {!loaded &&
+            (slow ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex max-w-xs flex-col items-center gap-3 px-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    This site is taking a while, or doesn&apos;t allow embedding.
+                  </p>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                  >
+                    <ExternalLinkIcon className="size-4" />
+                    Open in new tab
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              </div>
+            ))}
           <iframe
             src={embedSrc}
             title={label}
