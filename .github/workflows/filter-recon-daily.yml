@@ -89,6 +89,18 @@ jobs:
           fi
 
           node scripts/reconcile/daily-build-calls.mjs --work "$WORK"
+
+          # build-calls emits no call file for a dirty vendor whose type has no
+          # filter vocabulary (currently `other`). daily-export now drains those,
+          # so reaching here with a non-empty vendors.jsonl should always yield
+          # >=1 call - but guard anyway: with zero calls `batch submit` exits 1
+          # and fails the job (the 2026-08-17 failure). Nothing to submit is a
+          # clean no-op, not a failure.
+          if ! ls "$DIR"/calls/call-*.json >/dev/null 2>&1; then
+            echo "No call files built. Nothing to reconcile. Done."
+            exit 0
+          fi
+
           node scripts/reconcile/batch.mjs submit --work "$WORK"
 
           # Poll until the batch ends, capped so a stuck batch cannot hang the job.
