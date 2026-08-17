@@ -63,6 +63,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANTHROPIC_BATCH_API_KEY: ${{ secrets.ANTHROPIC_BATCH_API_KEY }}
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
         run: |
           umask 077
           : > .env.local
@@ -71,6 +72,13 @@ jobs:
             if [ -z "$val" ]; then echo "::error::$v secret is not set"; exit 1; fi
             printf '%s=%s\n' "$v" "$val" >> .env.local
           done
+          # Optional: the website backfill uses this and skips cleanly without it,
+          # so a missing secret is a warning, not a failed job.
+          if [ -n "${GOOGLE_PLACES_API_KEY:-}" ]; then
+            printf '%s=%s\n' GOOGLE_PLACES_API_KEY "$GOOGLE_PLACES_API_KEY" >> .env.local
+          else
+            echo "::warning::GOOGLE_PLACES_API_KEY not set; website backfill will be skipped"
+          fi
 
       - name: Reconcile dirty vendors
         run: |
@@ -78,6 +86,12 @@ jobs:
           WORK="daily-$(date -u +%Y%m%d-%H%M)"
           echo "WORK=$WORK" >> "$GITHUB_ENV"
           DIR="data/reconcile/$WORK"
+
+          # A scheduled run carries no inputs context, so inputs.dry_run is the
+          # empty string and APPLY becomes --apply (the schedule writes). A run
+          # triggered by hand defaults dry_run=true, so APPLY is empty (dry run).
+          # This one flag gates every writing step below, so they cannot disagree.
+          if [ "${{ inputs.dry_run }}" = "true" ]; then APPLY=""; else APPLY="--apply"; fi
 
           node scripts/reconcile/daily-export.mjs --work "$WORK"
 
@@ -88,14 +102,18 @@ jobs:
             exit 0
           fi
 
+          # Website backfill (deterministic, Google Places) - runs first so the
+          # tag/recon miner downstream sees a site that was just found. Covers
+          # every dirty vendor including `other`. Skips cleanly with no Places key.
+          node scripts/reconcile/daily-websites.mjs --work "$WORK" $APPLY
+
           node scripts/reconcile/daily-build-calls.mjs --work "$WORK"
 
           # build-calls emits no call file for a dirty vendor whose type has no
-          # filter vocabulary (currently `other`). daily-export now drains those,
-          # so reaching here with a non-empty vendors.jsonl should always yield
-          # >=1 call - but guard anyway: with zero calls `batch submit` exits 1
-          # and fails the job (the 2026-08-17 failure). Nothing to submit is a
-          # clean no-op, not a failure.
+          # filter vocabulary (currently `other`), so an all-`other` dirty set
+          # yields zero calls. Guard: with zero calls `batch submit` exits 1 and
+          # fails the job (the 2026-08-17 failure). Nothing to submit is a clean
+          # no-op, not a failure - the website backfill above still ran for them.
           if ! ls "$DIR"/calls/call-*.json >/dev/null 2>&1; then
             echo "No call files built. Nothing to reconcile. Done."
             exit 0
@@ -128,18 +146,11 @@ jobs:
 
           node scripts/reconcile/batch.mjs collect --work "$WORK"
 
-          # A scheduled run carries no inputs context, so inputs.dry_run is the
-          # empty string. The test is therefore inverted deliberately: apply is
-          # the default and only an explicit dry_run=true holds back. Written the
-          # other way round (= "false") the cron would quietly never write, which
-          # is the failure that hides - a green job every morning that did nothing.
-          # workflow_dispatch still defaults dry_run to true, so a run YOU trigger
-          # is still the safe one; only the unattended schedule writes.
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            node scripts/reconcile/daily-apply.mjs --work "$WORK"
-          else
-            node scripts/reconcile/daily-apply.mjs --work "$WORK" --apply
-          fi
+          # $APPLY (set at the top of this step) is --apply on the schedule and
+          # empty on a hand-triggered dry run. Deliberately inverted: apply is the
+          # default and only an explicit dry_run=true holds back, so the cron
+          # cannot quietly never write - the green-but-did-nothing failure.
+          node scripts/reconcile/daily-apply.mjs --work "$WORK" $APPLY
 
       - name: Upload run report
         if: always()

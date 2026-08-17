@@ -47,7 +47,7 @@ console.log(`On-write reconcile export -> ${dir}\n`);
 const vendors = await fetchAll(
   db,
   "vendors",
-  "id,name,vendor_type,city,region,filters,filters_meta,filters_source,filters_updated_at,filters_dirty_at",
+  "id,name,vendor_type,city,region,website,google_place_id,filters,filters_meta,filters_source,filters_updated_at,filters_dirty_at",
   (q) => q.not("filters_dirty_at", "is", null),
 );
 console.log(`dirty vendors: ${vendors.length}`);
@@ -148,6 +148,8 @@ for (const v of vendors) {
     vendor_type: v.vendor_type,
     city: v.city,
     region: v.region,
+    website: v.website ?? null,
+    google_place_id: v.google_place_id ?? null,
     filters: v.filters ?? {},
     filters_meta: v.filters_meta ?? {},
     filters_source: v.filters_source,
