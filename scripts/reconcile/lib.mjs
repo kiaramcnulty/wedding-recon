@@ -127,3 +127,29 @@ export function arg(name, fallback = undefined) {
 }
 
 export const has = (name) => process.argv.includes(`--${name}`);
+
+/**
+ * A money figure: a currency symbol next to a digit, or a digit next to an
+ * explicit currency word. Kept identical to MONEY in lib/recon-sort.ts (and the
+ * SQL twin): a documented price only registers as priced once it is written
+ * with a `$`, because `hasPriceQuote()` requires one and a bare number in recon
+ * is usually a guest count, an hour of coverage, or a year.
+ */
+export const MONEY = /\$\s*\d|\d\s*\$|\d\s*(?:dollars|usd)\b/i;
+
+/**
+ * A price stated as a BARE number - the defect that made a reconcile-authored
+ * "Bride pricing listed at 175." sort as unpriced and read as a field dump. A
+ * price-context word plus a digit but no `$`. Deliberately narrow so it never
+ * fires on "150 guests" or "8-hour minimum".
+ */
+export function bareNumberPrice(text) {
+  const t = text ?? "";
+  if (MONEY.test(t)) return false;
+  // A strong price-context word (no trailing \b, so plurals like "Prices" and
+  // "gowns" match); "from"/"package"/"start" alone are omitted as too broad.
+  if (!/\b(pric|gown|deposit|fee|rate|starts? at|starting at)/i.test(t)) return false;
+  // A remaining plain number once percentages are removed ("40% deposit" is a
+  // rate, not a bare dollar figure).
+  return /\d/.test(t.replace(/\d[\d,]*\s*%/g, ""));
+}

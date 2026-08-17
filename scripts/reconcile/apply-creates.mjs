@@ -25,7 +25,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ROOT, serviceClient, readJsonl, arg, has } from "./lib.mjs";
+import { ROOT, serviceClient, readJsonl, arg, has, bareNumberPrice } from "./lib.mjs";
 
 const APPLY = has("apply");
 const db = serviceClient();
@@ -68,6 +68,13 @@ for (const d of drafts) {
   const bad = notes.match(BANNED) || notes.match(PROCESS) || priceText.match(BANNED) || priceText.match(PROCESS);
   if (bad || EMDASH.test(notes) || EMDASH.test(priceText) || !notes) {
     console.error(`  GATE ${v.name}: ${bad ? `"${bad[0]}"` : EMDASH.test(notes + priceText) ? "em dash" : "empty notes"}`);
+    gated++;
+    continue;
+  }
+  // A price_text stating a bare number sorts as unpriced and reads as a field
+  // dump. Refuse it rather than insert it - re-draft under the $-figure contract.
+  if (bareNumberPrice(priceText)) {
+    console.error(`  GATE ${v.name}: price_text is a bare number, needs a $ figure -> "${priceText}"`);
     gated++;
     continue;
   }

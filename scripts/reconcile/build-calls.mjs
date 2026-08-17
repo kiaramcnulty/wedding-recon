@@ -168,7 +168,10 @@ that are empty.
  "contradictions":[{"key":"<tag key>","tag":<current value>,"recon":"<what the entry says>","entry_id":"<id>"}],
  "skipped":[{"key":"<tag key>","why":"<short reason>"}]}
 
-field is "notes" or "price_details". For a price write, also include "basis"
+field is "notes" or "price_details". A clause that states a price MUST use
+"price_details" (never "notes") and MUST write the figure with a dollar sign
+(for example "$480"), never a bare number - the app reads price_text and
+price_details for the priced sort and ignores notes. For a price write, also include "basis"
 (package, per_person, per_hour, per_night, per_gown) and "kind" (range,
 starting_at, single_figure). A number you cannot place on a basis is worse than
 no number, because it gets compared on the wrong axis - skip it instead.`;

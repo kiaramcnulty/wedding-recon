@@ -74,8 +74,10 @@ Write one or two plain sentences that state those facts. That is the whole job.
 - No marketing words (stunning, nestled, boasts, elevate, magical, exquisite).
 - No em dashes or en dashes. US spelling. Never mention data, tags, sources, or
   how the information was obtained. Do not write backslash-n.
-- If a price fact is present, put it in price_text as a plain line. If no price
-  fact is present, price_text says there is no published pricing, in plain words.
+- If a price fact is present, put it in price_text as a plain line that states
+  the figure with a dollar sign (for example "Gowns from $750" or "Bride $480"),
+  never a bare number like "750". If no price fact is present, price_text says
+  there is no published pricing, in plain words.
 
 OUTPUT one JSON object per vendor, one per line, no prose, no fence:
 {"vendor_id":"<id>","notes":"<one or two sentences>","price_text":"<price line or no-pricing line>"}`;

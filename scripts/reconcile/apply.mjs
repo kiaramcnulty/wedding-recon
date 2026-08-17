@@ -19,7 +19,7 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { serviceClient, workdir, readJsonl, arg, has } from "./lib.mjs";
+import { serviceClient, workdir, readJsonl, arg, has, MONEY } from "./lib.mjs";
 
 const WORK = arg("work");
 if (!WORK) {
@@ -72,6 +72,15 @@ for (const row of accepted) {
 
   // --- prose ---------------------------------------------------------------
   for (const e of row.recon_edits) {
+    // A documented price ($-bearing clause) belongs where the priced sort and
+    // the card read it. notes is invisible to hasPriceQuote(), so a price clause
+    // the model routed to notes is redirected to price_details. Bare-number
+    // price wording is left to the contract + the creates gate; not enforced on
+    // freeform appends here, where "reviews from 2019" would false-trip it.
+    if (MONEY.test(e.append) && e.field === "notes") {
+      console.log(`  ${v.name} / ${e.entry_id}: price clause redirected notes -> price_details`);
+      e.field = "price_details";
+    }
     const target = entries.get(e.entry_id);
     const current = (target[e.field] ?? "").trimEnd();
     // Append, never replace. The existing wording is somebody's account; this
