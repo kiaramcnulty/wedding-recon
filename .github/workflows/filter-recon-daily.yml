@@ -98,6 +98,14 @@ jobs:
           # This one flag gates every writing step below, so they cannot disagree.
           if [ "${{ inputs.dry_run }}" = "true" ]; then APPLY=""; else APPLY="--apply"; fi
 
+          # The website tag/recon MINER is shipped OFF: it auto-authors recon and
+          # has only ever run in dry-run. MINE_FLAG="--no-mine" holds back site
+          # fetching in build-calls AND skips the mine-apply step below - the two
+          # must move together, or a stray hallucinated `site` from a call that
+          # carried no website would still be inserted. Pilot by hand
+          # (docs/filter-recon-on-write.md), then set MINE_FLAG="" to enable.
+          MINE_FLAG="--no-mine"
+
           node scripts/reconcile/daily-export.mjs --work "$WORK"
 
           # No dirty vendors -> vendors.jsonl has no objects. Stop cleanly rather
@@ -112,12 +120,7 @@ jobs:
           # every dirty vendor including `other`. Skips cleanly with no Places key.
           node scripts/reconcile/daily-websites.mjs --work "$WORK" $APPLY
 
-          # --no-mine keeps the LIVE cron to website-backfill + tag-reconcile
-          # (both tested) and holds back the website tag/recon MINER, which
-          # auto-authors recon and has only ever run in dry-run. Pilot it by hand
-          # first (see docs/filter-recon-on-write.md): a dry run, read mine-report,
-          # a small --apply, confirm restore. Then delete --no-mine to enable it.
-          node scripts/reconcile/daily-build-calls.mjs --work "$WORK" --no-mine
+          node scripts/reconcile/daily-build-calls.mjs --work "$WORK" $MINE_FLAG
 
           # build-calls emits no call file for a dirty vendor whose type has no
           # filter vocabulary (currently `other`), so an all-`other` dirty set
@@ -163,11 +166,14 @@ jobs:
           node scripts/reconcile/daily-apply.mjs --work "$WORK" $APPLY
 
           # Website-mining half: insert the recon entries + tags the model drafted
-          # from vendors' own sites (the `site` field of the same result). Separate
-          # script so all the recon-AUTHORING guards live in one place and the
-          # tag-only reconcile above is untouched. mine-applied.jsonl records every
-          # insert (for the notify step and for restore.mjs).
-          node scripts/reconcile/daily-mine-apply.mjs --work "$WORK" $APPLY
+          # from vendors' own sites (the `site` field of the same result). Gated by
+          # MINE_FLAG so it turns on together with the site fetching above and never
+          # applies a `site` the build step did not request. Separate script so
+          # every recon-AUTHORING guard lives in one place and the tag-only
+          # reconcile above is untouched.
+          if [ -z "$MINE_FLAG" ]; then
+            node scripts/reconcile/daily-mine-apply.mjs --work "$WORK" $APPLY
+          fi
 
       - name: Notify on added recon
         if: always()
