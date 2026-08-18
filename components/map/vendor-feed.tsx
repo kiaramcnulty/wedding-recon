@@ -57,6 +57,7 @@ export function VendorFeed({
   footnote,
   selections,
   className,
+  pending = false,
   scrollRef: externalScrollRef,
 }: {
   /** Vendors to list, in display order. Each carries its OWN type, so a feed can mix them. */
@@ -68,6 +69,17 @@ export function VendorFeed({
   /** Active attribute filters per type, so each card's matched tags sort first. */
   selections?: FilterSelections;
   className?: string;
+  /**
+   * The list's source hasn't produced its first answer yet, so an empty
+   * `entries` means "not loaded", NOT "nothing matched". Used by the results
+   * VIEW: on returning from a vendor page the map remounts and refetches, and
+   * until it reports what's on screen `entries` is `[]` — without this the feed
+   * flashed "No vendors here" for the moment before the pins landed (reported
+   * 2026-08-18). While pending with nothing to show, the feed keeps its loading
+   * state; the empty message waits for a real (post-report) empty result. The
+   * cluster sheet opens on a snapshot it already has, so it leaves this false.
+   */
+  pending?: boolean;
   /**
    * Lets a host observe the scroll container. The bottom-sheet needs it: its
    * swipe-down-to-dismiss must only engage at scrollTop 0, or a swipe meant to
@@ -202,9 +214,16 @@ export function VendorFeed({
       ref={scrollRef}
       className={cn("overflow-y-auto overscroll-contain px-3 py-3", className)}
     >
-      {items === null ? (
-        <div className="flex h-40 items-center justify-center">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      {items === null || (pending && items.length === 0) ? (
+        // Loading: either the preview fetch is in flight (items === null), or
+        // the list's source hasn't reported yet and an empty list would be a
+        // premature "nothing here". Both read as "still finding vendors".
+        <div
+          className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground"
+          role="status"
+        >
+          <Loader2 className="size-6 animate-spin" />
+          <span className="text-sm font-medium">Finding vendors…</span>
         </div>
       ) : items.length === 0 ? (
         <p className="px-4 py-12 text-center text-sm text-muted-foreground">

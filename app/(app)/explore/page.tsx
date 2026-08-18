@@ -141,6 +141,28 @@ export default function ExplorePage() {
     entries: [],
     capped: false,
   });
+  // Has the map reported what's on screen even once this mount? Until it has,
+  // the empty `visible.entries` above means "not loaded yet", not "nothing
+  // matched" — the difference the list VIEW needs so it shows a loading state
+  // instead of flashing "No vendors here" while the map remounts and refetches
+  // on return from a vendor page (reported 2026-08-18).
+  const [visibleReported, setVisibleReported] = useState(false);
+  const handleVisibleVendorsChange = useCallback(
+    (payload: VisibleVendorsPayload) => {
+      setVisible(payload);
+      setVisibleReported(true);
+    },
+    [],
+  );
+  // Safety net: if the map never reports (a total fetch failure at load leaves
+  // applyVendors uncalled), stop waiting after the map's own load-failsafe
+  // window so the feed falls back to its empty state rather than spinning
+  // forever. The normal report lands in a second or two and clears this first.
+  useEffect(() => {
+    if (visibleReported) return;
+    const t = setTimeout(() => setVisibleReported(true), 10_000);
+    return () => clearTimeout(t);
+  }, [visibleReported]);
   // Selected vendor-type filter (empty = show all). Starts empty so the first
   // client render matches the server; any persisted selection is restored after
   // mount (see below) to avoid a hydration mismatch on the chip states.
@@ -695,7 +717,7 @@ export default function ExplorePage() {
           selectedTypes={selectedTypes}
           filterSelections={filterSelections}
           withFilters={filtersWanted}
-          onVisibleVendorsChange={setVisible}
+          onVisibleVendorsChange={handleVisibleVendorsChange}
           onVendorsChange={setMapVendors}
         />
       </div>
@@ -955,6 +977,7 @@ export default function ExplorePage() {
             entries={visible.entries}
             scrollKey="wr:screenScroll"
             selections={filterSelections}
+            pending={!visibleReported}
             className="flex-1"
             footnote={
               visible.entries.length < visible.total
