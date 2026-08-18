@@ -218,3 +218,66 @@ has none):
 
 This auto-mutates user-visible data on model judgment; the snapshot is the only
 undo.
+
+---
+
+## Update 2026-08-17: cron enabled, website backfill, own-site miner
+
+The header above is superseded. The cron has been **enabled** since 2026-08-13
+(it writes on the schedule; a hand dispatch still defaults to a dry run). Two
+changes landed 2026-08-17, plus a crash fix.
+
+**Crash fix.** A dirty vendor of a type with no filter vocabulary (`other`, e.g.
+transportation) makes `daily-build-calls` emit zero call files, and `batch
+submit` then exited 1 and failed the job. Guarded: no calls is a clean no-op.
+
+**Dirty-on-human-only (migration `0040`).** The `0038` trigger stamped every
+recon write. It now stamps only **human** inserts/edits; a bot insert or bot
+content edit does not (removals and status flips still do, for any author). The
+reason: a bot writer emits the vendor tags in the same pass it writes the entry
+(enrich at upload, the miner as it drafts), so re-reconciling a bot entry only
+re-derives what it already wrote — the redundant work that, once the miner also
+INSERTS recon, would re-fire the trigger forever. The async pass exists to tag
+recon whose author could not tag it, and that is only a human.
+
+**Website backfill + filter-less drain (`daily-websites.mjs`).** For each dirty
+vendor with no website but a `google_place_id`, one Google Places Details call
+(`websiteUri`, Enterprise SKU, 1,000 free/mo) sets `vendors.website` —
+deterministic, no model, covers every type incl. `other`. It also **drains**
+filter-less-type vendors (clears their `filters_dirty_at`), since they get no
+model result and nothing else would clear them; left set they re-export and
+re-probe Places every run. Needs repo secret `GOOGLE_PLACES_API_KEY` (skips
+cleanly without it). Runs before the miner so a just-found site is minable.
+
+**Own-site tag/recon miner — BUILT, shipped GATED OFF.** Reads a vendor OWN
+website only (no reviews, no web search, no third-party — an own-site quote can
+only be about that business) for filter tags it does not yet have, and authors a
+bot recon entry capturing each. Pieces: `site-fetch.mjs` (homepage + a few
+same-host pricing/wedding/FAQ pages, capped), the mining section of
+`daily-build-calls.mjs` (site vendors chunk small; `--no-mine` disables), and
+`daily-mine-apply.mjs` — the one place the pass authors recon.
+
+Guards (Kiara: same key gates as enrichvendors): `prose-gate.mjs` carries the
+enrich recon-prose regexes copied verbatim (drop the entry on a violation, never
+fail the run); every mined tag quote must be verbatim in its own drafted entry
+and a number must appear in its quote; the author is a CO roster bot **not**
+already writing for that vendor, so the one-per-author index (`0028`) cannot
+collide; mining only CREATES an absent tag, never overwrites, never touches a
+manual key, and authors nothing if every mined tag is already present (the
+convergence guard). A run that adds recon opens a GitHub issue (the notification,
+via the built-in token). `restore.mjs` undo now also deletes the inserted entries
+and clears the dirty flag the delete sets.
+
+**The miner is gated off** — the workflow passes `--no-mine`, so the live cron
+does website-backfill + tag-reconcile (both tested) and the miner stays dormant.
+It has only run in dry-run (a live site fetch, the prose gate, a real mining
+call, the apply path over a crafted result). **Pilot before enabling:**
+
+1. `node scripts/reconcile/daily-export.mjs --work pilot` then
+   `daily-websites.mjs --work pilot --apply` (or dry).
+2. `daily-build-calls.mjs --work pilot` (mining ON — no `--no-mine`), `batch.mjs
+   submit/status/collect --work pilot`.
+3. `daily-mine-apply.mjs --work pilot` (dry) → read `mine-report.md`.
+4. A small `daily-mine-apply.mjs --work pilot --apply`; verify the entries and
+   tags in the app; confirm `restore.mjs --work pilot --apply` reverts them.
+5. Then delete `--no-mine` from the workflow to enable it on the schedule.
