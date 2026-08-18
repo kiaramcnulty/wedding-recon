@@ -19,17 +19,23 @@
  * source here: we read it, we never rewrite it.
  */
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { workdir, readJsonl, arg } from "./lib.mjs";
+import { workdir, readJsonl, arg, has } from "./lib.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
+import { fetchSiteText } from "./site-fetch.mjs";
 
 const WORK = arg("work");
 if (!WORK) {
-  console.error("Usage: daily-build-calls.mjs --work <name> [--per-call N]");
+  console.error("Usage: daily-build-calls.mjs --work <name> [--per-call N] [--no-mine]");
   process.exit(1);
 }
 const PER_CALL = Number(arg("per-call", 20));
+// A call carrying a vendor's own-site text is far larger, so mining vendors are
+// chunked small. The site text (~24k chars/vendor) is the size driver, not the
+// output, so this bounds input; output stays a few drafted entries per call.
+const PER_SITE_CALL = Number(arg("per-site-call", 3));
+const MINE = !has("no-mine"); // --no-mine builds tag-reconcile-only calls (no site fetch)
 const MODEL = arg("model", "claude-sonnet-5");
 const MAX_TOKENS = Number(arg("max-tokens", 48000));
 
@@ -39,6 +45,15 @@ if (rows.length === 0) {
   console.log("No dirty vendors in the export. Nothing to build.");
   process.exit(0);
 }
+
+// Websites just found by daily-websites.mjs are in the DB but not in vendors.jsonl
+// (exported before the backfill), so merge them in: a vendor's effective website
+// is the one it had OR the one just backfilled.
+const found = new Map();
+if (existsSync(join(dir, "websites.jsonl"))) {
+  for (const r of readJsonl(join(dir, "websites.jsonl"))) if (r.website) found.set(r.id, r.website);
+}
+const effectiveWebsite = (v) => v.website || found.get(v.id) || null;
 
 /** Render one type's attribute vocabulary, including every allowed value. */
 function vocabulary(type) {
@@ -130,21 +145,96 @@ RULES THAT CAUSE REAL DAMAGE IF BROKEN
    (range, starting_at, single_figure). A number you cannot place on a basis is
    worse than none, because it gets compared on the wrong axis. Skip it instead.
 
+MINING THE WEBSITE (only for a vendor whose block includes a WEBSITE section)
+
+The WEBSITE section is the vendor OWN site text. Read it for filter attributes
+this vendor does not already have a tag or an entry for, and capture each as BOTH
+a tag and a short recon entry - a tag may exist only if recon prose documents it,
+so you write the prose that documents it.
+
+- Mine only facts the site plainly states: a published price, a stated capacity,
+  an explicit "we allow outside catering", a named service. If the site does not
+  say it, do not mine it. No guessing, no marketing restatement.
+- Do NOT mine a fact a current tag or an existing entry already covers - that is
+  the reconcile job above, not mining.
+- Write ONE recon entry per vendor capturing everything you mined, in the natural
+  voice of a couple who looked into the vendor: plain and specific, no marketing
+  words, and no mention of a website, page, or how you found it. price_text and
+  price_details are REQUIRED (state what the site lists, or that it lists none).
+- Each mined tag carries a "quote" that is a VERBATIM substring of your own entry
+  text (notes / price_text / price_details) - the tag and its evidence must agree.
+- If the site yields nothing new, omit "site" entirely.
+
 OUTPUT
 
 Emit EXACTLY ONE JSON object per vendor listed, one per line, nothing else - no
 prose, no markdown fence. Every vendor gets a line even with nothing to do: emit
-the bare {"vendor_id":"<id>"}. Omit arrays that are empty.
+the bare {"vendor_id":"<id>"}. Omit arrays and objects that are empty.
 
 {"vendor_id":"<id>",
  "writes":[{"key":"<tag key>","value":<value>,"op":"create|extend|overwrite","quote":"<verbatim sentence>","entry_id":"<id>","basis":"<price only>","kind":"<price only>","human_support":<n>,"bot_support":<n>,"note":"<short why, for overwrite or a false value>"}],
  "retract":[{"key":"<tag key>","reason":"<the supporting entry is gone>"}],
- "skipped":[{"key":"<tag key>","why":"<short reason>"}]}
+ "skipped":[{"key":"<tag key>","why":"<short reason>"}],
+ "site":{"entry":{"notes":"<one couple-voiced note capturing the mined facts>","price_text":"<required>","price_details":"<required>"},
+         "tags":[{"key":"<tag key>","value":<value>,"quote":"<verbatim substring of the entry above>","basis":"<price only>","kind":"<price only>"}]}}
 
 human_support / bot_support / note are only needed on an "overwrite" (or a write
-whose value is false). Omit them elsewhere.`;
+whose value is false). "site" is only for a vendor whose block had a WEBSITE
+section and yielded a genuinely new fact. Omit them elsewhere.`;
 
 // --- assemble ---------------------------------------------------------------
+
+/** One vendor block for the call body; appends its own-site text when mining. */
+function vendorBlock(v, siteText) {
+  const tags =
+    Object.entries(v.filters)
+      .filter(([, val]) => val !== null && !(Array.isArray(val) && val.length === 0))
+      .map(([k, val]) => {
+        const src = v.filters_meta?.[k]?.source;
+        const flag =
+          src === "manual"
+            ? "  [LOCKED - human set, do not change]"
+            : `  [source: ${src ?? "extraction"}]`;
+        return `    ${k}: ${JSON.stringify(val)}${flag}`;
+      })
+      .join("\n") || "    (none)";
+  const entries =
+    v.entries
+      .map(
+        (e) =>
+          `    entry ${e.id} (${e.is_bot ? "BOT" : "HUMAN"}, by ${e.username ?? "unknown"}):\n` +
+          (e.price_text ? `      price_text: ${e.price_text}\n` : "") +
+          (e.price_details ? `      price_details: ${e.price_details}\n` : "") +
+          (e.service_region ? `      service_region: ${e.service_region}\n` : "") +
+          `      notes: ${e.notes ?? ""}`,
+      )
+      .join("\n") || "    (no active entries - retract candidates only)";
+  let block = `VENDOR ${v.id}\n  name: ${v.name} (${v.city ?? "?"})\n  current tags:\n${tags}\n  recon entries:\n${entries}`;
+  if (siteText)
+    block += `\n  WEBSITE (this vendor own site text - mine per MINING THE WEBSITE):\n${siteText}`;
+  return block;
+}
+
+function writeCall(id, type, vocab, chunk, sites) {
+  const body = chunk.map((v) => vendorBlock(v, sites?.get(v.id) ?? null)).join("\n\n");
+  writeFileSync(
+    join(dir, "calls", `${id}.json`),
+    JSON.stringify(
+      {
+        custom_id: id,
+        params: {
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          thinking: { type: "adaptive" },
+          system: `${CONTRACT}\n\nATTRIBUTES FOR VENDOR TYPE "${type}" - a key or value not listed here is invalid:\n${vocab}`,
+          messages: [{ role: "user", content: body }],
+        },
+      },
+      null,
+      2,
+    ),
+  );
+}
 
 const byType = {};
 for (const r of rows) (byType[r.vendor_type] ??= []).push(r);
@@ -153,6 +243,8 @@ mkdirSync(join(dir, "calls"), { recursive: true });
 
 let n = 0;
 let built = 0;
+let mined = 0;
+let siteFail = 0;
 const manifest = [];
 
 for (const [type, list] of Object.entries(byType)) {
@@ -161,63 +253,48 @@ for (const [type, list] of Object.entries(byType)) {
     console.log(`  ${type}: no filter definitions, skipped (${list.length} vendors)`);
     continue;
   }
-  for (let i = 0; i < list.length; i += PER_CALL) {
-    const chunk = list.slice(i, i + PER_CALL);
+
+  // Fetch own-site text for every vendor that has a website (sequential - the
+  // dirty set is a trickle). Only a vendor we actually got text for is "mined";
+  // everything else (no site, or a failed fetch) batches at PER_CALL for tag
+  // reconcile only, exactly as before.
+  const sites = new Map();
+  for (const v of MINE ? list.filter((v) => effectiveWebsite(v)) : []) {
+    const r = await fetchSiteText(effectiveWebsite(v));
+    if (r?.text) {
+      sites.set(v.id, r.text);
+      mined++;
+    } else {
+      siteFail++;
+      console.log(`  site fetch failed for ${v.name}: ${r?.error ?? "no text"}`);
+    }
+  }
+  const withSite = list.filter((v) => sites.has(v.id));
+  const noSite = list.filter((v) => !sites.has(v.id));
+
+  // Mining calls: small chunks (site text is the size driver), each carrying text.
+  for (let i = 0; i < withSite.length; i += PER_SITE_CALL) {
+    const chunk = withSite.slice(i, i + PER_SITE_CALL);
     const id = `call-${String(++n).padStart(3, "0")}`;
-
-    const body = chunk
-      .map((v) => {
-        const tags =
-          Object.entries(v.filters)
-            .filter(([, val]) => val !== null && !(Array.isArray(val) && val.length === 0))
-            .map(([k, val]) => {
-              const src = v.filters_meta?.[k]?.source;
-              const flag =
-                src === "manual"
-                  ? "  [LOCKED - human set, do not change]"
-                  : `  [source: ${src ?? "extraction"}]`;
-              return `    ${k}: ${JSON.stringify(val)}${flag}`;
-            })
-            .join("\n") || "    (none)";
-        const entries =
-          v.entries
-            .map(
-              (e) =>
-                `    entry ${e.id} (${e.is_bot ? "BOT" : "HUMAN"}, by ${e.username ?? "unknown"}):\n` +
-                (e.price_text ? `      price_text: ${e.price_text}\n` : "") +
-                (e.price_details ? `      price_details: ${e.price_details}\n` : "") +
-                (e.service_region ? `      service_region: ${e.service_region}\n` : "") +
-                `      notes: ${e.notes ?? ""}`,
-            )
-            .join("\n") || "    (no active entries - retract candidates only)";
-        return `VENDOR ${v.id}\n  name: ${v.name} (${v.city ?? "?"})\n  current tags:\n${tags}\n  recon entries:\n${entries}`;
-      })
-      .join("\n\n");
-
-    writeFileSync(
-      join(dir, "calls", `${id}.json`),
-      JSON.stringify(
-        {
-          custom_id: id,
-          params: {
-            model: MODEL,
-            max_tokens: MAX_TOKENS,
-            thinking: { type: "adaptive" },
-            system: `${CONTRACT}\n\nATTRIBUTES FOR VENDOR TYPE "${type}" - a key or value not listed here is invalid:\n${vocab}`,
-            messages: [{ role: "user", content: body }],
-          },
-        },
-        null,
-        2,
-      ),
-    );
-    manifest.push({ call: id, type, vendors: chunk.length });
+    writeCall(id, type, vocab, chunk, sites);
+    manifest.push({ call: id, type, vendors: chunk.length, mining: true });
+    built += chunk.length;
+  }
+  // Reconcile-only calls: the usual PER_CALL batches, no site text.
+  for (let i = 0; i < noSite.length; i += PER_CALL) {
+    const chunk = noSite.slice(i, i + PER_CALL);
+    const id = `call-${String(++n).padStart(3, "0")}`;
+    writeCall(id, type, vocab, chunk, null);
+    manifest.push({ call: id, type, vendors: chunk.length, mining: false });
     built += chunk.length;
   }
 }
 
 writeFileSync(join(dir, "calls", "manifest.json"), JSON.stringify(manifest, null, 2));
-console.log(`\n${n} call files covering ${built} vendors -> ${join(dir, "calls")}`);
+console.log(
+  `\n${n} call files covering ${built} vendors ` +
+    `(${mined} carrying own-site text${siteFail ? `, ${siteFail} site fetches failed` : ""}) -> ${join(dir, "calls")}`,
+);
 for (const [type, list] of Object.entries(byType))
   console.log(`  ${type.padEnd(10)} ${list.length}`);
 console.log(`\nNext: node scripts/reconcile/batch.mjs submit --work ${WORK}`);

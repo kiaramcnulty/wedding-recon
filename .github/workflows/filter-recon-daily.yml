@@ -49,6 +49,11 @@ jobs:
     # killed mid-poll and the batch is abandoned - the exact loop that window is
     # sized to avoid.
     timeout-minutes: 180
+    # issues:write lets the notify step open an issue when the miner adds recon
+    # (the cheapest report-to-your-inbox that needs no new secret).
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
@@ -107,7 +112,12 @@ jobs:
           # every dirty vendor including `other`. Skips cleanly with no Places key.
           node scripts/reconcile/daily-websites.mjs --work "$WORK" $APPLY
 
-          node scripts/reconcile/daily-build-calls.mjs --work "$WORK"
+          # --no-mine keeps the LIVE cron to website-backfill + tag-reconcile
+          # (both tested) and holds back the website tag/recon MINER, which
+          # auto-authors recon and has only ever run in dry-run. Pilot it by hand
+          # first (see docs/filter-recon-on-write.md): a dry run, read mine-report,
+          # a small --apply, confirm restore. Then delete --no-mine to enable it.
+          node scripts/reconcile/daily-build-calls.mjs --work "$WORK" --no-mine
 
           # build-calls emits no call file for a dirty vendor whose type has no
           # filter vocabulary (currently `other`), so an all-`other` dirty set
@@ -152,6 +162,31 @@ jobs:
           # cannot quietly never write - the green-but-did-nothing failure.
           node scripts/reconcile/daily-apply.mjs --work "$WORK" $APPLY
 
+          # Website-mining half: insert the recon entries + tags the model drafted
+          # from vendors' own sites (the `site` field of the same result). Separate
+          # script so all the recon-AUTHORING guards live in one place and the
+          # tag-only reconcile above is untouched. mine-applied.jsonl records every
+          # insert (for the notify step and for restore.mjs).
+          node scripts/reconcile/daily-mine-apply.mjs --work "$WORK" $APPLY
+
+      - name: Notify on added recon
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DIR="data/reconcile/${WORK:-none}"
+          # mine-applied.jsonl exists only on an --apply run that inserted at least
+          # one entry, so this fires exactly when there is something to report.
+          if [ -s "$DIR/mine-applied.jsonl" ]; then
+            n=$(grep -c '{' "$DIR/mine-applied.jsonl" || true)
+            gh issue create \
+              --title "Website miner added $n recon entries ($WORK)" \
+              --body-file "$DIR/mine-report.md" \
+              || echo "::warning::could not open the notification issue"
+          else
+            echo "No recon added this run; no notification."
+          fi
+
       - name: Upload run report
         if: always()
         uses: actions/upload-artifact@v4
@@ -168,8 +203,10 @@ jobs:
           # applied.jsonl says what was written, results.jsonl says why.
           path: |
             data/reconcile/${{ env.WORK }}/report.md
+            data/reconcile/${{ env.WORK }}/mine-report.md
             data/reconcile/${{ env.WORK }}/export-report.txt
             data/reconcile/${{ env.WORK }}/applied.jsonl
+            data/reconcile/${{ env.WORK }}/mine-applied.jsonl
             data/reconcile/${{ env.WORK }}/results.jsonl
             data/reconcile/${{ env.WORK }}/snapshot/**
           retention-days: 90

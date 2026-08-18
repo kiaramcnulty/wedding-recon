@@ -21,6 +21,7 @@
  */
 
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { serviceClient, fetchAll, workdir, readJsonl, arg, has } from "./lib.mjs";
 
 const WORK = arg("work");
@@ -35,8 +36,16 @@ const dir = workdir(WORK);
 
 const snapVendors = readJsonl(join(dir, "snapshot/vendors-filters.jsonl"));
 const snapEntries = readJsonl(join(dir, "snapshot/recon-entries.jsonl"));
+// Entries the website miner INSERTED this run (daily-mine-apply). Reverting
+// filters to the snapshot already removes the tags they wrote; these rows say
+// which entries to delete to complete the undo.
+const minedInserts = existsSync(join(dir, "mine-applied.jsonl"))
+  ? readJsonl(join(dir, "mine-applied.jsonl"))
+  : [];
 console.log(
-  `Snapshot: ${snapVendors.length} filter rows, ${snapEntries.length} recon entries\n`,
+  `Snapshot: ${snapVendors.length} filter rows, ${snapEntries.length} recon entries` +
+    (minedInserts.length ? `, ${minedInserts.length} mined entries to delete` : "") +
+    "\n",
 );
 
 const eq = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -152,3 +161,25 @@ for (const s of entryFixes) {
   else ok++;
 }
 console.log(`restored text on ${ok}/${entryFixes.length} recon entries`);
+
+// Delete the entries the miner inserted this run, then clear the dirty flag the
+// delete itself sets (a removal always marks dirty, per migration 0040) - without
+// that, the very next cron run would re-mine the same fact and re-insert it, so
+// the undo would not stick.
+if (minedInserts.length) {
+  let del = 0;
+  const vids = new Set();
+  for (const m of minedInserts) {
+    const { error } = await db.from("recon_entries").delete().eq("id", m.entry_id);
+    if (error) console.error(`  mined entry ${m.entry_id} (${m.vendor}): ${error.message}`);
+    else {
+      del++;
+      vids.add(m.vendor_id);
+    }
+  }
+  for (const vid of vids)
+    await db.from("vendors").update({ filters_dirty_at: null }).eq("id", vid);
+  console.log(
+    `deleted ${del}/${minedInserts.length} mined entries and cleared ${vids.size} dirty flags`,
+  );
+}
