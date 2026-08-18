@@ -3,6 +3,7 @@
 import { redirect, RedirectType } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminUser } from "@/lib/auth/admin";
 import { usesServiceRegion } from "@/lib/constants/categories";
 import type { ReconType, VendorType } from "@/lib/constants/categories";
 
@@ -43,16 +44,32 @@ export async function updateRecon(input: UpdateReconInput) {
 
   // Re-read the row rather than trusting the client for vendor/ownership. RLS
   // would block a foreign update anyway, but this yields a real error instead
-  // of a silent zero-row write, and gives us the vendor type below.
+  // of a silent zero-row write, and gives us the vendor type below. The author
+  // is joined so we can tell an admin-editable (bot-authored) entry apart from a
+  // real person's, which admins may never edit.
   const { data: entry, error: fetchError } = await supabase
     .from("recon_entries")
-    .select("id, author_id, vendor_id, status, vendor:vendors(vendor_type)")
+    .select(
+      "id, author_id, vendor_id, status, vendor:vendors(vendor_type), author:profiles(is_bot)",
+    )
     .eq("id", input.reconId)
     .single();
 
   if (fetchError || !entry) throw new Error("Recon entry not found");
+
+  // Authorship OR admin-over-a-bot-entry. The same rule is enforced in RLS
+  // (migration 0041) — this is the friendly error, that is the boundary.
   if (entry.author_id !== user.id) {
-    throw new Error("You can only edit your own recon");
+    const authorRel = entry.author as
+      | { is_bot: boolean }
+      | { is_bot: boolean }[]
+      | null;
+    const authorIsBot =
+      (Array.isArray(authorRel) ? authorRel[0] : authorRel)?.is_bot ?? false;
+    const admin = authorIsBot && (await isAdminUser(supabase, user.id));
+    if (!admin) {
+      throw new Error("You do not have permission to edit this recon");
+    }
   }
   if (entry.status === "removed") {
     throw new Error("This entry was removed and can no longer be edited");

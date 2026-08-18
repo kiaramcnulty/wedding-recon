@@ -10,6 +10,8 @@ export interface Profile {
   created_at: string;
   /** Internal flag for seeded/curator bot accounts (enrichvenues pipeline). */
   is_bot: boolean;
+  /** Site admin — currently grants editing of bot-authored recon (migration 0041). */
+  is_admin: boolean;
 }
 
 export interface Vendor {

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { isAdminUser } from "@/lib/auth/admin";
 import type { VendorType } from "@/lib/constants/categories";
 import { EditReconForm } from "./edit-recon-form";
 
@@ -43,15 +44,27 @@ export default async function EditReconPage({
   const { data: entry, error } = await supabase
     .from("recon_entries")
     .select(
-      "*, vendor:vendors(id, name, vendor_type), media:recon_media(id, thumb_path, storage_path)",
+      "*, vendor:vendors(id, name, vendor_type), media:recon_media(id, thumb_path, storage_path), author:profiles(is_bot)",
     )
     .eq("id", id)
     .single();
 
-  // 404 rather than 403 on someone else's entry — no reason to confirm it
+  // 404 rather than 403 on an entry you may not edit — no reason to confirm it
   // exists. A removed entry is a moderator takedown, so it stays uneditable.
   if (error || !entry) notFound();
-  if (entry.author_id !== userId) notFound();
+
+  // The author edits their own; a site admin may also edit a bot-authored entry
+  // (never a real person's). The write path (actions.ts) and RLS re-check this.
+  if (entry.author_id !== userId) {
+    const authorRel = entry.author as
+      | { is_bot: boolean }
+      | { is_bot: boolean }[]
+      | null;
+    const authorIsBot =
+      (Array.isArray(authorRel) ? authorRel[0] : authorRel)?.is_bot ?? false;
+    const canAdminEdit = authorIsBot && (await isAdminUser(supabase, userId));
+    if (!canAdminEdit) notFound();
+  }
   if (entry.status === "removed") notFound();
 
   // Supabase types an embedded row as object-or-single-item-array.
