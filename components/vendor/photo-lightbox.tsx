@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface LightboxPhoto {
@@ -27,11 +27,23 @@ interface PhotoLightboxProps {
   tileClassName?: string;
 }
 
+// A horizontal drag past this many pixels counts as a swipe to the next/previous
+// photo rather than a tap. Kept comfortably above a tap's jitter so a stationary
+// tap-to-close is never read as a swipe.
+const SWIPE_THRESHOLD_PX = 40;
+
 /**
- * A strip of photo thumbnails that open full-size in a tap-to-close overlay.
+ * A strip of photo thumbnails that open full-size in an overlay. Once open, the
+ * photos are a single sequence you can page through — arrow buttons, the
+ * keyboard's left/right keys, or a swipe on touch — so opening any tile lets you
+ * reach every other one without closing first (this is why the vendor page
+ * merges its recon and Google photos into one array).
+ *
  * Thumbnails use the small variant; the full image is fetched only when a photo
  * is actually opened, so default page egress is unchanged (the lightbox adds no
- * baseline cost).
+ * baseline cost). Navigation is intentionally NOT preloaded — fetching adjacent
+ * full-size images the couple may never look at would undo that saving — so the
+ * next photo loads on demand.
  */
 export function PhotoLightbox({
   photos,
@@ -47,6 +59,31 @@ export function PhotoLightbox({
   // lightbox still maps correctly.
   const [failed, setFailed] = React.useState<ReadonlySet<number>>(new Set());
 
+  // The photos still showing, in original order. Navigation walks THIS list, not
+  // the raw indices, so a dropped tile is skipped rather than landing on a blank
+  // frame — the couple only ever paged past tiles they could see in the strip.
+  const visibleIndices = React.useMemo(
+    () => photos.map((_, i) => i).filter((i) => !failed.has(i)),
+    [photos, failed],
+  );
+
+  // Step to the next (dir +1) or previous (dir -1) visible photo, clamped at the
+  // ends. Functional update so it reads the latest open index without the
+  // handlers below needing it as a dependency.
+  const step = React.useCallback(
+    (dir: 1 | -1) => {
+      setOpenIdx((cur) => {
+        if (cur === null) return cur;
+        const pos = visibleIndices.indexOf(cur);
+        if (pos === -1) return cur;
+        const next = pos + dir;
+        if (next < 0 || next >= visibleIndices.length) return cur; // clamp
+        return visibleIndices[next];
+      });
+    },
+    [visibleIndices],
+  );
+
   // Portals need the DOM; defer the mount flag (see CLAUDE.md portal pattern).
   React.useEffect(() => {
     const t = setTimeout(() => setMounted(true), 0);
@@ -57,12 +94,45 @@ export function PhotoLightbox({
     if (openIdx === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpenIdx(null);
+      else if (e.key === "ArrowRight") step(1);
+      else if (e.key === "ArrowLeft") step(-1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openIdx]);
+  }, [openIdx, step]);
+
+  // Swipe tracking. A horizontal drag on the overlay pages through the photos;
+  // the guard flag stops the tap-to-close click that a browser may synthesize
+  // after the gesture from also dismissing the lightbox.
+  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const swipedRef = React.useRef(false);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+    swipedRef.current = false;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    // Horizontal intent only: a mostly-vertical drag is left alone (it isn't a
+    // page turn), so it falls through to the tap-to-close behavior unchanged.
+    if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dx) > Math.abs(dy)) {
+      swipedRef.current = true;
+      step(dx < 0 ? 1 : -1); // swipe left → next, swipe right → previous
+    }
+  };
 
   if (photos.length === 0) return null;
+
+  const pos = openIdx === null ? -1 : visibleIndices.indexOf(openIdx);
+  const atStart = pos <= 0;
+  const atEnd = pos < 0 || pos >= visibleIndices.length - 1;
+  const canPage = visibleIndices.length > 1;
 
   return (
     <>
@@ -112,17 +182,66 @@ export function PhotoLightbox({
             role="dialog"
             aria-modal="true"
             aria-label={`${alt} ${openIdx + 1}`}
-            onClick={() => setOpenIdx(null)}
+            onClick={() => {
+              // A swipe can be followed by a synthesized click on the backdrop;
+              // swallow that one so paging never doubles as a dismiss.
+              if (swipedRef.current) {
+                swipedRef.current = false;
+                return;
+              }
+              setOpenIdx(null);
+            }}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
             className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/85 p-4"
           >
             <button
               type="button"
               aria-label="Close"
               onClick={() => setOpenIdx(null)}
-              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+              className="absolute right-4 top-4 z-10 flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
             >
               <X className="size-5" />
             </button>
+
+            {canPage && (
+              // Position counter, so a long strip doesn't lose the couple's place.
+              <span className="pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-sm font-medium text-white">
+                {pos + 1} / {visibleIndices.length}
+              </span>
+            )}
+
+            {canPage && !atStart && (
+              <button
+                type="button"
+                aria-label="Previous photo"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  step(-1);
+                }}
+                className="absolute left-2 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:left-4"
+              >
+                <ChevronLeft className="size-6" />
+              </button>
+            )}
+            {canPage && !atEnd && (
+              <button
+                type="button"
+                aria-label="Next photo"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  step(1);
+                }}
+                className="absolute right-2 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:right-4"
+              >
+                <ChevronRight className="size-6" />
+              </button>
+            )}
+
+            {/* No `key` on the src: reusing the element keeps the current photo
+                on screen while the next one decodes, rather than flashing black.
+                The counter above updates on the index change, so a swipe still
+                registers instantly even before the image itself swaps. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photos[openIdx].full}
