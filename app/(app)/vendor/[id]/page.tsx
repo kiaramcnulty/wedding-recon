@@ -10,6 +10,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminUser } from "@/lib/auth/admin";
 import { getVendorGooglePhotos } from "@/lib/google-photos";
 import {
   CATEGORIES,
@@ -161,26 +162,29 @@ export default async function VendorPage({
   // recon here" check must stay a separate query (it counts `flagged` entries,
   // which the active-only list above does not include). getVendorGooglePhotos
   // only touches the network on a cache miss, so it's usually free.
-  const [existingRes, googlePhotos, coordsRes] = await Promise.all([
-    userId
-      ? supabase
-          .from("recon_entries")
-          .select("id")
-          .eq("vendor_id", id)
-          .eq("author_id", userId)
-          .neq("status", "removed")
-          .limit(1)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    getVendorGooglePhotos(vendor),
-    // vendors.location is PostGIS geography, which PostgREST hands back as hex
-    // EWKB — the RPC (migration 0029) is what flattens it to lng/lat. Errors
-    // are swallowed by design: until that migration is hand-applied the call
-    // fails, `data` is null, and the page renders exactly as it did before.
-    fixedLocation
-      ? supabase.rpc("vendor_location", { p_id: id }).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const [existingRes, googlePhotos, coordsRes, viewerIsAdmin] =
+    await Promise.all([
+      userId
+        ? supabase
+            .from("recon_entries")
+            .select("id")
+            .eq("vendor_id", id)
+            .eq("author_id", userId)
+            .neq("status", "removed")
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      getVendorGooglePhotos(vendor),
+      // vendors.location is PostGIS geography, which PostgREST hands back as hex
+      // EWKB — the RPC (migration 0029) is what flattens it to lng/lat. Errors
+      // are swallowed by design: until that migration is hand-applied the call
+      // fails, `data` is null, and the page renders exactly as it did before.
+      fixedLocation
+        ? supabase.rpc("vendor_location", { p_id: id }).maybeSingle()
+        : Promise.resolve({ data: null }),
+      // Site admins get an edit control on bot-authored recon below (0041).
+      isAdminUser(supabase, userId),
+    ]);
   const userHasRecon = !!existingRes.data;
   const coords = coordsRes.data as { lng: number; lat: number } | null;
 
@@ -428,6 +432,7 @@ export default async function VendorPage({
             key={entry.id}
             entry={entry}
             isMine={!!userId && entry.author_id === userId}
+            viewerIsAdmin={viewerIsAdmin}
             // This page's own URL *including* its return path, so the edit
             // page can send the user back to a vendor page that still knows
             // where it came from. Dropping the `from` here is what used to
