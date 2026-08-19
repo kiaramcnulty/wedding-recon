@@ -39,11 +39,13 @@ const SWIPE_THRESHOLD_PX = 40;
  * reach every other one without closing first (this is why the vendor page
  * merges its recon and Google photos into one array).
  *
- * Thumbnails use the small variant; the full image is fetched only when a photo
- * is actually opened, so default page egress is unchanged (the lightbox adds no
- * baseline cost). Navigation is intentionally NOT preloaded — fetching adjacent
- * full-size images the couple may never look at would undo that saving — so the
- * next photo loads on demand.
+ * Thumbnails use the small variant and are `loading="lazy"`, so a tile scrolled
+ * off the right of the strip is not fetched until the couple scrolls to it — for
+ * Google tiles that is a billed Place Photos fetch avoided. The full image is
+ * fetched only when a photo is actually opened, so default page egress is
+ * unchanged (the lightbox adds no baseline cost). Navigation is intentionally NOT
+ * preloaded — fetching adjacent full-size images the couple may never look at
+ * would undo that saving — so the next photo loads on demand.
  */
 export function PhotoLightbox({
   photos,
@@ -153,6 +155,13 @@ export function PhotoLightbox({
               <img
                 src={p.thumb}
                 alt={`${alt} ${i + 1}`}
+                // Off-screen tiles stay off the network until scrolled near. Each
+                // Google tile is a billed Place Photos fetch, so an eager strip
+                // paid for photos the couple never scrolled to. Recon photos lead
+                // the strip, so on a vendor with recon photos the Google tiles are
+                // usually off-screen on load and cost nothing until reached.
+                loading="lazy"
+                decoding="async"
                 onError={() =>
                   setFailed((prev) => {
                     const next = new Set(prev);

@@ -41,8 +41,9 @@ export interface VendorPreview {
   locality: string | null;
   reconCount: number;
   /**
-   * Ordered image candidates: Google photo first, then a recon thumbnail. Tried
-   * in order (each on error), falling through to a category placeholder.
+   * Ordered image candidates: recon thumbnail first (free Supabase read), then a
+   * Google photo (a billed fetch). Tried in order (each on error), falling
+   * through to a category placeholder.
    */
   photoCandidates: string[];
   /** Text previews of the vendor's recon entries (newest first, text-less entries skipped). */
@@ -199,14 +200,19 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         const v = vendorById.get(id);
         if (!v) return [];
         const candidates: string[] = [];
-        const hasGoogle =
-          (v.google_photos?.length ?? 0) > 0 || !!v.google_place_id;
-        // w=300 sizes this for the 96px card slot (3x DPR). Without it the
-        // route serves its 1200px default — ~17x the pixels actually drawn,
-        // multiplied by every card in a Hub or map feed.
-        if (hasGoogle) candidates.push(`/api/vendor-photo/${id}?i=0&w=300`);
+        // Recon photo FIRST (2026-08): it is a free Supabase read, while the
+        // Google fallback below is a billed Place Photos fetch ($7/1k, ~1,000
+        // free/month). Leading with the couple's own photo also matches the
+        // vendor page's strip, which puts recon photos first.
         const rt = reconThumb.get(id);
         if (rt) candidates.push(rt);
+        const hasGoogle =
+          (v.google_photos?.length ?? 0) > 0 || !!v.google_place_id;
+        // w=600 matches the vendor-page strip, so a card and the strip share ONE
+        // billed fetch + CDN entry for i=0 instead of billing 300 and 600
+        // separately. The extra bytes to a small card slot are cheap; the Google
+        // fetch is the thing that costs money.
+        if (hasGoogle) candidates.push(`/api/vendor-photo/${id}?i=0&w=600`);
         return [
           {
             id,
