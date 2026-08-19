@@ -17,7 +17,12 @@ interface PlacesPhoto {
   authorAttributions?: { displayName?: string; uri?: string }[];
 }
 
-const MAX_PHOTOS = 3;
+// Cap on stored/shown Google photos per vendor. Each one is a separate billed
+// Place Photos fetch on the vendor-page strip ($7/1k, ~1,000 free/month — small),
+// so this is a direct multiplier on the app's dominant Google cost. Dropped 3 -> 2
+// (2026-08): the third strip tile was the least-viewed and cost a fetch on every
+// vendor-page load. The card uses only i=0, so it is unaffected.
+const MAX_PHOTOS = 2;
 const TTL_MS = 30 * 24 * 60 * 60 * 1000; // re-resolve photo refs at most monthly
 
 // A well-formed Places photo resource name. Anything with path/query metachars is
@@ -48,7 +53,9 @@ export async function getVendorGooglePhotos(
     vendor.google_photos != null &&
     vendor.google_photos_fetched_at != null &&
     Date.now() - new Date(vendor.google_photos_fetched_at).getTime() < TTL_MS;
-  if (fresh) return vendor.google_photos as GooglePhotoRef[];
+  // Slice on read, not just at fetch time, so a row cached with the old cap of 3
+  // renders the new cap immediately instead of waiting out its 30-day TTL.
+  if (fresh) return (vendor.google_photos as GooglePhotoRef[]).slice(0, MAX_PHOTOS);
 
   return refreshVendorGooglePhotos(vendor.id, vendor.google_place_id);
 }
