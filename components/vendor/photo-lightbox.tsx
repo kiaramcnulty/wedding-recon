@@ -17,6 +17,13 @@ export interface LightboxPhoto {
    * serializable avoids a needless client boundary.
    */
   badge?: string;
+  /**
+   * When true, the tile holds its `src` until it is scrolled into view (an
+   * IntersectionObserver, not just `loading="lazy"`, which has a load-ahead
+   * margin). Set on BILLED tiles (a Google Place Photos fetch) so a photo the
+   * couple never scrolls to costs nothing; free recon tiles load immediately.
+   */
+  defer?: boolean;
 }
 
 interface PhotoLightboxProps {
@@ -39,13 +46,13 @@ const SWIPE_THRESHOLD_PX = 40;
  * reach every other one without closing first (this is why the vendor page
  * merges its recon and Google photos into one array).
  *
- * Thumbnails use the small variant and are `loading="lazy"`, so a tile scrolled
- * off the right of the strip is not fetched until the couple scrolls to it — for
- * Google tiles that is a billed Place Photos fetch avoided. The full image is
- * fetched only when a photo is actually opened, so default page egress is
- * unchanged (the lightbox adds no baseline cost). Navigation is intentionally NOT
- * preloaded — fetching adjacent full-size images the couple may never look at
- * would undo that saving — so the next photo loads on demand.
+ * Thumbnails load lazily; a tile marked `defer` (a billed Google fetch) holds its
+ * `src` behind an IntersectionObserver, so a Google photo scrolled off the strip
+ * that the couple never reaches is never fetched (a Place Photos fetch avoided).
+ * The full image is fetched only when a photo is actually opened, so default page
+ * egress is unchanged (the lightbox adds no baseline cost). Navigation is
+ * intentionally NOT preloaded — fetching adjacent full-size images the couple may
+ * never look at would undo that saving — so the next photo loads on demand.
  */
 export function PhotoLightbox({
   photos,
@@ -151,25 +158,17 @@ export function PhotoLightbox({
                 tileClassName,
               )}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={p.thumb}
-                alt={`${alt} ${i + 1}`}
-                // Off-screen tiles stay off the network until scrolled near. Each
-                // Google tile is a billed Place Photos fetch, so an eager strip
-                // paid for photos the couple never scrolled to. Recon photos lead
-                // the strip, so on a vendor with recon photos the Google tiles are
-                // usually off-screen on load and cost nothing until reached.
-                loading="lazy"
-                decoding="async"
-                onError={() =>
+              <TileImage
+                photo={p}
+                index={i}
+                alt={alt}
+                onFail={() =>
                   setFailed((prev) => {
                     const next = new Set(prev);
                     next.add(i);
                     return next;
                   })
                 }
-                className="h-full w-full object-cover"
               />
               {p.badge && (
                 // Names the source per-tile, which is what lets photos of
@@ -262,5 +261,66 @@ export function PhotoLightbox({
           document.body,
         )}
     </>
+  );
+}
+
+/**
+ * One strip thumbnail. A `defer` tile (a billed Google Place Photos fetch) holds
+ * its `src` until an IntersectionObserver reports it scrolled into view, so a
+ * Google photo the couple never reaches is never fetched. A free recon tile
+ * loads immediately (with the browser's lazy hint as a bonus). `onFail` drops a
+ * tile whose image 404s (e.g. a rotated Google photo), matching the parent.
+ */
+function TileImage({
+  photo,
+  index,
+  alt,
+  onFail,
+}: {
+  photo: LightboxPhoto;
+  index: number;
+  alt: string;
+  onFail: () => void;
+}) {
+  const ref = React.useRef<HTMLImageElement | null>(null);
+  const [show, setShow] = React.useState(!photo.defer);
+
+  React.useEffect(() => {
+    if (show) return;
+    const el = ref.current;
+    if (!el) return;
+    // No IntersectionObserver (a very old engine): load it, deferred a tick so
+    // this is not a synchronous setState in an effect body.
+    if (typeof IntersectionObserver === "undefined") {
+      const t = setTimeout(() => setShow(true), 0);
+      return () => clearTimeout(t);
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setShow(true);
+          io.disconnect();
+        }
+      },
+      // A small margin so the tile loads as the couple scrolls toward it rather
+      // than popping in blank — a tile they never approach still never loads.
+      { rootMargin: "150px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [show]);
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      ref={ref}
+      // `undefined` (not "") so a not-yet-shown tile requests nothing at all.
+      src={show ? photo.thumb : undefined}
+      alt={`${alt} ${index + 1}`}
+      loading="lazy"
+      decoding="async"
+      onError={onFail}
+      className="h-full w-full bg-muted object-cover"
+    />
   );
 }

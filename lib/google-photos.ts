@@ -18,11 +18,12 @@ interface PlacesPhoto {
 }
 
 // Cap on stored/shown Google photos per vendor. Each one is a separate billed
-// Place Photos fetch on the vendor-page strip ($7/1k, ~1,000 free/month — small),
-// so this is a direct multiplier on the app's dominant Google cost. Dropped 3 -> 2
-// (2026-08): the third strip tile was the least-viewed and cost a fetch on every
-// vendor-page load. The card uses only i=0, so it is unaffected.
-const MAX_PHOTOS = 2;
+// Place Photos fetch ($7/1k, ~1,000 free/month), so this is a direct multiplier
+// on the app's dominant Google cost. Dropped 3 -> 2 -> 1 (2026-08): the vendor
+// page keeps ONE supplementary Google photo, shown last (after the couple's own
+// recon photos) and — via `defer` on its strip tile — only fetched if the couple
+// actually scrolls to it. The card uses only i=0, so it is unaffected.
+const MAX_PHOTOS = 1;
 const TTL_MS = 30 * 24 * 60 * 60 * 1000; // re-resolve photo refs at most monthly
 
 // A well-formed Places photo resource name. Anything with path/query metachars is

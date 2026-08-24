@@ -38,14 +38,17 @@ export function VendorPhotos({
   reconPhotos,
 }: VendorPhotosProps) {
   // Tiles are 150x112 CSS, so w=600 still covers a 3x screen (450px); the 1200px
-  // variant is fetched only when a photo is opened. Both are CDN-cached
-  // separately, and the full size is never on the page's baseline.
+  // variant is fetched only when a photo is opened. `defer` holds each billed
+  // Google tile's fetch until it is scrolled into view — and Google photos sort
+  // AFTER recon photos, so on a vendor with recon photos the Google tile starts
+  // off-screen and costs nothing unless the couple actually scrolls to it.
   const googlePhotos: LightboxPhoto[] = Array.from(
     { length: googleCount },
     (_, i) => ({
       thumb: `/api/vendor-photo/${vendorId}?i=${i}&w=600`,
       full: `/api/vendor-photo/${vendorId}?i=${i}&w=1200`,
       badge: "Google",
+      defer: true,
     }),
   );
 
