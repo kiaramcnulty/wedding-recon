@@ -29,6 +29,7 @@ import {
 } from "@/lib/filters/match";
 import type { Vendor } from "@/lib/types";
 import {
+  ALL_VENDOR_TYPES,
   CATEGORIES,
   VENDOR_TYPES,
   type VendorType,
@@ -113,6 +114,18 @@ function pickTypes<T>(
     if (allowed.has(t) && v && typeof v === "object") out[t as VendorType] = v as T;
   }
   return out;
+}
+
+/**
+ * Normalize a raw `vendor_type` string (which may be legacy or unknown) to a
+ * known category. The peek card looks its type up in CATEGORIES with no
+ * fallback, so a search suggestion's untyped `vendorType` has to land on a real
+ * key — legacy `music` has a CATEGORIES entry, anything else falls to "other".
+ */
+function toVendorType(raw: string): VendorType {
+  return (ALL_VENDOR_TYPES as readonly string[]).includes(raw)
+    ? (raw as VendorType)
+    : "other";
 }
 
 export default function ExplorePage() {
@@ -610,7 +623,10 @@ export default function ExplorePage() {
 
   // Tapping a vendor flies the map straight to its pin (rather than opening the
   // vendor page) — the vendor is centered on the map, ready to tap. Zoom 15 is
-  // close enough that a single pin reads clearly.
+  // close enough that a single pin reads clearly. It also opens the peek card,
+  // so a searched vendor surfaces exactly like a tapped pin does: `openPin` is
+  // the one shared path the map's pin tap and restore-on-return already use, so
+  // every way of selecting a vendor lands on the same card.
   function selectVendor(v: VendorSuggestion) {
     suppressFetchRef.current = true; // don't reopen the dropdown on the query change
     setCityQuery(v.name);
@@ -618,6 +634,7 @@ export default function ExplorePage() {
     setSuggestions([]);
     setVendorResults([]);
     setShowSuggestions(false);
+    openPin({ id: v.vendorId, vendorType: toVendorType(v.vendorType) });
   }
 
   async function handleSearch(e: React.FormEvent<HTMLFormElement>) {
@@ -1005,22 +1022,25 @@ export default function ExplorePage() {
       )}
 
 
-      {/* Bottom stack over the map: the single-pin peek card (Zillow-style) sits
-          on top of the control row, so the brand mark and locate button stay
-          reachable beneath it rather than being pushed above the card. In the
-          flow, so it sits above the bottom nav and pushes nothing around.
+      {/* Bottom stack over the map. The single-pin peek card (Zillow-style) and
+          the locate button share ONE slot at the bottom edge: while a card is
+          open it takes the locate button's place — the button is not needed
+          then, and dropping the card down here (rather than floating it a
+          button's height above) lands it neatly along the bottom. In the flow,
+          so it sits above the bottom nav and pushes nothing around.
 
-          Hidden in list view: these are map controls (a locate button and the
-          basemap-anchored brand mark), and a pin peek describes a pin nobody
-          can see. */}
+          Hidden in list view: these are map controls, and a pin peek describes
+          a pin nobody can see. */}
       <div
         className={cn(
           "pointer-events-none relative z-10 mt-auto",
           view === "list" && "hidden",
         )}
       >
-        {pin && (
-          <div className="pointer-events-auto mx-auto w-full max-w-[480px] px-3">
+        {pin ? (
+          // `pb-9` matches the clearance the locate row gave the map attribution
+          // along the bottom edge, so the card lands right in the button's spot.
+          <div className="pointer-events-auto mx-auto w-full max-w-[480px] px-3 pb-9 pt-3">
             <VendorPinPreview
               vendorId={pin.id}
               vendorType={pin.vendorType}
@@ -1028,31 +1048,31 @@ export default function ExplorePage() {
               onClose={closePin}
             />
           </div>
+        ) : (
+          // Locate button, lifted clear of the map attribution along the bottom
+          // edge. The brand pill that used to sit opposite it moved to the top
+          // bar, so this row is just the one control now.
+          //
+          // The row stays click-through and only the button takes taps, which
+          // also settles the long-standing complaint that this full-width row
+          // ate every map tap in its ~90px band — a pin sitting down there could
+          // not be tapped at all.
+          <div className="flex items-end justify-end px-3 pb-9 pt-3">
+            <button
+              type="button"
+              onClick={handleLocate}
+              disabled={locating}
+              aria-label="Center map on my location"
+              className="pointer-events-auto flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
+            >
+              {locating ? (
+                <Loader2 size={20} className="animate-spin" aria-hidden />
+              ) : (
+                <Navigation size={20} aria-hidden />
+              )}
+            </button>
+          </div>
         )}
-
-        {/* Locate button, lifted clear of the map attribution along the bottom
-            edge. The brand pill that used to sit opposite it moved to the top
-            bar, so this row is just the one control now.
-
-            The row stays click-through and only the button takes taps, which
-            also settles the long-standing complaint that this full-width row
-            ate every map tap in its ~90px band — a pin sitting down there could
-            not be tapped at all. */}
-        <div className="flex items-end justify-end px-3 pb-9 pt-3">
-          <button
-            type="button"
-            onClick={handleLocate}
-            disabled={locating}
-            aria-label="Center map on my location"
-            className="pointer-events-auto flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
-          >
-            {locating ? (
-              <Loader2 size={20} className="animate-spin" aria-hidden />
-            ) : (
-              <Navigation size={20} aria-hidden />
-            )}
-          </button>
-        </div>
       </div>
       </div>
     </div>
