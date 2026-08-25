@@ -14,9 +14,10 @@ copy — spaced hyphens).
 
 ## What this is
 
-A paid tier ("Vendor Verification", $20/month with 6 months prepaid up front)
-that lets a wedding vendor claim their listing, keep its info accurate, and get
-a verified badge + modest ranking boost + a CTA button shown to couples.
+A paid tier ("Vendor Verification", billed $120 every 6 months — effectively
+$20/month, auto-renewing every 6 months) that lets a wedding vendor claim their
+listing, keep its info accurate, and get a verified badge + modest ranking boost
++ a CTA button shown to couples.
 Full background: `Wedding Recon - Vendor Verification.pdf` (Kiara's spec) —
 but where that PDF and this doc disagree, **this doc wins**; it incorporates
 the review discussion that amended the spec.
@@ -25,13 +26,13 @@ the review discussion that amended the spec.
 
 | Decision | Resolution |
 |---|---|
-| Badge semantics | The badge asserts "identity confirmed + info maintained by the business". Payment is the gate, not the meaning. A small info affordance (tooltip/sheet) on the badge states this in one line. |
+| Badge semantics | The badge marks a paying vendor who claims and maintains this listing. The user-facing copy is ONLY the words "Verified vendor" — no identity-confirmation claim, no info popover, no extra sentence. Payment is the gate; the badge makes no assertion beyond "verified vendor". |
 | Badge color | Blue check (verified convention), NOT green (green = brand + venue category). Default `#2563EB`; must be visually checked side-by-side against photos-category blue `#378ADD` — a deeper blue + different shape (check-in-circle) is the separation. Badge = icon + "Verified vendor" subtext next to the name. |
 | Badge surfaces | Vendor page header, `vendor-preview-card.tsx` (covers cluster feed, results feed, pin peek, Hub at once). **Never on map pins** — the pin signal budget (dashed/ring/halo) is spent. |
 | Ranking | Verified sorts first **within its partition only**: a new key in `compareRanked()` immediately after the `rank` key (before `matched`). Applies to Explore's results feed + cluster feed (automatic — shared comparator). **The Hub is NOT re-sorted** — it is the couple's own planning space; badge yes, boost no. |
-| Vendor data | Vendor-entered data is a **separate labeled source, never an overwrite**. It lives in its own table and is merged at read time only while perks are active. Cancellation = the merge stops; `vendors` rows are never mutated by the portal. Pricing: displayed as its own labeled block; recon entries and recon-derived rank pricing are untouched. Factual overrides (website, instagram, filter tags) DO win over extracted data while active, labeled "Provided by vendor". |
+| Vendor data | Vendor-entered data is a **separate labeled source, never an overwrite**. It lives in its own table and is merged at read time only while perks are active. Cancellation = the merge stops; `vendors` rows are never mutated by the portal. Pricing: displayed as its own labeled block; recon entries and recon-derived rank pricing are untouched. Factual overrides (website, instagram, filter tags) DO win over extracted data while active, labeled "Provided by vendor" — but only at read time: the recon-/extraction-sourced values in `vendors` (including `vendors.filters`) are never mutated, so disabling perks reverts to the original data with no restore step (rollback is a boolean flip). |
 | Claims | **Auto-approved on submission.** Kiara reviews retroactively via (a) an email report per new claim + per completed checkout, and (b) a minimal admin page where she can revoke. No pre-approval gate anywhere in the flow. |
-| Billing | Stripe only. $120 Checkout up front covering 6 months, then $20/month auto-renew, via a Subscription Schedule (see Billing section). Stripe Customer Portal handles card updates/cancel/invoices. **Never build billing UI; never store card data.** |
+| Billing | Stripe only. ONE recurring price billed $120 every 6 months, auto-renewing every 6 months (effective $20/month) — no Subscription Schedule, no monthly price. Stripe Customer Portal handles card updates/cancel/invoices. **Never build billing UI; never store card data.** |
 | Free tier | None for now. Claiming is free to *do*, but nothing is published (no badge, no overrides, no CTA) until the subscription is active. |
 | Portal + recon | The portal **never displays recon entries and never links to the vendor's public page**. Vendors edit only their own draft fields. |
 | Portal layout | Responsive: must work well on phones AND desktop. Single column, `max-w-[760px]` (the Hub's width), fluid below that. No bottom nav, not inside the 480px app frame. |
@@ -49,10 +50,12 @@ the review discussion that amended the spec.
    written ONLY by the Stripe webhook route using the service-role client. It
    has no client RLS policies at all (no select needed client-side — the
    portal reads it through a server component).
-3. **Perks-active is one predicate, used everywhere:** claim `approved` AND
-   subscription active AND listing published. Implement it once as a SQL
-   helper (see migration 0043) and once in TS; never inline the logic a third
-   time.
+3. **Perks-active is one rule.** claim `approved` AND subscription `active`
+   AND listing `published`. It lives in exactly one SQL place — the
+   `verified_vendor_ids()` SECURITY DEFINER set function (migration 0044) —
+   consumed by the scalar wrapper `vendor_is_verified` (vendor page), the two
+   bbox RPCs (set-based left join, migration 0045), and the preview fetch. Plus
+   once in TS. Never inline the three conditions anywhere else.
 4. **RPC changes follow the 0034/0035 pattern:** `drop function` + `create`
    when the return shape changes, backward compatible in both directions,
    client guards with `=== true` so an unapplied migration degrades to
@@ -61,15 +64,26 @@ the review discussion that amended the spec.
    render logged out). The portal routes are the only new authed surface.
 6. Vendor-uploaded photos follow the existing pipeline: client-side compress
    (`lib/image-compress.ts`) + direct-to-Storage upload; Server Actions only
-   record paths. Never route image bytes through an action.
+   record paths (into `vendor_listings.photos`). Never route image bytes
+   through an action.
+7. **Vendor-claimant and site-admin are two disjoint roles; a claim never
+   grants admin.** Claiming inserts a `vendor_claims` row and nothing else — it
+   must NEVER set `profiles.is_admin`. The only write a claim confers is the
+   claim-scoped RLS on that vendor's own `vendor_listings` draft; it grants no
+   policy on `recon_entries` or `vendors`, so a claimant can edit their listing
+   and nothing else. The site-admin capability (`profiles.is_admin` /
+   `is_site_admin()` / the `admins update bot recon` policy from 0041 — editing
+   bot recon) is unchanged and unreachable from the portal: `/portal/admin`
+   gates on `isAdminUser()`, not on a claim. Do NOT widen the admin RLS or add
+   any recon-write policy for claimants.
 
-## Schema — four new migrations (numbering starts at 0041)
+## Schema — four new migrations (numbering starts at 0042; 0040 and 0041 are already taken)
 
 All idempotent, hand-applied in the Supabase SQL editor. Remember: no
 apostrophes in SQL comments, one ALTER per constraint, doubled apostrophes in
 string literals, no dollar-quoted bodies containing apostrophes.
 
-### 0041_vendor_claims.sql
+### 0042_vendor_claims.sql
 ```sql
 create table if not exists vendor_claims (
   id uuid primary key default gen_random_uuid(),
@@ -93,7 +107,7 @@ RLS: enable; authenticated users can `insert` a row for themselves
 policies (revocation goes through the service role via the admin page).
 Status defaults to `approved` — that IS the auto-approve.
 
-### 0042_vendor_listings.sql
+### 0043_vendor_listings.sql
 ```sql
 create table if not exists vendor_listings (
   vendor_id uuid primary key references vendors(id) on delete cascade,
@@ -104,6 +118,7 @@ create table if not exists vendor_listings (
   website text,
   instagram text,                   -- bare handle, same convention as vendors.instagram
   pricing jsonb not null default '[]'::jsonb, -- [{label, price, unit}]
+  photos jsonb not null default '[]'::jsonb, -- [{storage_path, thumb_path}], recon_media convention
   filter_overrides jsonb not null default '{}'::jsonb, -- same shape as vendors.filters
   published boolean not null default false,
   updated_at timestamptz not null default now()
@@ -115,7 +130,7 @@ and c.user_id = auth.uid() and c.status = 'approved')`. Public (anon) select
 is NOT granted — public reads go through the RPCs/joins which already gate on
 perks-active, and granting anon select would leak unpublished drafts.
 
-### 0043_vendor_subscriptions.sql
+### 0044_vendor_subscriptions.sql
 ```sql
 create table if not exists vendor_subscriptions (
   vendor_id uuid primary key references vendors(id) on delete cascade,
@@ -129,67 +144,102 @@ create table if not exists vendor_subscriptions (
 ```
 No RLS policies for clients (service-role writes only; enable RLS with no
 policies = deny all, which is correct).
-Also define the single perks predicate as a SQL function, used by 0044 and any
-future query:
+Define the perks rule ONCE, as a SECURITY DEFINER set function (used by 0045,
+the preview fetch, and the scalar wrapper). SECURITY DEFINER because it reads
+`vendor_subscriptions` (client deny-all) and the claim-scoped `vendor_listings`
+— a plain function would return false for every anon/public reader. Mirrors
+`is_site_admin()` from 0041. The three source tables hold only claimed/paying
+vendors, so the set is tiny; validate the merged hot path with `explain analyze`
+per the 0035 discipline. Also add the sibling that returns each verified
+vendor's published `filter_overrides`, so the read-time filter merge (0045) can
+reach the same claim-scoped rows through the same definer boundary — only
+`published` listings are ever returned, which are public by definition, so no
+draft leaks.
 ```sql
+-- canonical rule: the set of vendor ids whose perks are live.
+-- optional p_ids filters to a caller supplied list (the preview fetch);
+-- null returns every verified vendor (the bbox left join).
+create or replace function verified_vendor_ids(p_ids uuid[] default null)
+returns setof uuid language sql stable security definer as
+'select c.vendor_id
+   from vendor_claims c
+   join vendor_subscriptions s on s.vendor_id = c.vendor_id and s.status = ''active''
+   join vendor_listings l on l.vendor_id = c.vendor_id and l.published = true
+  where c.status = ''approved''
+    and (p_ids is null or c.vendor_id = any (p_ids))';
+
+-- verified vendors published filter overrides, for the read-time merge in 0045.
+create or replace function verified_listing_overrides(p_ids uuid[] default null)
+returns table (vendor_id uuid, filter_overrides jsonb)
+language sql stable security definer as
+'select l.vendor_id, l.filter_overrides
+   from vendor_listings l
+   join vendor_claims c on c.vendor_id = l.vendor_id and c.status = ''approved''
+   join vendor_subscriptions s on s.vendor_id = l.vendor_id and s.status = ''active''
+  where l.published = true
+    and (p_ids is null or l.vendor_id = any (p_ids))';
+
+-- thin scalar wrapper for single row callers (the vendor page). Not itself
+-- definer; it just consumes the definer set above, so the rule stays in one place.
 create or replace function vendor_is_verified(p_vendor_id uuid)
 returns boolean language sql stable as
-'select exists (
-   select 1 from vendor_claims c
-   join vendor_subscriptions s on s.vendor_id = c.vendor_id
-   join vendor_listings l on l.vendor_id = c.vendor_id
-   where c.vendor_id = p_vendor_id
-     and c.status = ''approved''
-     and s.status = ''active''
-     and l.published = true
- )';
+'select exists (select 1 from verified_vendor_ids(array[p_vendor_id]))';
 ```
 (Grace period: Stripe keeps status `active` until an invoice actually fails;
 `past_due` = perks off. That is the intended behavior — no custom grace logic.)
 
-### 0044_vendors_in_bbox_verified.sql
+### 0045_vendors_in_bbox_verified.sql
 Re-create `vendors_in_bbox` (drop + create, return shape changes) adding
-`verified boolean` (via `vendor_is_verified`, `coalesce(..., false)` — the
-0035 NULL lesson applies). Re-create `vendor_filters_in_bbox` so that for a
-verified vendor, `filters` is `vendors.filters || vendor_listings.filter_overrides`
-(jsonb concat: override keys win, extracted keys survive where not overridden).
-Client work in `vendor-map.tsx`: read `verified === true` per row, thread it
-into `RankedVendor`, and treat a missing column as false — so the app deploys
-before or after the migration with no coordination, same as 0034/0035.
+`verified boolean`. Compute it with a **set-based left join, never a per-row
+`vendor_is_verified` call** — this is the app's busiest query:
+`left join verified_vendor_ids() vv on vv = v.id`, `verified = (vv is not
+null)`. A left-join test is never NULL, but keep the client `=== true` guard so
+a pre-migration deploy reads every row as false (the 0035 lesson). Re-create
+`vendor_filters_in_bbox` so that for a verified vendor, `filters` is
+`vendors.filters || filter_overrides` (jsonb concat: override keys win,
+extracted keys survive where not overridden), sourcing the overrides from a
+`left join verified_listing_overrides() vo on vo.vendor_id = v.id`. **The merge
+is read-time only — `vendors.filters` (the recon-/extraction-sourced tags) is
+never mutated, so flipping perks off reverts to the exact original data with no
+restore step.** Both functions reach the deny-all / claim-scoped tables only
+through the SECURITY DEFINER helpers from 0044 (a definer setof function is
+safely callable from a non-definer one), so the bbox functions stay non-definer
+and nothing else about them changes. Validate the hot path with `explain
+analyze` like 0035. Client work in `vendor-map.tsx`: read `verified === true`
+per row, thread it into `RankedVendor`, treat a missing column as false —
+deploys before or after the migration with no coordination, same as 0034/0035.
 
 ## Billing (Stripe)
 
-**Products/prices (one-time setup in the Stripe dashboard, document IDs in
-`.env.local`):** one Product "Vendor Verification"; Price A = $120 every 6
-months; Price B = $20 monthly.
+**Product/price (one-time setup in the Stripe dashboard, document the id in
+`.env.local`):** one Product "Vendor Verification" with ONE recurring Price =
+$120 every 6 months. No monthly price, no Subscription Schedule, no phases, no
+proration. It simply auto-renews every 6 months (effective $20/month).
 
 **Purchase flow:** portal "Activate verification" button → server action
-creates a Checkout Session (mode `subscription`, Price A, `client_reference_id`
-= vendor_id, customer email prefilled) → redirect to Stripe → success URL back
-to the portal.
+creates a Checkout Session (mode `subscription`, the 6-month price,
+`client_reference_id` = vendor_id, customer email prefilled) → redirect to
+Stripe → success URL back to the portal.
 
 **Webhook route** `app/api/stripe-webhook/route.ts` (verify signature with
 `STRIPE_WEBHOOK_SECRET`; service-role client; idempotent handlers):
 - `checkout.session.completed`: upsert `vendor_subscriptions` (customer id,
-  subscription id, status active, period end). Then create a Subscription
-  Schedule `from_subscription`, phases = [current phase: Price A, 1 iteration,
-  then: Price B monthly], `end_behavior: 'release'`. Release means that after
-  month 6 it becomes a plain monthly subscription with full Customer Portal
-  support. Send the claim-report email (below) noting payment completed.
+  subscription id, status active, `current_period_end`). Send the claim-report
+  email (below) noting payment completed. That is the whole handler — no
+  schedule to create.
 - `customer.subscription.updated` / `invoice.paid` / `invoice.payment_failed`
   / `customer.subscription.deleted`: mirror status + `current_period_end` onto
   the row.
 
 **Cancel/card management:** the portal's billing card links to a Stripe
-Customer Portal session (server action creates it). During the prepaid phase a
-cancel = no renewal at month 6 (they keep what they paid for); after release,
-standard monthly cancel-at-period-end. Configure the Customer Portal in the
-Stripe dashboard: cancel enabled, plan switching disabled.
+Customer Portal session (server action creates it). Cancel =
+cancel-at-period-end → no renewal at the next 6-month boundary; they keep perks
+until `current_period_end`. Configure the Customer Portal in the Stripe
+dashboard: cancel enabled, plan switching disabled.
 
-**Env:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-`STRIPE_PRICE_6MO`, `STRIPE_PRICE_MONTHLY` in `.env.local` + `.env.example`
-with comments in `SETUP.md`. The `stripe` npm package is the one new
-dependency (free).
+**Env:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_6MO` in
+`.env.local` + `.env.example` with comments in `SETUP.md`. The `stripe` npm
+package is the one new dependency (free).
 
 **Refund/abuse runbook (manual, for Kiara, include in the portal admin page as
 a note):** if a claim turns out fraudulent — revoke the claim in the admin
@@ -230,9 +280,9 @@ Screens:
    handle the 23505 gracefully, existing convention).
 3. **`/portal/listing`** — the editor: intro (char-limited textarea), CTA
    label (select from the enum) + URL, website, instagram, photos (max 4,
-   existing compress+upload pipeline, storage prefix `vendor-media/`),
-   pricing rows (add/remove/reorder rows of label/price/unit), and the filter
-   tag editor. **Filter controls are generated from
+   existing compress+upload pipeline, storage prefix `vendor-media/`, paths
+   recorded on `vendor_listings.photos`), pricing rows (add/remove/reorder rows
+   of label/price/unit), and the filter tag editor. **Filter controls are generated from
    `filtersForType(vendorType)` in `lib/constants/vendor-filters.ts`** — the
    same `FilterDef[]` the Explore filter sheet renders, so the editable set
    can never drift from the filterable set. `multi` → checkboxes, `bool` →
@@ -243,10 +293,11 @@ Screens:
    active; if billing is not active, save as draft and surface the Activate
    step).
 4. **`/portal/billing`** — status + the Checkout / Customer Portal links.
-5. **`/portal/admin`** — Kiara only: gate on `getClaims()` sub equal to env
-   `ADMIN_USER_ID`. Table of claims (newest first) with the domain-match
-   flag, subscription status, and a Revoke button (server action, service
-   role: set claim `revoked` + `revoked_at`). Nothing fancier.
+5. **`/portal/admin`** — site admin only: gate on the existing `isAdminUser()`
+   (`profiles.is_admin`, migration 0041) — NOT on holding a vendor claim, so a
+   vendor can never reach it. Table of claims (newest first) with the
+   domain-match flag, subscription status, and a Revoke button (server action,
+   service role: set claim `revoked` + `revoked_at`). Nothing fancier.
 
 **The portal never renders recon entries and never links to the public vendor
 page.** The live preview renders only vendor-entered fields.
@@ -254,25 +305,33 @@ page.** The live preview renders only vendor-entered fields.
 ## Public app surfaces
 
 1. **`VerifiedBadge` component** (`components/vendor/verified-badge.tsx`):
-   blue check-in-circle + "Verified vendor" text, with an info popover: "This
-   business confirmed its identity and maintains its own listing info." One
-   component, used everywhere the badge appears.
+   blue check-in-circle + "Verified vendor" text, and nothing else — no info
+   popover, no tooltip copy, no identity claim. One component, used everywhere
+   the badge appears.
 2. **Vendor page** (`app/(app)/vendor/[id]/page.tsx`): extend the existing
    cached `getVendor(id)` query (React `cache()` — keep the one-query rule)
-   to join `vendor_listings` + the verified predicate. When verified: a
-   compact header block above the photos — badge, intro clamped to 2 lines
-   with an expand toggle, CTA button (`<ExternalLink>`,
-   `cn(buttonVariants())`). Pricing rows render as a collapsible section
-   BELOW the photo strip, labeled "Pricing - provided by vendor". Website /
+   to join `vendor_listings` + the verified flag. The "Verified vendor" badge
+   sits next to the vendor name in the page header. When verified, the whole
+   vendor-provided block renders **below the photo strip** (try this placement
+   first, adjust if it reads off): intro clamped to 2 lines with an expand
+   toggle, CTA button (`<ExternalLink>`, `cn(buttonVariants())`), then the
+   pricing rows as a collapsible section labeled "Pricing - provided by
+   vendor". Vendor-uploaded photos are prepended to the single photo strip
+   (`vendor-photos.tsx`) — **sorted before recon and Google photos** — each
+   carrying a "Provided by vendor" per-tile badge (the existing
+   `LightboxPhoto.badge` mechanism, same as the "Google" chip). Website /
    instagram links and the filter chips show a small "Provided by vendor"
    annotation when they come from overrides. **Acceptance gate: on a 390x844
    viewport the first recon card must still be reachable at or near the fold
-   — measure before/after like the media-block work did; if the header pushes
-   recon meaningfully down, tighten the header, not the recon.**
+   — measure before/after like the media-block work did; if the block pushes
+   recon meaningfully down, tighten the block, not the recon.**
 3. **Preview card** (`components/map/vendor-preview-card.tsx`): badge next to
-   the name. `useVendorPreviews` must select the verified flag (add to its
-   query); all four surfaces (cluster feed, results feed, pin peek, Hub) get
-   it automatically.
+   the name. `useVendorPreviews` fetches by plain table select, which cannot
+   read the deny-all subscriptions table under the caller RLS, so it resolves
+   the verified set with one extra `.rpc("verified_vendor_ids", { p_ids })`
+   call (the SECURITY DEFINER set function from migration 0044) and marks those
+   ids verified. All four surfaces (cluster feed, results feed, pin peek, Hub)
+   get it automatically.
 4. **List order** (`components/map/vendor-map.tsx`): add `verified` to
    `RankedVendor`; in `compareRanked()` insert the key after `rank`, before
    `matched`. Missing/undefined compares as false (`=== true`). Update
@@ -300,13 +359,13 @@ clicks") — no extra infra needed to add that to the portal later.
 
 ## Build order (each phase ships and builds independently)
 
-**Phase 1 — claims + portal shell.** Migrations 0041–0043 written (hand-apply
+**Phase 1 — claims + portal shell.** Migrations 0042–0044 written (hand-apply
 checklist in the PR description), portal route group + auth + claim flow +
 admin page + claim-report email. Gate: a fresh account can claim a seeded
 vendor end to end; second claim on the same vendor is cleanly refused; report
 email arrives (or logs when key unset); `npm run build` passes.
 
-**Phase 2 — editor + public surfaces.** Migration 0044, listing editor with
+**Phase 2 — editor + public surfaces.** Migration 0045, listing editor with
 live preview, vendor page header + pricing block, badge on card + page,
 comparator key, RPC merge. Gate: with a hand-inserted active subscription row,
 the badge/CTA/overrides appear everywhere listed and vanish when the row is
@@ -314,11 +373,10 @@ flipped inactive; the fold measurement passes; `verify` skill walk of Explore
 list order shows the verified vendor first within its partition and NOT above
 the partial-match divider when it is a partial match.
 
-**Phase 3 — Stripe.** Checkout, webhook, schedule creation, Customer Portal
-link, billing card. Gate: Stripe test-mode end-to-end (test clock optional but
-recommended for the 6-month phase transition); webhook signature verification
-rejects unsigned payloads; canceling in the Customer Portal flips perks off at
-period end.
+**Phase 3 — Stripe.** Checkout, webhook, Customer Portal link, billing card.
+Gate: Stripe test-mode end-to-end; webhook signature verification rejects
+unsigned payloads; canceling in the Customer Portal flips perks off at period
+end.
 
 **Phase 4 — analytics + acquisition links.** Events above, the two links.
 Gate: events visible in PostHog; links present; build passes.
