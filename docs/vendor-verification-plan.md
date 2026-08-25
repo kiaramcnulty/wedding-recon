@@ -26,14 +26,14 @@ the review discussion that amended the spec.
 
 | Decision | Resolution |
 |---|---|
-| Badge semantics | The badge marks a paying vendor who claims and maintains this listing. The user-facing copy is ONLY the words "Verified vendor" — no identity-confirmation claim, no info popover, no extra sentence. Payment is the gate; the badge makes no assertion beyond "verified vendor". |
-| Badge color | Blue check (verified convention), NOT green (green = brand + venue category). Default `#2563EB`; must be visually checked side-by-side against photos-category blue `#378ADD` — a deeper blue + different shape (check-in-circle) is the separation. Badge = icon + "Verified vendor" subtext next to the name. |
+| Badge semantics | The badge marks a paying vendor who claims and maintains this listing. The user-facing copy is ONLY the words "Vendor verified" (that exact word order, everywhere) — no identity-confirmation claim, no info popover, no extra sentence. Payment is the gate; the badge makes no assertion beyond "vendor verified". |
+| Badge color | Blue check (verified convention), NOT green (green = brand + venue category). Default `#2563EB`; must be visually checked side-by-side against photos-category blue `#378ADD` — a deeper blue + different shape (check-in-circle) is the separation. Badge = icon + "Vendor verified" subtext next to the name. |
 | Badge surfaces | Vendor page header, `vendor-preview-card.tsx` (covers cluster feed, results feed, pin peek, Hub at once). **Never on map pins** — the pin signal budget (dashed/ring/halo) is spent. |
 | Ranking | Verified sorts first **within its partition only**: a new key in `compareRanked()` immediately after the `rank` key (before `matched`). Applies to Explore's results feed + cluster feed (automatic — shared comparator). **The Hub is NOT re-sorted** — it is the couple's own planning space; badge yes, boost no. |
 | Vendor data | Vendor-entered data is a **separate labeled source, never an overwrite**. It lives in its own table and is merged at read time only while perks are active. Cancellation = the merge stops; `vendors` rows are never mutated by the portal. Pricing: displayed as its own labeled block; recon entries and recon-derived rank pricing are untouched. Factual overrides (website, instagram, filter tags) DO win over extracted data while active, labeled "Provided by vendor" — but only at read time: the recon-/extraction-sourced values in `vendors` (including `vendors.filters`) are never mutated, so disabling perks reverts to the original data with no restore step (rollback is a boolean flip). |
 | Claims | **Auto-approved on submission.** Kiara reviews retroactively via (a) an email report per new claim + per completed checkout, and (b) a minimal admin page where she can revoke. No pre-approval gate anywhere in the flow. |
 | Billing | Stripe only. ONE recurring price billed $120 every 6 months, auto-renewing every 6 months (effective $20/month) — no Subscription Schedule, no monthly price. Stripe Customer Portal handles card updates/cancel/invoices. **Never build billing UI; never store card data.** |
-| Free tier | None for now. Claiming is free to *do*, but nothing is published (no badge, no overrides, no CTA) until the subscription is active. |
+| Free tier | None for now. Claiming is free to *do*, and a claimant can draft their whole listing before paying — but nothing is published (no badge, no overrides, no CTA, no photos) until the subscription is active. The flow is claim → edit listing → pay; payment publishes work the vendor has already invested. |
 | Portal + recon | The portal **never displays recon entries and never links to the vendor's public page**. Vendors edit only their own draft fields. |
 | Portal layout | Responsive: must work well on phones AND desktop. Single column, `max-w-[760px]` (the Hub's width), fluid below that. No bottom nav, not inside the 480px app frame. |
 | Pricing input | Repeatable rows `{label, price, unit}`, not an n×n grid. The editor shows a live rendered preview of the public pricing block so vendors can see the formatting they get. |
@@ -150,7 +150,11 @@ Define the perks rule ONCE, as a SECURITY DEFINER set function (used by 0045,
 the preview fetch, and the scalar wrapper). SECURITY DEFINER because it reads
 `vendor_subscriptions` (client deny-all) and the claim-scoped `vendor_listings`
 — a plain function would return false for every anon/public reader. Mirrors
-`is_site_admin()` from 0041. The three source tables hold only claimed/paying
+`is_site_admin()` from 0041. **Every SECURITY DEFINER function MUST pin its
+search path (`set search_path = public` in the function definition, as below)**
+— a definer function with a mutable search path is a privilege-escalation
+foothold and the Supabase linter flags it; the non-definer wrapper does not
+need it. The three source tables hold only claimed/paying
 vendors, so the set is tiny; validate the merged hot path with `explain analyze`
 per the 0035 discipline. Also add the sibling that returns each verified
 vendor's published `filter_overrides`, so the read-time filter merge (0045) can
@@ -162,7 +166,8 @@ draft leaks.
 -- optional p_ids filters to a caller supplied list (the preview fetch);
 -- null returns every verified vendor (the bbox left join).
 create or replace function verified_vendor_ids(p_ids uuid[] default null)
-returns setof uuid language sql stable security definer as
+returns setof uuid language sql stable security definer
+set search_path = public as
 'select c.vendor_id
    from vendor_claims c
    join vendor_subscriptions s on s.vendor_id = c.vendor_id and s.status = ''active''
@@ -173,7 +178,8 @@ returns setof uuid language sql stable security definer as
 -- verified vendors published filter overrides, for the read-time merge in 0045.
 create or replace function verified_listing_overrides(p_ids uuid[] default null)
 returns table (vendor_id uuid, filter_overrides jsonb)
-language sql stable security definer as
+language sql stable security definer
+set search_path = public as
 'select l.vendor_id, l.filter_overrides
    from vendor_listings l
    join verified_vendor_ids(p_ids) vv on vv = l.vendor_id';
@@ -186,13 +192,6 @@ returns boolean language sql stable as
 ```
 (Grace period: Stripe keeps status `active` until an invoice actually fails;
 `past_due` = perks off. That is the intended behavior — no custom grace logic.)
-
-### 0046_stripe_webhook_events.sql
-Stripe retries and can deliver events out of order. Persist each processed Stripe
-event id in a small service-role-only table (primary key `stripe_event_id`, plus
-`processed_at`) before sending the claim report or PostHog event. A duplicate
-delivery must be acknowledged without repeating side effects. The webhook still
-upserts the subscription state so later authoritative subscription events win.
 
 ### 0045_vendors_in_bbox_verified.sql
 Re-create `vendors_in_bbox` (drop + create, return shape changes) adding
@@ -215,6 +214,14 @@ analyze` like 0035. Client work in `vendor-map.tsx`: read `verified === true`
 per row, thread it into `RankedVendor`, treat a missing column as false —
 deploys before or after the migration with no coordination, same as 0034/0035.
 
+### 0046_stripe_webhook_events.sql
+Stripe retries and can deliver events out of order. Persist each processed Stripe
+event id in a small service-role-only table (primary key `stripe_event_id`, plus
+`processed_at`) before sending the claim report or PostHog event. A duplicate
+delivery must be acknowledged without repeating side effects. The webhook still
+upserts the subscription state so later authoritative subscription events win.
+(Applied in Phase 3, with the webhook — the numeric order is also the apply order.)
+
 ## Billing (Stripe)
 
 **Product/price (one-time setup in the Stripe dashboard, document the id in
@@ -234,9 +241,12 @@ existing billing-management path instead.
 `STRIPE_WEBHOOK_SECRET`; service-role client; idempotent handlers):
 - `checkout.session.completed`: retrieve the referenced Stripe subscription and
   upsert its customer id, subscription id, actual status, and
-  `current_period_end`. Never infer `active` from checkout completion. Send the
-  claim-report email (below) only after the event-id dedupe succeeds. That is
-  the whole handler — no schedule to create.
+  `current_period_end`. Never infer `active` from checkout completion. If the
+  retrieved status is `active` and a `vendor_listings` row exists for the
+  vendor, set `published = true` (service role) — this is what publishes a
+  draft the vendor wrote before paying. Send the claim-report email (below)
+  only after the event-id dedupe succeeds. That is the whole handler — no
+  schedule to create.
 - `customer.subscription.updated` / `invoice.paid` / `invoice.payment_failed`
   / `customer.subscription.deleted`: resolve the subscription and mirror its
   actual status + `current_period_end` onto the row. Event ordering must not
@@ -299,11 +309,18 @@ Screens:
    can never drift from the filterable set. `multi` → checkboxes, `bool` →
    yes/no/unset (unset = no override), `range` → min/max inputs. Below the
    form: a live preview of the public pricing block + intro exactly as the
-   vendor page will render them. This route is available only with an active
-   subscription. The Save action re-checks that status server-side and, if it
-   is not active, writes nothing and sends the vendor to Activate verification.
-   There are no vendor listing drafts. Every successful Save upserts
-   `vendor_listings` with `published = true`.
+   vendor page will render them. **This route is available to any approved
+   claimant, paid or not — drafting before paying is the conversion design**
+   (the flow is claim → edit listing → pay; payment publishes work the vendor
+   already invested). The Save action re-checks the subscription status
+   server-side and upserts `vendor_listings` with `published` = (subscription
+   active): an unpaid save persists as a draft (`published = false`) and the
+   portal then surfaces the Activate verification step; a paid save publishes.
+   Draft-leak containment is structural, not procedural: `vendor_listings` has
+   no anon select, every public read path goes through the perks-active definer
+   functions (which require `published = true`), and the live preview renders
+   only inside the authed portal — so a draft is unreachable from any public
+   surface by construction.
 4. **`/portal/billing`** — status + the Checkout / Customer Portal links.
 5. **`/portal/admin`** — site admin only: gate on the existing `isAdminUser()`
    (`profiles.is_admin`, migration 0041) — NOT on holding a vendor claim, so a
@@ -314,33 +331,39 @@ Screens:
 **The portal never renders recon entries and never links to the public vendor
 page.** The live preview renders only vendor-entered fields.
 
-**Vendor photo storage:** add a `vendor-media` bucket and narrow Storage RLS.
-An upload path must be namespaced by the claimed vendor id and authenticated
-user id. Insert/update/delete policies must require that namespace, `owner =
-auth.uid()`, and an approved claim for that vendor; public read is allowed only
-for paths referenced by a perks-active published listing (serve through a
-server-authorized URL if a Storage policy cannot express that predicate).
-Validate the same path ownership again in the Save action before recording it
-in `vendor_listings.photos`.
+**Vendor photo storage:** add a `vendor-media` bucket following the
+`recon-media` pattern: **public read, writes scoped by RLS.** Upload paths are
+namespaced `<vendor_id>/<user_id>/<uuid>...`; insert/update/delete policies
+require that namespace, `owner = auth.uid()`, and an approved claim for that
+vendor. Do NOT build a conditional-read policy or a serving proxy — a Storage
+policy cannot reasonably express "referenced by a published listing", and it
+is not needed: paths are unguessable uuids, nothing public references them
+until the listing publishes, and this is exactly the exposure `recon-media`
+already accepts (photos upload before the recon entry exists). Validate path
+ownership again in the Save action before recording paths in
+`vendor_listings.photos`.
 
 ## Public app surfaces
 
 1. **`VerifiedBadge` component** (`components/vendor/verified-badge.tsx`):
-   blue check-in-circle + "Verified vendor" text, and nothing else — no info
+   blue check-in-circle + "Vendor verified" text, and nothing else — no info
    popover, no tooltip copy, no identity claim. One component, used everywhere
    the badge appears.
 2. **Vendor page** (`app/(app)/vendor/[id]/page.tsx`): extend the existing
    cached `getVendor(id)` query (React `cache()` — keep the one-query rule)
-   to join `vendor_listings` + the verified flag. The "Verified vendor" badge
+   to join `vendor_listings` + the verified flag. The "Vendor verified" badge
    sits next to the vendor name in the page header. When verified, the whole
    vendor-provided block renders **below the photo strip** (try this placement
    first, adjust if it reads off): intro clamped to 2 lines with an expand
    toggle, CTA button (`<ExternalLink>`, `cn(buttonVariants())`), then the
    pricing rows as a collapsible section labeled "Pricing - provided by
-   vendor". Vendor-uploaded photos are prepended to the single photo strip
-   (`vendor-photos.tsx`) — **sorted before recon and Google photos** — each
-   carrying a "Provided by vendor" per-tile badge (the existing
-   `LightboxPhoto.badge` mechanism, same as the "Google" chip). Website /
+   vendor". Vendor-uploaded photos join the single photo strip
+   (`vendor-photos.tsx`) in the order **recon photos → vendor photos → Google
+   photos** — recon stays first on purpose (the strip's documented principle:
+   community content leads, marketing never reads as official, and the page's
+   job is getting the reader to the recon). Vendor tiles carry a "Provided by
+   vendor" per-tile badge (the existing `LightboxPhoto.badge` mechanism, same
+   as the "Google" chip). Website /
    instagram links and the filter chips show a small "Provided by vendor"
    annotation when they come from overrides. **Acceptance gate: on a 390x844
    viewport the first recon card must still be reachable at or near the fold
@@ -386,20 +409,24 @@ admin page + claim-report email. Gate: a fresh account can claim a seeded
 vendor end to end; second claim on the same vendor is cleanly refused; report
 email arrives (or logs when key unset); `npm run build` passes.
 
-**Phase 2 — editor + public surfaces.** Migration 0045, subscription-gated
-listing editor with no draft persistence, live preview, vendor page header +
-pricing block, badge on card + page,
-comparator key, RPC merge. Gate: with a hand-inserted active subscription row,
-the badge/CTA/overrides appear everywhere listed and vanish when the row is
-flipped inactive; the fold measurement passes; `verify` skill walk of Explore
-list order shows the verified vendor first within its partition and NOT above
-the partial-match divider when it is a partial match.
+**Phase 2 — editor + public surfaces.** Migration 0045, listing editor
+(draft-then-activate: open to any approved claimant, `published` tracks
+subscription status), live preview, vendor page header + pricing block, badge
+on card + page, comparator key, RPC merge. Gate: with a hand-inserted active
+subscription row, the badge/CTA/overrides appear everywhere listed and vanish
+when the row is flipped inactive; an unpaid claimant's saved draft is
+confirmed unreachable from every public surface (vendor page, both feeds, the
+RPCs called as anon); the fold measurement passes; `verify` skill walk of
+Explore list order shows the verified vendor first within its partition and
+NOT above the partial-match divider when it is a partial match.
 
 **Phase 3 — Stripe.** Migration 0046, Checkout, webhook, Customer Portal link,
-billing card. Gate: Stripe test-mode end-to-end; webhook signature verification
-rejects unsigned payloads; duplicate and out-of-order webhook deliveries do not
-repeat notifications or regress the stored state; canceling in the Customer
-Portal flips perks off at period end.
+billing card. Gate: Stripe test-mode end-to-end, including the draft path — a
+listing saved before payment goes live (published, badge visible) when the
+test checkout completes; webhook signature verification rejects unsigned
+payloads; duplicate and out-of-order webhook deliveries do not repeat
+notifications or regress the stored state; canceling in the Customer Portal
+flips perks off at period end.
 
 **Phase 4 — analytics + acquisition links.** Events above, the two links.
 Gate: events visible in PostHog; links present; build passes.
