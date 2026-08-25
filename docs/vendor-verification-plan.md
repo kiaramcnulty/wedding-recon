@@ -77,7 +77,7 @@ the review discussion that amended the spec.
    gates on `isAdminUser()`, not on a claim. Do NOT widen the admin RLS or add
    any recon-write policy for claimants.
 
-## Schema — four new migrations (numbering starts at 0042; 0040 and 0041 are already taken)
+## Schema — five new migrations (numbering starts at 0042; 0040 and 0041 are already taken)
 
 All idempotent, hand-applied in the Supabase SQL editor. Remember: no
 apostrophes in SQL comments, one ALTER per constraint, doubled apostrophes in
@@ -125,10 +125,12 @@ create table if not exists vendor_listings (
 );
 ```
 RLS: enable; select/insert/update allowed when the caller holds the approved
-claim: `exists (select 1 from vendor_claims c where c.vendor_id = vendor_id
-and c.user_id = auth.uid() and c.status = 'approved')`. Public (anon) select
-is NOT granted — public reads go through the RPCs/joins which already gate on
-perks-active, and granting anon select would leak unpublished drafts.
+claim for **this listing**: `exists (select 1 from vendor_claims c where
+c.vendor_id = vendor_listings.vendor_id and c.user_id = auth.uid() and
+c.status = 'approved')`. Use the same explicitly qualified predicate in both
+the `USING` and `WITH CHECK` clauses. Public (anon) select is NOT granted —
+public reads go through the RPCs/joins which already gate on perks-active, and
+granting anon select would leak unpublished drafts.
 
 ### 0044_vendor_subscriptions.sql
 ```sql
@@ -174,10 +176,7 @@ returns table (vendor_id uuid, filter_overrides jsonb)
 language sql stable security definer as
 'select l.vendor_id, l.filter_overrides
    from vendor_listings l
-   join vendor_claims c on c.vendor_id = l.vendor_id and c.status = ''approved''
-   join vendor_subscriptions s on s.vendor_id = l.vendor_id and s.status = ''active''
-  where l.published = true
-    and (p_ids is null or l.vendor_id = any (p_ids))';
+   join verified_vendor_ids(p_ids) vv on vv = l.vendor_id';
 
 -- thin scalar wrapper for single row callers (the vendor page). Not itself
 -- definer; it just consumes the definer set above, so the rule stays in one place.
@@ -187,6 +186,13 @@ returns boolean language sql stable as
 ```
 (Grace period: Stripe keeps status `active` until an invoice actually fails;
 `past_due` = perks off. That is the intended behavior — no custom grace logic.)
+
+### 0046_stripe_webhook_events.sql
+Stripe retries and can deliver events out of order. Persist each processed Stripe
+event id in a small service-role-only table (primary key `stripe_event_id`, plus
+`processed_at`) before sending the claim report or PostHog event. A duplicate
+delivery must be acknowledged without repeating side effects. The webhook still
+upserts the subscription state so later authoritative subscription events win.
 
 ### 0045_vendors_in_bbox_verified.sql
 Re-create `vendors_in_bbox` (drop + create, return shape changes) adding
@@ -217,19 +223,24 @@ $120 every 6 months. No monthly price, no Subscription Schedule, no phases, no
 proration. It simply auto-renews every 6 months (effective $20/month).
 
 **Purchase flow:** portal "Activate verification" button → server action
-creates a Checkout Session (mode `subscription`, the 6-month price,
-`client_reference_id` = vendor_id, customer email prefilled) → redirect to
-Stripe → success URL back to the portal.
+authorizes the current user's approved claim and derives its `vendor_id`
+server-side → creates a Checkout Session (mode `subscription`, the 6-month
+price, `client_reference_id` = vendor_id, customer email prefilled) → redirect
+to Stripe → success URL back to the portal. Do not create a second Checkout
+Session when that vendor already has a live or pending subscription; return the
+existing billing-management path instead.
 
 **Webhook route** `app/api/stripe-webhook/route.ts` (verify signature with
 `STRIPE_WEBHOOK_SECRET`; service-role client; idempotent handlers):
-- `checkout.session.completed`: upsert `vendor_subscriptions` (customer id,
-  subscription id, status active, `current_period_end`). Send the claim-report
-  email (below) noting payment completed. That is the whole handler — no
-  schedule to create.
+- `checkout.session.completed`: retrieve the referenced Stripe subscription and
+  upsert its customer id, subscription id, actual status, and
+  `current_period_end`. Never infer `active` from checkout completion. Send the
+  claim-report email (below) only after the event-id dedupe succeeds. That is
+  the whole handler — no schedule to create.
 - `customer.subscription.updated` / `invoice.paid` / `invoice.payment_failed`
-  / `customer.subscription.deleted`: mirror status + `current_period_end` onto
-  the row.
+  / `customer.subscription.deleted`: resolve the subscription and mirror its
+  actual status + `current_period_end` onto the row. Event ordering must not
+  let an older event overwrite newer Stripe state.
 
 **Cancel/card management:** the portal's billing card links to a Stripe
 Customer Portal session (server action creates it). Cancel =
@@ -288,10 +299,11 @@ Screens:
    can never drift from the filterable set. `multi` → checkboxes, `bool` →
    yes/no/unset (unset = no override), `range` → min/max inputs. Below the
    form: a live preview of the public pricing block + intro exactly as the
-   vendor page will render them. One Save button (server action, upsert
-   `vendor_listings`, `published = true` on first save once billing is
-   active; if billing is not active, save as draft and surface the Activate
-   step).
+   vendor page will render them. This route is available only with an active
+   subscription. The Save action re-checks that status server-side and, if it
+   is not active, writes nothing and sends the vendor to Activate verification.
+   There are no vendor listing drafts. Every successful Save upserts
+   `vendor_listings` with `published = true`.
 4. **`/portal/billing`** — status + the Checkout / Customer Portal links.
 5. **`/portal/admin`** — site admin only: gate on the existing `isAdminUser()`
    (`profiles.is_admin`, migration 0041) — NOT on holding a vendor claim, so a
@@ -301,6 +313,15 @@ Screens:
 
 **The portal never renders recon entries and never links to the public vendor
 page.** The live preview renders only vendor-entered fields.
+
+**Vendor photo storage:** add a `vendor-media` bucket and narrow Storage RLS.
+An upload path must be namespaced by the claimed vendor id and authenticated
+user id. Insert/update/delete policies must require that namespace, `owner =
+auth.uid()`, and an approved claim for that vendor; public read is allowed only
+for paths referenced by a perks-active published listing (serve through a
+server-authorized URL if a Storage policy cannot express that predicate).
+Validate the same path ownership again in the Save action before recording it
+in `vendor_listings.photos`.
 
 ## Public app surfaces
 
@@ -365,18 +386,20 @@ admin page + claim-report email. Gate: a fresh account can claim a seeded
 vendor end to end; second claim on the same vendor is cleanly refused; report
 email arrives (or logs when key unset); `npm run build` passes.
 
-**Phase 2 — editor + public surfaces.** Migration 0045, listing editor with
-live preview, vendor page header + pricing block, badge on card + page,
+**Phase 2 — editor + public surfaces.** Migration 0045, subscription-gated
+listing editor with no draft persistence, live preview, vendor page header +
+pricing block, badge on card + page,
 comparator key, RPC merge. Gate: with a hand-inserted active subscription row,
 the badge/CTA/overrides appear everywhere listed and vanish when the row is
 flipped inactive; the fold measurement passes; `verify` skill walk of Explore
 list order shows the verified vendor first within its partition and NOT above
 the partial-match divider when it is a partial match.
 
-**Phase 3 — Stripe.** Checkout, webhook, Customer Portal link, billing card.
-Gate: Stripe test-mode end-to-end; webhook signature verification rejects
-unsigned payloads; canceling in the Customer Portal flips perks off at period
-end.
+**Phase 3 — Stripe.** Migration 0046, Checkout, webhook, Customer Portal link,
+billing card. Gate: Stripe test-mode end-to-end; webhook signature verification
+rejects unsigned payloads; duplicate and out-of-order webhook deliveries do not
+repeat notifications or regress the stored state; canceling in the Customer
+Portal flips perks off at period end.
 
 **Phase 4 — analytics + acquisition links.** Events above, the two links.
 Gate: events visible in PostHog; links present; build passes.
