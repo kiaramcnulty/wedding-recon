@@ -25,6 +25,7 @@ import { VendorMapPreview } from "@/components/vendor/vendor-map-preview";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { VendorPhotos } from "@/components/vendor/vendor-photos";
 import { ReconCard } from "@/components/vendor/recon-card";
+import { VerifiedBadge } from "@/components/vendor/verified-badge";
 import { SaveButton } from "@/components/vendor/save-button";
 import { ShareButton } from "@/components/vendor/share-button";
 import { BackButton } from "@/components/vendor/back-button";
@@ -162,7 +163,7 @@ export default async function VendorPage({
   // recon here" check must stay a separate query (it counts `flagged` entries,
   // which the active-only list above does not include). getVendorGooglePhotos
   // only touches the network on a cache miss, so it's usually free.
-  const [existingRes, googlePhotos, coordsRes, viewerIsAdmin] =
+  const [existingRes, googlePhotos, coordsRes, viewerIsAdmin, verifiedRes] =
     await Promise.all([
       userId
         ? supabase
@@ -184,9 +185,15 @@ export default async function VendorPage({
         : Promise.resolve({ data: null }),
       // Site admins get an edit control on bot-authored recon below (0041).
       isAdminUser(supabase, userId),
+      // Vendor Verification badge. The scalar wrapper over verified_vendor_ids
+      // (migration 0044). Errors are swallowed by design: until that migration
+      // is hand-applied the call fails, `data` is null, and the page renders
+      // with no badge exactly as it does today.
+      supabase.rpc("vendor_is_verified", { p_vendor_id: id }),
     ]);
   const userHasRecon = !!existingRes.data;
   const coords = coordsRes.data as { lng: number; lat: number } | null;
+  const isVerified = verifiedRes.data === true;
 
   // Distinct author names for the "Photos via Google" caption.
   const googleCredit =
@@ -265,14 +272,18 @@ export default async function VendorPage({
             <CategoryIcon className="size-5" />
           </div>
 
-          {/* Name + category label */}
+          {/* Name + category label, with the Vendor Verification badge under
+              the name when this is a paying verified vendor. */}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <h1 className="font-heading text-lg font-semibold leading-tight truncate">
               {vendor.name}
             </h1>
-            <span className="text-xs font-medium" style={{ color: colorHex }}>
-              {categoryLabel}
-            </span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="text-xs font-medium" style={{ color: colorHex }}>
+                {categoryLabel}
+              </span>
+              {isVerified && <VerifiedBadge />}
+            </div>
           </div>
 
           {/* Action buttons */}

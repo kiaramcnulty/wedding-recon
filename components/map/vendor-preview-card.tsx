@@ -11,6 +11,7 @@ import { sortReconEntries } from "@/lib/recon-sort";
 import type { FilterSelection, VendorFilters } from "@/lib/filters/match";
 import { vendorTags } from "@/lib/filters/vendor-tags";
 import { VendorTagPreview } from "@/components/vendor/vendor-tags";
+import { VerifiedBadge } from "@/components/vendor/verified-badge";
 import { cn } from "@/lib/utils";
 
 /**
@@ -50,6 +51,13 @@ export interface VendorPreview {
   slides: ReconSlide[];
   /** The vendor's raw filter attributes, for the tag pills. */
   filters: VendorFilters;
+  /**
+   * Vendor Verification: a paying, verified vendor gets the badge. Resolved by a
+   * separate `verified_vendor_ids` RPC (see the fetch below), not from the
+   * vendor row — a plain table select cannot read the deny-all subscriptions
+   * table under caller RLS.
+   */
+  verified: boolean;
 }
 
 /** Minimal row shapes for the on-tap detail fetch (client queries are untyped). */
@@ -127,7 +135,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
     if (idList.length === 0) return;
     (async () => {
       const supabase = createClient();
-      const [vendorsRes, reconRes, claimsRes] = await Promise.all([
+      const [vendorsRes, reconRes, claimsRes, verifiedRes] = await Promise.all([
         supabase
           .from("vendors")
           // city/region/address_text feed the "City, ST" subtitle — three small
@@ -145,12 +153,23 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
           .in("vendor_id", idList)
           .order("created_at", { ascending: false }),
         supabase.auth.getClaims(),
+        // Which of these ids are verified vendors. A SECURITY DEFINER set
+        // function (migration 0044), because the perks rule reads the deny-all
+        // subscriptions table a plain select cannot touch. An error here (the
+        // RPC not yet applied) is treated as "nobody verified" so the card is
+        // exactly what it is today — same never-throw stance as searchVendors.
+        supabase.rpc("verified_vendor_ids", { p_ids: idList }),
       ]);
       if (cancelled) return;
 
       const vendors = (vendorsRes.data ?? []) as unknown as VendorLite[];
       const recons = (reconRes.data ?? []) as unknown as ReconRow[];
       const viewerId = claimsRes.data?.claims.sub ?? null;
+      const verifiedIds = new Set<string>(
+        ((verifiedRes.data ?? []) as { vendor_id: string }[]).map(
+          (r) => r.vendor_id,
+        ),
+      );
 
       const vendorById = new Map<string, VendorLite>();
       for (const v of vendors) vendorById.set(v.id, v);
@@ -222,6 +241,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
             photoCandidates: candidates,
             slides: slidesByVendor.get(id) ?? [],
             filters: v.filters ?? null,
+            verified: verifiedIds.has(id),
           },
         ];
       });
@@ -365,8 +385,15 @@ export function VendorPreviewCard({
                 {category.label}
               </span>
             )}
-            <span className="block truncate font-heading text-sm font-semibold">
-              {item.name}
+            {/* Name + verified badge. The badge is a sibling of the truncating
+                name (not inside it) so `truncate`'s nowrap/overflow never clips
+                the check; `min-w-0` lets the name shrink past it. iconOnly keeps
+                the card compact — the full label lives on the vendor page. */}
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="min-w-0 truncate font-heading text-sm font-semibold">
+                {item.name}
+              </span>
+              {item.verified && <VerifiedBadge iconOnly />}
             </span>
             {/* "City, ST" of the address behind the pin — shown for every
                 vendor type, including the service-region ones whose pin marks
