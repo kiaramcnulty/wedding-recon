@@ -97,12 +97,20 @@ export default async function PortalPage() {
                     </span>
                   )}
                 </div>
-                {!verified && (
-                  <p className="text-xs text-muted-foreground">
-                    Your listing editor and verification (the badge, top
-                    placement, and a booking button) are coming soon.
-                  </p>
-                )}
+                <div className="flex items-center justify-between gap-2">
+                  <Link
+                    href={`/portal/listing/${c.vendor_id}`}
+                    className="text-sm font-medium text-primary no-underline hover:underline"
+                  >
+                    Edit listing
+                  </Link>
+                  {!verified && (
+                    <span className="text-xs text-muted-foreground">
+                      Verification (badge, top placement, booking button) coming
+                      soon
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

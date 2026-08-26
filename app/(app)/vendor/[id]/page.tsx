@@ -26,11 +26,27 @@ import type { ReconEntryWithDetails } from "@/lib/types";
 import { VendorPhotos } from "@/components/vendor/vendor-photos";
 import { ReconCard } from "@/components/vendor/recon-card";
 import { VerifiedBadge } from "@/components/vendor/verified-badge";
+import {
+  VendorListingContent,
+  type PricingRow,
+} from "@/components/vendor/listing-content";
 import { SaveButton } from "@/components/vendor/save-button";
 import { ShareButton } from "@/components/vendor/share-button";
 import { BackButton } from "@/components/vendor/back-button";
 import { ExternalLink } from "@/components/external-link";
 import { BrandFooter } from "@/components/brand-lockup";
+
+/** One row of a verified vendor's published listing (RPC verified_listing_public). */
+interface VerifiedListingRow {
+  vendor_id: string;
+  intro: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  website: string | null;
+  instagram: string | null;
+  pricing: PricingRow[] | null;
+  photos: unknown[] | null;
+}
 
 /** Instagram glyph — lucide v1 dropped brand icons, so this is drawn inline to lucide's stroke conventions. */
 function InstagramIcon({ className }: { className?: string }) {
@@ -185,15 +201,20 @@ export default async function VendorPage({
         : Promise.resolve({ data: null }),
       // Site admins get an edit control on bot-authored recon below (0041).
       isAdminUser(supabase, userId),
-      // Vendor Verification badge. The scalar wrapper over verified_vendor_ids
-      // (migration 0044). Errors are swallowed by design: until that migration
-      // is hand-applied the call fails, `data` is null, and the page renders
-      // with no badge exactly as it does today.
-      supabase.rpc("vendor_is_verified", { p_vendor_id: id }),
+      // A verified vendor's published listing (intro / CTA / pricing / links).
+      // A SECURITY DEFINER function (migration 0046) that returns a row ONLY for
+      // a verified vendor, so it doubles as the badge signal. Errors are
+      // swallowed by design: until 0046 is applied the call fails, `data` is
+      // null/empty, and the page renders with no badge or block, as today.
+      supabase.rpc("verified_listing_public", { p_vendor_id: id }),
     ]);
   const userHasRecon = !!existingRes.data;
   const coords = coordsRes.data as { lng: number; lat: number } | null;
-  const isVerified = verifiedRes.data === true;
+  const listing = ((verifiedRes.data ?? []) as VerifiedListingRow[])[0] ?? null;
+  const isVerified = !!listing;
+  // The vendor's own maintained links win over extracted ones while verified.
+  const effectiveWebsite = listing?.website || vendor.website;
+  const effectiveInstagram = listing?.instagram || vendor.instagram;
 
   // Distinct author names for the "Photos via Google" caption.
   const googleCredit =
@@ -326,13 +347,14 @@ export default async function VendorPage({
               )}
             </div>
           )}
-          {(vendor.website || vendor.instagram) && (
+          {(effectiveWebsite || effectiveInstagram) && (
             <div className="flex items-center gap-4">
-              {vendor.website && (
-                // Embeddability varies per site; checked in the background via
-                // /api/embed-check — blocked sites stay plain new-tab links.
+              {effectiveWebsite && (
+                // A verified vendor's own website (listing) wins over the
+                // extracted one. Embeddability varies per site; checked in the
+                // background via /api/embed-check — blocked sites stay new-tab.
                 <ExternalLink
-                  href={vendor.website}
+                  href={effectiveWebsite}
                   embed={{ vendorId: vendor.id, kind: "website" }}
                   track={{ kind: "website", vendorId: vendor.id }}
                   className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
@@ -341,11 +363,11 @@ export default async function VendorPage({
                   <span className="truncate">Visit website</span>
                 </ExternalLink>
               )}
-              {vendor.instagram && (
+              {effectiveInstagram && (
                 // Instagram blocks framing on all profile pages — always a
                 // plain new-tab link (embed defaults to false).
                 <ExternalLink
-                  href={`https://www.instagram.com/${vendor.instagram}`}
+                  href={`https://www.instagram.com/${effectiveInstagram}`}
                   track={{ kind: "instagram", vendorId: vendor.id }}
                   className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
                 >
@@ -376,6 +398,28 @@ export default async function VendorPage({
             googleCount={googlePhotos.length}
             googleCredit={googleCredit}
             reconPhotos={photos}
+          />
+        </div>
+      )}
+
+      {/* Verified vendor's own listing content — intro, a CTA button, and a
+          pricing block (collapsed). Below the photos, above the map, so the
+          couple sees the vendor's pitch after the photos but the recon stays
+          the page's job. Renders nothing unless the vendor is verified AND has
+          content. Re-measure the fold once vendor photos land (deferred). */}
+      {isVerified && listing && (
+        <div className="mt-4 px-4">
+          <VendorListingContent
+            content={{
+              intro: listing.intro,
+              ctaLabel: listing.cta_label,
+              ctaUrl: listing.cta_url,
+              pricing: (listing.pricing ?? []).map((r) => ({
+                label: r.label ?? "",
+                price: r.price ?? "",
+                unit: r.unit ?? "",
+              })),
+            }}
           />
         </div>
       )}
