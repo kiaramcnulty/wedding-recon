@@ -1,18 +1,28 @@
 import { redirect } from "next/navigation";
 import { BadgeCheck, Store } from "lucide-react";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminUser } from "@/lib/auth/admin";
 import { CATEGORIES, type VendorType } from "@/lib/constants/categories";
 import { VerifiedBadge } from "@/components/vendor/verified-badge";
 import { ClaimBusiness } from "@/components/portal/claim-business";
+import { BillingControl } from "@/components/portal/billing-control";
 import Link from "next/link";
+
+/** Stripe statuses that mean a subscription exists (manage, not activate). */
+const LIVE_STATUSES = new Set([
+  "active",
+  "trialing",
+  "past_due",
+  "incomplete",
+  "unpaid",
+]);
 
 /**
  * Vendor portal dashboard. Auth-gated (a signed-out visitor is sent to login,
- * back to /portal). Shows the vendor's claimed businesses and the claim flow to
- * add one. The listing editor and billing are later phases — each claimed card
- * says what is coming rather than pretending it exists.
+ * back to /portal). Shows the vendor's claimed businesses, each with a link to
+ * edit its listing and a billing control (activate the $120/6-mo verification,
+ * or manage an existing subscription), plus the claim flow to add a business.
  *
  * Deliberately reads NO recon and links to NO public vendor page (portal rule).
  */
@@ -46,14 +56,27 @@ export default async function PortalPage() {
     .order("created_at", { ascending: false });
   const claims = (claimRows ?? []) as unknown as ClaimRow[];
 
-  // Which of these are currently verified (paying). A public SECURITY DEFINER
-  // function — no subscription table read needed here, and it lights up
-  // automatically once billing lands. All false in this slice (no Stripe yet).
+  // Which of these are currently verified (approved claim + active subscription
+  // + published listing). A public SECURITY DEFINER function.
   const ids = claims.map((c) => c.vendor_id);
   const verifiedSet = new Set<string>();
+  // Which claimed vendors already have a subscription on file (any live status),
+  // so the card offers "Manage billing" vs "Activate". Read via the service role
+  // because vendor_subscriptions is deny-all to clients; scoped to this user's
+  // own claimed vendor ids, so nothing leaks.
+  const subscribedSet = new Set<string>();
   if (ids.length > 0) {
     const { data: vids } = await supabase.rpc("verified_vendor_ids", { p_ids: ids });
     for (const r of (vids ?? []) as { vendor_id: string }[]) verifiedSet.add(r.vendor_id);
+
+    const svc = createServiceRoleClient();
+    const { data: subs } = await svc
+      .from("vendor_subscriptions")
+      .select("vendor_id, status")
+      .in("vendor_id", ids);
+    for (const s of (subs ?? []) as { vendor_id: string; status: string }[]) {
+      if (LIVE_STATUSES.has(s.status)) subscribedSet.add(s.vendor_id);
+    }
   }
 
   const isAdmin = await isAdminUser(supabase, userId);
@@ -97,19 +120,17 @@ export default async function PortalPage() {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Link
                     href={`/portal/listing/${c.vendor_id}`}
                     className="text-sm font-medium text-primary no-underline hover:underline"
                   >
                     Edit listing
                   </Link>
-                  {!verified && (
-                    <span className="text-xs text-muted-foreground">
-                      Verification (badge, top placement, booking button) coming
-                      soon
-                    </span>
-                  )}
+                  <BillingControl
+                    vendorId={c.vendor_id}
+                    hasSubscription={subscribedSet.has(c.vendor_id)}
+                  />
                 </div>
               </div>
             );

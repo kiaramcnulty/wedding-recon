@@ -20,7 +20,11 @@ export const config = {
      * public, cookie-free, edge-cached endpoints, and running the session
      * refresh over them would attach a Set-Cookie that makes the response
      * uncacheable (see app/api/map/vendors/route.ts).
+     *
+     * `api/stripe-webhook` is excluded too: it authenticates by Stripe
+     * signature over its RAW body, carries no cookies, and has no session to
+     * refresh — the middleware would only add a needless Auth round trip.
      */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|api/vendor-photo|api/map/vendors|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|api/vendor-photo|api/map/vendors|api/stripe-webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
