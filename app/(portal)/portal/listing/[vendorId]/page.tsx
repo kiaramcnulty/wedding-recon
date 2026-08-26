@@ -14,6 +14,7 @@ interface ListingRow {
   website: string | null;
   instagram: string | null;
   pricing: PricingRow[] | null;
+  photos: { storage_path: string; thumb_path: string }[] | null;
   filter_overrides: Record<string, unknown> | null;
   published: boolean;
 }
@@ -43,7 +44,7 @@ export default async function ListingEditorPage({
     supabase.from("vendors").select("name, vendor_type").eq("id", vendorId).maybeSingle(),
     supabase
       .from("vendor_listings")
-      .select("intro, cta_label, cta_url, website, instagram, pricing, filter_overrides, published")
+      .select("intro, cta_label, cta_url, website, instagram, pricing, photos, filter_overrides, published")
       .eq("vendor_id", vendorId)
       .maybeSingle(),
   ]);
@@ -61,6 +62,12 @@ export default async function ListingEditorPage({
       unit: r.unit ?? "",
     })),
     filterOverrides: l?.filter_overrides ?? {},
+    photos: (l?.photos ?? []).map((p) => ({
+      storagePath: p.storage_path,
+      thumbPath: p.thumb_path,
+      // Thumbnail public URL for the picker preview (public bucket).
+      url: supabase.storage.from("vendor-media").getPublicUrl(p.thumb_path).data.publicUrl,
+    })),
     published: l?.published ?? false,
   };
 
@@ -88,6 +95,7 @@ export default async function ListingEditorPage({
       <ListingEditor
         vendorId={vendorId}
         vendorType={vendor?.vendor_type as VendorType}
+        userId={userId}
         initial={initial}
       />
     </div>

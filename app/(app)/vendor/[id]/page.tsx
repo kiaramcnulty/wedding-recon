@@ -45,7 +45,7 @@ interface VerifiedListingRow {
   website: string | null;
   instagram: string | null;
   pricing: PricingRow[] | null;
-  photos: unknown[] | null;
+  photos: { storage_path: string; thumb_path: string }[] | null;
 }
 
 /** Instagram glyph — lucide v1 dropped brand icons, so this is drawn inline to lucide's stroke conventions. */
@@ -257,6 +257,24 @@ export default async function VendorPage({
     })),
   );
 
+  // A verified vendor's own uploaded photos, badged and slotted between recon
+  // and Google in the strip (see VendorPhotos). Public bucket, so the URLs are
+  // resolved here server-side with no network call.
+  const vendorPhotos =
+    (isVerified &&
+      (listing?.photos as { storage_path: string; thumb_path: string }[] | null)?.map(
+        (p) => ({
+          thumb: supabase.storage
+            .from("vendor-media")
+            .getPublicUrl(p.thumb_path).data.publicUrl,
+          full: supabase.storage
+            .from("vendor-media")
+            .getPublicUrl(p.storage_path).data.publicUrl,
+          badge: "Provided by vendor",
+        }),
+      )) ||
+    [];
+
   // Service areas as reported by the recon on this vendor, deduped. Shown in
   // place of the map for service-region types — it explains why there is no pin
   // here, and it is real data rather than decoration, so it renders only when
@@ -410,16 +428,17 @@ export default async function VendorPage({
         </div>
       )}
 
-      {/* All photos in ONE strip — recon first, then Google (badged per tile,
-          bytes proxied from cached references). Two stacked strips plus the map
+      {/* All photos in ONE strip — recon first, then the verified vendor's own
+          uploads, then Google (badged per tile). Two stacked strips plus the map
           used to fill the whole first screen before any recon was reachable. */}
-      {(photos.length > 0 || googlePhotos.length > 0) && (
+      {(photos.length > 0 || vendorPhotos.length > 0 || googlePhotos.length > 0) && (
         <div className="mt-4">
           <VendorPhotos
             vendorId={vendor.id}
             googleCount={googlePhotos.length}
             googleCredit={googleCredit}
             reconPhotos={photos}
+            vendorPhotos={vendorPhotos}
           />
         </div>
       )}

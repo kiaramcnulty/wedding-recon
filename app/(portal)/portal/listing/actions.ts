@@ -16,6 +16,11 @@ export interface PricingRowInput {
   unit: string;
 }
 
+export interface PhotoInput {
+  storage_path: string;
+  thumb_path: string;
+}
+
 export interface SaveListingInput {
   vendorId: string;
   intro: string;
@@ -25,6 +30,28 @@ export interface SaveListingInput {
   instagram: string | null;
   pricing: PricingRowInput[];
   filterOverrides: Record<string, unknown>;
+  photos: PhotoInput[];
+}
+
+const MAX_PHOTOS = 4;
+
+/**
+ * Keep only photos whose paths are namespaced under THIS vendor's folder — the
+ * same ownership the bucket RLS enforces at upload, re-checked here before the
+ * paths are recorded, so a client cannot record a path it does not own.
+ */
+function sanitizePhotos(vendorId: string, raw: PhotoInput[]): PhotoInput[] {
+  const prefix = `${vendorId}/`;
+  return (raw ?? [])
+    .filter(
+      (p) =>
+        typeof p?.storage_path === "string" &&
+        typeof p?.thumb_path === "string" &&
+        p.storage_path.startsWith(prefix) &&
+        p.thumb_path.startsWith(prefix),
+    )
+    .slice(0, MAX_PHOTOS)
+    .map((p) => ({ storage_path: p.storage_path, thumb_path: p.thumb_path }));
 }
 
 /**
@@ -129,6 +156,7 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
   const filterOverrides = vendorType
     ? sanitizeFilterOverrides(vendorType, input.filterOverrides ?? {})
     : {};
+  const photos = sanitizePhotos(input.vendorId, input.photos);
 
   // Validate.
   const intro = input.intro.trim().slice(0, MAX_INTRO);
@@ -174,6 +202,7 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
       website,
       instagram,
       pricing,
+      photos,
       filter_overrides: filterOverrides,
       published,
       updated_at: new Date().toISOString(),

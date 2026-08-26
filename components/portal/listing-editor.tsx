@@ -14,8 +14,14 @@ import {
   type PricingRow,
 } from "@/components/vendor/listing-content";
 import { FilterOverrideEditor } from "@/components/portal/filter-override-editor";
+import {
+  VendorPhotoPicker,
+  type PhotoItem,
+} from "@/components/portal/vendor-photo-picker";
 import { filtersForType } from "@/lib/constants/vendor-filters";
 import type { VendorType } from "@/lib/constants/categories";
+import { createClient } from "@/lib/supabase/client";
+import { uploadVendorImages } from "@/lib/vendor-media-upload";
 import { saveListing } from "@/app/(portal)/portal/listing/actions";
 
 const CTA_LABELS = ["Book a tour", "Check availability", "Contact us", "Get a quote"] as const;
@@ -30,16 +36,20 @@ export interface ListingInitial {
   instagram: string;
   pricing: PricingRow[];
   filterOverrides: Record<string, unknown>;
+  /** Already-uploaded photos, with their public URLs resolved server-side. */
+  photos: { storagePath: string; thumbPath: string; url: string }[];
   published: boolean;
 }
 
 export function ListingEditor({
   vendorId,
   vendorType,
+  userId,
   initial,
 }: {
   vendorId: string;
   vendorType: VendorType;
+  userId: string;
   initial: ListingInitial;
 }) {
   const router = useRouter();
@@ -54,6 +64,14 @@ export function ListingEditor({
   const [filterOverrides, setFilterOverrides] = React.useState<
     Record<string, unknown>
   >(initial.filterOverrides);
+  const [photoItems, setPhotoItems] = React.useState<PhotoItem[]>(() =>
+    initial.photos.map((p) => ({
+      kind: "existing" as const,
+      storagePath: p.storagePath,
+      thumbPath: p.thumbPath,
+      url: p.url,
+    })),
+  );
   const [pending, startTransition] = React.useTransition();
 
   const filterDefs = React.useMemo(() => filtersForType(vendorType), [vendorType]);
@@ -66,6 +84,28 @@ export function ListingEditor({
 
   const submit = () => {
     startTransition(async () => {
+      // Upload any newly-picked photos to vendor-media first (bytes never go
+      // through the Server Action), then record paths in listing order: kept
+      // existing photos keep their paths, new ones consume the uploads in turn.
+      let photos: { storage_path: string; thumb_path: string }[];
+      try {
+        const supabase = createClient();
+        const newFiles = photoItems.flatMap((it) => (it.kind === "new" ? [it.file] : []));
+        const uploaded = newFiles.length
+          ? await uploadVendorImages(supabase, vendorId, userId, newFiles)
+          : [];
+        let u = 0;
+        photos = photoItems.map((it) => {
+          if (it.kind === "existing")
+            return { storage_path: it.storagePath, thumb_path: it.thumbPath };
+          const up = uploaded[u++];
+          return { storage_path: up.storagePath, thumb_path: up.thumbPath };
+        });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Photo upload failed.");
+        return;
+      }
+
       const res = await saveListing({
         vendorId,
         intro,
@@ -75,6 +115,7 @@ export function ListingEditor({
         instagram: instagram || null,
         pricing: rows.map((r) => ({ label: r.label, price: r.price, unit: r.unit ?? "" })),
         filterOverrides,
+        photos,
       });
       if (!res.ok) {
         toast.error(res.error);
@@ -223,6 +264,9 @@ export function ListingEditor({
           Add pricing row
         </Button>
       </div>
+
+      {/* Photos — uploaded to vendor-media on save, lead the vendor page strip. */}
+      <VendorPhotoPicker items={photoItems} onChange={setPhotoItems} />
 
       {/* Attribute overrides — the filter tags for this vendor's type. */}
       <FilterOverrideEditor
