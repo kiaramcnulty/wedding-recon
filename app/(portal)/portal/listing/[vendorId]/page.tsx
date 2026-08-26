@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ListingEditor, type ListingInitial } from "@/components/portal/listing-editor";
 import type { PricingRow } from "@/components/vendor/listing-content";
+import type { VendorType } from "@/lib/constants/categories";
 
 interface ListingRow {
   intro: string | null;
@@ -13,6 +14,7 @@ interface ListingRow {
   website: string | null;
   instagram: string | null;
   pricing: PricingRow[] | null;
+  filter_overrides: Record<string, unknown> | null;
   published: boolean;
 }
 
@@ -38,10 +40,10 @@ export default async function ListingEditorPage({
   if (!claim) notFound();
 
   const [{ data: vendor }, { data: listing }] = await Promise.all([
-    supabase.from("vendors").select("name").eq("id", vendorId).maybeSingle(),
+    supabase.from("vendors").select("name, vendor_type").eq("id", vendorId).maybeSingle(),
     supabase
       .from("vendor_listings")
-      .select("intro, cta_label, cta_url, website, instagram, pricing, published")
+      .select("intro, cta_label, cta_url, website, instagram, pricing, filter_overrides, published")
       .eq("vendor_id", vendorId)
       .maybeSingle(),
   ]);
@@ -58,6 +60,7 @@ export default async function ListingEditorPage({
       price: r.price ?? "",
       unit: r.unit ?? "",
     })),
+    filterOverrides: l?.filter_overrides ?? {},
     published: l?.published ?? false,
   };
 
@@ -82,7 +85,11 @@ export default async function ListingEditorPage({
         </p>
       </div>
 
-      <ListingEditor vendorId={vendorId} initial={initial} />
+      <ListingEditor
+        vendorId={vendorId}
+        vendorType={vendor?.vendor_type as VendorType}
+        initial={initial}
+      />
     </div>
   );
 }

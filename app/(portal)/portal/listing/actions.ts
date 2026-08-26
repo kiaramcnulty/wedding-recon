@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { filtersForType } from "@/lib/constants/vendor-filters";
+import type { VendorType } from "@/lib/constants/categories";
 
 const CTA_LABELS = ["Book a tour", "Check availability", "Contact us", "Get a quote"] as const;
 type CtaLabel = (typeof CTA_LABELS)[number];
@@ -22,6 +24,42 @@ export interface SaveListingInput {
   website: string | null;
   instagram: string | null;
   pricing: PricingRowInput[];
+  filterOverrides: Record<string, unknown>;
+}
+
+/**
+ * Keep only the keys/values that this vendor type's filters legitimately hold,
+ * in the exact jsonb shape the matcher reads. Anything else the client sent is
+ * dropped, so a listing save can never inject arbitrary jsonb into the merge:
+ *   multi  -> string[] of known option values (dropped if empty)
+ *   bool   -> boolean
+ *   range  -> finite number(s) at the def's key (point) or lo/hi (overlap)
+ */
+function sanitizeFilterOverrides(
+  vendorType: VendorType,
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const def of filtersForType(vendorType)) {
+    if (def.kind === "multi") {
+      const v = raw[def.key];
+      const allowed = new Set((def.options ?? []).map((o) => o.value));
+      if (Array.isArray(v)) {
+        const clean = v.filter((x): x is string => typeof x === "string" && allowed.has(x));
+        if (clean.length) out[def.key] = clean;
+      }
+    } else if (def.kind === "bool") {
+      const v = raw[def.key];
+      if (typeof v === "boolean") out[def.key] = v;
+    } else if (def.kind === "range") {
+      const keys = def.mode === "point" ? [def.key] : [def.lo ?? def.key, def.hi ?? def.key];
+      for (const k of keys) {
+        const n = raw[k];
+        if (typeof n === "number" && Number.isFinite(n)) out[k] = n;
+      }
+    }
+  }
+  return out;
 }
 
 export type SaveListingResult =
@@ -80,6 +118,18 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
     .maybeSingle();
   if (!claim) return { ok: false, error: "You do not manage this business." };
 
+  // Vendor type is canonical vendor data; the sanitizer reads it (not the
+  // client) to decide which override keys are valid for this vendor.
+  const { data: vendorRow } = await supabase
+    .from("vendors")
+    .select("vendor_type")
+    .eq("id", input.vendorId)
+    .maybeSingle();
+  const vendorType = vendorRow?.vendor_type as VendorType | undefined;
+  const filterOverrides = vendorType
+    ? sanitizeFilterOverrides(vendorType, input.filterOverrides ?? {})
+    : {};
+
   // Validate.
   const intro = input.intro.trim().slice(0, MAX_INTRO);
   const ctaLabel: CtaLabel | null =
@@ -124,6 +174,7 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
       website,
       instagram,
       pricing,
+      filter_overrides: filterOverrides,
       published,
       updated_at: new Date().toISOString(),
     },

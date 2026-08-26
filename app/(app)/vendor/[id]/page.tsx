@@ -179,7 +179,7 @@ export default async function VendorPage({
   // recon here" check must stay a separate query (it counts `flagged` entries,
   // which the active-only list above does not include). getVendorGooglePhotos
   // only touches the network on a cache miss, so it's usually free.
-  const [existingRes, googlePhotos, coordsRes, viewerIsAdmin, verifiedRes] =
+  const [existingRes, googlePhotos, coordsRes, viewerIsAdmin, verifiedRes, overridesRes] =
     await Promise.all([
       userId
         ? supabase
@@ -207,6 +207,9 @@ export default async function VendorPage({
       // swallowed by design: until 0046 is applied the call fails, `data` is
       // null/empty, and the page renders with no badge or block, as today.
       supabase.rpc("verified_listing_public", { p_vendor_id: id }),
+      // A verified vendor's published filter overrides (migration 0044), merged
+      // over the extracted tags below so the chips match what the map shows.
+      supabase.rpc("verified_listing_overrides", { p_ids: [id] }),
     ]);
   const userHasRecon = !!existingRes.data;
   const coords = coordsRes.data as { lng: number; lat: number } | null;
@@ -215,6 +218,18 @@ export default async function VendorPage({
   // The vendor's own maintained links win over extracted ones while verified.
   const effectiveWebsite = listing?.website || vendor.website;
   const effectiveInstagram = listing?.instagram || vendor.instagram;
+  // Merge the vendor's published filter overrides over the extracted filters,
+  // exactly as vendor_filters_in_bbox does for the map (0045), so the chips and
+  // the map agree. Override keys win; extracted keys survive where not set.
+  const overrideRow = ((overridesRes.data ?? []) as {
+    vendor_id: string;
+    filter_overrides: Record<string, unknown> | null;
+  }[])[0];
+  const filterOverrides = overrideRow?.filter_overrides ?? {};
+  const hasOverrides = Object.keys(filterOverrides).length > 0;
+  const effectiveFilters = hasOverrides
+    ? { ...(vendor.filters ?? {}), ...filterOverrides }
+    : vendor.filters;
 
   // Distinct author names for the "Photos via Google" caption.
   const googleCredit =
@@ -259,7 +274,7 @@ export default async function VendorPage({
   // Full list of the vendor's filter attributes as pills — the same facets the
   // Explore filter sheet is built from. No active selection on this page, so
   // they render in importance order (see lib/filters/vendor-tags.ts).
-  const tags = vendorTags(vendor.vendor_type, vendor.filters);
+  const tags = vendorTags(vendor.vendor_type, effectiveFilters);
 
   const category = CATEGORIES[vendor.vendor_type as VendorType];
   const CategoryIcon = category?.icon ?? MapPin;
@@ -381,10 +396,17 @@ export default async function VendorPage({
       </div>
 
       {/* Filter tags — the vendor's attributes as pills, wrapping across as many
-          lines as needed. Hidden when nothing has been extracted for it. */}
+          lines as needed. Hidden when nothing has been extracted for it. A
+          verified vendor's own overrides are merged in above; when present, a
+          small note credits them. */}
       {tags.length > 0 && (
         <div className="mt-4 px-4">
           <VendorTagList tags={tags} />
+          {isVerified && hasOverrides && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Some details provided by the vendor
+            </p>
+          )}
         </div>
       )}
 

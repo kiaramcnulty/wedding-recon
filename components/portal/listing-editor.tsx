@@ -13,6 +13,9 @@ import {
   VendorListingContent,
   type PricingRow,
 } from "@/components/vendor/listing-content";
+import { FilterOverrideEditor } from "@/components/portal/filter-override-editor";
+import { filtersForType } from "@/lib/constants/vendor-filters";
+import type { VendorType } from "@/lib/constants/categories";
 import { saveListing } from "@/app/(portal)/portal/listing/actions";
 
 const CTA_LABELS = ["Book a tour", "Check availability", "Contact us", "Get a quote"] as const;
@@ -26,14 +29,17 @@ export interface ListingInitial {
   website: string;
   instagram: string;
   pricing: PricingRow[];
+  filterOverrides: Record<string, unknown>;
   published: boolean;
 }
 
 export function ListingEditor({
   vendorId,
+  vendorType,
   initial,
 }: {
   vendorId: string;
+  vendorType: VendorType;
   initial: ListingInitial;
 }) {
   const router = useRouter();
@@ -45,7 +51,12 @@ export function ListingEditor({
   const [rows, setRows] = React.useState<PricingRow[]>(
     initial.pricing.length ? initial.pricing : [],
   );
+  const [filterOverrides, setFilterOverrides] = React.useState<
+    Record<string, unknown>
+  >(initial.filterOverrides);
   const [pending, startTransition] = React.useTransition();
+
+  const filterDefs = React.useMemo(() => filtersForType(vendorType), [vendorType]);
 
   const setRow = (i: number, patch: Partial<PricingRow>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -63,6 +74,7 @@ export function ListingEditor({
         website: website || null,
         instagram: instagram || null,
         pricing: rows.map((r) => ({ label: r.label, price: r.price, unit: r.unit ?? "" })),
+        filterOverrides,
       });
       if (!res.ok) {
         toast.error(res.error);
@@ -211,6 +223,13 @@ export function ListingEditor({
           Add pricing row
         </Button>
       </div>
+
+      {/* Attribute overrides — the filter tags for this vendor's type. */}
+      <FilterOverrideEditor
+        defs={filterDefs}
+        value={filterOverrides}
+        onChange={setFilterOverrides}
+      />
 
       {/* Live preview */}
       <div className="flex flex-col gap-2">
