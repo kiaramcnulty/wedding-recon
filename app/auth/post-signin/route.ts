@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { postSignInPath } from "@/lib/auth/post-signin";
+import {
+  POST_SIGNIN_INTENT_COOKIE,
+  readSignInDestinationCookie,
+} from "@/lib/auth/post-signin-redirect";
 
 /**
  * Destination hop for the emailed-code path.
@@ -19,5 +23,17 @@ export async function GET(request: NextRequest) {
   const { origin } = new URL(request.url);
   const supabase = await createClient();
 
-  return NextResponse.redirect(`${origin}${await postSignInPath(supabase)}`);
+  // The destination the visitor arrived with (e.g. /portal), stashed by the
+  // login page. Honored unless this account still needs onboarding — in which
+  // case the cookie is left in place so setUsername can honor it afterwards.
+  const intended = readSignInDestinationCookie(
+    request.cookies.get(POST_SIGNIN_INTENT_COOKIE)?.value,
+  );
+  const dest = await postSignInPath(supabase, intended);
+
+  const res = NextResponse.redirect(`${origin}${dest}`);
+  if (dest !== "/onboarding") {
+    res.cookies.set(POST_SIGNIN_INTENT_COOKIE, "", { maxAge: 0, path: "/" });
+  }
+  return res;
 }
