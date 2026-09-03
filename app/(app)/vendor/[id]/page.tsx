@@ -26,6 +26,7 @@ import type { ReconEntryWithDetails } from "@/lib/types";
 import { VendorPhotos } from "@/components/vendor/vendor-photos";
 import { ReconCard } from "@/components/vendor/recon-card";
 import { VerifiedBadge } from "@/components/vendor/verified-badge";
+import { VerifyBusinessLink } from "@/components/portal/verify-business-link";
 import {
   VendorListingContent,
   type PricingRow,
@@ -451,6 +452,7 @@ export default async function VendorPage({
       {isVerified && listing && (
         <div className="mt-4 px-4">
           <VendorListingContent
+            vendorId={vendor.id}
             content={{
               intro: listing.intro,
               ctaLabel: listing.cta_label,
@@ -541,6 +543,19 @@ export default async function VendorPage({
           />
         ))}
       </div>
+
+      {/* Acquisition: the highest-intent surface for a vendor googling
+          themselves. Quiet line, tracked by source. Hidden once verified. */}
+      {!isVerified && (
+        <div className="mt-6 px-4 text-center">
+          <VerifyBusinessLink
+            source="vendor_page"
+            className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            Are you the owner? Verify this business
+          </VerifyBusinessLink>
+        </div>
+      )}
 
       <BrandFooter />
     </div>

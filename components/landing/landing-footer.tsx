@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { BrandLockup } from "@/components/brand-lockup";
+import { VerifyBusinessLink } from "@/components/portal/verify-business-link";
 import { CONTACT_EMAIL, FOOTER } from "@/lib/landing/content";
 import { APP_HREF } from "@/lib/landing/nav";
 
@@ -60,6 +61,14 @@ export function LandingFooter() {
                 >
                   {FOOTER.contactLabel}
                 </a>
+              </li>
+              <li>
+                <VerifyBusinessLink
+                  source="landing_footer"
+                  className="text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  For vendors
+                </VerifyBusinessLink>
               </li>
             </ul>
           </div>

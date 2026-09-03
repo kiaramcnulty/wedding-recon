@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 
 import { ExternalLink } from "@/components/external-link";
 import { buttonVariants } from "@/components/ui/button";
+import { captureClient } from "@/lib/analytics/posthog";
 import { cn } from "@/lib/utils";
 
 /**
@@ -36,10 +37,13 @@ const INTRO_CLAMP_THRESHOLD = 160;
 export function VendorListingContent({
   content,
   interactive = true,
+  vendorId,
   className,
 }: {
   content: ListingContent;
   interactive?: boolean;
+  /** Present on the real vendor page (not the editor preview) — enables CTA-click tracking. */
+  vendorId?: string;
   className?: string;
 }) {
   const [introOpen, setIntroOpen] = React.useState(false);
@@ -80,6 +84,13 @@ export function VendorListingContent({
         interactive ? (
           <ExternalLink
             href={ctaUrl}
+            onClick={() => {
+              if (vendorId)
+                captureClient("vendor_cta_clicked", {
+                  vendor_id: vendorId,
+                  cta_label: ctaLabel,
+                });
+            }}
             className={cn(buttonVariants({ size: "lg" }), "w-full no-underline!")}
           >
             {ctaLabel}
