@@ -27,6 +27,7 @@ import { saveListing } from "@/app/(portal)/portal/listing/actions";
 const CTA_LABELS = ["Book a tour", "Check availability", "Contact us", "Get a quote"] as const;
 const MAX_INTRO = 600;
 const MAX_ROWS = 20;
+const MAX_DESC = 200;
 
 export interface ListingInitial {
   intro: string;
@@ -79,7 +80,9 @@ export function ListingEditor({
   const setRow = (i: number, patch: Partial<PricingRow>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const addRow = () =>
-    setRows((rs) => (rs.length >= MAX_ROWS ? rs : [...rs, { label: "", price: "", unit: "" }]));
+    setRows((rs) =>
+      rs.length >= MAX_ROWS ? rs : [...rs, { label: "", price: "", unit: "", description: "" }],
+    );
   const removeRow = (i: number) => setRows((rs) => rs.filter((_, j) => j !== i));
 
   const submit = () => {
@@ -113,7 +116,12 @@ export function ListingEditor({
         ctaUrl: ctaUrl || null,
         website: website || null,
         instagram: instagram || null,
-        pricing: rows.map((r) => ({ label: r.label, price: r.price, unit: r.unit ?? "" })),
+        pricing: rows.map((r) => ({
+          label: r.label,
+          price: r.price,
+          unit: r.unit ?? "",
+          description: r.description ?? "",
+        })),
         filterOverrides,
         photos,
       });
@@ -124,9 +132,11 @@ export function ListingEditor({
       toast.success(
         res.published
           ? "Listing saved and published."
-          : "Listing saved as a draft. Activate verification to publish it.",
+          : "Listing saved as a draft. Subscribe to verification to publish it.",
       );
-      router.refresh();
+      // Back to the portal so the next step in the flow is in front of them
+      // (subscribe, or the verified manage view once live).
+      router.push("/portal");
     });
   };
 
@@ -211,43 +221,51 @@ export function ListingEditor({
         <div>
           <h3 className="text-sm font-semibold">Pricing</h3>
           <p className="text-xs text-muted-foreground">
-            Add a row per package or item. Label, price, and an optional unit
-            (e.g. &ldquo;per event&rdquo;, &ldquo;per person&rdquo;).
+            Add a row per package or item: a name, price, an optional unit (e.g.
+            &ldquo;per event&rdquo;), and a short description of what&apos;s included.
           </p>
         </div>
         {rows.length > 0 && (
           <div className="flex flex-col gap-2">
             {rows.map((r, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i} className="flex flex-col gap-2 rounded-lg border p-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={r.label}
+                    onChange={(e) => setRow(i, { label: e.target.value })}
+                    placeholder="Package"
+                    className="flex-1"
+                    aria-label={`Pricing row ${i + 1} label`}
+                  />
+                  <Input
+                    value={r.price}
+                    onChange={(e) => setRow(i, { price: e.target.value })}
+                    placeholder="$5,000"
+                    className="w-24"
+                    aria-label={`Pricing row ${i + 1} price`}
+                  />
+                  <Input
+                    value={r.unit ?? ""}
+                    onChange={(e) => setRow(i, { unit: e.target.value })}
+                    placeholder="per event"
+                    className="w-24"
+                    aria-label={`Pricing row ${i + 1} unit`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeRow(i)}
+                    aria-label={`Remove pricing row ${i + 1}`}
+                    className="shrink-0 p-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
                 <Input
-                  value={r.label}
-                  onChange={(e) => setRow(i, { label: e.target.value })}
-                  placeholder="Package"
-                  className="flex-1"
-                  aria-label={`Pricing row ${i + 1} label`}
+                  value={r.description ?? ""}
+                  onChange={(e) => setRow(i, { description: e.target.value.slice(0, MAX_DESC) })}
+                  placeholder="What's included (optional)"
+                  aria-label={`Pricing row ${i + 1} description`}
                 />
-                <Input
-                  value={r.price}
-                  onChange={(e) => setRow(i, { price: e.target.value })}
-                  placeholder="$5,000"
-                  className="w-28"
-                  aria-label={`Pricing row ${i + 1} price`}
-                />
-                <Input
-                  value={r.unit ?? ""}
-                  onChange={(e) => setRow(i, { unit: e.target.value })}
-                  placeholder="per event"
-                  className="w-28"
-                  aria-label={`Pricing row ${i + 1} unit`}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeRow(i)}
-                  aria-label={`Remove pricing row ${i + 1}`}
-                  className="shrink-0 p-1 text-muted-foreground hover:text-foreground"
-                >
-                  <Trash2 className="size-4" />
-                </button>
               </div>
             ))}
           </div>

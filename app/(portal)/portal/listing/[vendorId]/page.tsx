@@ -60,6 +60,7 @@ export default async function ListingEditorPage({
       label: r.label ?? "",
       price: r.price ?? "",
       unit: r.unit ?? "",
+      description: r.description ?? "",
     })),
     filterOverrides: l?.filter_overrides ?? {},
     photos: (l?.photos ?? []).map((p) => ({

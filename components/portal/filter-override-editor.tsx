@@ -177,9 +177,9 @@ export function FilterOverrideEditor({
             </div>
           )}
 
-          {def.hint && (
-            <span className="text-xs text-muted-foreground">{def.hint}</span>
-          )}
+          {/* def.hint is written for a couple filtering ("venues that seat your
+              party"), which reads as nonsense to a vendor declaring their own
+              attributes — so it is deliberately not shown here. */}
         </div>
       ))}
     </div>

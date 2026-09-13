@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, BadgeCheck } from "lucide-react";
 
 import { ExternalLink } from "@/components/external-link";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,6 +23,8 @@ export interface PricingRow {
   label: string;
   price: string;
   unit?: string;
+  /** An optional longer line under the package name (what's included, etc.). */
+  description?: string;
 }
 
 export interface ListingContent {
@@ -58,6 +60,11 @@ export function VendorListingContent({
 
   return (
     <div className={cn("flex flex-col gap-3 rounded-xl border bg-muted/30 p-4", className)}>
+      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <BadgeCheck className="size-3.5 shrink-0 text-brand-ink" />
+        Directly from the vendor
+      </p>
+
       {intro?.trim() && (
         <div>
           <p
@@ -113,7 +120,7 @@ export function VendorListingContent({
             aria-expanded={priceOpen}
             className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium"
           >
-            <span>Pricing · provided by vendor</span>
+            <span>Pricing</span>
             <ChevronDown
               className={cn("size-4 shrink-0 transition-transform", priceOpen && "rotate-180")}
             />
@@ -121,8 +128,15 @@ export function VendorListingContent({
           {priceOpen && (
             <ul className="divide-y border-t">
               {rows.map((r, i) => (
-                <li key={i} className="flex items-baseline justify-between gap-3 px-3 py-2 text-sm">
-                  <span className="min-w-0 flex-1">{r.label}</span>
+                <li key={i} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <span>{r.label}</span>
+                    {r.description?.trim() && (
+                      <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                        {r.description}
+                      </p>
+                    )}
+                  </div>
                   <span className="shrink-0 text-right font-medium">
                     {r.price}
                     {r.unit ? (

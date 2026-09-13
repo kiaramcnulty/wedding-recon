@@ -29,7 +29,7 @@ type Selection =
   | { kind: "manual"; value: ManualSelection }
   | null;
 
-export function ClaimBusiness() {
+export function ClaimBusiness({ hideHeading = false }: { hideHeading?: boolean } = {}) {
   const router = useRouter();
   const [selection, setSelection] = React.useState<Selection>(null);
   const [vendorType, setVendorType] = React.useState<VendorType | null>(null);
@@ -103,15 +103,17 @@ export function ClaimBusiness() {
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border p-4">
-      <div>
-        <h2 className="font-heading text-base font-semibold">
-          Claim your business
-        </h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Search for your business below. If it is not listed yet, you can add it.
-        </p>
-      </div>
+    <div className={cn("flex flex-col gap-4", !hideHeading && "rounded-xl border p-4")}>
+      {!hideHeading && (
+        <div>
+          <h2 className="font-heading text-base font-semibold">
+            Claim your business
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Search for your business below. If it is not listed yet, you can add it.
+          </p>
+        </div>
+      )}
 
       <PlacesCombobox
         onSelectExisting={(v) => setSelection({ kind: "existing", value: v })}

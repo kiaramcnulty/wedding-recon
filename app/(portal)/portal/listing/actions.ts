@@ -14,6 +14,7 @@ export interface PricingRowInput {
   label: string;
   price: string;
   unit: string;
+  description: string;
 }
 
 export interface PhotoInput {
@@ -95,6 +96,7 @@ export type SaveListingResult =
 
 const MAX_INTRO = 600;
 const MAX_PRICING_ROWS = 20;
+const MAX_PRICING_DESC = 200;
 
 /** Bare Instagram handle from a handle, @handle, or profile URL. */
 function normalizeInstagram(raw: string | null): string | null {
@@ -178,6 +180,7 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
       label: r.label.trim(),
       price: r.price.trim(),
       unit: r.unit.trim(),
+      description: (r.description ?? "").trim().slice(0, MAX_PRICING_DESC),
     }))
     .filter((r) => r.label || r.price)
     .slice(0, MAX_PRICING_ROWS);

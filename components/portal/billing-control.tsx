@@ -10,11 +10,12 @@ import {
   openBillingPortal,
   type BillingResult,
 } from "@/app/(portal)/portal/billing/actions";
+import { PRICE_PER_MONTH } from "@/lib/portal/verification";
 
 /**
  * Billing control for one claimed vendor. If the vendor already has a
  * subscription on file, it opens the Stripe Customer Portal (manage / cancel /
- * update card); otherwise it starts Checkout for the $120 / 6-month plan. Both
+ * update card); otherwise it starts Checkout for the verification plan. Both
  * server actions return a Stripe URL we redirect to.
  */
 export function BillingControl({
@@ -62,7 +63,7 @@ export function BillingControl({
       className="gap-1.5"
     >
       {pending && <Loader2 className="size-4 animate-spin" />}
-      Activate verification · $120 / 6 mo
+      Subscribe · {PRICE_PER_MONTH}
     </Button>
   );
 }
