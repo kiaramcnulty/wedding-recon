@@ -88,6 +88,10 @@ type ClientEvents = {
   vendor_saved: { vendor_type: string };
   share_clicked: { vendor_id: string };
   vendor_link_out: { kind: "website" | "instagram" | "maps"; vendor_id: string };
+  /** A couple/vendor clicked a "verify your business" acquisition link. */
+  vendor_verify_link_clicked: { source: "vendor_page" | "landing_footer" };
+  /** A couple clicked a verified vendor's CTA button on the vendor page. */
+  vendor_cta_clicked: { vendor_id: string; cta_label: string };
 };
 
 export function captureClient<E extends keyof ClientEvents>(

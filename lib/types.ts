@@ -72,6 +72,23 @@ export interface Vendor {
    */
   has_price?: boolean;
   has_photo?: boolean;
+  /**
+   * Whether this vendor is a paying, verified vendor (Vendor Verification tier)
+   * — the key the Explore list order sorts on immediately after `rank`, within
+   * the partition. Computed server-side by `vendors_in_bbox` (migration `0045`)
+   * as a set-based left join against `verified_vendor_ids()`, so the busiest
+   * query pays for it once, not once per row.
+   *
+   * Undefined on rows from anywhere else, and on every row until `0045` is
+   * applied. The comparator tests `=== true`, so a missing flag is false for
+   * all rows alike and the key quietly becomes a no-op.
+   *
+   * Note: this drives ORDER only. The verified BADGE on preview cards comes
+   * from a separate `verified_vendor_ids` RPC call in `useVendorPreviews`,
+   * because that fetch is a plain table select that cannot read the deny-all
+   * subscriptions table under caller RLS.
+   */
+  verified?: boolean;
 }
 
 /**

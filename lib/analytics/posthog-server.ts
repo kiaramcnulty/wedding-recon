@@ -38,7 +38,11 @@ function getClient(): PostHog | null {
   return client;
 }
 
-export type ServerEvent = "signup_completed" | "recon_saved";
+export type ServerEvent =
+  | "signup_completed"
+  | "recon_saved"
+  | "vendor_claim_created"
+  | "vendor_checkout_completed";
 
 /**
  * Capture a conversion event and await its delivery. `setOnce` becomes

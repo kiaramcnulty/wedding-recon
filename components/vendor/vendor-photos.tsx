@@ -29,6 +29,8 @@ interface VendorPhotosProps {
   googleCredit: string | null;
   /** Photos attached to this vendor's recon entries. */
   reconPhotos: LightboxPhoto[];
+  /** A verified vendor's own uploaded photos (badged), between recon and Google. */
+  vendorPhotos?: LightboxPhoto[];
 }
 
 export function VendorPhotos({
@@ -36,6 +38,7 @@ export function VendorPhotos({
   googleCount,
   googleCredit,
   reconPhotos,
+  vendorPhotos = [],
 }: VendorPhotosProps) {
   // Tiles are 150x112 CSS, so w=600 still covers a 3x screen (450px); the 1200px
   // variant is fetched only when a photo is opened. Both are CDN-cached
@@ -49,7 +52,11 @@ export function VendorPhotos({
     }),
   );
 
-  const photos = [...reconPhotos, ...googlePhotos];
+  // Order: recon photos (community evidence) lead, then the vendor's own
+  // uploads, then Google. Recon stays first on purpose — the page's job is to
+  // get the reader to the recon, and community content should not read as the
+  // vendor's marketing.
+  const photos = [...reconPhotos, ...vendorPhotos, ...googlePhotos];
   if (photos.length === 0) return null;
 
   return (

@@ -18,6 +18,7 @@ import {
 import { isApproximateLocation } from "@/lib/map/vendor-location";
 import { bboxForView, padBbox, snapBbox, type ViewportBbox } from "@/lib/map/viewport";
 import { mapWithConcurrency, withRpcRetry } from "@/lib/map/rpc-fanout";
+import { compareRanked, type RankedVendor } from "@/lib/map/rank";
 import {
   filterRankFor,
   filterMatchFor,
@@ -148,17 +149,6 @@ const MAX_VISIBLE_ENTRIES = 200;
 // per row per pan.
 const UNFILTERED_MATCH: FilterMatchDetail = { rank: 1, unknown: 0, active: 0 };
 
-/** A vendor scored for the list order. `d` is squared distance from the map center. */
-interface RankedVendor {
-  id: string;
-  vendorType: VendorType;
-  rank: 0 | 1;
-  matched: number;
-  priced: boolean;
-  photo: boolean;
-  d: number;
-}
-
 /**
  * Score one vendor for the list order, or null if it is ruled out (rank -1).
  *
@@ -188,6 +178,13 @@ function rankVendor(
     id: v.id,
     vendorType,
     rank: match.rank as 0 | 1,
+    // `=== true` rather than a truthiness test: undefined on every row until
+    // migration 0045 is applied, and that has to read as false for all rows
+    // alike so the verified key drops out — not as NaN, which would corrupt the
+    // comparator. Verified sorts within the rank partition only (the comparator
+    // places it after `rank`), so a verified partial match never lifts above a
+    // full match.
+    verified: v.verified === true,
     matched: matchedFraction(match),
     // `=== true` rather than a truthiness test: both flags are undefined on
     // every row until migration 0035 is applied, and that has to read as false
@@ -199,44 +196,9 @@ function rankVendor(
   };
 }
 
-/**
- * The list order. Five keys:
- *
- *   rank     full matches before the "missing some information" ones. This has
- *            to stay outermost: it is the partition the list draws its divider
- *            on, and what the cap keeps when it bites.
- *   matched  how MUCH of the ask a vendor met — the partial tier is itself
- *            graded, so a venue silent on 1 filter of 3 outranks one silent on
- *            2. A no-op above the divider, where every row matched everything
- *            and scores 1, which is why it can sit here rather than being
- *            special-cased to rank 0.
- *   priced   a vendor with an extracted price before one without. A couple is
- *            shopping on budget, and a card that can answer "what does this
- *            cost" is worth more than one that cannot. No divider — this tier
- *            is internal, unlike rank.
- *   photo    a card that draws an image before one that falls through to a
- *            category placeholder.
- *   d        then nearest the map center.
- *
- * Each key only ever reorders within the tier above it, so distance still
- * decides everything at the bottom.
- *
- * **Shared by BOTH feeds** — the on-screen results list and the tapped-cluster
- * sheet. The cluster sheet used to render MapLibre leaf order, which is
- * supercluster tree order and arbitrary to a reader, so the same two vendors
- * came out in a different order depending on which way you opened the list
- * (reported 2026-08-07: a "No quote found" photographer above one quoting
- * $2.5k). If a sixth key is ever added, add it here and both move together.
- */
-function compareRanked(a: RankedVendor, b: RankedVendor): number {
-  return (
-    b.rank - a.rank ||
-    b.matched - a.matched ||
-    Number(b.priced) - Number(a.priced) ||
-    Number(b.photo) - Number(a.photo) ||
-    a.d - b.d
-  );
-}
+// The list order (`compareRanked`) and the `RankedVendor` shape live in
+// `lib/map/rank.ts` so a node test can import the ordering rule directly
+// (`scripts/test-rank-order.mjs`). `rankVendor` above still owns the scoring.
 
 // Label sizes: the selected pin's name is set larger than its neighbours', and
 // offset further down to clear its bigger disc (offsets are in ems of text-size).

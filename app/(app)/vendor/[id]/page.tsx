@@ -25,11 +25,29 @@ import { VendorMapPreview } from "@/components/vendor/vendor-map-preview";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { VendorPhotos } from "@/components/vendor/vendor-photos";
 import { ReconCard } from "@/components/vendor/recon-card";
+import { VerifiedBadge } from "@/components/vendor/verified-badge";
+import { VerifyBusinessLink } from "@/components/portal/verify-business-link";
+import {
+  VendorListingContent,
+  type PricingRow,
+} from "@/components/vendor/listing-content";
 import { SaveButton } from "@/components/vendor/save-button";
 import { ShareButton } from "@/components/vendor/share-button";
 import { BackButton } from "@/components/vendor/back-button";
 import { ExternalLink } from "@/components/external-link";
 import { BrandFooter } from "@/components/brand-lockup";
+
+/** One row of a verified vendor's published listing (RPC verified_listing_public). */
+interface VerifiedListingRow {
+  vendor_id: string;
+  intro: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  website: string | null;
+  instagram: string | null;
+  pricing: PricingRow[] | null;
+  photos: { storage_path: string; thumb_path: string }[] | null;
+}
 
 /** Instagram glyph — lucide v1 dropped brand icons, so this is drawn inline to lucide's stroke conventions. */
 function InstagramIcon({ className }: { className?: string }) {
@@ -162,7 +180,7 @@ export default async function VendorPage({
   // recon here" check must stay a separate query (it counts `flagged` entries,
   // which the active-only list above does not include). getVendorGooglePhotos
   // only touches the network on a cache miss, so it's usually free.
-  const [existingRes, googlePhotos, coordsRes, viewerIsAdmin] =
+  const [existingRes, googlePhotos, coordsRes, viewerIsAdmin, verifiedRes, overridesRes] =
     await Promise.all([
       userId
         ? supabase
@@ -184,9 +202,35 @@ export default async function VendorPage({
         : Promise.resolve({ data: null }),
       // Site admins get an edit control on bot-authored recon below (0041).
       isAdminUser(supabase, userId),
+      // A verified vendor's published listing (intro / CTA / pricing / links).
+      // A SECURITY DEFINER function (migration 0046) that returns a row ONLY for
+      // a verified vendor, so it doubles as the badge signal. Errors are
+      // swallowed by design: until 0046 is applied the call fails, `data` is
+      // null/empty, and the page renders with no badge or block, as today.
+      supabase.rpc("verified_listing_public", { p_vendor_id: id }),
+      // A verified vendor's published filter overrides (migration 0044), merged
+      // over the extracted tags below so the chips match what the map shows.
+      supabase.rpc("verified_listing_overrides", { p_ids: [id] }),
     ]);
   const userHasRecon = !!existingRes.data;
   const coords = coordsRes.data as { lng: number; lat: number } | null;
+  const listing = ((verifiedRes.data ?? []) as VerifiedListingRow[])[0] ?? null;
+  const isVerified = !!listing;
+  // The vendor's own maintained links win over extracted ones while verified.
+  const effectiveWebsite = listing?.website || vendor.website;
+  const effectiveInstagram = listing?.instagram || vendor.instagram;
+  // Merge the vendor's published filter overrides over the extracted filters,
+  // exactly as vendor_filters_in_bbox does for the map (0045), so the chips and
+  // the map agree. Override keys win; extracted keys survive where not set.
+  const overrideRow = ((overridesRes.data ?? []) as {
+    vendor_id: string;
+    filter_overrides: Record<string, unknown> | null;
+  }[])[0];
+  const filterOverrides = overrideRow?.filter_overrides ?? {};
+  const hasOverrides = Object.keys(filterOverrides).length > 0;
+  const effectiveFilters = hasOverrides
+    ? { ...(vendor.filters ?? {}), ...filterOverrides }
+    : vendor.filters;
 
   // Distinct author names for the "Photos via Google" caption.
   const googleCredit =
@@ -214,6 +258,24 @@ export default async function VendorPage({
     })),
   );
 
+  // A verified vendor's own uploaded photos, badged and slotted between recon
+  // and Google in the strip (see VendorPhotos). Public bucket, so the URLs are
+  // resolved here server-side with no network call.
+  const vendorPhotos =
+    (isVerified &&
+      (listing?.photos as { storage_path: string; thumb_path: string }[] | null)?.map(
+        (p) => ({
+          thumb: supabase.storage
+            .from("vendor-media")
+            .getPublicUrl(p.thumb_path).data.publicUrl,
+          full: supabase.storage
+            .from("vendor-media")
+            .getPublicUrl(p.storage_path).data.publicUrl,
+          badge: "Provided by vendor",
+        }),
+      )) ||
+    [];
+
   // Service areas as reported by the recon on this vendor, deduped. Shown in
   // place of the map for service-region types — it explains why there is no pin
   // here, and it is real data rather than decoration, so it renders only when
@@ -231,7 +293,7 @@ export default async function VendorPage({
   // Full list of the vendor's filter attributes as pills — the same facets the
   // Explore filter sheet is built from. No active selection on this page, so
   // they render in importance order (see lib/filters/vendor-tags.ts).
-  const tags = vendorTags(vendor.vendor_type, vendor.filters);
+  const tags = vendorTags(vendor.vendor_type, effectiveFilters);
 
   const category = CATEGORIES[vendor.vendor_type as VendorType];
   const CategoryIcon = category?.icon ?? MapPin;
@@ -265,14 +327,18 @@ export default async function VendorPage({
             <CategoryIcon className="size-5" />
           </div>
 
-          {/* Name + category label */}
+          {/* Name + category label, with the Vendor Verification badge under
+              the name when this is a paying verified vendor. */}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <h1 className="font-heading text-lg font-semibold leading-tight truncate">
               {vendor.name}
             </h1>
-            <span className="text-xs font-medium" style={{ color: colorHex }}>
-              {categoryLabel}
-            </span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="text-xs font-medium" style={{ color: colorHex }}>
+                {categoryLabel}
+              </span>
+              {isVerified && <VerifiedBadge />}
+            </div>
           </div>
 
           {/* Action buttons */}
@@ -315,13 +381,14 @@ export default async function VendorPage({
               )}
             </div>
           )}
-          {(vendor.website || vendor.instagram) && (
+          {(effectiveWebsite || effectiveInstagram) && (
             <div className="flex items-center gap-4">
-              {vendor.website && (
-                // Embeddability varies per site; checked in the background via
-                // /api/embed-check — blocked sites stay plain new-tab links.
+              {effectiveWebsite && (
+                // A verified vendor's own website (listing) wins over the
+                // extracted one. Embeddability varies per site; checked in the
+                // background via /api/embed-check — blocked sites stay new-tab.
                 <ExternalLink
-                  href={vendor.website}
+                  href={effectiveWebsite}
                   embed={{ vendorId: vendor.id, kind: "website" }}
                   track={{ kind: "website", vendorId: vendor.id }}
                   className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
@@ -330,11 +397,11 @@ export default async function VendorPage({
                   <span className="truncate">Visit website</span>
                 </ExternalLink>
               )}
-              {vendor.instagram && (
+              {effectiveInstagram && (
                 // Instagram blocks framing on all profile pages — always a
                 // plain new-tab link (embed defaults to false).
                 <ExternalLink
-                  href={`https://www.instagram.com/${vendor.instagram}`}
+                  href={`https://www.instagram.com/${effectiveInstagram}`}
                   track={{ kind: "instagram", vendorId: vendor.id }}
                   className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-primary/80"
                 >
@@ -348,23 +415,54 @@ export default async function VendorPage({
       </div>
 
       {/* Filter tags — the vendor's attributes as pills, wrapping across as many
-          lines as needed. Hidden when nothing has been extracted for it. */}
+          lines as needed. Hidden when nothing has been extracted for it. A
+          verified vendor's own overrides are merged in above; when present, a
+          small note credits them. */}
       {tags.length > 0 && (
         <div className="mt-4 px-4">
           <VendorTagList tags={tags} />
+          {isVerified && hasOverrides && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Some details provided by the vendor
+            </p>
+          )}
         </div>
       )}
 
-      {/* All photos in ONE strip — recon first, then Google (badged per tile,
-          bytes proxied from cached references). Two stacked strips plus the map
+      {/* All photos in ONE strip — recon first, then the verified vendor's own
+          uploads, then Google (badged per tile). Two stacked strips plus the map
           used to fill the whole first screen before any recon was reachable. */}
-      {(photos.length > 0 || googlePhotos.length > 0) && (
+      {(photos.length > 0 || vendorPhotos.length > 0 || googlePhotos.length > 0) && (
         <div className="mt-4">
           <VendorPhotos
             vendorId={vendor.id}
             googleCount={googlePhotos.length}
             googleCredit={googleCredit}
             reconPhotos={photos}
+            vendorPhotos={vendorPhotos}
+          />
+        </div>
+      )}
+
+      {/* Verified vendor's own listing content — intro, a CTA button, and a
+          pricing block (collapsed). Below the photos, above the map, so the
+          couple sees the vendor's pitch after the photos but the recon stays
+          the page's job. Renders nothing unless the vendor is verified AND has
+          content. Re-measure the fold once vendor photos land (deferred). */}
+      {isVerified && listing && (
+        <div className="mt-4 px-4">
+          <VendorListingContent
+            vendorId={vendor.id}
+            content={{
+              intro: listing.intro,
+              ctaLabel: listing.cta_label,
+              ctaUrl: listing.cta_url,
+              pricing: (listing.pricing ?? []).map((r) => ({
+                label: r.label ?? "",
+                price: r.price ?? "",
+                unit: r.unit ?? "",
+              })),
+            }}
           />
         </div>
       )}
@@ -445,6 +543,19 @@ export default async function VendorPage({
           />
         ))}
       </div>
+
+      {/* Acquisition: the highest-intent surface for a vendor googling
+          themselves. Quiet line, tracked by source. Hidden once verified. */}
+      {!isVerified && (
+        <div className="mt-6 px-4 text-center">
+          <VerifyBusinessLink
+            source="vendor_page"
+            className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            Are you the owner? Verify this business
+          </VerifyBusinessLink>
+        </div>
+      )}
 
       <BrandFooter />
     </div>

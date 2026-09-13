@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { UserRound, LogIn, LogOut, X, Mail, Info } from "lucide-react";
+import { UserRound, LogIn, LogOut, X, Mail, Info, Store } from "lucide-react";
 
 import { LANDING_HREF } from "@/lib/landing/nav";
 import { createClient } from "@/lib/supabase/client";
@@ -230,6 +230,16 @@ export function ProfileMenu({ className }: { className?: string }) {
             >
               <Info className="size-4 shrink-0" />
               About Wedding Recon
+            </Link>
+            {/* Vendor entry point. A guest tapping this lands on /portal, which
+                sends them to sign in and back. */}
+            <Link
+              href="/portal"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground"
+            >
+              <Store className="size-4 shrink-0" />
+              Are you a vendor?
             </Link>
             <button
               type="button"

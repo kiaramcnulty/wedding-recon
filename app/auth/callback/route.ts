@@ -3,6 +3,10 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { postSignInPath } from "@/lib/auth/post-signin";
+import {
+  POST_SIGNIN_INTENT_COOKIE,
+  readSignInDestinationCookie,
+} from "@/lib/auth/post-signin-redirect";
 
 /**
  * Completes a sign-in from the EMAILED LINK.
@@ -49,7 +53,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login`);
   }
 
-  // Onboarding (new user) vs explore (returning) — shared with the code path so
-  // both sign-in routes land in the same place.
-  return NextResponse.redirect(`${origin}${await postSignInPath(supabase)}`);
+  // Onboarding (new user) vs the intent they arrived with vs explore (returning)
+  // — shared with the code path so both sign-in routes land in the same place.
+  const intended = readSignInDestinationCookie(
+    request.cookies.get(POST_SIGNIN_INTENT_COOKIE)?.value,
+  );
+  const dest = await postSignInPath(supabase, intended);
+
+  const res = NextResponse.redirect(`${origin}${dest}`);
+  // Consumed once we route somewhere real; kept through onboarding so
+  // setUsername can honor it after the new account is set up.
+  if (dest !== "/onboarding") {
+    res.cookies.set(POST_SIGNIN_INTENT_COOKIE, "", { maxAge: 0, path: "/" });
+  }
+  return res;
 }

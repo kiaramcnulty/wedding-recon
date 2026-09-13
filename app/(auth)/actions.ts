@@ -8,6 +8,10 @@ import {
   parseAttribution,
   type Attribution,
 } from "@/lib/analytics/attribution";
+import {
+  POST_SIGNIN_INTENT_COOKIE,
+  readSignInDestinationCookie,
+} from "@/lib/auth/post-signin-redirect";
 import { captureServer } from "@/lib/analytics/posthog-server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -115,7 +119,18 @@ export async function setUsername(
     await captureServer(user.id, "signup_completed", undefined, setOnce);
   }
 
-  redirect("/explore");
+  // Honor a sign-in intent carried through onboarding (a new vendor who came in
+  // via "Verify this business" lands on /portal, not /explore). The auth routes
+  // leave the cookie in place while routing to onboarding; consume it here.
+  const jar = await cookies();
+  const intended = readSignInDestinationCookie(
+    jar.get(POST_SIGNIN_INTENT_COOKIE)?.value,
+  );
+  if (intended) {
+    jar.set(POST_SIGNIN_INTENT_COOKIE, "", { maxAge: 0, path: "/" });
+  }
+
+  redirect(intended ?? "/explore");
 }
 
 /** Sign the current user out and send them to the login screen. */

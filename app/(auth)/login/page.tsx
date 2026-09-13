@@ -14,6 +14,10 @@ import {
   getPendingOtpEmail,
   setPendingOtpEmail,
 } from "@/lib/auth/pending-otp";
+import {
+  POST_SIGNIN_INTENT_COOKIE,
+  sanitizeSignInDestination,
+} from "@/lib/auth/post-signin-redirect";
 import { useIsStandalone } from "@/lib/use-standalone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,6 +85,15 @@ function LoginContent() {
       }
 
       setPendingOtpEmail(email);
+      // Stash where to land after sign-in (e.g. /portal for a vendor verifying
+      // their business). Both completions — the emailed code and the emailed
+      // link — read this cookie back; the query-string `from` cannot survive the
+      // browser-verify → /auth/post-signin hop on its own. Scoped to the OTP's
+      // own ~1h life, cleared once consumed.
+      const dest = sanitizeSignInDestination(rawFrom);
+      if (dest) {
+        document.cookie = `${POST_SIGNIN_INTENT_COOKIE}=${encodeURIComponent(dest)}; path=/; max-age=3600; samesite=lax`;
+      }
       setSent(true);
     } catch {
       toast.error("Something went wrong. Please try again.");
