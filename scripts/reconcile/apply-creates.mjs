@@ -25,7 +25,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ROOT, serviceClient, readJsonl, arg, has, bareNumberPrice } from "./lib.mjs";
+import { ROOT, serviceClient, readJsonl, has, bareNumberPrice } from "./lib.mjs";
 
 const APPLY = has("apply");
 const db = serviceClient();

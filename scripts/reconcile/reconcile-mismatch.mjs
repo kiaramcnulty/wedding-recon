@@ -20,7 +20,7 @@
  */
 
 import { join } from "node:path";
-import { serviceClient, ROOT, arg, has } from "./lib.mjs";
+import { serviceClient, ROOT, has } from "./lib.mjs";
 import { readFileSync } from "node:fs";
 
 const APPLY = has("apply");

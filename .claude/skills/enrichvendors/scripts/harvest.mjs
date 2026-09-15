@@ -283,7 +283,8 @@ async function harvestOne(v) {
   const s = out.site_error ? `site FAIL: ${out.site_error}`
     : site ? `${(out.pages?.length ?? 1) - 1} subpages, ${out.images?.length ?? 0} imgs, ${out.pdfs?.length ?? 0} pdfs${pdfTried ? ` (read ${pdfOk}/${pdfTried})` : ''}` : 'no website';
   console.log(`${v.name} — ${g} | ${s}`);
-  out.site_error || (!site && !v.google_place_id) ? failed++ : ok++;
+  if (out.site_error || (!site && !v.google_place_id)) failed++;
+  else ok++;
 }
 
 const queue = [...targets];

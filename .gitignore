@@ -73,3 +73,10 @@ next-env.d.ts
 # results). The snapshots are the local undo record; they are point-in-time
 # operational output, not source, so they stay out of the repo like the above.
 /data/reconcile/
+
+# one-off upload/recovery scratch scripts + their Places cache, same reasoning as
+# data/ above: point-in-time operational output, not source
+/.recon-upload-tmp/
+
+# generated giveaway workbook (built by scripts/cost-sheet/build.ts from the DB)
+/2025_wedding_vendors_for_reddit.xlsx
