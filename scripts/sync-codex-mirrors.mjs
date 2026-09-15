@@ -71,14 +71,22 @@ function walk(dir, base = dir, out = []) {
 const stale = [];
 let written = 0;
 
-/** Write `content` to `rel`, or record it as stale under --check. */
-function emit(rel, content) {
+/**
+ * Write `content` to `rel`, or record it as stale under --check.
+ *
+ * `checked: false` writes the file but exempts it from --check. That is for
+ * output which is gitignored AND machine-specific, so comparing it proves
+ * nothing: it is legitimately absent in a fresh clone (which would otherwise
+ * fail `npm test` on a clean checkout -- caught by cloning the repo and running
+ * the check) and legitimately different on another machine.
+ */
+function emit(rel, content, { checked = true } = {}) {
   const abs = path.join(ROOT, rel);
   const existing = fs.existsSync(abs) ? fs.readFileSync(abs) : null;
   const next = Buffer.from(content);
   if (existing && existing.equals(next)) return;
   if (CHECK) {
-    stale.push(rel + (existing ? " (differs)" : " (missing)"));
+    if (checked) stale.push(rel + (existing ? " (differs)" : " (missing)"));
     return;
   }
   fs.mkdirSync(path.dirname(abs), { recursive: true });
@@ -163,7 +171,7 @@ const hooksJson =
     null,
     2,
   ) + "\n";
-emit(".codex/hooks.json", hooksJson);
+emit(".codex/hooks.json", hooksJson, { checked: false });
 
 // ── self-check: no canonical-tree paths may survive into a mirror ────────────
 // The rewrites are blind string substitutions, so a sentence that MENTIONS the
