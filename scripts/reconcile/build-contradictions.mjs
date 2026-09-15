@@ -31,7 +31,6 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { workdir, readJsonl, arg } from "./lib.mjs";
-import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
 
 const WORK = arg("work");
 if (!WORK) {

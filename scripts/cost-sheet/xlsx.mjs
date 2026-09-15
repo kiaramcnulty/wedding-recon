@@ -37,7 +37,6 @@ export function colName(n) {
 function esc(s) {
   return String(s)
     .replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))
-    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
 }
 

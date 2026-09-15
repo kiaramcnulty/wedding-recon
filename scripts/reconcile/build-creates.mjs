@@ -27,7 +27,7 @@ const MODEL = arg("model", "claude-sonnet-5");
 const MAX_TOKENS = Number(arg("max-tokens", 32000));
 
 const src = JSON.parse(readFileSync(resolve(ROOT, "data/reconcile/creates-targets.json"), "utf8"));
-const { targets, bots } = src;
+const { targets } = src;
 const dir = resolve(ROOT, "data/reconcile/creates");
 mkdirSync(join(dir, "calls"), { recursive: true });
 

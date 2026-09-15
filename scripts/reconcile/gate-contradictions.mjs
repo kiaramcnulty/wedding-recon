@@ -119,7 +119,6 @@ for (const r of results) {
 writeJsonl(join(dir, "accepted-fix.jsonl"), accepted);
 
 const byVerdict = (vv) => accepted.filter((r) => r.verdict === vv);
-const line = (r) => `  ${vendors.get(r.vendor_id)?.name ?? r.vendor_id} [${r.key}] - ${r.reason ?? ""}`;
 
 const report = [
   `Contradiction adjudication gate - ${WORK}`,

@@ -79,7 +79,6 @@ let removed = 0, fixedPrice = 0, fixedCap = 0, skipped = 0;
 
 for (const id of targetIds) {
   const vd = vendors.get(id);
-  const f = vd.filters;
   const nameKey = Object.keys(REMOVE).find((n) => vd.name.includes(n));
 
   // Snapshot before touching.
