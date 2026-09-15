@@ -49,7 +49,8 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - `npm run dev` -- dev server (needs `.env.local`).
 - `npm run build` -- production build (**must pass before commit**).
 - `npm run lint` -- eslint. Must be clean; one known-benign warning remains (`watch()` in `app/(app)/add/page.tsx`, react-hook-form + React Compiler).
-- `npm test` -- the 7 node check scripts in `scripts/test-*.mjs` (123 assertions). Run after touching filter matching, list ordering, the RPC fan-out, bbox snapping, or the verification SQL -- these are the only executable checks on those rules.
+- `npm test` -- the 7 node check scripts in `scripts/test-*.mjs` (123 assertions), preceded by a staleness check on the Codex mirrors. Run after touching filter matching, list ordering, the RPC fan-out, bbox snapping, or the verification SQL -- these are the only executable checks on those rules.
+- `npm run sync-codex` -- regenerate the Codex mirrors from `.claude/`. See the Skills section.
 
 **Keep the lint gate usable.** `eslint.config.mjs` ignores `.claude/worktrees/**`, `.agents/**`, `.codex/**`, `data/**` and `.recon-upload-tmp/**`. Each git worktree is a FULL copy of the repo, so linting them lints the codebase two or three times over: two stale worktrees once made `npm run lint` report **41,335 problems / 1,516 errors** while the app's own source was clean. If lint output suddenly explodes, check for a new worktree before believing the findings.
 
@@ -97,7 +98,10 @@ Three project skills. Each `SKILL.md` is loaded when the skill is invoked, so th
   - **`pipeline.mjs status` is the real quality gate**, not upload. It counts the same defects `upload.mjs` hard-fails on -- these are cheap to fix in the JSONLs and expensive afterwards.
 - **`/verify`** (`.claude/skills/verify/`) -- run and drive the app with no Supabase credentials, via a fake PostgREST server + Playwright. Reach for it early on "renders but looks wrong": a DOM probe beats reasoning from screenshots (it named the collapsed-map bug in one shot after two wrong fixes).
 
-**Skills are mirrored for Codex** in `.agents/skills/` + `.codex/`, byte-identical apart from paths and runtime names. If you edit a skill script, **apply it to both mirrors** -- they drift silently otherwise, and `pipeline.mjs` once hardcoded a `.claude/...` reference path that made the Codex copy read the Claude tree's rules (now derived from `import.meta.url`).
+**The Codex mirrors are GENERATED, never hand-edited.** `.claude/skills` + `.claude/agents` + `.claude/hooks` are the source of truth; `scripts/sync-codex-mirrors.mjs` produces `.agents/skills` + `.codex/agents` + `.codex/hooks` from them (`npm run sync-codex`), and `npm test` fails when they are stale. Edit the canonical tree and re-run it -- editing a mirror directly gets overwritten.
+  - Hand-maintaining them drifted twice, both times silently. Every mirrored `SKILL.md` pointed at a `.Codex/skills/` directory that does not exist, so a Codex session failed on its first command (26 occurrences). And `pipeline.mjs` hardcoded its references path to the canonical tree, so the mirror read the *other* copy's drafting rules -- working only because both trees coexist here.
+  - The rewrites are blind string substitutions, so **do not name either tree literally in prose that the substitution would mangle.** A comment reading "`.claude/skills` for Claude Code, `.agents/skills` for Codex" came out as "`.claude/skills` for Codex, `.agents/skills` for Codex". The script warns when a mirror still points at the canonical tree; the fix is always to reword the SOURCE.
+  - `.codex/hooks.json` is the one generated file that is **gitignored** -- Codex wants an absolute command path, which is machine-specific. Run `npm run sync-codex` once per checkout.
 
 ## Status
 

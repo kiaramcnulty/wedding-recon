@@ -14,7 +14,7 @@
 //   photos-map map screened keeper photos (photos/screen/keep-batch-*.json) into the CSV
 //              (first entry per vendor only — the same photo never appears on two entries)
 //
-// usage: node --env-file=.env.local .claude/skills/enrichvendors/scripts/pipeline.mjs <workdir> <cmd> [flags]
+// usage: node --env-file=.env.local .agents/skills/enrichvendors/scripts/pipeline.mjs <workdir> <cmd> [flags]
 //   batch:      --region ST --roster <path> --size N --batch <id> [--per-call 25] [--only "Name A;Name B"] [--exclude "..."] [--supplemental]
 //               [--mode api|harness]  api (DEFAULT): call files carry a no-tools delivery
 //               override (JSON lines in the response body + a final {"_flags": ...} line)
@@ -369,7 +369,7 @@ async function cmdBatch() {
   console.log(`entry distribution: ${[1, 2, 3].map((n) => `${n}-entry×${dist[n] || 0}`).join(', ')} (richness-driven)`);
   console.log(`bot load: ${Object.entries(perBot).map(([b, n]) => `${b}=${n}`).join(', ')}`);
   console.log(`largest call file ≈ ${maxTok} tokens`);
-  if (apiMode) console.log(`API mode: submit with draft.mjs — node --env-file=.env.local .claude/skills/enrichvendors/scripts/draft.mjs ${workdir} submit --batch ${batch}`);
+  if (apiMode) console.log(`API mode: submit with draft.mjs — node --env-file=.env.local .agents/skills/enrichvendors/scripts/draft.mjs ${workdir} submit --batch ${batch}`);
   else console.log(`spawn one draft-worker agent per drafts/${batch}-call-NN.md`);
 }
 

@@ -80,3 +80,9 @@ next-env.d.ts
 
 # generated giveaway workbook (built by scripts/cost-sheet/build.ts from the DB)
 /2025_wedding_vendors_for_reddit.xlsx
+
+# Codex mirrors are GENERATED from .claude/ by scripts/sync-codex-mirrors.mjs and
+# are tracked, so the fixes in them survive a fresh clone. The one exception is
+# hooks.json: Codex wants an absolute command path, which is machine-specific, so
+# it is generated per checkout instead of committed. Run `npm run sync-codex`.
+/.codex/hooks.json

@@ -1,0 +1,95 @@
+# Draft call — /enrichvendors single-turn contract (all vendor types)
+
+You are drafting bot recon entries for the wedding vendors listed below. Everything you need is IN THIS FILE: this contract, the entry rules, the type-specific rules, the bot voices, and one research dossier per vendor. Do NOT read any other file, do NOT search the web, do NOT use any tool except one Write at the end. Never fabricate a price, quote, event, or booking.
+
+## How many rows — read each block's `entries=` header
+- Each vendor block assigns `entries=N` (1–3) with a bot and date per entry (`entry1: bot=botX date=M/YYYY | entry2: ...`). Write EXACTLY that many JSON lines for that vendor — one per assigned bot, dated with its assigned date. Override a date only if the dossier contains a clearly better-sourced real date (e.g. a dated reddit comment) — and never onto a sibling entry's month/year: two entries from "different couples" carrying the same collected date reads as one author. If an override would collide, keep the assigned date instead.
+- Multi-entry vendors split by SOURCE CLUSTER, never by padding: entry 1 leads with site/published pricing; entry 2 leads with review/reddit experience color (staff, vibe, what working with them was like, quirks); entry 3 (rare) leads with logistics/booking-process details. Conflicting prices from different sources go in SEPARATE entries — that's a feature (more data points).
+- Each entry stands ALONE. Different bots are different couples: clearly different voice and opening, NEVER reference another entry ("as someone else said", "the other listing") or hint the vendor is one of a set. A reader sees separate cards from different people.
+- STRICT anecdote partition: before writing a multi-entry vendor, assign each dossier story to EXACTLY ONE entry — a specific reviewer's experience, a named trip or event, a memorable detail (the camera-shy couple, the Costa Rica wedding, the fast baby-shoot turnaround) appears in ONE sibling only, never retold in different words by the "other couple". Two independent strangers citing the same anecdote is the single biggest tell that one author wrote both. Only the vendor's PUBLISHED price facts may recur across siblings (reworded + differently sourced, per the pricing rule above). If there aren't enough distinct stories to give each assigned entry its own material, write fewer rows and flag ` SHORT:<slug>`.
+- Every entry still carries `price_text` + `price_details`. Non-pricing-cluster entries derive a HEDGED version of the vendor's sourced pricing in their own words ("going off their posted rates it's about $X-$Y", "reviews put it around $X") — never copy a sibling entry's pricing wording verbatim, and ideally cite a different source than the sibling. **If the dossier gives a number at all, that number leads the headline**, however soft the source; a headline saying pricing is quote-only while the entry states a figure contradicts itself and fails the upload gate. When nothing was found, say so plainly and VARY the wording across entries — "No quote provided" / "No quote found" / "Didn't get a quote" (never the retired "Quote only"; see `common/entry-rules-core.md`).
+- If the dossier can't support N distinct honest entries, write fewer and append ` SHORT:<slug>` to your reply. Fewer real entries always beats padded ones.
+- Write EXACTLY the assigned rows and no more — never an extra row, a test row, or any row containing placeholder text (`PLACEHOLDER`, `REMOVE`, `TODO`); one stray row fails the whole merge.
+
+## Every row
+- `recon_type` is always `online`.
+- `price_text` + `price_details` REQUIRED (specifics per the entry rules and type rules below). NEVER invent a number, NEVER extrapolate a market rate onto a specific vendor.
+- `notes`: ONE line (no embedded newlines and no `\n` escape sequence — inline "-bullets" separated by a space are how you start a new line; see the output-format section), first person, in the assigned bot's voice per the voice cards. **Bullet-style notes are fine and actively encouraged — including notes that OPEN with a bullet** (Kiara, 2026-07-29: "the bullets are okay and encouraged, the variety is good"). Real people jot notes both ways: some write a paragraph, some rattle off "-parking is $40/night -breakfast included -ask about the shuttle". A corpus where every entry is uniform prose reads MORE synthetic, not less, so **vary the shape across rows** — mix running prose, bullet lists, and label-style fragments ("-Staff: ...") rather than settling into one format. The upload gate deliberately does NOT flag this; `debullet()` in `upload.mjs` converts bullet boundaries to real newlines at insert and the vendor page renders them correctly. NO minimum length — a ~200-char note covering all the real intel is a great entry. Length follows intel; cap ~90 words; never pad or restate. Attribute borrowed experiences ("a bride on reddit said...", "a review mentions..."); never first person for things the bot didn't do. Include warts when sources have them.
+- No em/en dashes (– —) anywhere; use hyphens, commas, periods. No banned marketing/AI phrases (list in the entry rules). Vary sentence openings and shapes across rows — no two rows share a long word-run.
+- NEVER use research-tooling language: no "crawl", "scrape", "fetch", "parse", "harvest", "dossier", "boilerplate", "garbled text", or descriptions of pages failing to be machine-read. Bracketed provenance tags in your research block (like [launchintel] or [zola]) name FILES, not sources — in entry text cite the underlying source ("a Knot listing", "a pricing guide", "their site"); the words "digest" and "launchintel" are validator-rejected.
+- **A missing price is a fact about the VENDOR, never an event that happened to you.** Write the outcome, not the attempt: "their site doesn't list pricing", "you have to inquire for rates", "nothing public on rates, so it's a call-and-ask", "they don't publish package prices". NEVER narrate the attempt itself — no page that "wouldn't load", "didn't load", "failed to load", was "down", "unavailable", or "unreachable", no HTTP status codes (403, 404), no "automated checks/lookups". The reader cannot tell the difference between a site that has no prices and a site you could not open, and only one of those is about the vendor. (This bullet previously offered "couldn't get their pricing page to load" as a GOOD example — it is not, and that single exemplar seeded a leak across two vendor types before the validator was taught to catch it. Both `pipeline.mjs status` and the `upload.mjs` gate now hard-fail on it.)
+- NEVER reference this project or how the entry was produced: no "batch", "enrich", "seeded", "roster", "dataset", "bot", "pipeline", or any hint that the vendor is one of a set being processed. The note is one couple writing about one vendor — it must read as if nothing else exists.
+- `photos`: EMPTY. `sources`: short refs only, e.g. `site /pricing; google reviews; reddit:reddit-04.txt` — no commas inside.
+- `service_region`: see the type rules — required for some types, always-null for others (include the key only when the type rules require it).
+
+## Filter tags — the structured half of the same fact (per vendor, on entry 1)
+
+Every vendor also carries a set of **filter tags** — the structured, queryable
+version of the facts you are already writing in prose. The Explore map filters,
+the price sort, and the map's category counts all read the tags; a couple
+reading the card reads the prose. They must describe the SAME vendor and must
+agree, so you write BOTH from the one dossier in this one call. This is what
+keeps the two stores from drifting: same research, same judgment, one call.
+
+The allowed tag keys and their permitted values for THIS vendor's type are
+inlined in the header block above (`FILTER VOCABULARY`). A value not in that list
+is invalid and is rejected at upload.
+
+### THE HARD RULE — every tag must live in the recon (upload-enforced)
+
+**A tag may exist ONLY if a sentence in this vendor's recon prose documents it.**
+For every tag you emit, quote the exact sentence from your own `notes` /
+`price_text` / `price_details` (any of this vendor's entries) that a couple would
+read and learn the fact from. The upload gate checks that quote is a VERBATIM
+substring of the prose you wrote — **if it is not, the whole upload fails**, the
+same as a banned phrase. So there is no way to tag a fact you did not also write
+into the recon. If you cannot point to a sentence, you have two honest choices:
+write the fact into the prose (then tag it), or drop the tag. Never tag a fact
+the reader would not find on the card.
+
+The reverse is the everyday rule you already follow: if the dossier supports a
+filterable fact, WRITE it into the prose AND tag it. Tag as many attributes as
+the research genuinely supports — the more complete the tags, the more searches
+this vendor turns up in.
+
+### Evidence bar — positive only, absence is not a negative
+- Emit a tag ONLY with positive evidence in the dossier. No evidence -> leave the
+  key ABSENT. Absent means "unknown", and the matcher keeps the vendor visible.
+- NEVER emit `false` or an empty list to mean "did not find it". A `false` is a
+  positive claim the vendor LACKS the thing, and it REMOVES the vendor from that
+  search. Only write `false` when the dossier says so outright ("no on-site
+  lodging", "outside catering not allowed").
+- A price tag needs a real published or clearly-sourced number, on a basis you
+  can name (per person / package / per night / per gown). A number you cannot
+  place on a basis is worse than none — do not tag it.
+
+### Output — a `filters` object on the vendor's FIRST entry only
+Add one extra key, `filters`, to the FIRST JSON row of each vendor (omit it on
+that vendor's other rows). Each entry is `key: {value, quote}`:
+
+`"filters": {"setting": {"value": ["mountain","barn_rustic"], "quote": "the ceremony lawn sits right under the peaks and the reception is in a restored barn"}, "capacity_max": {"value": 150, "quote": "they cap it at 150 guests"}, "price_min": {"value": 3000, "quote": "packages start at $3,000"}, "price_max": {"value": 12000, "quote": "packages start at $3,000 and the full-Saturday package runs $12,000"}, "price_basis": {"value": "package"}, "price_kind": {"value": "range"}}`
+
+- `value` matches the vocabulary (a list for multi, `true`/`false` for bool, a
+  number for a range bound). `quote` is a verbatim slice of THIS vendor's prose.
+- `price_basis` / `price_kind` / `price_confidence` describe the price and need
+  no quote of their own (they ride on the priced sentence).
+- A multi list asserts completeness for what you were able to evidence: include
+  every value the prose supports, and no value it does not.
+
+## Flags (append to your one-line reply, never draft a row for them)
+Wrong-type has TWO tiers — pick by how certain the dossier makes you. `<NOTFLAG>` is the exact per-type name from the type rules (`NOTAVENUE`, `NOTCATERER`, ...); a trailing `!` marks the strong tier. Every `<slug>` in ANY flag below is the **exact `slug=` value from that vendor's `===` header line — copy it verbatim, never re-derive it from the name** (auto-removal joins flags to vendors by that slug; a re-slugified name, especially one with an apostrophe or `&`, silently fails to match).
+- ` <NOTFLAG>!:<slug>` (STRONG — the `!` means "positive evidence"; auto-removed, no human vetting) — the dossier POSITIVELY shows this vendor is not this run's type at all. Two ways to earn it: (a) a fundamentally DIFFERENT KIND of business — a planner, rental company, caterer, officiant, tour operator, retail shop, day-use attraction — whose name and site sell that other thing; or (b) positive evidence it has NO capacity for this type's core service — for a VENUE run, a stay-only hotel or dine-in-only restaurant: pricing is ALL per-night-stay or per-plate, the summary and reviews are about rooms/meals, and there is NO event-SPACE language — no ceremony/reception/ballroom/banquet-hall, no rental or site fee, no guest-capacity count. (A "room block for guests" is a lodging product, NOT event space; the word "event" alone does not make a venue.) Only use `!` when you can point to that evidence in the dossier. Write NO rows.
+- ` <NOTFLAG>:<slug>` (SOFT — a report a human vets, NOT a delete) — it looks like it might be the wrong type but you are NOT certain. DRAFT the row(s) NORMALLY anyway (real facts, in voice — never meta-commentary like "flagging separately" or placeholder text; validator-rejected) and add this flag; the orchestrator decides whether to keep or remove. Use this, never `!`, whenever there is any doubt.
+- Guardrail — do NOT flag either tier: a hotel, resort, restaurant, ranch, or golf club whose dossier merely LACKS wedding text (but shows nothing ruling events out) is `THIN`, not any wrong-type flag. Venues host events even when their reviews are all about skiing. Absence of wedding text = `THIN` (keep the pin); positive evidence of no event space = `<NOTFLAG>!`.
+- ` THIN:<slug>` — essentially nothing beyond name/city (no site text, no reviews, no digest or reddit lines, no google summary), OR a plausible-type business whose dossier has no honest type-relevant fact to write. Write NO rows; an entry must contain at least one real sourced fact.
+- ` SHORT:<slug>` — you wrote fewer rows than the block assigned (dossier couldn't honestly support them all).
+
+## Output format (exact) — JSON Lines
+Write ONE JSON object per row, one object per line — no wrapping array, no markdown fences, no header line. Every object has ALL of these keys (plus `service_region` when the type rules require it, plus `filters` on each vendor's FIRST row per the Filter tags section):
+`{"venue": "<the VENDOR'S business name — key is named venue for historical reasons>", "vendor_id": "<VERBATIM from the block>", "recon_type": "online", "month": <number>, "year": <number>, "price_text": "...", "price_details": "...", "notes": "...", "photos": "", "sources": "...", "bot": "<VERBATIM botN for THIS entry from the block>"}`
+JSON handles all escaping — just emit valid JSON per line. Keep `notes` one logical line: no real newline characters **and no `\n` escape sequence either**. To start a new bullet, just write the next `-bullet` after a space (`-parking is $40 -breakfast included`); `debullet()` in `upload.mjs` turns those boundaries into real line breaks at insert, which is what the vendor page renders. Writing `\n` yourself does NOT produce a line break — it survives every downstream step as the two literal characters and prints on the card mid-sentence ("on shoots\n-she's described as"), which is exactly what happened before 2026-08-04. Same rule for `price_details` and `price_text`.
+
+## Finish
+Write all the JSON lines to the OUTPUT FILE named at the bottom of this file, in ONE Write call. Then STOP and reply with exactly one line: `<output file>: done` (plus any ` <NOTFLAG>!: slug1` / ` <NOTFLAG>: slug2` / ` THIN: slug1, slug2` / ` SHORT: slug1` flags).
+
+Do NOT read your output file back to check or count it, do NOT re-read this file, do NOT list directories or reach for any other tool. Downstream scripts validate every row for free (coverage, pricing fields, service_region, banned phrases, em-dashes, dedup) — a read-back only re-bills this whole file's tokens for nothing, and a wrong cell is cheaper to fix later than a re-read is now. Write once and stop.

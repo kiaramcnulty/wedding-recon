@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "for f in scripts/test-*.mjs; do echo \"--- $f\"; node \"$f\" || exit 1; done"
+    "test": "node scripts/sync-codex-mirrors.mjs --check && for f in scripts/test-*.mjs; do echo \"--- $f\"; node \"$f\" || exit 1; done",
+    "sync-codex": "node scripts/sync-codex-mirrors.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

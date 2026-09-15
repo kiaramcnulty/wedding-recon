@@ -1,0 +1,27 @@
+{
+  "denver co|co": {
+    "lat": 39.739235799999996,
+    "lng": -104.99025100000001,
+    "label": "Denver, CO"
+  },
+  "sedalia co|co": {
+    "lat": 39.436933599999996,
+    "lng": -104.9597046,
+    "label": "Sedalia, CO"
+  },
+  "erie co|co": {
+    "lat": 40.0502623,
+    "lng": -105.04998169999999,
+    "label": "Erie, CO"
+  },
+  "dillon co|co": {
+    "lat": 39.6302643,
+    "lng": -106.0433518,
+    "label": "Dillon, CO"
+  },
+  "bennett co|co": {
+    "lat": 39.7588736,
+    "lng": -104.4274609,
+    "label": "Bennett, CO"
+  }
+}

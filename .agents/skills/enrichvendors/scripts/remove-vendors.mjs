@@ -1,0 +1,282 @@
+// Remove mis-seeded / wrong-type vendors (and everything that cascades from them).
+// Dry-run by default; NOTHING is deleted without --apply.
+//
+// Why this exists: a wrong-type vendor (a stay-only hotel seeded as a VENUE, a retail
+// shop swept into a caterer run) should leave the directory entirely, not linger with a
+// hedged "call direct" recon. `vendors(id)` cascades to recon_entries -> recon_media,
+// saved_vendors, and reports (0001_init.sql), so one delete of the vendor row removes the
+// vendor AND all its recon in a single shot. This is the safe, repeatable landing for the
+// wrong-type (NOT*) flag from drafting (SKILL.md Phase 3).
+//
+// It is DELIBERATELY human-gated. Workers over-fire NOT* (real venues like Park Hyatt
+// Beaver Creek were wrongly flagged because their dossiers had no wedding-specific text),
+// so you vet the list, dry-run to see the blast radius, and only then --apply. See
+// SKILL.md line ~86 for the vetting rule: only unambiguous other-type businesses go here;
+// anything that could plausibly host an event stays as an unenriched pin.
+//
+// usage:
+//   node --env-file=.env.local .agents/skills/enrichvendors/scripts/remove-vendors.mjs \
+//        --id <uuid> [--id <uuid> ...] [--name-has "<substr>"] [--apply]
+//   node --env-file=.env.local ... remove-vendors.mjs --ids-file <path> [--apply]
+//        (--ids-file: one uuid per line; blank lines and '# ...' comments ignored)
+//   node --env-file=.env.local ... remove-vendors.mjs \
+//        --strong-from <drafts/ID-flags.json | flags.txt> --manifest <drafts/ID-manifest.json> [--apply]
+//        (the auto-remove path: pulls ONLY the strong NOT*! tier and resolves it via the
+//         manifest; repeat --manifest for a multi-batch run. Combine with --id if needed.)
+//
+// Guard rails (dry-run reports each; --apply refuses if any BLOCKER is unresolved):
+//   * BLOCKER  vendor was added by a real user (created_by is set) — pass --force-user-vendor
+//     to override. A wrong-type cleanup never deletes user-created rows (SKILL.md line 137).
+//   * BLOCKER  vendor has recon from a NON-bot author — pass --force-user-recon to override.
+//     Real couples' recon is never collateral of a bot-content cleanup.
+//   * --name-has "<substr>": every fetched vendor name MUST contain it (case-insensitive),
+//     else the whole run aborts. Cheap fat-finger guard against a wrong uuid.
+//   * caps at 25 ids per run unless --force (guards a runaway mass delete).
+import fs from 'node:fs';
+import { createClient } from '@supabase/supabase-js';
+import { argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
+
+const APPLY = process.argv.includes('--apply');
+const FORCE = process.argv.includes('--force');
+const FORCE_USER_VENDOR = process.argv.includes('--force-user-vendor');
+const FORCE_USER_RECON = process.argv.includes('--force-user-recon');
+const nameHas = (argValue('name-has') || '').toLowerCase();
+
+for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) {
+  if (!process.env[k]) { console.error(`${k} missing — run with --env-file=.env.local from the repo root`); process.exit(1); }
+}
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+// ── Collect target ids: repeated --id and/or --ids-file ─────────────────────────
+const ids = [];
+process.argv.forEach((a, i) => { if (a === '--id' && process.argv[i + 1]) ids.push(process.argv[i + 1].trim()); });
+const idsFile = argValue('ids-file');
+if (idsFile) {
+  for (const raw of fs.readFileSync(idsFile, 'utf8').split('\n')) {
+    const l = raw.replace(/#.*$/, '').trim();
+    if (l) ids.push(l);
+  }
+}
+
+// --strong-from <flags file> + --manifest <file>...: the auto-remove path. Resolves ONLY
+// the STRONG "!" tier (NOTAVENUE!, NOTCATERER!, ...) to vendor ids via the batch manifest;
+// soft NOT* and THIN/SHORT are left alone (they are reports the orchestrator vets by hand).
+// Accepts the API-mode drafts/<id>-flags.json ({custom_id: "flag string"}) OR a harness-mode
+// flags.txt (one "<FLAG> <slug>" per line).
+function strongSlugsFromFlagString(s) {
+  const re = /(NOT[A-Z]+!|NOT[A-Z]+|THIN|SHORT)\s*:/g;
+  const hits = []; let m;
+  while ((m = re.exec(s)) !== null) hits.push({ flag: m[1], at: m.index, slugAt: re.lastIndex });
+  const slugs = [];
+  for (let i = 0; i < hits.length; i++) {
+    if (!hits[i].flag.endsWith('!')) continue;
+    const end = i + 1 < hits.length ? hits[i + 1].at : s.length;
+    for (const tok of s.slice(hits[i].slugAt, end).split(/[\s,]+/)) {
+      if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tok)) slugs.push(tok);
+    }
+  }
+  return slugs;
+}
+const strongFrom = argValue('strong-from');
+if (strongFrom) {
+  const raw = fs.readFileSync(strongFrom, 'utf8');
+  const strongSlugs = new Set();
+  let parsed = null;
+  try { parsed = JSON.parse(raw); } catch { /* not JSON — treat as flags.txt below */ }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    for (const v of Object.values(parsed)) for (const s of strongSlugsFromFlagString(String(v ?? ''))) strongSlugs.add(s);
+  } else {
+    for (const line of raw.split('\n')) {
+      const l = line.replace(/#.*$/, '').trim(); if (!l) continue;
+      const [flag, ...rest] = l.split(/\s+/);
+      if (/^NOT[A-Z]+!$/.test(flag)) for (const s of rest) if (s) strongSlugs.add(s.replace(/,+$/, ''));
+    }
+  }
+  const manifestFiles = process.argv.map((a, i) => (a === '--manifest' ? process.argv[i + 1] : null)).filter(Boolean);
+  if (!manifestFiles.length) { console.error('--strong-from needs at least one --manifest <file> to resolve slugs to vendor ids'); process.exit(1); }
+  const slugToId = new Map();
+  // Worker LLMs slugify the vendor NAME by their own rules — they DROP apostrophes and "&",
+  // where slugOf (the manifest slug) turns "'" into a separator and "&" into "and". So an
+  // apostrophe/ampersand vendor's worker-emitted flag slug ("aprils-garden",
+  // "sweet-heart-winery-event-center") never string-equals the manifest slug
+  // ("april-s-garden", "sweet-heart-winery-and-event-center") and used to fall through as
+  // UNRESOLVED (12 of 81 strong flags on the 2026-07 CO music run). canonKey collapses both
+  // conventions — drop apostrophes, treat every other non-alnum run as a word gap, drop the
+  // standalone word "and" (which "&" becomes under slugOf) — so the two forms reconcile.
+  // Used only as a FALLBACK after exact match, and only when the key maps to a SINGLE vendor.
+  const canonKey = (s) => (s || '').toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter((w) => w && w !== 'and').join('');
+  const canonToId = new Map(); const canonConflict = new Set(); const canonByVid = new Map();
+  for (const mf of manifestFiles) for (const row of JSON.parse(fs.readFileSync(mf, 'utf8'))) {
+    if (row.slug && row.vendor_id) slugToId.set(row.slug, row.vendor_id);
+    if (!row.vendor_id) continue;
+    if (row.name) canonByVid.set(row.vendor_id, canonKey(row.name));   // full-name canon, for the prefix fallback
+    for (const key of new Set([canonKey(row.slug), canonKey(row.name)])) {
+      if (!key) continue;
+      if (canonToId.has(key) && canonToId.get(key) !== row.vendor_id) canonConflict.add(key);
+      else canonToId.set(key, row.vendor_id);
+    }
+  }
+  const canonVendors = [...canonByVid.entries()].map(([vid, c]) => ({ vid, c }));
+  const unresolved = [];
+  for (const slug of strongSlugs) {
+    const ck = canonKey(slug);
+    let id = slugToId.get(slug) || (ck && !canonConflict.has(ck) ? canonToId.get(ck) : undefined);
+    if (!id && ck.length >= 6) {
+      // A worker sometimes SHORTENS a long name — dropping a trailing "- descriptor" or
+      // "(note)" ("J. Cotter Gallery" for "J. Cotter Gallery - The Gold and Silversmith of
+      // Vail"), so its canon is a PREFIX of the manifest canon. Resolve only when the prefix
+      // hits exactly one vendor (the ≥6 length guard keeps short slugs from colliding).
+      const hits = [...new Set(canonVendors.filter((v) => v.c.startsWith(ck)).map((v) => v.vid))];
+      if (hits.length === 1) id = hits[0];
+    }
+    if (id) ids.push(id); else unresolved.push(slug);
+  }
+  console.log(`strong (auto-remove) slugs: ${strongSlugs.size} | resolved ${strongSlugs.size - unresolved.length}${unresolved.length ? ` | UNRESOLVED ${unresolved.length}: ${unresolved.join(', ')}` : ''}`);
+  if (unresolved.length) console.log('  (unresolved slugs are not in the given manifest(s) — pass the matching --manifest, or remove by --id)');
+}
+
+const targetIds = [...new Set(ids)];
+if (!targetIds.length) { console.error('no vendor ids — pass --id <uuid> (repeatable) and/or --ids-file <path>'); process.exit(1); }
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const badFmt = targetIds.filter((id) => !UUID.test(id));
+if (badFmt.length) { console.error(`not valid uuids:\n${badFmt.map((s) => `  ${s}`).join('\n')}`); process.exit(1); }
+if (targetIds.length > 25 && !FORCE) { console.error(`${targetIds.length} ids exceeds the 25-per-run safety cap — re-run with --force if that is intended`); process.exit(1); }
+
+// ── Fetch vendors + full dependency picture ─────────────────────────────────────
+const { data: vendors, error: vErr } = await supabase
+  .from('vendors').select('id,name,city,region,source,created_by,google_place_id').in('id', targetIds);
+if (vErr) { console.error('vendor fetch failed:', vErr.message); process.exit(1); }
+
+const found = new Set(vendors.map((v) => v.id));
+const missing = targetIds.filter((id) => !found.has(id));
+
+const { data: recon, error: rErr } = await selectAll(() =>
+  supabase.from('recon_entries').select('id,vendor_id,author_id,status').in('vendor_id', targetIds).order('id'));
+if (rErr) { console.error('recon fetch failed:', rErr.message); process.exit(1); }
+
+const reconIds = recon.map((r) => r.id);
+const authorIds = [...new Set(recon.map((r) => r.author_id))];
+const authors = new Map();
+if (authorIds.length) {
+  const { data: profs, error: pErr } = await supabase.from('profiles').select('id,username,is_bot').in('id', authorIds);
+  if (pErr) { console.error('profile fetch failed:', pErr.message); process.exit(1); }
+  for (const p of profs) authors.set(p.id, p);
+}
+
+const mediaByEntry = new Map();
+if (reconIds.length) {
+  const { data: media, error: mErr } = await selectAll(() =>
+    supabase.from('recon_media').select('id,recon_entry_id').in('recon_entry_id', reconIds).order('id'));
+  if (mErr) { console.error('media fetch failed:', mErr.message); process.exit(1); }
+  for (const m of media) mediaByEntry.set(m.recon_entry_id, (mediaByEntry.get(m.recon_entry_id) || 0) + 1);
+}
+
+const { data: saves, error: sErr } = await selectAll(() =>
+  supabase.from('saved_vendors').select('id,vendor_id').in('vendor_id', targetIds).order('id'));
+if (sErr) { console.error('saves fetch failed:', sErr.message); process.exit(1); }
+const savesByVendor = new Map();
+for (const s of saves) savesByVendor.set(s.vendor_id, (savesByVendor.get(s.vendor_id) || 0) + 1);
+
+// ── Per-vendor report + blockers ────────────────────────────────────────────────
+const reconByVendor = new Map();
+for (const r of recon) { (reconByVendor.get(r.vendor_id) || reconByVendor.set(r.vendor_id, []).get(r.vendor_id)).push(r); }
+
+let nameMismatch = false;
+const blocked = [];
+const clear = [];
+console.log(`\nTargets: ${targetIds.length} id(s) | found ${vendors.length}${missing.length ? ` | NOT FOUND ${missing.length}` : ''}\n`);
+if (missing.length) console.log(`  not in vendors table (already gone?):\n${missing.map((id) => `    ${id}`).join('\n')}\n`);
+
+for (const v of vendors) {
+  const rs = reconByVendor.get(v.id) || [];
+  const media = rs.reduce((n, r) => n + (mediaByEntry.get(r.id) || 0), 0);
+  const savedCount = savesByVendor.get(v.id) || 0;
+  const botAuthors = [], userAuthors = [];
+  for (const r of rs) {
+    const a = authors.get(r.author_id);
+    (a && a.is_bot ? botAuthors : userAuthors).push(a ? a.username : r.author_id);
+  }
+  const reasons = [];
+  if (v.created_by && !FORCE_USER_VENDOR) reasons.push('user-created vendor (created_by set) — needs --force-user-vendor');
+  if (userAuthors.length && !FORCE_USER_RECON) reasons.push(`${userAuthors.length} recon from non-bot author(s): ${[...new Set(userAuthors)].join(', ')} — needs --force-user-recon`);
+  if (nameHas && !(v.name || '').toLowerCase().includes(nameHas)) { reasons.push(`name does not contain --name-has "${nameHas}"`); nameMismatch = true; }
+
+  console.log(`  ${v.name}  [${v.id}]`);
+  console.log(`    ${v.city || '?'}, ${v.region || '?'} | source=${v.source || '?'} | ${v.created_by ? 'created_by=' + v.created_by : 'seed (created_by=null)'}`);
+  console.log(`    recon: ${rs.length} (${botAuthors.length} bot${userAuthors.length ? `, ${userAuthors.length} USER` : ''}) | media: ${media} | hub saves: ${savedCount}`);
+  if (reasons.length) { console.log(`    BLOCKED: ${reasons.join(' | ')}`); blocked.push(v); }
+  else clear.push(v);
+  console.log('');
+}
+
+// --name-has mismatch is a hard, whole-run abort: a wrong uuid slipped in.
+if (nameMismatch) { console.error('ABORT: at least one vendor name does not match --name-has. Fix the id list; nothing was touched.'); process.exit(1); }
+
+console.log(`Clear to delete: ${clear.length} | blocked: ${blocked.length}`);
+if (!clear.length) { console.log('nothing to delete.'); process.exit(blocked.length ? 1 : 0); }
+
+if (!APPLY) {
+  console.log('\nDRY RUN — nothing deleted. Re-run with --apply after reviewing the list above.');
+  console.log('(delete cascades: vendors -> recon_entries -> recon_media, plus saved_vendors + reports.)');
+  process.exit(0);
+}
+
+// ── Apply: delete the vendor rows; cascade removes recon/media/saves/reports ─────
+const delIds = clear.map((v) => v.id);
+const { error: dErr } = await supabase.from('vendors').delete().in('id', delIds);
+if (dErr) { console.error('delete failed:', dErr.message); process.exit(1); }
+
+// Verify the rows are actually gone.
+const { data: still } = await supabase.from('vendors').select('id').in('id', delIds);
+const remaining = (still || []).map((r) => r.id);
+if (remaining.length) { console.error(`WARNING: ${remaining.length} still present after delete: ${remaining.join(', ')}`); process.exit(1); }
+console.log(`\nDELETED ${delIds.length} vendor(s) and all cascaded recon/media/saves.`);
+if (blocked.length) console.log(`(skipped ${blocked.length} blocked — override flags above if those were also intended.)`);
+
+// ── Propagate the removal back to the LAUNCH workdir ──────────────────────────
+// Deleting from the DB is only half the job: the launch CSV that seeded these rows still
+// lists them, so the next `launchvendors upload.mjs --apply` on that workdir re-inserts
+// every one. (2026-07-29, CO beauty: 5 wrong-type vendors removed here were still queued
+// as "TO INSERT: 5" by the launch dry-run afterwards.) Move them into that workdir's
+// pruned.csv, which is also what makes resolve.mjs's pruned-guard keep ignoring them.
+const deleted = vendors.filter((v) => delIds.includes(v.id));
+const norm = (s) => (s || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
+const byPid = new Set(deleted.map((v) => v.google_place_id).filter(Boolean));
+const byName = new Set(deleted.map((v) => `${norm(v.name)}|${norm(v.city)}`));
+let movedTotal = 0;
+for (const root of ['data/launchvendors', 'data/launchvenues']) {
+  if (!fs.existsSync(root)) continue;
+  for (const dir of fs.readdirSync(root)) {
+    for (const csvName of ['vendors.csv', 'venues.csv']) {
+      const p = `${root}/${dir}/${csvName}`;
+      if (!fs.existsSync(p)) continue;
+      const txt = fs.readFileSync(p, 'utf8');
+      const recs = []; let cur = '', q = false;
+      for (let i = 0; i < txt.length; i++) { const ch = txt[i]; if (ch === '"') q = !q; if (ch === '\n' && !q) { recs.push(cur); cur = ''; } else cur += ch; }
+      if (cur.trim()) recs.push(cur);
+      if (recs.length < 2) continue;
+      const split = (l) => { const o = []; let c = '', qq = false;
+        for (let i = 0; i < l.length; i++) { const ch = l[i];
+          if (qq) { if (ch === '"') { if (l[i + 1] === '"') { c += '"'; i++; } else qq = false; } else c += ch; }
+          else if (ch === '"') qq = true; else if (ch === ',') { o.push(c); c = ''; } else c += ch; } o.push(c); return o; };
+      const hdr = split(recs[0]);
+      const iN = hdr.indexOf('name'), iC = hdr.indexOf('city'), iP = hdr.indexOf('place_id');
+      if (iN < 0) continue;
+      const keep = [recs[0]], moved = [];
+      for (let i = 1; i < recs.length; i++) {
+        if (!recs[i].trim()) continue;
+        const f = split(recs[i]);
+        const hit = (iP >= 0 && f[iP] && byPid.has(f[iP])) || byName.has(`${norm(f[iN])}|${norm(iC >= 0 ? f[iC] : '')}`);
+        (hit ? moved : keep).push(recs[i]);
+      }
+      if (!moved.length) continue;
+      fs.writeFileSync(p, keep.join('\n'));
+      const pruned = `${root}/${dir}/pruned.csv`;
+      if (fs.existsSync(pruned)) fs.appendFileSync(pruned, '\n' + moved.join('\n'));
+      else fs.writeFileSync(pruned, [recs[0], ...moved].join('\n'));
+      movedTotal += moved.length;
+      console.log(`  launch workdir synced: moved ${moved.length} row(s) out of ${p} into pruned.csv`);
+    }
+  }
+}
+if (!movedTotal) console.log('  (no launch-workdir rows matched — nothing to sync)');
