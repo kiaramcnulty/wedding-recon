@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -53,11 +52,15 @@
 
 :root {
   /* app/layout.tsx loads Geist onto --font-geist-sans, but Tailwind's font-sans
-     utility reads --font-sans, which used to be supplied by the
-     `shadcn/tailwind.css` import above. The shadcn package no longer ships that
-     file, so the variable resolved to nothing and every surface in the app fell
-     back to the browser default serif (Times New Roman). Point it at the font
-     the app actually loads. */
+     utility reads --font-sans, which was once supplied by an
+     `@import "shadcn/tailwind.css"` at the top of this file. The shadcn package
+     stopped shipping that file (it publishes only dist/), so the import silently
+     no-opped, --font-sans resolved to nothing, and every surface in the app fell
+     back to the browser default serif (Times New Roman). Nothing failed loudly:
+     the CSS import no-ops, the build passes, and a serif page just looks like a
+     design choice. The one-line check is `getComputedStyle(document.body)
+     .fontFamily` in a browser -- it must start with Geist. The dead import is
+     now gone; this variable is what makes font-sans work. */
   --font-sans: var(--font-geist-sans);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
