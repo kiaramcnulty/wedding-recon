@@ -30,6 +30,7 @@
 //  count up front, inside the same call. See git history for rich/richout.)
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import { norm, parseCSV, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
 import { etype, researchDirs, filterVocab } from './etype.mjs';
@@ -127,12 +128,6 @@ function loadManifest(batch) {
   const p = path.join(draftsDir, `${batch}-manifest.json`);
   if (!fs.existsSync(p)) { console.error(`${p} not found — run batch first`); process.exit(1); }
   return JSON.parse(fs.readFileSync(p, 'utf8'));
-}
-function parseDraftCsv(p) {
-  const rows = parseCSV(fs.readFileSync(p, 'utf8'));
-  if (!rows.length) return { hdr: [], data: [] };
-  const hdr = rows[0].map((h) => h.trim());
-  return { hdr, data: rows.slice(1).filter((r) => r.some((c) => c && c.trim())) };
 }
 // v3 workers write JSON Lines — JSON.stringify escaping ends the CSV-corruption failure
 // class (11/21 workers corrupted their CSVs in the 2026-07 photographer run; a full
@@ -335,7 +330,13 @@ async function cmdBatch() {
 
   // call files: header (contract + core rules + type rules + voice cards, inlined ONCE
   // per call) + one block per vendor carrying its per-entry bot/date assignments
-  const refDir = '.claude/skills/enrichvendors/references';
+  // Resolved from THIS file's location, not from cwd and not hardcoded to a
+  // tree. The skill is mirrored (.claude/skills for Claude Code, .agents/skills
+  // for Codex) and each mirror ships its own complete references/ dir, so a
+  // literal '.claude/...' made the Codex copy silently read the Claude tree --
+  // working only because both happen to coexist in this repo, and drifting the
+  // moment one mirror's rules changed. Also survives being run from a subdir.
+  const refDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'references');
   const header = [
     profile.refs.map((f) => fs.readFileSync(path.join(refDir, f), 'utf8')).join('\n\n---\n\n'),
     filterVocab(profile.key),   // the tag keys + values the worker may emit; see draft-contract.md "Filter tags"

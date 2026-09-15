@@ -294,7 +294,7 @@ export function pdfText(buffer, { maxBytes = 40 * 1024 * 1024, guard = true } = 
   // `guard: false` is for diagnostics only — never turn it off in the harvest.
   if (guard && (!readsAsEnglish(healed) || !moneyLooksSane(healed))) return '';
   return healed
-    .replace(/ /g, '')
+    .replace(/\x00/g, '')
     // Collapse the single-glyph-per-operator output some generators produce.
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')

@@ -539,7 +539,7 @@ function cacheSet(key, value) {
  */
 export async function placesSearch(query, pageToken) {
   const SKU = 'Text Search Enterprise';
-  const key = `search ${query} ${pageToken || ''}`;
+  const key = `search\u0000${query}\u0000${pageToken || ''}`;
   const hit = cacheGet(key, SKU);
   if (hit) return hit;
 
@@ -570,7 +570,7 @@ export async function placesSearch(query, pageToken) {
  */
 export async function placeDetails(placeId, fields = 'id,displayName,formattedAddress,location,websiteUri') {
   const SKU = detailsSku(fields);
-  const key = `details ${placeId} ${fields}`;
+  const key = `details\u0000${placeId}\u0000${fields}`;
   const hit = cacheGet(key, SKU);
   if (hit) return hit;
 

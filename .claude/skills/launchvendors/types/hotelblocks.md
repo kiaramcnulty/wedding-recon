@@ -20,6 +20,18 @@ If you can't find any of that, **leave it out** — a hotel that merely exists n
 A property with **wedding event space** (ballroom, ceremony lawn, reception hall, banquet rooms) is a **`venue`**, not a `hotel`, even when it also blocks guest rooms. `hotel` is for **stay-only** properties whose wedding-relevant offering IS the room block. Two consequences:
 - Enforced mechanically at upload: `google_place_id` dedup is **global across vendor types**, so a property already seeded as a `venue` is skipped with `already in DB as venue`. **Expect a meaningful count of these on any region that had a venue launch first — that's the rule working, not an error.** Report the count and names; never try to work around it.
 - Enforced by judgment in Phase 4 for properties NOT yet in the DB: a hotel that markets wedding ceremonies/receptions on site → remove from this run and note it as a venue candidate. The name can't tell you ("Hilton Denver" reads the same either way) — the site can.
+
+#### The exception, and the precedent for it (Kiara, 2026-08-03)
+**Where a property is primarily valuable to couples AS A ROOM BLOCK, type it `hotel` even if it has event space.** Judged per property, because the listing should lead with what couples actually come to it for -- not with everything the property can technically do.
+
+Two properties were re-typed `venue` -> `hotel` under this rule, and they are the precedent to reason from:
+- **The Maven Hotel** -- repeatedly recommended on Reddit for guest blocks, at roughly $250/night against a $450 rack rate. The block IS the reason couples bring it up.
+- **Holiday Inn Estes Park** -- its own recon says it is "not marketed as a wedding venue", while it comes up again and again for lodging a wedding party in a town where lodging is the hard part.
+
+The tell in both cases is the same: **what the evidence is about.** Reddit threads, reviews and the property's own copy all talk about rooms and rates, not about getting married there. When the evidence is about event space instead, venue still wins.
+
+This is a **typing** decision, never a duplication one -- `vendors.google_place_id` is `unique`, so one property is one row and you are choosing which single category it lives in.
+
 - The converse is a gift: venue enrichment auto-removes **stay-only hotels** via `NOTAVENUE!` (all per-night pricing, reviews about rooms, zero event-space language). Those removed properties are this type's **prime candidates** — if a venue run in this region logged any, mine that list first.
 
 ### Other ground truth
