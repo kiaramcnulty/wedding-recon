@@ -502,6 +502,7 @@ export const FOOTER = {
   addReconLabel: "Add recon",
   hubLabel: "Planning Hub",
   termsLabel: "Terms & disclaimer",
+  privacyLabel: "Privacy policy",
   contactLabel: "Contact",
   /** Appears after "© <year> Wedding Recon." at the very bottom. */
   disclaimer:

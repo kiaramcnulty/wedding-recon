@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { BrandFooter } from "@/components/brand-lockup";
 
 export default function TermsPage() {
@@ -55,7 +57,14 @@ export default function TermsPage() {
       </section>
 
       <p className="text-xs text-muted-foreground leading-relaxed pt-4 border-t">
-        By creating an account, you agree to these terms.
+        By creating an account, you agree to these terms. See also our{" "}
+        <Link
+          href="/privacy"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          Privacy policy
+        </Link>
+        .
       </p>
 
       <BrandFooter />

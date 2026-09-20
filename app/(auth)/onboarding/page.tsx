@@ -101,6 +101,13 @@ export default function OnboardingPage() {
                 className="text-primary underline underline-offset-4 hover:text-primary/80"
               >
                 Terms
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                className="text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                Privacy policy
               </Link>
             </span>
           </label>

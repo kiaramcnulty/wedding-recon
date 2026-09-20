@@ -55,6 +55,14 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
+                <Link
+                  href="/privacy"
+                  className="text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {FOOTER.privacyLabel}
+                </Link>
+              </li>
+              <li>
                 <a
                   href={`mailto:${CONTACT_EMAIL}`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
