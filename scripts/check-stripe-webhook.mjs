@@ -119,7 +119,11 @@ const key = process.env.STRIPE_SECRET_KEY;
 if (!key) {
   note("STRIPE_SECRET_KEY not set — skipping (reachability was still checked)");
 } else {
-  const mode = key.startsWith("sk_live_") ? "live" : "test";
+  // Match on the _live_ infix, not an sk_ prefix: the key this is MEANT to run
+  // with is a RESTRICTED key (rk_live_...) scoped to read Webhook endpoints,
+  // and an sk_-only test would have called that test mode and printed the
+  // "this proves nothing about live" warning on the one key that does.
+  const mode = /^(sk|rk)_live_/.test(key) ? "live" : "test";
   if (mode === "live") {
     ok("using a live-mode key");
   } else {
@@ -127,7 +131,7 @@ if (!key) {
     // a broken live endpoint stayed invisible, so say so loudly.
     note(
       "using a TEST-mode key: this says NOTHING about live mode, where real vendors pay.\n" +
-        "       Re-run with a live key (STRIPE_SECRET_KEY=sk_live_... npm run check:stripe-webhook).",
+        "       Re-run with a live key (STRIPE_SECRET_KEY=rk_live_... npm run check:stripe-webhook).",
     );
   }
 
