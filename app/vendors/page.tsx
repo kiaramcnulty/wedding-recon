@@ -1,24 +1,19 @@
 import type { Metadata } from "next";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { Section, SectionHeading } from "@/components/landing/section";
 import { PortalCtaLink } from "@/components/vendors/portal-cta-link";
-import { VendorFaq } from "@/components/vendors/vendor-faq";
 import { buttonVariants } from "@/components/ui/button";
 import { CONTACT_EMAIL } from "@/lib/landing/content";
-import { SITE_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import {
   BENEFITS_SECTION,
   CLOSING_CTA,
-  FAQ_ITEMS,
-  FAQ_SECTION,
+  CONTACT,
   HERO,
-  HONESTY,
   META,
-  PRICING_SECTION,
   STEPS,
   STEPS_SECTION,
   VERIFICATION_BENEFITS,
@@ -63,30 +58,9 @@ export const metadata: Metadata = {
   },
 };
 
-/**
- * Structured data. Generated from the same FAQ_ITEMS the page renders, so the
- * visible answers and the structured ones can never disagree - Google treats a
- * mismatch as a violation. Its own @id, distinct from the landing page's.
- */
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "@id": `${SITE_URL}/vendors#faq`,
-  mainEntity: FAQ_ITEMS.map((item) => ({
-    "@type": "Question",
-    name: item.question,
-    acceptedAnswer: { "@type": "Answer", text: item.answer },
-  })),
-};
-
 export default function VendorsPage() {
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-
       <LandingHeader />
 
       <main className="flex-1">
@@ -192,72 +166,21 @@ export default function VendorsPage() {
         </Section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* What verification is NOT. The couple side promises that vendors    */}
-        {/* cannot pay to change what is written about them; this page has to  */}
-        {/* say the same thing, in the vendor's direction.                     */}
+        {/* Contact. All that is left of the FAQ band - a single line, so it  */}
+        {/* gets a slim section rather than a full one.                        */}
         {/* ---------------------------------------------------------------- */}
-        <Section className="border-y bg-muted/30">
-          <div className="max-w-3xl">
-            <SectionHeading eyebrow={HONESTY.eyebrow}>
-              {HONESTY.heading}
-            </SectionHeading>
-            <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-              {HONESTY.body}
-            </p>
-            <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-              {HONESTY.reportNote}
-            </p>
-          </div>
-        </Section>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Pricing                                                           */}
-        {/* ---------------------------------------------------------------- */}
-        <Section>
-          <SectionHeading eyebrow={PRICING_SECTION.eyebrow}>
-            {PRICING_SECTION.heading}
-          </SectionHeading>
-          <div className="mt-8 max-w-3xl rounded-2xl border bg-card p-6 sm:p-8">
-            <p className="font-heading text-3xl font-semibold tracking-tight">
-              {HERO.reassurance}
-            </p>
-            <ul className="mt-6 flex flex-col gap-3">
-              {PRICING_SECTION.points.map((point) => (
-                <li key={point} className="flex items-start gap-2.5">
-                  <Check
-                    className="mt-0.5 size-4 shrink-0 text-brand-ink"
-                    aria-hidden
-                  />
-                  <span className="text-sm leading-relaxed text-muted-foreground">
-                    {point}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Section>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* FAQ                                                               */}
-        {/* ---------------------------------------------------------------- */}
-        <Section id="vendor-faq" className="border-y bg-muted/30">
-          <SectionHeading eyebrow={FAQ_SECTION.eyebrow}>
-            {FAQ_SECTION.heading}
-          </SectionHeading>
-          <div className="mt-8">
-            <VendorFaq />
-          </div>
-          <p className="mt-6 text-sm text-muted-foreground">
-            {FAQ_SECTION.footerPrompt}{" "}
+        <section className="border-t px-5 py-8">
+          <p className="mx-auto w-full max-w-5xl text-sm text-muted-foreground">
+            {CONTACT.prompt}{" "}
             <a
               href={`mailto:${CONTACT_EMAIL}`}
               className="font-medium text-brand-ink underline underline-offset-2"
             >
-              {FAQ_SECTION.footerLinkLabel}
+              {CONTACT.linkLabel}
             </a>
             .
           </p>
-        </Section>
+        </section>
 
         {/* ---------------------------------------------------------------- */}
         {/* Closing CTA                                                       */}

@@ -121,12 +121,19 @@ straight onto a sign-in form with no idea what they were signing up for.
   which is the trap `docs/notes/landing-and-seo.md` records for `/`. The
   redirect already routes every account state correctly, so the CTA does not
   need to know who is reading.
-- **The page says what verification is NOT.** The couple-side FAQ promises that
-  vendors cannot pay to change what is written about them, and the vendor-side
-  page has to say the same thing in the other direction or the two surfaces
-  contradict each other. Claims **auto-approve** with retroactive review
-  (`lib/notify/claim-report.ts`), so the FAQ says claiming is immediate and a
-  false claim gets revoked -- do not write copy promising an up-front review.
+- **The page is deliberately SHORT** (trimmed 2026-09-20, Kiara): hero, the
+  four benefits, the three steps, a contact line, closing CTA. A "what
+  verification is not" section, a pricing band and a vendor FAQ were all built
+  and then cut. Consequences to know before adding anything back: there is no
+  longer any statement ON THIS PAGE that paying cannot change what couples
+  wrote -- the couple-side landing FAQ still says it, so the two surfaces do
+  not contradict, but the vendor-facing half of that promise is now unsaid. And
+  the page carries **no JSON-LD at all**: the `FAQPage` node went with the FAQ,
+  because structured data describing content the page does not render is a
+  policy violation. Re-adding an FAQ means re-adding both.
+- **Claims auto-approve with retroactive review** (`lib/notify/claim-report.ts`)
+  -- if copy is ever written about the claim step, it must not promise an
+  up-front review.
 - **`/portal` is disallowed in `robots.ts`.** Its signed-out redirect happens
   mid-stream (the route has a `loading.tsx`, so the shell flushes `200` first
   and the redirect arrives in the body, not as a `307`), which means a crawler

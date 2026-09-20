@@ -22,10 +22,7 @@ import { PRICE_BILLING_NOTE, PRICE_PER_MONTH } from "@/lib/portal/verification";
  * 1. NO EM DASHES. Use a spaced hyphen ( - ) for a sentence break.
  * 2. US spelling.
  * 3. Use a typographic apostrophe (it is / does not) or escape a straight one.
- * 4. FAQ `answer` stays PLAIN TEXT with no markup - the same string is emitted
- *    as FAQPage structured data, and a visible/structured mismatch is a policy
- *    violation.
- * 5. NEVER hardcode the price. It comes from `lib/portal/verification.ts`, which
+ * 4. NEVER hardcode the price. It comes from `lib/portal/verification.ts`, which
  *    is the one place the portal button, the step and this page all read.
  */
 
@@ -116,73 +113,13 @@ export const STEPS: readonly { title: string; body: string }[] = [
 ];
 
 /**
- * The honesty section. This is the question every vendor asks first, and
- * answering it plainly up front is what keeps the couple side trustworthy - the
- * landing FAQ already promises couples that vendors cannot pay to change what is
- * written about them, and this page must not appear to promise the opposite.
+ * The contact line. All that remains of the FAQ band (removed 2026-09-20,
+ * Kiara) - the questions themselves are gone, the way to ask one is not.
  */
-export const HONESTY = {
-  eyebrow: "What verification is not",
-  heading: "Paying does not change what couples wrote.",
-  body: "Recon entries are posted by couples, and verification gives you no power to edit, hide, or remove them. A verified listing sits alongside them, in your own words. If an entry is inaccurate or unfair, you can report it like anyone else and it gets reviewed on its merits.",
-  reportNote:
-    "Your listing is clearly marked as coming from you, so couples can tell your details apart from their neighbors' notes.",
+export const CONTACT = {
+  prompt: "Questions about verification?",
+  linkLabel: "Email us",
 } as const;
-
-export const PRICING_SECTION = {
-  eyebrow: "Pricing",
-  heading: "One price, one business.",
-  points: [
-    "Billed through Stripe. Cancel anytime from the portal, and your listing simply unpublishes at the end of the period.",
-    "Verification covers one business. If you run several, each is claimed and subscribed separately.",
-    "No setup fee, no commission, and no charge to couples for contacting you.",
-  ],
-} as const;
-
-export const FAQ_SECTION = {
-  eyebrow: "Questions",
-  heading: "Vendor questions.",
-  footerPrompt: "Still have a question?",
-  footerLinkLabel: "Email us",
-} as const;
-
-export interface VendorFaqItem {
-  question: string;
-  answer: string;
-}
-
-export const FAQ_ITEMS: readonly VendorFaqItem[] = [
-  {
-    question: "Do I need a separate vendor account?",
-    answer:
-      "No. Wedding Recon has one kind of account. Sign in with your email, claim your business, and the vendor portal appears for you. If you already have an account from browsing as a couple, use that one.",
-  },
-  {
-    question: "My business is already on Wedding Recon. How did it get there?",
-    answer:
-      "Colorado vendors were added so couples had something to research, the same way a map lists businesses. Claiming yours puts you in control of the details on it.",
-  },
-  {
-    question: "Can I edit or remove recon that couples posted about me?",
-    answer:
-      "No. Those entries belong to the people who wrote them. You can report an entry that is inaccurate or unfair and it gets reviewed, which is the same option any visitor has.",
-  },
-  {
-    question: "What happens if I cancel?",
-    answer:
-      "Your listing unpublishes and your checkmark goes away at the end of the period you paid for. Your business stays on the map, and you can subscribe again later without redoing your listing.",
-  },
-  {
-    question: "Does verification guarantee I rank first?",
-    answer:
-      "No. Verification moves you up among vendors who match what a couple searched for. It never puts you ahead of a vendor who is a better match for the filters they chose.",
-  },
-  {
-    question: "How do I prove the business is mine?",
-    answer:
-      "Claiming is immediate, so you are never stuck waiting to build your listing. Claims are reviewed afterward and a claim on a business that is not yours is revoked. Signing up with an email at your business domain is the fastest way to be recognized.",
-  },
-];
 
 export const CLOSING_CTA = {
   heading: "Claim your business.",
