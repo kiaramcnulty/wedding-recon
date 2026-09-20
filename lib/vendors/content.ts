@@ -26,6 +26,16 @@ import { PRICE_BILLING_NOTE, PRICE_PER_MONTH } from "@/lib/portal/verification";
  *    is the one place the portal button, the step and this page all read.
  */
 
+/**
+ * Where every CTA on this page goes.
+ *
+ * NOT /portal: that route redirects a signed-out visitor to /vendors, so a CTA
+ * here pointing at it is a loop back to the page you are already on. `from` is
+ * where sign-in lands, `back` is where the back link returns - see
+ * lib/auth/post-signin-redirect.ts.
+ */
+export const SIGN_IN_HREF = "/login?from=/portal&back=/vendors";
+
 export const META = {
   title: "Wedding Recon for vendors - claim and verify your business",
   socialTitle: "Verify your business on Wedding Recon",
@@ -37,7 +47,7 @@ export const HERO = {
   eyebrow: "For wedding vendors",
   heading: "Verify your wedding business",
   subheading:
-    "Wedding Recon is a community for Colorado couples to find vendors and compare real quotes and experiences. Verification lets you give your business credibility, tell couples what you offer, and give interested leads a way to get in touch.",
+    "Wedding Recon is a community for Colorado couples to find vendors and compare real quotes and experiences. Verification gives your business credibility, tells couples what you offer directly from you, and provides interested leads a path to get in touch.",
   primaryCta: "Get started",
   signInPrompt: "Already have an account?",
   signInCta: "Sign in",

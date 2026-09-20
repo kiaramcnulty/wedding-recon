@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { captureClient } from "@/lib/analytics/posthog";
+import { SIGN_IN_HREF } from "@/lib/vendors/content";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,13 +12,19 @@ import { cn } from "@/lib/utils";
  * and this event is the step after it - so keeping them separate is what makes
  * the page measurable rather than invisible between the link and the sign-in.
  *
- * `href` defaults to /portal, which routes by account state: a signed-out
- * visitor is sent back here, a signed-in one goes straight to their dashboard.
- * The sign-in CTA passes its own href instead.
+ * `href` defaults to the SIGN-IN form, not to /portal. /portal is the router
+ * that sends a signed-out visitor to /vendors, so a CTA on /vendors pointing at
+ * it just reloaded this page - which is what the button did until 2026-09-20.
+ * The reader has already seen the pitch; the next step is the one OTP form that
+ * signs in or creates the account. `back=/vendors` returns them here if they
+ * change their mind, and `from=/portal` is where sign-in lands.
+ *
+ * Cold links from ELSEWHERE in the app still point at /portal - see
+ * components/portal/verify-business-link.tsx.
  */
 export function PortalCtaLink({
   placement,
-  href = "/portal",
+  href = SIGN_IN_HREF,
   className,
   children,
 }: {

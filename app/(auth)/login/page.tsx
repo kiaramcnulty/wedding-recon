@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Loader2, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
@@ -72,6 +72,32 @@ function LoginContent() {
   // a couple saving a venue, and the generic copy is what made the old
   // link-straight-to-login flow read as "sign up for what?".
   const isVendorIntent = (rawFrom ?? "").startsWith("/portal");
+
+  // Already signed in? There is nothing to do on this screen, so go where the
+  // caller was headed. This is what lets a CTA point here unconditionally: the
+  // /vendors buttons cannot know who is reading (the page is static), and
+  // without this a signed-in vendor who found /vendors in search would be
+  // asked to log in again.
+  //
+  // Deliberately NOT a blocking check - the form renders immediately for the
+  // common signed-out case and only a live session triggers the bounce.
+  // getClaims() verifies the JWT locally, so this costs no Auth round trip.
+  // Runs once on mount, so it cannot fire against the session the OTP step
+  // itself just created.
+  const router = useRouter();
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getClaims();
+      if (!active || !data?.claims?.sub) return;
+      router.replace(sanitizeSignInDestination(rawFrom) ?? "/explore");
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

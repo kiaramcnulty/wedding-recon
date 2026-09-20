@@ -104,8 +104,20 @@ straight onto a sign-in form with no idea what they were signing up for.
   Signed out it redirects to `/vendors` (the public pitch) instead of
   `/login`; signed in it renders the dashboard exactly as before. One rule
   decides for every surface, so a signed-in vendor never detours through
-  marketing and a new link cannot be wired up wrong. Keep pointing new vendor
-  links at `/portal`, not at `/vendors`.
+  marketing and a new link cannot be wired up wrong. Keep pointing new COLD
+  vendor links at `/portal`, not at `/vendors`.
+- **But a CTA on `/vendors` must NOT point at `/portal`** -- the router sends a
+  signed-out visitor to `/vendors`, so the button reloads the page it is on.
+  Both "Get started" buttons shipped that way on 2026-09-20 and were caught by
+  Kiara clicking one on the preview, not by any check: the href was right for
+  every surface except the one it was on, and no test covers a redirect chain
+  that terminates where it started. They now use `SIGN_IN_HREF`
+  (`lib/vendors/content.ts`) -- `/login?from=/portal&back=/vendors`.
+- **`/login` bounces an already-signed-in visitor to `from`**, which is what
+  lets a STATIC page hand every account state the same href. The check is
+  deliberately non-blocking (the form renders immediately; only a live session
+  triggers the bounce) and runs once on mount, so it cannot fire against the
+  session the OTP step itself just minted.
 - **The pitch is ONE constant, not two copies.** `VERIFICATION_BENEFITS` lives
   in `lib/vendors/content.ts` and is rendered by both `/vendors` and the
   in-portal `VerificationIntro`. A vendor reads one before signing up and the

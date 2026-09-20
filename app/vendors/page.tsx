@@ -103,7 +103,6 @@ export default function VendorsPage() {
                 {HERO.signInPrompt}{" "}
                 <PortalCtaLink
                   placement="signin"
-                  href="/login?from=/portal&back=/vendors"
                   className="font-medium text-brand-ink underline underline-offset-2"
                 >
                   {HERO.signInCta}
