@@ -14,6 +14,8 @@ export interface VendorSearchSuggestion {
   /** Pin coordinates, so the Explore bar can fly the map straight to it. */
   lng: number;
   lat: number;
+  /** Vendor Verification badge — same predicate as the map and vendor page. */
+  verified: boolean;
 }
 
 /**
@@ -43,6 +45,23 @@ export async function GET(req: NextRequest) {
     requireCoords: true,
   });
 
+  // Which of these are verified vendors. Resolved HERE rather than by a second
+  // client round trip, so the badge is present on first paint instead of
+  // popping in under the user's cursor. One RPC over the <=6 ids already
+  // matched; skipped entirely when nothing matched. Same SECURITY DEFINER set
+  // function the map and the vendor page use (migration 0044), and the same
+  // never-throw stance as searchVendors: an error (the RPC not yet applied)
+  // reads as "nobody verified" and the bar behaves exactly as it does today.
+  const verifiedIds = new Set<string>();
+  if (matches.length > 0) {
+    const { data } = await supabase.rpc("verified_vendor_ids", {
+      p_ids: matches.map((v) => v.id),
+    });
+    for (const r of (data ?? []) as { vendor_id: string }[]) {
+      verifiedIds.add(r.vendor_id);
+    }
+  }
+
   const results: VendorSearchSuggestion[] = matches.map((v) => ({
     vendorId: v.id,
     vendorType: v.vendorType,
@@ -52,6 +71,7 @@ export async function GET(req: NextRequest) {
     // requireCoords guarantees both are present.
     lng: v.lng as number,
     lat: v.lat as number,
+    verified: verifiedIds.has(v.id),
   }));
 
   return NextResponse.json(results);

@@ -15,6 +15,7 @@ import {
 import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
 import { VendorFeed, ViewToggle } from "@/components/map/vendor-feed";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
+import { VerifiedBadge } from "@/components/vendor/verified-badge";
 import {
   VendorFilterSheet,
   FilterButton,
@@ -55,6 +56,8 @@ interface VendorSuggestion {
   secondaryText: string;
   lng: number;
   lat: number;
+  /** Vendor Verification badge; resolved server-side by /api/vendor-search. */
+  verified: boolean;
 }
 
 // Origin of the basemap tiles — preconnected below so the TLS handshake happens
@@ -871,8 +874,15 @@ export default function ExplorePage() {
                               />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate font-medium">
-                                {v.name}
+                              {/* iconOnly: the name already competes for width
+                                  in a dropdown row — same call the preview card
+                                  makes. min-w-0 on the name keeps the truncation
+                                  on the NAME, so the badge never gets clipped. */}
+                              <span className="flex items-center gap-1">
+                                <span className="min-w-0 truncate font-medium">
+                                  {v.name}
+                                </span>
+                                {v.verified && <VerifiedBadge iconOnly />}
                               </span>
                               {v.secondaryText && (
                                 <span className="block truncate text-xs text-muted-foreground">
