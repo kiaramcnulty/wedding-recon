@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/client";
+import { findStripeSubscription, mirrorSubscription } from "@/lib/stripe/sync";
 
 export type BillingResult = { url: string } | { error: string };
 
@@ -42,6 +43,14 @@ async function hasApprovedClaim(vendorId: string): Promise<boolean> {
  * Checkout — we return a Customer Portal link instead, so a double-charge is
  * impossible. The subscription carries vendor_id in its metadata so every later
  * webhook event can map back to the vendor.
+ *
+ * Two sources are consulted, not one. vendor_subscriptions is written ONLY by
+ * the webhook, so a webhook that never arrived leaves it empty and the mirror
+ * alone would report "never paid" about someone who has paid — and then sell
+ * them a second subscription. Before opening Checkout we therefore ask Stripe
+ * itself, and if it holds a subscription we are missing we mirror it on the
+ * spot. That makes a missed delivery self-healing on the vendor's next visit
+ * instead of something only a manual event replay can repair.
  */
 export async function startCheckout(vendorId: string): Promise<BillingResult> {
   const supabase = await createClient();
@@ -77,6 +86,34 @@ export async function startCheckout(vendorId: string): Promise<BillingResult> {
       return_url: `${SITE_URL}/portal`,
     });
     return { url: portal.url };
+  }
+
+  // The mirror says no subscription. Confirm that against Stripe before
+  // charging anyone — see the note above. Fail OPEN on a search error: the
+  // mirror check above is the primary guard, and a Stripe search outage must
+  // not block every new vendor from subscribing.
+  try {
+    const live = await findStripeSubscription(stripe, vendorId);
+    if (live && LIVE_STATUSES.has(live.status)) {
+      const nowActive = await mirrorSubscription(vendorId, live);
+      const customerId =
+        typeof live.customer === "string" ? live.customer : live.customer.id;
+      console.warn(
+        `[billing] reconciled vendor ${vendorId} from Stripe (${live.id}, ${live.status}) — the webhook never recorded it`,
+      );
+      // Already active: they are verified as of this write, so return them to
+      // the portal to SEE that, rather than to a billing page they did not ask
+      // for. Anything else (incomplete, past_due) is genuinely a billing
+      // problem, so the Customer Portal is the right destination.
+      if (nowActive) return { url: `${SITE_URL}/portal` };
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: `${SITE_URL}/portal`,
+      });
+      return { url: portal.url };
+    }
+  } catch (e) {
+    console.error("[billing] Stripe reconcile lookup failed", e);
   }
 
   const session = await stripe.checkout.sessions.create({
