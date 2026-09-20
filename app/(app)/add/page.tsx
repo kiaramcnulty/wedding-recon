@@ -31,6 +31,10 @@ import {
   type ReconFormValues,
 } from "@/components/recon/recon-form-fields";
 import { PlacesCombobox } from "@/components/add/places-combobox";
+import {
+  MANUAL_LOCATION_ERROR,
+  manualSelectionHasLocation,
+} from "@/lib/vendor/manual-entry";
 import type {
   PlaceSelection,
   ManualSelection,
@@ -383,11 +387,12 @@ function AddReconForm() {
     if (
       !preVendorId &&
       vendorState.mode === "manual" &&
-      vendorState.manualLat == null
+      !manualSelectionHasLocation({
+        lat: vendorState.manualLat,
+        lng: vendorState.manualLng,
+      })
     ) {
-      setVendorError(
-        "Please choose an address, city, or state from the suggestions.",
-      );
+      setVendorError(MANUAL_LOCATION_ERROR);
       return;
     }
     setVendorError(null);

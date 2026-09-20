@@ -68,7 +68,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return bad("unknown vendor type");
   }
 
-  const requested = Math.trunc(Number(sp.get("max_rows")));
+  // Number(null) is 0, NOT NaN — so reading a MISSING max_rows through
+  // Number() made the "fall back to the ceiling" branch unreachable and
+  // clamped the response to a single row instead. The map always sends the
+  // param (vendor-map.tsx), so the app never saw it; every other caller got
+  // one pin per type and no error. Read the raw param and branch on absence.
+  const rawMaxRows = sp.get("max_rows");
+  const requested = rawMaxRows === null ? NaN : Math.trunc(Number(rawMaxRows));
   const maxRows = Number.isFinite(requested)
     ? Math.min(Math.max(requested, 1), MAX_ROWS_CEILING)
     : MAX_ROWS_CEILING;

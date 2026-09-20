@@ -12,6 +12,10 @@ import {
   type ExistingVendorSelection,
   type ManualSelection,
 } from "@/components/add/places-combobox";
+import {
+  MANUAL_LOCATION_ERROR,
+  manualSelectionHasLocation,
+} from "@/lib/vendor/manual-entry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,6 +79,12 @@ export function ClaimBusiness({ hideHeading = false }: { hideHeading?: boolean }
       });
     } else {
       const m = selection.value;
+      // A manual entry with no geocode creates a vendor that cannot appear on
+      // the map or in search — see manualSelectionHasLocation.
+      if (!manualSelectionHasLocation(m)) {
+        toast.error(MANUAL_LOCATION_ERROR);
+        return;
+      }
       Object.assign(input, {
         manualName: m.name,
         manualCity: m.city,
