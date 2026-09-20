@@ -233,7 +233,7 @@ export function ProfileMenu({ className }: { className?: string }) {
               About Wedding Recon
             </Link>
             {/* Vendor entry point. /portal routes by account state: a guest
-                lands on the public pitch at /vendors, a signed-in vendor goes
+                lands on the public pitch at /for-vendors, a signed-in vendor goes
                 straight to their dashboard. Tracked with the same event as the
                 other two entry points so the funnel counts all three. */}
             <Link

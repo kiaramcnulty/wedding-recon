@@ -10,10 +10,10 @@ import { PRICE_BILLING_NOTE, PRICE_PER_MONTH } from "@/lib/portal/verification";
 
 /**
  * ============================================================================
- * EVERY WORD ON /vendors LIVES IN THIS FILE.
+ * EVERY WORD ON /for-vendors LIVES IN THIS FILE.
  * ============================================================================
  *
- * Same contract as `lib/landing/content.ts`: `app/vendors/page.tsx` is layout
+ * Same contract as `lib/landing/content.ts`: `app/for-vendors/page.tsx` is layout
  * only and contains no sentences of its own.
  *
  * Editing rules (identical to the landing page, so the two surfaces read as one
@@ -29,12 +29,12 @@ import { PRICE_BILLING_NOTE, PRICE_PER_MONTH } from "@/lib/portal/verification";
 /**
  * Where every CTA on this page goes.
  *
- * NOT /portal: that route redirects a signed-out visitor to /vendors, so a CTA
- * here pointing at it is a loop back to the page you are already on. `from` is
+ * NOT /portal: that route redirects a signed-out visitor to /for-vendors, so a
+ * CTA here pointing at it is a loop back to the page you are already on. `from` is
  * where sign-in lands, `back` is where the back link returns - see
  * lib/auth/post-signin-redirect.ts.
  */
-export const SIGN_IN_HREF = "/login?from=/portal&back=/vendors";
+export const SIGN_IN_HREF = "/login?from=/portal&back=/for-vendors";
 
 export const META = {
   title: "Wedding Recon for vendors - claim and verify your business",

@@ -56,9 +56,10 @@ function LoginContent() {
   //
   // `from` is where sign-in LANDS (stashed in the intent cookie below);
   // `back` is where the back link RETURNS to. They are usually the same, but
-  // the vendor flow is the case where they cannot be: /vendors sends
-  // `from=/portal&back=/vendors`, because /portal bounces a signed-out visitor
-  // back to /vendors - so a back link pointing at `from` would have returned
+  // the vendor flow is the case where they cannot be: /for-vendors sends
+  // `from=/portal&back=/for-vendors`, because /portal bounces a signed-out
+  // visitor back to /for-vendors - so a back link pointing at `from` would have
+  // returned
   // the visitor to this very screen. Both are validated by the same sanitizer.
   const searchParams = useSearchParams();
   const rawFrom = searchParams.get("from");
@@ -68,15 +69,15 @@ function LoginContent() {
     sanitizeSignInDestination(rawFrom) ??
     "/explore";
 
-  // A vendor arriving from /vendors is signing in for a different reason than
+  // A vendor arriving from /for-vendors is signing in for a different reason than
   // a couple saving a venue, and the generic copy is what made the old
   // link-straight-to-login flow read as "sign up for what?".
   const isVendorIntent = (rawFrom ?? "").startsWith("/portal");
 
   // Already signed in? There is nothing to do on this screen, so go where the
   // caller was headed. This is what lets a CTA point here unconditionally: the
-  // /vendors buttons cannot know who is reading (the page is static), and
-  // without this a signed-in vendor who found /vendors in search would be
+  // /for-vendors buttons cannot know who is reading (the page is static), and
+  // without this a signed-in vendor who found /for-vendors in search would be
   // asked to log in again.
   //
   // Deliberately NOT a blocking check - the form renders immediately for the
@@ -160,7 +161,7 @@ function LoginContent() {
           <ChevronLeft className="size-4" />
           {backHref === "/explore"
             ? "Back to explore"
-            : backHref === "/vendors"
+            : backHref === "/for-vendors"
               ? "Back to vendor info"
               : "Back"}
         </Link>

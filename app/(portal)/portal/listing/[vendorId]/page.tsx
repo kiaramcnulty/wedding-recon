@@ -28,10 +28,10 @@ export default async function ListingEditorPage({
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const userId = claimsData?.claims.sub;
-  // `back=/vendors` so the login screen's back link leaves the auth flow
+  // `back=/for-vendors` so the login screen's back link leaves the auth flow
   // instead of pointing at a portal path that would bounce straight back here.
   if (!userId) {
-    redirect(`/login?from=/portal/listing/${vendorId}&back=/vendors`);
+    redirect(`/login?from=/portal/listing/${vendorId}&back=/for-vendors`);
   }
 
   // Must hold the approved claim. Do not reveal the route otherwise.

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
  * Page gutter + column width for every band on a marketing page, and the
  * eyebrow/heading pair that opens one.
  *
- * Extracted from `app/page.tsx` (2026-09-20) when `/vendors` became the second
+ * Extracted from `app/page.tsx` (2026-09-20) when `/for-vendors` became the second
  * marketing surface. Both pages have to agree on gutter, max width and
  * scroll-margin or they read as two different sites.
  */

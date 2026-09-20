@@ -92,7 +92,7 @@ type ClientEvents = {
   vendor_verify_link_clicked: {
     source: "vendor_page" | "landing_footer" | "profile_menu";
   };
-  /** A vendor clicked a CTA on the public /vendors page (the step after the
+  /** A vendor clicked a CTA on the public /for-vendors page (the step after the
    *  acquisition link, and the last one before sign-in). */
   vendor_portal_cta_clicked: { placement: "hero" | "closing" | "signin" };
   /** A couple clicked a verified vendor's CTA button on the vendor page. */

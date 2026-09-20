@@ -43,10 +43,10 @@ export const metadata: Metadata = {
   // would otherwise append the brand to a title that already opens with it.
   title: { absolute: META.title },
   description: DESCRIPTION,
-  alternates: { canonical: "/vendors" },
+  alternates: { canonical: "/for-vendors" },
   openGraph: {
     type: "website",
-    url: "/vendors",
+    url: "/for-vendors",
     siteName: "Wedding Recon",
     title: META.socialTitle,
     description: DESCRIPTION,
