@@ -38,7 +38,7 @@ export default async function AdminClaimsPage() {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   const userId = claims?.claims.sub ?? null;
-  if (!userId) redirect("/login?from=/portal/admin");
+  if (!userId) redirect("/login?from=/portal/admin&back=/vendors");
   // A non-admin should not learn this route exists.
   if (!(await isAdminUser(supabase, userId))) notFound();
 

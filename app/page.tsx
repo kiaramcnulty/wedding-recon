@@ -9,6 +9,7 @@ import { LandingHeader } from "@/components/landing/landing-header";
 import { DataHighlight } from "@/components/landing/data-highlight";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { ProblemCard } from "@/components/landing/problem-card";
+import { Section, SectionHeading } from "@/components/landing/section";
 import { SwipeCarousel } from "@/components/landing/swipe-carousel";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -89,46 +90,6 @@ const jsonLd = {
     },
   ],
 };
-
-/** Consistent page gutter + column width for every band on the page. */
-function Section({
-  id,
-  className,
-  children,
-}: {
-  id?: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    // scroll-mt keeps an anchored section's heading clear of the sticky
-    // header, which would otherwise cover it when a nav link jumps here.
-    <section id={id} className={cn("px-5 py-14 md:py-20", id && "scroll-mt-16", className)}>
-      <div className="mx-auto w-full max-w-5xl">{children}</div>
-    </section>
-  );
-}
-
-function SectionHeading({
-  eyebrow,
-  children,
-}: {
-  eyebrow?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <>
-      {eyebrow && (
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink">
-          {eyebrow}
-        </p>
-      )}
-      <h2 className="mt-2 font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-        {children}
-      </h2>
-    </>
-  );
-}
 
 export default function LandingPage() {
   return (

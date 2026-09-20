@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { UserRound, LogIn, LogOut, X, Mail, Info, Store } from "lucide-react";
 
+import { captureClient } from "@/lib/analytics/posthog";
 import { LANDING_HREF } from "@/lib/landing/nav";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/app/(auth)/actions";
@@ -231,11 +232,18 @@ export function ProfileMenu({ className }: { className?: string }) {
               <Info className="size-4 shrink-0" />
               About Wedding Recon
             </Link>
-            {/* Vendor entry point. A guest tapping this lands on /portal, which
-                sends them to sign in and back. */}
+            {/* Vendor entry point. /portal routes by account state: a guest
+                lands on the public pitch at /vendors, a signed-in vendor goes
+                straight to their dashboard. Tracked with the same event as the
+                other two entry points so the funnel counts all three. */}
             <Link
               href="/portal"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                captureClient("vendor_verify_link_clicked", {
+                  source: "profile_menu",
+                });
+                setOpen(false);
+              }}
               className="flex w-full items-center gap-2 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground"
             >
               <Store className="size-4 shrink-0" />
