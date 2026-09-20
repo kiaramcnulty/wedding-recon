@@ -15,7 +15,7 @@ Mobile-first PWA for engaged couples to (1) explore local wedding vendors on a m
 | Vendor page: photo strip + external-link overlay | `docs/notes/vendor-page.md` |
 | Landing page, first-visit routing, SEO | `docs/notes/landing-and-seo.md` |
 | Sign-in (the CODE leads, not the link) and `from` navigation | `docs/notes/auth-and-navigation.md` |
-| Admin flag + the Vendor Verification paid tier / portal | `docs/notes/admin-and-portal.md` |
+| Admin flag, the Vendor Verification paid tier / portal, the public `/vendors` entry point | `docs/notes/admin-and-portal.md` |
 | Analytics: PostHog + first-party attribution | `docs/notes/analytics.md` |
 | React/UI/Supabase/form patterns and the expensive gotchas | `docs/notes/app-patterns.md` |
 | Migration ledger (all 48, applied state) | `docs/notes/migrations.md` |
@@ -36,6 +36,7 @@ Plans and investigations (not as-built) stay in `docs/` directly -- e.g. `docs/v
 - `app/page.tsx` — the **marketing landing page** at `/` (statically prerendered, desktop-first, no bottom nav). It used to be a bare `redirect("/explore")`; the redirect now lives in the middleware and is conditional. See "Landing page + first-visit routing" below.
 - `app/(app)/` — main screens with the mobile frame + bottom nav: `explore`, `add`, `hub`, and `vendor/[id]`.
 - `app/(auth)/` — login / onboarding (no bottom nav).
+- `app/vendors/` — the **public vendor-side marketing page** (statically prerendered, at the root like `/terms` so it does not mount `<MarkVisited>`). It is the pitch a vendor reads before signing up; `app/(portal)/` behind it is the signed-in dashboard.
 - `components/` — shared components (`bottom-nav.tsx`, plus feature components).
 - `components/landing/` + `lib/landing/` — landing-page-only components and content. Nothing under `app/(app)/` should import from them except the two links back (`BrandFooter`, `ProfileMenu`), which take `LANDING_HREF` from `lib/landing/nav.ts`.
 - Mobile frame is `max-w-[480px]`, centered. The landing page is the one screen that is **not** in that frame — it runs to `max-w-5xl`, since it is the only surface people meet on a laptop.
@@ -73,6 +74,8 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 - **Every overlay over the map opts IN to pointer events.** The whole over-the-map stack sits in one `pointer-events-none absolute inset-0` box, so a control without `pointer-events-auto` is inert and the tap goes to the MapLibre canvas -- it renders and hovers correctly, it just does not respond. Put the class on individual controls, never on a row (the gaps must stay pannable). Check: `document.elementFromPoint(x, y)` at a control's centre must not return `canvas.maplibregl-canvas`.
 - **Ordering rules are shared, never re-implemented**: `sortReconEntries()` (`lib/recon-sort.ts`) for recon entries on both the vendor page and preview cards; `compareRanked()` (`lib/map/rank.ts`) for both list feeds. A new sort key goes in those modules so every surface moves together.
 - **Schema** lives in `supabase/migrations/`. If you change the DB, add a new numbered migration -- don't edit applied ones. Write them idempotent and **apply new ones by hand in the Supabase SQL editor**. See Migrations below and `docs/notes/migrations.md`.
+- **Cold vendor links point at `/portal`; the CTAs ON `/vendors` point at the sign-in form.** `/portal` is the router: signed out it redirects to the public pitch at `/vendors`, signed in it renders the dashboard. That is what keeps the three cold entry points (landing footer, profile menu, vendor page) a single href that cannot go stale — but a CTA on `/vendors` pointing at the router is a **loop back to the page you are already on**, which is exactly what "Get started" did until it was caught on 2026-09-20. Those use `SIGN_IN_HREF` (`lib/vendors/content.ts`), and `/login` bounces an already-signed-in visitor on to `from`, so one href is right for every account state. The benefit list is ONE constant (`VERIFICATION_BENEFITS` in `lib/vendors/content.ts`) shared by the page and the in-portal intro, and the price is `lib/portal/verification.ts` — never retyped. `docs/notes/admin-and-portal.md`.
+- **`from` and `back` are different params on `/login`**: `from` is where sign-in LANDS, `back` is only what the back link returns to. They must stay separate wherever the landing destination would bounce the visitor back to login (the vendor flow does exactly that). Both go through `sanitizeSignInDestination()`.
 - **Copy/nomenclature**: the recon CTA is **"Save recon"** (not "Publish"); user-facing labels say **"Vendor"**, not "Business".
 - **External links**: use `<ExternalLink>` from `components/external-link.tsx`, never a bare `<a target="_blank">`. See `docs/notes/vendor-page.md`.
 - **No `next/image` anywhere** -- deliberate, since Vercel Image Optimization is billed and an explicit `?w=` on a plain `<img>` is free. Google photo widths are allowlisted (`600`, `1200`); each width is a separate CDN key AND a separate billed Google fetch. Place Photos is the app's dominant Google cost -- see `docs/google-places-cost.md`.

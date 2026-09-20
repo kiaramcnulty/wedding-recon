@@ -89,7 +89,12 @@ type ClientEvents = {
   share_clicked: { vendor_id: string };
   vendor_link_out: { kind: "website" | "instagram" | "maps"; vendor_id: string };
   /** A couple/vendor clicked a "verify your business" acquisition link. */
-  vendor_verify_link_clicked: { source: "vendor_page" | "landing_footer" };
+  vendor_verify_link_clicked: {
+    source: "vendor_page" | "landing_footer" | "profile_menu";
+  };
+  /** A vendor clicked a CTA on the public /vendors page (the step after the
+   *  acquisition link, and the last one before sign-in). */
+  vendor_portal_cta_clicked: { placement: "hero" | "closing" | "signin" };
   /** A couple clicked a verified vendor's CTA button on the vendor page. */
   vendor_cta_clicked: { vendor_id: string; cta_label: string };
 };

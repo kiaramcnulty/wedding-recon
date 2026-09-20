@@ -7,6 +7,9 @@ import { SITE_URL } from "@/lib/site";
  * the public surface; everything listed under `disallow` is either a personal
  * workspace (the Hub), a form, or machinery with nothing to index.
  *
+ * `/vendors` (the vendor-side marketing page) IS indexable and sits in the
+ * sitemap; `/portal` behind it is not.
+ *
  * Note `/vendor/` is deliberately NOT disallowed — those pages carry the unique
  * recon content and are the long-tail of this site's search traffic.
  */
@@ -23,6 +26,9 @@ export default function robots(): MetadataRoute.Robots {
           "/hub",
           "/login",
           "/onboarding",
+          // Auth-gated, and it redirects a signed-out crawler to /vendors -
+          // which would otherwise index as a duplicate of that page.
+          "/portal",
           "/recon/",
         ],
       },

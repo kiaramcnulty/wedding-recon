@@ -92,6 +92,72 @@ any of it, because it records what each slice deliberately left out.
   guard; a Stripe search outage must not block every new vendor from
   subscribing).
 
+### The public vendor entry point: `/vendors` (2026-09-20)
+
+Every vendor link in the app -- the landing footer, the profile menu, and the
+"Are you the owner?" line on a vendor page -- pointed at `/portal`, which is
+auth-gated on its first line. So the pitch (`VerificationIntro`) lived BEHIND
+the gate and a vendor who had never heard of Vendor Verification was dropped
+straight onto a sign-in form with no idea what they were signing up for.
+
+- **`/portal` is now the ROUTER, and that is why no entry point had to change.**
+  Signed out it redirects to `/vendors` (the public pitch) instead of
+  `/login`; signed in it renders the dashboard exactly as before. One rule
+  decides for every surface, so a signed-in vendor never detours through
+  marketing and a new link cannot be wired up wrong. Keep pointing new COLD
+  vendor links at `/portal`, not at `/vendors`.
+- **But a CTA on `/vendors` must NOT point at `/portal`** -- the router sends a
+  signed-out visitor to `/vendors`, so the button reloads the page it is on.
+  Both "Get started" buttons shipped that way on 2026-09-20 and were caught by
+  Kiara clicking one on the preview, not by any check: the href was right for
+  every surface except the one it was on, and no test covers a redirect chain
+  that terminates where it started. They now use `SIGN_IN_HREF`
+  (`lib/vendors/content.ts`) -- `/login?from=/portal&back=/vendors`.
+- **`/login` bounces an already-signed-in visitor to `from`**, which is what
+  lets a STATIC page hand every account state the same href. The check is
+  deliberately non-blocking (the form renders immediately; only a live session
+  triggers the bounce) and runs once on mount, so it cannot fire against the
+  session the OTP step itself just minted.
+- **The pitch is ONE constant, not two copies.** `VERIFICATION_BENEFITS` lives
+  in `lib/vendors/content.ts` and is rendered by both `/vendors` and the
+  in-portal `VerificationIntro`. A vendor reads one before signing up and the
+  other after; a second copy of the list would eventually promise them two
+  different things. Price is still `lib/portal/verification.ts` -- never
+  retyped in either place.
+- **`/vendors` sits at the app root, not under `(app)`.** That layout mounts
+  `<MarkVisited>`, and a vendor reading about verification is not a couple
+  using the product -- marking them as one would suppress the landing page.
+  Same reasoning as `/terms` and the portal.
+- **It reads no cookies, so it stays statically prerendered** (`○` in the build
+  output). Resolving auth state server-side to relabel the CTA would drop that,
+  which is the trap `docs/notes/landing-and-seo.md` records for `/`. The
+  redirect already routes every account state correctly, so the CTA does not
+  need to know who is reading.
+- **The page is deliberately SHORT** (trimmed 2026-09-20, Kiara): hero, the
+  four benefits, the three steps, a contact line, closing CTA. A "what
+  verification is not" section, a pricing band and a vendor FAQ were all built
+  and then cut. Consequences to know before adding anything back: there is no
+  longer any statement ON THIS PAGE that paying cannot change what couples
+  wrote -- the couple-side landing FAQ still says it, so the two surfaces do
+  not contradict, but the vendor-facing half of that promise is now unsaid. And
+  the page carries **no JSON-LD at all**: the `FAQPage` node went with the FAQ,
+  because structured data describing content the page does not render is a
+  policy violation. Re-adding an FAQ means re-adding both.
+- **Claims auto-approve with retroactive review** (`lib/notify/claim-report.ts`)
+  -- if copy is ever written about the claim step, it must not promise an
+  up-front review.
+- **`/portal` is disallowed in `robots.ts`.** Its signed-out redirect happens
+  mid-stream (the route has a `loading.tsx`, so the shell flushes `200` first
+  and the redirect arrives in the body, not as a `307`), which means a crawler
+  would otherwise index `/portal` as a duplicate of `/vendors`.
+- **`/for-vendors` is a permanent redirect to `/vendors`** (`next.config.ts`) --
+  it is the URL people guess, and an alias keeps the guess working without
+  splitting ranking signals across two URLs. Only `/vendors` is in the sitemap.
+- **Funnel:** `vendor_verify_link_clicked { source }` on the three entry links
+  (the profile menu was untracked until now, so the old numbers under-count),
+  then `vendor_portal_cta_clicked { placement }` on `/vendors`. Two hops,
+  because the page between the link and the sign-in is otherwise invisible.
+
 ### Manual vendor entry must resolve a location (fixed 2026-09-20)
 
 `PlacesCombobox` emits a `ManualSelection` as soon as a NAME is typed, with

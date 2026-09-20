@@ -26,6 +26,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // `/for-vendors` is the URL people guess for a vendor page; `/vendors` is the
+  // one that ships and the only one in the sitemap. A permanent redirect keeps
+  // the guess working without splitting ranking signals across two URLs.
+  async redirects() {
+    return [
+      { source: "/for-vendors", destination: "/vendors", permanent: true },
+    ];
+  },
+
   // PostHog ingestion endpoints must not get a trailing slash appended.
   skipTrailingSlashRedirect: true,
 };

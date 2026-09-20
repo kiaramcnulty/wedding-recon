@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Loader2, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
@@ -52,15 +52,52 @@ function LoginContent() {
     return () => clearTimeout(t);
   }, []);
 
-  // Where the back button returns to: the page that sent the guest here passes
-  // a validated internal `from` path (e.g. a vendor page from the favorite
-  // button). Falls back to Explore when there's no origin.
+  // Two different destinations, which used to be one param and could not be.
+  //
+  // `from` is where sign-in LANDS (stashed in the intent cookie below);
+  // `back` is where the back link RETURNS to. They are usually the same, but
+  // the vendor flow is the case where they cannot be: /vendors sends
+  // `from=/portal&back=/vendors`, because /portal bounces a signed-out visitor
+  // back to /vendors - so a back link pointing at `from` would have returned
+  // the visitor to this very screen. Both are validated by the same sanitizer.
   const searchParams = useSearchParams();
   const rawFrom = searchParams.get("from");
+  const rawBack = searchParams.get("back");
   const backHref =
-    rawFrom && rawFrom.startsWith("/") && !rawFrom.startsWith("//")
-      ? rawFrom
-      : "/explore";
+    sanitizeSignInDestination(rawBack) ??
+    sanitizeSignInDestination(rawFrom) ??
+    "/explore";
+
+  // A vendor arriving from /vendors is signing in for a different reason than
+  // a couple saving a venue, and the generic copy is what made the old
+  // link-straight-to-login flow read as "sign up for what?".
+  const isVendorIntent = (rawFrom ?? "").startsWith("/portal");
+
+  // Already signed in? There is nothing to do on this screen, so go where the
+  // caller was headed. This is what lets a CTA point here unconditionally: the
+  // /vendors buttons cannot know who is reading (the page is static), and
+  // without this a signed-in vendor who found /vendors in search would be
+  // asked to log in again.
+  //
+  // Deliberately NOT a blocking check - the form renders immediately for the
+  // common signed-out case and only a live session triggers the bounce.
+  // getClaims() verifies the JWT locally, so this costs no Auth round trip.
+  // Runs once on mount, so it cannot fire against the session the OTP step
+  // itself just created.
+  const router = useRouter();
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getClaims();
+      if (!active || !data?.claims?.sub) return;
+      router.replace(sanitizeSignInDestination(rawFrom) ?? "/explore");
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -121,7 +158,11 @@ function LoginContent() {
           className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ChevronLeft className="size-4" />
-          {backHref === "/explore" ? "Back to explore" : "Back"}
+          {backHref === "/explore"
+            ? "Back to explore"
+            : backHref === "/vendors"
+              ? "Back to vendor info"
+              : "Back"}
         </Link>
       </div>
 
@@ -165,11 +206,16 @@ function LoginContent() {
         <Card className="w-full">
           <CardHeader>
             <CardTitle className="text-xl">
-              Log in or create an account
+              {isVendorIntent
+                ? "Sign in to verify your business"
+                : "Log in or create an account"}
             </CardTitle>
             <CardDescription>
               Enter your email and we&apos;ll send you a sign-in code — no
-              password needed. New here? The same code creates your account.
+              password needed. New here? The same code creates your account
+              {isVendorIntent
+                ? ", and it is the same account couples use."
+                : "."}
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -24,8 +24,9 @@ const LIVE_STATUSES = new Set([
 ]);
 
 /**
- * Vendor portal dashboard. Auth-gated (a signed-out visitor is sent to login,
- * back to /portal). Walks a vendor through three sequential steps —
+ * Vendor portal dashboard. Auth-gated: a signed-out visitor is sent to the
+ * public pitch at /vendors, whose CTA routes them through login and back here.
+ * Walks a vendor through three sequential steps —
  *   1. Find or create your business (claim)
  *   2. Create your verified listing (draft)
  *   3. Subscribe to verification (publishes the listing, adds the checkmark)
@@ -77,7 +78,11 @@ export default async function PortalPage() {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const userId = claimsData?.claims.sub;
-  if (!userId) redirect("/login?from=/portal");
+  // Signed out: the PITCH, not the sign-in form. /portal is what every vendor
+  // entry point in the app links to, so this redirect is what makes those links
+  // state-aware for free - a cold vendor reads what verification is at
+  // /vendors, while a signed-in one never sees the marketing page at all.
+  if (!userId) redirect("/vendors");
 
   // Own approved claims + the vendor row (RLS returns only this user's claims).
   const { data: claimRows } = await supabase
