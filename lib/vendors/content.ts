@@ -47,7 +47,7 @@ export const HERO = {
   eyebrow: "For wedding vendors",
   heading: "Verify your wedding business",
   subheading:
-    "Wedding Recon is a community for Colorado couples to find vendors and compare real quotes and experiences. Verification gives your business credibility, tells couples what you offer directly from you, and provides interested leads a path to get in touch.",
+    "Verification gives your business credibility and increased visibility.",
   primaryCta: "Get started",
   signInPrompt: "Already have an account?",
   signInCta: "Sign in",
