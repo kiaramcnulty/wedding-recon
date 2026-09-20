@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * capture fires on click and the navigation is a soft in-app nav, so PostHog
  * flushes normally (no page unload). One component, both surfaces.
  *
- * It points at /portal rather than /vendors on purpose: /portal routes by
+ * It points at /portal rather than /for-vendors on purpose: /portal routes by
  * account state, sending a signed-out visitor to the public pitch and a
  * signed-in vendor straight to their dashboard. Every entry point therefore
  * stays a single href and cannot go stale.

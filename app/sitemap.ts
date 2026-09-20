@@ -27,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/explore`, changeFrequency: "daily", priority: 0.8 },
     // The vendor-side marketing page. Public, static, and the only vendor URL
     // worth indexing - /portal behind it is auth-gated and disallowed.
-    { url: `${SITE_URL}/vendors`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/for-vendors`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
   ];

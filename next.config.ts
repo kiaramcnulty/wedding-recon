@@ -26,12 +26,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // `/for-vendors` is the URL people guess for a vendor page; `/vendors` is the
-  // one that ships and the only one in the sitemap. A permanent redirect keeps
-  // the guess working without splitting ranking signals across two URLs.
+  // The page lives at `/for-vendors` (Kiara). `/vendors` was the original path
+  // and shipped to production briefly, so it stays as a permanent redirect
+  // rather than a 404 - and only `/for-vendors` is in the sitemap, so the two
+  // never split ranking signals.
   async redirects() {
     return [
-      { source: "/for-vendors", destination: "/vendors", permanent: true },
+      { source: "/vendors", destination: "/for-vendors", permanent: true },
     ];
   },
 

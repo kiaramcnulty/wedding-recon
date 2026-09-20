@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
  * the page measurable rather than invisible between the link and the sign-in.
  *
  * `href` defaults to the SIGN-IN form, not to /portal. /portal is the router
- * that sends a signed-out visitor to /vendors, so a CTA on /vendors pointing at
+ * that sends a signed-out visitor to /for-vendors, so a CTA there pointing at
  * it just reloaded this page - which is what the button did until 2026-09-20.
  * The reader has already seen the pitch; the next step is the one OTP form that
- * signs in or creates the account. `back=/vendors` returns them here if they
+ * signs in or creates the account. `back=/for-vendors` returns them here if they
  * change their mind, and `from=/portal` is where sign-in lands.
  *
  * Cold links from ELSEWHERE in the app still point at /portal - see

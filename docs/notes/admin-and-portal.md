@@ -92,7 +92,7 @@ any of it, because it records what each slice deliberately left out.
   guard; a Stripe search outage must not block every new vendor from
   subscribing).
 
-### The public vendor entry point: `/vendors` (2026-09-20)
+### The public vendor entry point: `/for-vendors` (2026-09-20)
 
 Every vendor link in the app -- the landing footer, the profile menu, and the
 "Are you the owner?" line on a vendor page -- pointed at `/portal`, which is
@@ -101,30 +101,30 @@ the gate and a vendor who had never heard of Vendor Verification was dropped
 straight onto a sign-in form with no idea what they were signing up for.
 
 - **`/portal` is now the ROUTER, and that is why no entry point had to change.**
-  Signed out it redirects to `/vendors` (the public pitch) instead of
+  Signed out it redirects to `/for-vendors` (the public pitch) instead of
   `/login`; signed in it renders the dashboard exactly as before. One rule
   decides for every surface, so a signed-in vendor never detours through
   marketing and a new link cannot be wired up wrong. Keep pointing new COLD
-  vendor links at `/portal`, not at `/vendors`.
-- **But a CTA on `/vendors` must NOT point at `/portal`** -- the router sends a
-  signed-out visitor to `/vendors`, so the button reloads the page it is on.
+  vendor links at `/portal`, not at `/for-vendors`.
+- **But a CTA on `/for-vendors` must NOT point at `/portal`** -- the router sends a
+  signed-out visitor to `/for-vendors`, so the button reloads the page it is on.
   Both "Get started" buttons shipped that way on 2026-09-20 and were caught by
   Kiara clicking one on the preview, not by any check: the href was right for
   every surface except the one it was on, and no test covers a redirect chain
   that terminates where it started. They now use `SIGN_IN_HREF`
-  (`lib/vendors/content.ts`) -- `/login?from=/portal&back=/vendors`.
+  (`lib/vendors/content.ts`) -- `/login?from=/portal&back=/for-vendors`.
 - **`/login` bounces an already-signed-in visitor to `from`**, which is what
   lets a STATIC page hand every account state the same href. The check is
   deliberately non-blocking (the form renders immediately; only a live session
   triggers the bounce) and runs once on mount, so it cannot fire against the
   session the OTP step itself just minted.
 - **The pitch is ONE constant, not two copies.** `VERIFICATION_BENEFITS` lives
-  in `lib/vendors/content.ts` and is rendered by both `/vendors` and the
+  in `lib/vendors/content.ts` and is rendered by both `/for-vendors` and the
   in-portal `VerificationIntro`. A vendor reads one before signing up and the
   other after; a second copy of the list would eventually promise them two
   different things. Price is still `lib/portal/verification.ts` -- never
   retyped in either place.
-- **`/vendors` sits at the app root, not under `(app)`.** That layout mounts
+- **`/for-vendors` sits at the app root, not under `(app)`.** That layout mounts
   `<MarkVisited>`, and a vendor reading about verification is not a couple
   using the product -- marking them as one would suppress the landing page.
   Same reasoning as `/terms` and the portal.
@@ -149,13 +149,13 @@ straight onto a sign-in form with no idea what they were signing up for.
 - **`/portal` is disallowed in `robots.ts`.** Its signed-out redirect happens
   mid-stream (the route has a `loading.tsx`, so the shell flushes `200` first
   and the redirect arrives in the body, not as a `307`), which means a crawler
-  would otherwise index `/portal` as a duplicate of `/vendors`.
-- **`/for-vendors` is a permanent redirect to `/vendors`** (`next.config.ts`) --
+  would otherwise index `/portal` as a duplicate of `/for-vendors`.
+- **`/for-vendors` is a permanent redirect to `/for-vendors`** (`next.config.ts`) --
   it is the URL people guess, and an alias keeps the guess working without
-  splitting ranking signals across two URLs. Only `/vendors` is in the sitemap.
+  splitting ranking signals across two URLs. Only `/for-vendors` is in the sitemap.
 - **Funnel:** `vendor_verify_link_clicked { source }` on the three entry links
   (the profile menu was untracked until now, so the old numbers under-count),
-  then `vendor_portal_cta_clicked { placement }` on `/vendors`. Two hops,
+  then `vendor_portal_cta_clicked { placement }` on `/for-vendors`. Two hops,
   because the page between the link and the sign-in is otherwise invisible.
 
 ### Manual vendor entry must resolve a location (fixed 2026-09-20)
