@@ -35,11 +35,11 @@ export const META = {
 
 export const HERO = {
   eyebrow: "For wedding vendors",
-  heading: "Couples are already researching you here.",
+  heading: "Verify your wedding business",
   subheading:
-    "Wedding Recon is where Colorado couples compare real quotes and notes on local wedding vendors. Verification lets you claim your listing, tell them what you actually offer, and give them a way to get in touch.",
+    "Wedding Recon is a community for Colorado couples to find vendors and compare real quotes and experiences. Verification lets you give your business credibility, tell couples what you offer, and give interested leads a way to get in touch.",
   primaryCta: "Get started",
-  signInPrompt: "Already have a Wedding Recon account?",
+  signInPrompt: "Already have an account?",
   signInCta: "Sign in",
   reassurance: `${PRICE_PER_MONTH}, ${PRICE_BILLING_NOTE}. Cancel anytime.`,
 } as const;
@@ -122,7 +122,7 @@ export const CONTACT = {
 } as const;
 
 export const CLOSING_CTA = {
-  heading: "Claim your business.",
-  body: "It takes a few minutes, and you can see the whole flow before you pay anything.",
+  heading: "Verify your business.",
+  body: `Create trust and visibility with couples actively looking for wedding vendors, for 10 minutes of time and just ${PRICE_PER_MONTH}.`,
   cta: "Get started",
 } as const;
