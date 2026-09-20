@@ -1,0 +1,49 @@
+name: stripe-webhook-check
+
+# Holds the LIVE Stripe webhook registration to the contract in
+# lib/stripe/webhook-events.ts: reachable without a redirect, registered at the
+# canonical host, subscribed to every event the handler acts on.
+#
+# This is a production-configuration check, not a unit test, which is why it is
+# not in `npm test` (that has to pass offline). It runs weekly because the
+# failure it catches is SILENT and slow: Vendor Verification shipped, a vendor
+# paid, and the only symptom was a badge that never appeared. Nothing errored.
+#
+# Needs two repo settings, and is a no-op without them:
+#   secret STRIPE_LIVE_SECRET_KEY  - a live-mode restricted key; read-only on
+#                                    "Webhook endpoints" is sufficient.
+#   variable STRIPE_WEBHOOK_URL    - https://www.weddingrecon.com/api/stripe-webhook
+#                                    (the WWW host; the apex answers 308 and
+#                                    Stripe does not follow redirects)
+
+on:
+  schedule:
+    - cron: "41 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check the live webhook registration
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_LIVE_SECRET_KEY }}
+          STRIPE_WEBHOOK_URL: ${{ vars.STRIPE_WEBHOOK_URL }}
+        run: |
+          if [ -z "$STRIPE_WEBHOOK_URL" ]; then
+            echo "::warning::STRIPE_WEBHOOK_URL is not set; skipping."
+            exit 0
+          fi
+          if [ -z "$STRIPE_SECRET_KEY" ]; then
+            # Reachability alone is still worth running, but say plainly that
+            # the registration half did not happen -- a green run that silently
+            # checked nothing is the exact failure mode this repo keeps hitting.
+            echo "::warning::STRIPE_LIVE_SECRET_KEY is not set; checking reachability only."
+          fi
+          node scripts/check-stripe-webhook.mjs

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { captureServer } from "@/lib/analytics/posthog-server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRegion } from "@/lib/normalize-region";
+import { MANUAL_LOCATION_ERROR } from "@/lib/vendor/manual-entry";
 import type { VendorType, ReconType } from "@/lib/constants/categories";
 
 export interface CreateReconInput {
@@ -111,13 +112,21 @@ export async function createRecon(input: CreateReconInput) {
       const city = (input.manualCity ?? "").trim();
 
       if (!name) throw new Error("Vendor name is required");
+      // A vendor with no point cannot be found: not on the Explore map, not in
+      // vendor search. The form blocks this too, but an action is callable
+      // without the form. See lib/vendor/manual-entry.ts.
+      if (input.manualLat == null || input.manualLng == null) {
+        throw new Error(MANUAL_LOCATION_ERROR);
+      }
 
-      const { data: existing } = await supabase
-        .from("vendors")
-        .select("id")
-        .ilike("name", name)
-        .ilike("city", city || "")
-        .maybeSingle();
+      // Blank city has to match a NULL city, not the empty string: `ilike` on
+      // "" never matches NULL, so the dedup silently missed every existing
+      // city-less row and created a duplicate instead.
+      const dedup = supabase.from("vendors").select("id").ilike("name", name);
+      const { data: existing } = await (city
+        ? dedup.ilike("city", city)
+        : dedup.is("city", null)
+      ).maybeSingle();
 
       if (existing) {
         vendorId = existing.id as string;

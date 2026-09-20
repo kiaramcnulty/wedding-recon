@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { getStripe } from "@/lib/stripe/client";
+import { subscriptionIdFor } from "@/lib/stripe/webhook-events";
+import { mirrorSubscription } from "@/lib/stripe/sync";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { captureServer } from "@/lib/analytics/posthog-server";
 
@@ -17,49 +19,19 @@ import { captureServer } from "@/lib/analytics/posthog-server";
  *
  * The subscription carries vendor_id in its metadata (set at checkout), so
  * every event maps back to a vendor without another lookup.
+ *
+ * REGISTER THIS ON THE CANONICAL HOST. weddingrecon.com answers with a 308 to
+ * www.weddingrecon.com, and Stripe does NOT follow redirects -- it records the
+ * 3xx as a failed delivery and nothing here ever runs. The endpoint URL must be
+ * https://www.weddingrecon.com/api/stripe-webhook, in LIVE mode, subscribed to
+ * every type in HANDLED_EVENT_TYPES. `npm run check:stripe-webhook` asserts all
+ * three; see docs/notes/admin-and-portal.md for the outage it comes from.
  */
 
 // Stripe needs Node (crypto for signature verification), not the Edge runtime.
 export const runtime = "nodejs";
 // Never statically optimize; this reads a signed request body per call.
 export const dynamic = "force-dynamic";
-
-/** current_period_end moved onto items in recent API versions; check both. */
-function periodEnd(sub: Stripe.Subscription): string | null {
-  const s = sub as unknown as {
-    current_period_end?: number;
-    items?: { data?: Array<{ current_period_end?: number }> };
-  };
-  const ts = s.current_period_end ?? s.items?.data?.[0]?.current_period_end;
-  return typeof ts === "number" ? new Date(ts * 1000).toISOString() : null;
-}
-
-/** Extract the subscription id an event refers to, or null if none applies. */
-function subscriptionIdFor(event: Stripe.Event): string | null {
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const s = event.data.object as Stripe.Checkout.Session;
-      return typeof s.subscription === "string"
-        ? s.subscription
-        : (s.subscription?.id ?? null);
-    }
-    case "customer.subscription.created":
-    case "customer.subscription.updated":
-    case "customer.subscription.deleted":
-      return (event.data.object as Stripe.Subscription).id;
-    case "invoice.paid":
-    case "invoice.payment_failed": {
-      const inv = event.data.object as unknown as {
-        subscription?: string | { id: string } | null;
-      };
-      return typeof inv.subscription === "string"
-        ? inv.subscription
-        : (inv.subscription?.id ?? null);
-    }
-    default:
-      return null;
-  }
-}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -99,30 +71,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       // A subscription not created by our flow — nothing to map it to.
       return NextResponse.json({ received: true, unmapped: subId });
     }
-    const customerId =
-      typeof sub.customer === "string" ? sub.customer : sub.customer.id;
 
-    await svc.from("vendor_subscriptions").upsert(
-      {
-        vendor_id: vendorId,
-        stripe_customer_id: customerId,
-        stripe_subscription_id: sub.id,
-        status: sub.status,
-        current_period_end: periodEnd(sub),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "vendor_id" },
-    );
-
-    // Activation publishes a draft listing (if one exists). Never unpublishes:
-    // the perks predicate already gates on status = active, and leaving
-    // published sticky means a re-subscribe relights the listing instantly.
-    if (sub.status === "active") {
-      await svc
-        .from("vendor_listings")
-        .update({ published: true })
-        .eq("vendor_id", vendorId);
-    }
+    await mirrorSubscription(vendorId, sub);
 
     // One-time side effects: only on the FIRST time we see this event id.
     // ignoreDuplicates makes this INSERT ... ON CONFLICT DO NOTHING, so a

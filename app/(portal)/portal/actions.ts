@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRegion } from "@/lib/normalize-region";
+import { MANUAL_LOCATION_ERROR } from "@/lib/vendor/manual-entry";
 import { captureServer } from "@/lib/analytics/posthog-server";
 import { sendClaimReport, emailMatchesWebsite } from "@/lib/notify/claim-report";
 import type { VendorType } from "@/lib/constants/categories";
@@ -105,12 +106,20 @@ export async function claimVendor(input: ClaimVendorInput): Promise<ClaimResult>
       const city = (input.manualCity ?? "").trim();
       if (!name) return { ok: false, error: "Enter your business name." };
       if (!input.vendorType) return { ok: false, error: "Pick a vendor category." };
-      const { data: existing } = await supabase
-        .from("vendors")
-        .select("id")
-        .ilike("name", name)
-        .ilike("city", city || "")
-        .maybeSingle();
+      // A vendor with no point cannot be found: not on the Explore map, not in
+      // vendor search. The form blocks this too, but an action is callable
+      // without the form. See manualSelectionHasLocation.
+      if (input.manualLat == null || input.manualLng == null) {
+        return { ok: false, error: MANUAL_LOCATION_ERROR };
+      }
+      // Blank city has to match a NULL city, not the empty string: `ilike` on
+      // "" never matches NULL, so the dedup silently missed every existing
+      // city-less row and created a duplicate instead.
+      const dedup = supabase.from("vendors").select("id").ilike("name", name);
+      const { data: existing } = await (city
+        ? dedup.ilike("city", city)
+        : dedup.is("city", null)
+      ).maybeSingle();
       if (existing) {
         vendorId = existing.id as string;
       } else {

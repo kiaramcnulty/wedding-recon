@@ -62,6 +62,96 @@ any of it, because it records what each slice deliberately left out.
   `Set-Cookie` would make them uncacheable, and `api/stripe-webhook` because it
   authenticates by Stripe signature over its RAW body and has no session to
   refresh.
+- **The webhook must be registered on `www`, and Stripe does not follow
+  redirects.** `weddingrecon.com` answers `308` to `www.weddingrecon.com`; a
+  browser follows it, `curl -L` follows it, and Stripe records the `3xx` as a
+  FAILED delivery. An endpoint registered on the apex reads as perfectly
+  correct in the dashboard and never fires once. This is the same 308 that
+  silently defeated the keep-alive workflow -- and note that the fix there
+  (add `-L`) is exactly the fix NOT available here, so the URL itself has to be
+  right. Canonical value:
+  `https://www.weddingrecon.com/api/stripe-webhook`.
+- **`HANDLED_EVENT_TYPES` (`lib/stripe/webhook-events.ts`) is the event
+  contract**, and the registered endpoint is held to it by
+  `npm run check:stripe-webhook`. The handler's `subscriptionIdFor` switch and
+  that list are kept in step by `scripts/test-stripe-webhook-events.mjs` (23
+  assertions, offline), so the registration check can never be asserting a set
+  the handler has drifted away from.
+- **`mirrorSubscription()` (`lib/stripe/sync.ts`) is the ONE writer of
+  `vendor_subscriptions`**, shared by the webhook and by the billing action's
+  reconcile path. Both have to produce identical state -- the reconcile path
+  exists for when the webhook did not run, so a divergent shape would make the
+  repair worse than the gap.
+- **Checkout consults Stripe, not just our mirror.** `vendor_subscriptions` is
+  written only by the webhook, so a missed delivery leaves it empty and the
+  mirror alone reports "never paid" about someone who has paid -- and the
+  portal then sells them a SECOND subscription. `startCheckout` therefore
+  searches Stripe by `metadata['vendor_id']` first and mirrors anything it
+  finds, which makes a missed delivery self-healing on the vendor's next
+  visit. It fails OPEN on a search error (the mirror check is the primary
+  guard; a Stripe search outage must not block every new vendor from
+  subscribing).
+
+### Manual vendor entry must resolve a location (fixed 2026-09-20)
+
+`PlacesCombobox` emits a `ManualSelection` as soon as a NAME is typed, with
+`lat`/`lng` still null until a geocode suggestion is picked -- so the CALLER
+decides when the entry is complete. That contract lived only in a comment, and
+only one of its two callers honoured it: Add Recon blocked submit, the portal
+claim form did not, and **neither server action checked at all**. A vendor who
+typed their business name and skipped the location field got a row with no
+point, which cannot appear on the Explore map (`vendors_in_bbox` needs one) and
+does not come back from vendor search -- invisible except by direct link.
+
+It reached a PAYING verified vendor (Enjoue Collection, claimed 2026-09-19),
+whose row was given the Denver centroid by hand on 2026-09-20. **98 of 2,301
+rows are still in that state, all `source=user`** -- not yet backfilled.
+
+The rule is now `lib/vendor/manual-entry.ts`
+(`MANUAL_LOCATION_ERROR` + `manualSelectionHasLocation`), called by all four
+sites: both forms for the friendly error, both server actions for the actual
+guard, since an action is callable without a form. It is a plain module and
+deliberately NOT exported from the `"use client"` combobox -- Next turns every
+export of a client module into a client reference, so a server action importing
+it from there gets a stub it cannot call.
+
+Same block, second bug: the pre-insert dedup did `.ilike("city", city || "")`,
+and `ilike` on `""` never matches NULL, so an existing city-less row was never
+found and a duplicate was created instead. Blank city now matches
+`.is("city", null)`.
+
+### The 2026-09-19 silent-verification outage
+
+The failure the three checks above come from, because every symptom was in
+production and every cause was in configuration.
+
+Vendor Verification shipped on 2026-09-13. On 2026-09-19 a real vendor (Enjoue
+Studio Events, plus a second business of theirs) claimed their listings, filled
+them in, uploaded photos, set filter overrides, and paid. Nothing on the site
+changed. The claim was approved and the listing rows were complete, but
+`vendor_subscriptions` was **empty -- zero rows, whole table** -- so
+`verified_vendor_ids()` returned nobody and not a single vendor read as
+verified anywhere.
+
+Three configuration faults, any one of which is sufficient on its own:
+
+1. The apex `308` above.
+2. The only endpoint registered on the account pointed at a **branch preview
+   deployment** left over from the verification PR
+   (`wedding-recon-git-claude-vendor-verified-slice-...vercel.app`), not
+   production.
+3. That endpoint subscribed to `customer.source.updated`,
+   `customer.card.updated` and `customer.bank_account.updated` -- none of which
+   the handler acts on -- while **omitting `customer.subscription.updated`**,
+   which it does.
+
+Two lessons worth keeping separate from the fixes. **Checking test mode proves
+nothing about live mode**: the sandbox account looked healthy and real vendors
+pay in live mode. And **the whole path was individually correct** -- handler,
+predicate, RLS, SQL checks all passed, including the 20 assertions in
+`scripts/test-verified-sql.mjs` -- because nothing tested that Stripe could
+reach us at all. That gap is now `npm run check:stripe-webhook` plus the weekly
+`.github/workflows/stripe-webhook-check.yml`.
 - **The claim email is optional by design.** `lib/notify/claim-report.ts` sends
   via one `fetch` to Resend (no SDK dependency) and logs-and-continues when
   `RESEND_API_KEY` is unset, so a claim never fails because email did. The
