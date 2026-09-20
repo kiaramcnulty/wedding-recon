@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
 
 /**
- * Crawl rules. The landing page, Explore, vendor pages and the terms page are
- * the public surface; everything listed under `disallow` is either a personal
+ * Crawl rules. The landing page, Explore, vendor pages, legal pages, and public
+ * connector docs are the public surface; everything listed under `disallow` is either a personal
  * workspace (the Hub), a form, or machinery with nothing to index.
  *
  * `/for-vendors` (the vendor-side marketing page) IS indexable and sits in the

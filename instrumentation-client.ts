@@ -7,6 +7,7 @@
  * free (no CSR-bailout risk). See docs/analytics-plan.md.
  */
 import {
+  captureClient,
   capturePageview,
   initPostHog,
 } from "@/lib/analytics/posthog";
@@ -45,12 +46,29 @@ function writeFirstTouch(): void {
   }
 }
 
+function captureMuseArrival(url = window.location.href): void {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.searchParams.get("utm_source")?.toLowerCase() !== "muse") return;
+    const marker = `wr_muse_arrival:${parsed.pathname}:${parsed.searchParams.get("utm_campaign") ?? ""}`;
+    if (sessionStorage.getItem(marker)) return;
+    sessionStorage.setItem(marker, "1");
+    captureClient("muse_arrival", {
+      landing_path: parsed.pathname,
+      campaign: parsed.searchParams.get("utm_campaign"),
+    });
+  } catch {
+    // Analytics must never block a page load.
+  }
+}
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 try {
   writeFirstTouch();
   if (initPostHog()) {
     // Initial load. onRouterTransitionStart (below) covers client navigations.
     capturePageview();
+    captureMuseArrival();
   }
 } catch {
   // A broken analytics init must never take the app down with it.
@@ -65,6 +83,7 @@ export function onRouterTransitionStart(url: string): void {
   try {
     const abs = new URL(url, window.location.origin).href;
     capturePageview(abs);
+    captureMuseArrival(abs);
   } catch {
     // ignore
   }

@@ -30,6 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/for-vendors`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/developers/connectors`, changeFrequency: "monthly", priority: 0.2 },
   ];
 
   // Vendor pages are public and each carries unique recon, so they belong in

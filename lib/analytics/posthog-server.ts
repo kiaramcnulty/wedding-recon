@@ -17,6 +17,7 @@
  * `userId`; here we simply use `userId` as the distinct id.
  */
 import { PostHog } from "posthog-node";
+import { after } from "next/server";
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST =
@@ -67,4 +68,41 @@ export async function captureServer(
   } catch {
     // swallow — the user's action must succeed regardless
   }
+}
+
+export interface ConnectorTelemetry {
+  operation: "root" | "capabilities" | "search_vendors" | "get_vendor";
+  partner: "muse";
+  status: number;
+  duration_ms: number;
+  category?: string;
+  location_id?: string;
+  result_count?: number;
+  partial_result_count?: number;
+  request_id: string;
+}
+
+/**
+ * Operational connector telemetry only. It intentionally excludes API keys,
+ * search text, conversation prompts, recon text, and personal wedding details.
+ */
+export async function captureConnectorTelemetry(
+  properties: ConnectorTelemetry,
+): Promise<void> {
+  const c = getClient();
+  if (!c) return;
+  try {
+    await c.captureImmediate({
+      distinctId: "connector:muse",
+      event: "connector_request",
+      properties: { ...properties, $process_person_profile: false },
+    });
+  } catch {
+    // Observability never changes an API result.
+  }
+}
+
+/** Send operational analytics after the API response, outside user latency. */
+export function scheduleConnectorTelemetry(properties: ConnectorTelemetry): void {
+  after(() => captureConnectorTelemetry(properties));
 }

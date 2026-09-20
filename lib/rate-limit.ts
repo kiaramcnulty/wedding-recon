@@ -34,3 +34,32 @@ export async function checkRateLimit(
     return true;
   }
 }
+
+export type StrictRateLimitResult = "allowed" | "limited" | "unavailable";
+
+/**
+ * Connector policy: unlike image serving, a limiter outage must fail closed.
+ * This leaves the existing fail-open behavior above untouched for images.
+ */
+export async function checkRateLimitStrict(
+  key: string,
+  max: number,
+  windowSeconds: number,
+): Promise<StrictRateLimitResult> {
+  try {
+    const admin = createServiceRoleClient();
+    const { data, error } = await admin.rpc("check_rate_limit", {
+      p_key: key,
+      p_max: max,
+      p_window_seconds: windowSeconds,
+    });
+    if (error) {
+      console.error("[rate-limit] strict check failed:", error.message);
+      return "unavailable";
+    }
+    return data === false ? "limited" : "allowed";
+  } catch (error) {
+    console.error("[rate-limit] strict check threw:", error);
+    return "unavailable";
+  }
+}
