@@ -40,7 +40,7 @@ export type ClaimResult =
   | { ok: true; vendorId: string; alreadyYours: boolean }
   | { ok: false; error: string };
 
-const CONTACT = "kiaramcnulty@gmail.com";
+const CONTACT = "kiara@weddingrecon.com";
 
 /**
  * Claim a business for the signed-in vendor. Auto-approved. Resolves (or

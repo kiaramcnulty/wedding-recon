@@ -269,8 +269,8 @@ export function ProfileMenu({ className }: { className?: string }) {
               <DialogTitle>Questions or feedback?</DialogTitle>
               <DialogDescription>
                 Please send any questions or feedback to the site creator,{" "}
-                <a href="mailto:kiaramcnulty@gmail.com">
-                  kiaramcnulty@gmail.com
+                <a href="mailto:kiara@weddingrecon.com">
+                  kiara@weddingrecon.com
                 </a>
                 . Responses are typically received within 1 business day.
               </DialogDescription>

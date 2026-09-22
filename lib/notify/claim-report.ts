@@ -15,7 +15,7 @@
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const DEFAULT_FROM = "Wedding Recon <onboarding@resend.dev>";
-const DEFAULT_TO = "kiaramcnulty@gmail.com";
+const DEFAULT_TO = "kiara@weddingrecon.com";
 
 export interface ClaimReport {
   vendorName: string;

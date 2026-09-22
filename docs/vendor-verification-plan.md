@@ -271,7 +271,7 @@ Stripe dashboard by hand. No code path needed.
 
 No transactional email infra exists in the repo today. Use **Resend**
 (free tier, one API call): `lib/notify/claim-report.ts` sending to
-`kiaramcnulty@gmail.com` on (a) claim created, (b) checkout completed. Content:
+`kiara@weddingrecon.com` on (a) claim created, (b) checkout completed. Content:
 vendor name, city, type, claimant email, whether the email domain matches the
 vendor website domain (the `email_domain_matches_website` flag — compute at
 claim time by comparing the auth email domain to the hostname of

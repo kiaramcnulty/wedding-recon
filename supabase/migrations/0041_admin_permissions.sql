@@ -77,5 +77,5 @@ update public.profiles p
 set is_admin = true
 from auth.users u
 where u.id = p.id
-  and lower(u.email) = lower('kiaramcnulty@gmail.com')
+  and lower(u.email) = lower('kiara@weddingrecon.com')
   and p.is_admin is distinct from true;

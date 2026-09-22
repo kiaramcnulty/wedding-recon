@@ -509,4 +509,4 @@ export const FOOTER = {
     "Recon entries are personal experiences shared by couples or aggregated online, not verified facts - always confirm pricing and details with the vendor.",
 } as const;
 
-export const CONTACT_EMAIL = "kiaramcnulty@gmail.com";
+export const CONTACT_EMAIL = "kiara@weddingrecon.com";

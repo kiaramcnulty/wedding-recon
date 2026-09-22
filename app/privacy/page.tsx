@@ -199,7 +199,7 @@ export default function PrivacyPage() {
         <h2 className="text-lg font-medium">Contact</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Questions, requests, or concerns about privacy? Email
-          kiaramcnulty@gmail.com.
+          kiara@weddingrecon.com.
         </p>
       </section>
 

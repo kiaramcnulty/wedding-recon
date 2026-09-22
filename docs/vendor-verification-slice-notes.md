@@ -129,7 +129,7 @@ listing editor, the vendor-page listing content, and billing (later phases).
 ```
 # Resend API key for the claim-report email. Unset = email skipped (logged).
 RESEND_API_KEY=
-# Where reports go (default kiaramcnulty@gmail.com).
+# Where reports go (default kiara@weddingrecon.com).
 CLAIM_REPORT_EMAIL=
 # Verified sender (default Resend shared test domain onboarding@resend.dev).
 CLAIM_REPORT_FROM=
