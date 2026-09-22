@@ -65,6 +65,8 @@ export default function PrivacyPage() {
           cookie and attach it to your profile if you later sign up. It records
           where you came from and nothing else, it is never overwritten by a
           later visit, and a direct visit records nothing at all.
+          A separate Muse-arrival event lets us count a connector return without
+          replacing that original first-touch source.
         </p>
         <p className="text-sm text-muted-foreground leading-relaxed">
           <strong className="font-medium text-foreground">Usage.</strong> Page
@@ -114,6 +116,20 @@ export default function PrivacyPage() {
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-lg font-medium">Connector API</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          The read-only connector exposes selected public vendor and active recon
+          information. It never returns emails, author IDs, private saves,
+          reports, moderation data, unpublished vendor listings, billing
+          identifiers, or raw internal metadata. Operational telemetry is
+          limited to operation, category, coarse location, result counts,
+          duration, status, request ID, and partner identity. We do not log API
+          keys, agent prompts, full search conversation text, recon text, or
+          personal wedding details.
+        </p>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-lg font-medium">Why we use it</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           To sign you in and keep your account secure; to show your recon and
@@ -147,10 +163,12 @@ export default function PrivacyPage() {
         <h2 className="text-lg font-medium">Cookies</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           We use a session cookie to keep you signed in, the first-touch source
-          cookie described above, and PostHog&rsquo;s analytics cookie. There are
-          no advertising or cross-site tracking cookies. You can clear or block
-          cookies in your browser; sign-in will stop working without the session
-          cookie.
+          cookie described above, PostHog&rsquo;s analytics cookie, and a
+          first-party preference cookie that records for up to one year only
+          that this browser has used the product. There are no advertising or
+          cross-site tracking cookies. You can clear or block cookies in your
+          browser; sign-in will stop working without the session cookie.
+          Connector API routes neither require nor set browser cookies.
         </p>
       </section>
 
@@ -163,6 +181,14 @@ export default function PrivacyPage() {
           to delete your account and everything attached to it. Content you posted may remain in backups for a short
           period after deletion, and moderation records may be retained where we
           need them to prevent abuse.
+        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Connector operational analytics are reviewed after the 30-day pilot
+          and retained for no more than 12 months unless a longer period is
+          needed to investigate abuse or a security incident. Quota counters
+          contain only credential bucket identifiers and counts, reset in place,
+          and may be removed during routine maintenance. Access is limited to
+          operators who need it.
         </p>
       </section>
 

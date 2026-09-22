@@ -24,7 +24,9 @@ export const config = {
      * `api/stripe-webhook` is excluded too: it authenticates by Stripe
      * signature over its RAW body, carries no cookies, and has no session to
      * refresh — the middleware would only add a needless Auth round trip.
+     * `api/connectors` has its own API-key authentication and deliberately uses
+     * a cookie-free anon client, so session refresh must never set cookies on it.
      */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|api/vendor-photo|api/map/vendors|api/stripe-webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|api/vendor-photo|api/map/vendors|api/stripe-webhook|api/connectors|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

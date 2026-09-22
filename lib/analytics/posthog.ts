@@ -97,6 +97,8 @@ type ClientEvents = {
   vendor_portal_cta_clicked: { placement: "hero" | "closing" | "signin" };
   /** A couple clicked a verified vendor's CTA button on the vendor page. */
   vendor_cta_clicked: { vendor_id: string; cta_label: string };
+  /** Real browser arrival from a Muse connector result; separate from first-touch. */
+  muse_arrival: { landing_path: string; campaign: string | null };
 };
 
 export function captureClient<E extends keyof ClientEvents>(

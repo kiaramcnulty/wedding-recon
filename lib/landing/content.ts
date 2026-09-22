@@ -458,7 +458,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Can vendors pay to appear, or to change what is written about them?",
     answer:
-      "No. Vendors appear because couples are researching them. If an entry is inaccurate or unfair, anyone can report it and it gets reviewed.",
+      "Vendors cannot pay to erase or rewrite community recon. A separate paid verification option can add a verified badge, vendor-published details, and a modest ranking boost among vendors in the same match tier. It is not a quality certification. If an entry is inaccurate or unfair, anyone can report it and it gets reviewed.",
   },
   {
     question: "What kinds of vendors are on here?",

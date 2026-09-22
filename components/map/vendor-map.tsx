@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
+import type * as GeoJSON from "geojson";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import {
