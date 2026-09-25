@@ -3,7 +3,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/resolve.mjs <workdir> --state CO [--region "Denver, CO"] [--type photographer]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, nameKey, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, centroidLookup, cleanWebsite, cleanInstagram, sleep, argValue, typeProfile, initPlacesCache, placesSpendReport } from './lib.mjs';
+import { readVenues, writeVenues, appendPruned, denylisted, isPermanentlyClosed, nameKey, sigTokens, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, centroidLookup, cleanWebsite, cleanInstagram, sleep, argValue, typeProfile, initPlacesCache, placesSpendReport } from './lib.mjs';
 
 const workdir = process.argv[2];
 const state = argValue('state');
@@ -43,7 +43,7 @@ for (let i = 0; i < venues.length; i++) if (!byKey.has(knownNames[i])) byKey.set
 
 const cands = fs.readFileSync(candFile, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
 let resolved = 0, approx = 0, nomatch = 0, dups = 0, researchSite = 0, donated = 0, revived = 0;
-const flagged = [];
+const flagged = [], denied = [], closed = [];
 const revivedNames = [];
 
 const donate = (row, c, ig) => {
@@ -61,6 +61,9 @@ for (const c of cands) {
   // Previously pruned by name — don't resurrect it. `--rescue` in adjudicate.mjs is the
   // one supported way back out of pruned.csv, so a rejection survives any number of re-runs.
   if (prunedKeys.has(key)) { revived++; if (revivedNames.length < 12) revivedNames.push(c.name); continue; }
+  // Deliberately deleted from the DB (denylist.json). Checked by name BEFORE the Places call,
+  // since a closed listing Google has since dropped would otherwise land as a centroid row.
+  if (denylisted({ name: c.name }, profile)) { denied.push(c.name); continue; }
   // Name-level dedup vs everything already in the file (exact, or containment when name is distinctive enough).
   const dupKey = knownNames.find((n) => n === key || (sigTokens(c.name).length >= 2 && (n.includes(key) || key.includes(n))));
   if (dupKey !== undefined) { dups++; donate(byKey.get(dupKey), c, ig); continue; }
@@ -75,6 +78,19 @@ for (const c of cands) {
     // Same guard as the name check, but on the RESOLVED place: a candidate can reach a
     // pruned row under a different name (a rebrand, or two businesses sharing a listing).
     if (prunedPids.has(p.id)) { revived++; if (revivedNames.length < 12) revivedNames.push(`${c.name} -> ${p.displayName?.text || p.id}`); continue; }
+    if (denylisted({ place_id: p.id }, profile)) { denied.push(`${c.name} -> ${p.displayName?.text || p.id}`); continue; }
+    // Google says it has shut for good: prune it (rescuable) rather than falling through to a
+    // centroid row, which would re-add the closed vendor with no place_id to catch it by.
+    if (isPermanentlyClosed(p)) {
+      const { city, state: st, cleanAddress } = parseCityState(p.formattedAddress, state);
+      closed.push({
+        name: p.displayName?.text || c.name, address: cleanAddress, city, state: st, website: '', instagram: ig,
+        lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '', place_id: p.id,
+        provenance: c.provenance || 'research', flags: 'PRUNED:closed-permanently', subtype: '',
+      });
+      seenPid.add(p.id);
+      continue;
+    }
     const gName = p.displayName.text; // canonical Google name
     const gKey = nameKey(gName, profile);
     const { city, state: st, cleanAddress } = parseCityState(p.formattedAddress, state);
@@ -125,7 +141,10 @@ for (const c of cands) {
 }
 
 writeVenues(file, venues);
-console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known (${donated} donated ig/website to existing rows) | +${researchSite} using a research website | ${revived} skipped as previously-pruned | total ${venues.length}`);
+appendPruned(workdir, closed);
+console.log(`resolve: ${cands.length} candidates | +${resolved} matched | +${approx} approx-centroid | +${nomatch} no-match | ${dups} already-known (${donated} donated ig/website to existing rows) | +${researchSite} using a research website | ${revived} skipped as previously-pruned | ${closed.length} pruned as closed-permanently | ${denied.length} denylisted | total ${venues.length}`);
+if (closed.length) console.log(`  closed permanently per Google (moved to pruned.csv, rescuable): ${closed.map((v) => v.name).join('; ')}`);
+if (denied.length) console.log(`  skipped as denylisted (denylist.json): ${denied.join('; ')}`);
 if (revived) {
   console.log(`  skipped (already in pruned.csv — rescue with: adjudicate.mjs ... --rescue "<name>" --apply):\n    ${revivedNames.join('\n    ')}`);
   console.log(`  NOTE: adjudicate is TERMINAL — if you are re-running resolve after adjudicating, you are probably re-doing work. Resolve everything first, then adjudicate once.`);
