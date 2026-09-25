@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { readVenues, writeVenues, nameKey, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep, typeProfile, selectAll, initPlacesCache, placesSpendReport } from './lib.mjs';
+import { readVenues, writeVenues, denylisted, isPermanentlyClosed, nameKey, tokensOverlap, parseCityState, placesSearch, websiteWithFallback, sleep, typeProfile, selectAll, initPlacesCache, placesSpendReport } from './lib.mjs';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -41,12 +41,18 @@ if (profile.vendorTypes) {
 // A row with an address containing digits but no place_id gets one more Places
 // attempt (business match with the token guard; else address geocode for coords only).
 let lateResolved = 0, lateGeocoded = 0;
+const lateClosed = new Set();
 for (const v of venues) {
   if (v.place_id || !/\d/.test(v.address)) continue;
   try {
     const d = await placesSearch(`${v.name} ${v.address}`);
     const p = d.places?.[0];
-    if (p && tokensOverlap(v.name, p.displayName?.text || '', profile.weak) && v.state && (p.formattedAddress || '').includes(v.state)) {
+    const matched = p && tokensOverlap(v.name, p.displayName?.text || '', profile.weak) && v.state && (p.formattedAddress || '').includes(v.state);
+    if (matched && isPermanentlyClosed(p)) {
+      // The address filled in during review belongs to a place Google says has shut — hold
+      // the row back rather than insert a closed vendor (reported in the skip lines below).
+      lateClosed.add(v);
+    } else if (matched) {
       const { city, state, cleanAddress } = parseCityState(p.formattedAddress, v.state);
       Object.assign(v, {
         address: cleanAddress, city: city || v.city, state,
@@ -94,7 +100,7 @@ const dbName = new Map(existing.filter((v) => typeScope.includes(v.vendor_type))
 // An existing DB row that lacks a website/instagram but whose CSV twin now has one gets the
 // blank backfilled (fills blanks only — never overwrites). Insert is otherwise insert-only,
 // so without this a row that first landed website-less stays blank forever.
-const toInsert = [], skipDbPid = [], skipDbName = [], skipBatch = [], skipNoName = [], skipOtherType = [], backfill = [];
+const toInsert = [], skipDbPid = [], skipDbName = [], skipBatch = [], skipNoName = [], skipOtherType = [], skipDenied = [], skipClosed = [], backfill = [];
 const batchPid = new Set(), batchName = new Set();
 const maybeBackfill = (dbRow, v) => {
   const patch = {};
@@ -104,6 +110,10 @@ const maybeBackfill = (dbRow, v) => {
 };
 for (const v of venues) {
   if (!v.name) { skipNoName.push(v); continue; }
+  // The hard stop for denylist.json: whatever path a deleted vendor took back into the CSV
+  // (a workdir swept before it was denied, a hand edit, a rescue), it is not inserted.
+  if (denylisted(v, profile)) { skipDenied.push(v.name); continue; }
+  if (lateClosed.has(v)) { skipClosed.push(v.name); continue; }
   const nk = nameKey(v.name, profile) + '|' + nameKey(v.city, null);
   if (v.place_id && dbPid.has(v.place_id)) {
     const hit = dbPid.get(v.place_id);
@@ -150,6 +160,8 @@ if (skipOtherType.length) lines.push(`skip — same place exists as ANOTHER vend
 lines.push(`skip — already in DB by name+city (${skipDbName.length}): ${skipDbName.join('; ') || '—'}`);
 lines.push(`skip — duplicate within batch (${skipBatch.length}): ${skipBatch.join(', ') || '—'}`);
 if (skipNoName.length) lines.push(`skip — blank name: ${skipNoName.length}`);
+if (skipDenied.length) lines.push(`skip — denylisted, deliberately deleted from the DB (${skipDenied.length}): ${skipDenied.join(', ')}`);
+if (skipClosed.length) lines.push(`skip — late-resolve matched a CLOSED_PERMANENTLY place (${skipClosed.length}): ${skipClosed.join(', ')}`);
 if (backfill.length) lines.push(`BACKFILL on existing rows (${backfill.length}): ${backfill.map((b) => `${b.name} (${Object.keys(b.patch).join('+')})`).join(', ')}`);
 lines.push(`TO INSERT: ${payload.length}  (google-matched ${payload.filter((p) => p.source === 'google').length}, approximate-pin ${approx.length}, NO LOCATION ${noLoc.length}${profile.captureInstagram ? `, with instagram ${toInsert.filter((v) => v.instagram).length}` : ''})`);
 if (profile.vendorTypes) lines.push(`  by type (from CSV subtype — review before --apply): ${typeScope.map((t) => `${t} ${payload.filter((p) => p.vendor_type === t).length}`).join(', ')}`);

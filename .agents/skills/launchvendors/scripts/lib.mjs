@@ -536,6 +536,12 @@ function cacheSet(key, value) {
  * deliberate and much the cheaper side of the trade: one call returns up to 20 places, so
  * carrying the website here costs +$3 per 1,000 CALLS instead of +$20 per 1,000 PLACES to
  * fetch it one at a time through Place Details. Do not "optimize" it out.
+ *
+ * `places.businessStatus` (read by isPermanentlyClosed) is a PRO field, below the Enterprise
+ * tier the call already bills at, so it adds nothing to the price — same reasoning as
+ * `displayName`. The cache key does not include the mask, so pages cached before it was
+ * added come back without it for up to 30 days and are treated as open; the denylist is the
+ * hard guarantee, this is the cheap early catch.
  */
 export async function placesSearch(query, pageToken) {
   const SKU = 'Text Search Enterprise';
@@ -548,7 +554,7 @@ export async function placesSearch(query, pageToken) {
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.websiteUri,nextPageToken',
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.websiteUri,places.businessStatus,nextPageToken',
     },
     body: JSON.stringify(pageToken ? { textQuery: query, pageToken } : { textQuery: query }),
   });
@@ -649,6 +655,56 @@ export async function centroidLookup(labels, state) {
   }
   return null;
 }
+
+// ── Denylist: vendors deliberately deleted from the hosted DB ────────────────
+// A row deleted from `vendors` leaves no trace anywhere, so the next sweep of the same type
+// and region would re-find it on Google and re-insert it (2026-09-24: Jennifer Lane Events,
+// closed since 2020, deleted by hand). `denylist.json` is the committed record, keyed by
+// google_place_id: { names: [...], vendor_type, removed: "YYYY-MM-DD", reason }. The repo is
+// PUBLIC — business names and a short reason only, never who asked or any personal data.
+//
+// Unlike pruned.csv (per-workdir, rescuable by adjudicate --rescue) this is global and has
+// no rescue path: to un-deny a vendor, delete its entry in a reviewed commit.
+//
+// Matching: a row WITH a place_id is denied only by that place_id (a different place_id is a
+// different Google place, hence a different business). A row WITHOUT one — a research
+// candidate that fell to a centroid — is denied by normalized name within the same vendor
+// type, since Google may have dropped the closed listing and the name is all that is left.
+const DENYLIST_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'denylist.json');
+let denylist = null;
+
+export function loadDenylist() {
+  if (denylist) return denylist;
+  denylist = JSON.parse(fs.readFileSync(DENYLIST_FILE, 'utf8'));   // a malformed file must fail loudly, not deny nothing
+  return denylist;
+}
+
+/**
+ * The denylist entry that blocks this row, or null. `row` is { place_id, name, subtype? };
+ * `profile` scopes the name match to the run's vendor type(s).
+ */
+export function denylisted(row, profile) {
+  const table = loadDenylist();
+  const pid = (row.place_id || '').trim();
+  if (pid) return table[pid] ? { place_id: pid, ...table[pid] } : null;
+  if (!row.name) return null;
+  const scope = profile?.vendorTypes ?? (profile?.vendorType ? [profile.vendorType] : null);
+  const key = nameKey(row.name, profile);
+  for (const [id, e] of Object.entries(table)) {
+    if (scope && e.vendor_type && !scope.includes(e.vendor_type)) continue;
+    if ((e.names || []).some((n) => nameKey(n, profile) === key)) return { place_id: id, ...e };
+  }
+  return null;
+}
+
+/**
+ * Google marks a place it knows has shut as CLOSED_PERMANENTLY. `businessStatus` rides in
+ * placesSearch()'s mask at no extra cost (a Pro field in a call already billed Enterprise).
+ * A MISSING status is not evidence of anything — responses cached before the field was
+ * added lack it — so only an explicit CLOSED_PERMANENTLY counts. CLOSED_TEMPORARILY is
+ * kept: a venue shut for renovation is still a venue.
+ */
+export const isPermanentlyClosed = (place) => place?.businessStatus === 'CLOSED_PERMANENTLY';
 
 // Domains that are never a vendor's OWN website — social, maps/search, and wedding/review
 // DIRECTORIES. A listicle or scrape often lists one of these as a vendor's "site"; we only

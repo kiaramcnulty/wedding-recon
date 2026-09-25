@@ -194,6 +194,13 @@ expensive, *and* the website is lost. The fallback pays for itself.
 
 **The sweep field mask keeps `places.websiteUri`**, for the reason in the table note above.
 
+**`places.businessStatus` was added to the sweep mask (2026-09-24) at no cost.** It is a
+**Pro** field in Text Search, below the Enterprise tier `websiteUri` already sets, so the
+call stays at Text Search Enterprise. It lets `scout`/`resolve` prune `CLOSED_PERMANENTLY`
+places. It was deliberately NOT added to any Place Details mask: those key the cache by
+mask, so a change would re-pay every cached lookup, and on the `websiteUri`-only fallback it
+buys nothing the search did not already return.
+
 **`wedcheck` is already well-tuned.** The free same-host subpage probe runs before the paid
 reviews call specifically so a hit avoids it.
 

@@ -2,7 +2,7 @@
 // usage: node --env-file=.env.local .claude/skills/launchvendors/scripts/scout.mjs <workdir> --region "Denver, CO" [--type photographer] [--statewide Colorado] [--anchors "Boulder, CO;Golden, CO"]
 import fs from 'node:fs';
 import path from 'node:path';
-import { readVenues, writeVenues, appendPruned, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile, wrongTypeByName, initPlacesCache, placesSpendReport } from './lib.mjs';
+import { readVenues, writeVenues, appendPruned, parseCityState, placesSearch, websiteWithFallback, sleep, argValue, typeProfile, wrongTypeByName, denylisted, isPermanentlyClosed, initPlacesCache, placesSpendReport } from './lib.mjs';
 
 const workdir = process.argv[2];
 const region = argValue('region');
@@ -33,7 +33,7 @@ const queries = [
   ...[region, ...anchors].flatMap((a) => [].concat(profile.sweepQuery(a))),
 ];
 let added = 0, dup = 0, offState = 0;
-const junk = [];
+const junk = [], denied = [];
 for (const q of queries) {
   let pageToken;
   for (let page = 0; page < 3; page++) {
@@ -47,6 +47,9 @@ for (const q of queries) {
       if (st !== state) { offState++; continue; }
       seen.add(p.id);
       const name = p.displayName?.text || '';
+      // Deliberately deleted from the DB (denylist.json) — never re-enters, not even pruned.csv,
+      // because a denylisted vendor is not a candidate for adjudicate --rescue.
+      if (denylisted({ place_id: p.id, name }, profile)) { denied.push(name); continue; }
       const row = {
         name, address: cleanAddress, city, state: st,
         website: '', instagram: '',
@@ -61,6 +64,9 @@ for (const q of queries) {
       // Wrong-TYPE noise by name (planners in photographer sweeps etc. — per-type
       // wrongType/ownSignal in lib.mjs); same pruned.csv trail as junk-name.
       if (wrongTypeByName(profile, name)) { row.flags = 'PRUNED:wrong-type-name'; junk.push(row); continue; }
+      // Google says it has shut for good. Pruned with a reason (skip the website call too) so a
+      // skim can still rescue it if Google is wrong.
+      if (isPermanentlyClosed(p)) { row.flags = 'PRUNED:closed-permanently'; junk.push(row); continue; }
       row.website = await websiteWithFallback(p.id, p.websiteUri);
       venues.push(row);
       added++;
@@ -73,6 +79,7 @@ for (const q of queries) {
 }
 writeVenues(file, venues);
 appendPruned(workdir, junk);
-console.log(`scout(${profile.key}): ${queries.length} queries | +${added} new | ${dup} repeat | ${offState} out-of-state | ${junk.length} junk-name pruned | total ${venues.length} rows -> ${file}`);
-if (junk.length) console.log(`  pruned by name (see pruned.csv): ${junk.map((v) => v.name).join('; ')}`);
+console.log(`scout(${profile.key}): ${queries.length} queries | +${added} new | ${dup} repeat | ${offState} out-of-state | ${junk.length} pruned by name/closed | ${denied.length} denylisted | total ${venues.length} rows -> ${file}`);
+if (junk.length) console.log(`  pruned (see pruned.csv): ${junk.map((v) => `${v.name} [${v.flags.replace('PRUNED:', '')}]`).join('; ')}`);
+if (denied.length) console.log(`  skipped as denylisted (denylist.json): ${denied.join('; ')}`);
 console.log(placesSpendReport());
