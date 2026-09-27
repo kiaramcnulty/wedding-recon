@@ -7,7 +7,7 @@ gitignored.
 
 ---
 
-**Subject:** verify your business, reach prospective couples on Wedding Recon
+**Subject:** verify your business, reach couples on Wedding Recon
 
 Hi {{first name}},
 
