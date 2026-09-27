@@ -86,3 +86,6 @@ next-env.d.ts
 # hooks.json: Codex wants an absolute command path, which is machine-specific, so
 # it is generated per checkout instead of committed. Run `npm run sync-codex`.
 /.codex/hooks.json
+
+# Local analytics exports (vendor contact lists, funnel PDFs). Personal data: never commit.
+/analytics/
