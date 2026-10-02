@@ -125,9 +125,14 @@ for (const c of changes) {
     // checks in guardProseEdit still compare the whole before/after card.
     const split = (t) => String(t ?? "").split(/(?<=[.!?])\s+|\n/).map((s) => s.trim()).filter(Boolean);
     const added = PROSE.filter((f) => f in c.set)
-      .flatMap((f) => { const old = new Set(split(row[f])); return split(c.set[f]).filter((s) => !old.has(s)); })
-      .join(" ");
-    const errs = guardProseEdit(before, after, added);
+      .flatMap((f) => { const old = new Set(split(row[f])); return split(c.set[f]).filter((s) => !old.has(s)); });
+    // Card-level checks once, then each new sentence ON ITS OWN: joined, a
+    // digit in one sentence and a price word in another tripped the bare-number
+    // check ("4 person minimum" next to an unrelated pricing sentence).
+    const errs = [...new Set([
+      ...guardProseEdit(before, after, ""),
+      ...added.flatMap((s) => guardProseEdit(before, before, s)),
+    ])];
     if (errs.length) { skipped.push(`${at}: prose gate - ${errs.join("; ")}`); continue; }
   }
   plan.push(c);
