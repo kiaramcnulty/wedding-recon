@@ -132,3 +132,12 @@ Runs after the mechanical sweeps and re-dossiers, so reviewers spend their judgm
 3. **Photos (item 10): delete the ones that fail.** The test is not "did the vendor take it" but "does it purport to show the vendor or its work product". A guest's photo of a venue is fine; a stock bride on a photographer's card, another band on a band's card, or headstones from a different cemetery are not.
 4. **Bot-entry cap (item 11): at most 3 BOT entries per vendor** (real users' entries do not count toward it), going forward and by trimming existing vendors over the cap.
 5. **Reconcile-added sentences (item 1):** (A) a real source confirms it: keep sentence and tag. (B) a source contradicts it: replace BOTH the sentence and the tag with the true fact. (C) unconfirmable either way: remove the sentence AND the tag.
+
+## Progress log
+
+- **2026-10-02** Pipeline fixes merged (PR #61). `filter-recon-daily` paused (PR #63 + Actions UI; resume = step 8, issue #62).
+- **2026-10-02** Item 12 applied: 138 thin reconcile-created entries set `status: removed` (soft delete). Undo: `restore.mjs --work qualitypass-12-remove-thin-entries --run 20261002T215815-qualitypass-apply-9638d8 --apply`. All 138 were the vendors' only bot entries, so those 138 vendors have no recon again and are re-enrich candidates.
+- **2026-10-02** Item 2 applied: 956 collected dates moved forward to the newest source each entry quotes (median 7 months; 1 shares a sibling month). Undo: `restore.mjs --work qualitypass-02-date-moves --run 20261002T215952-qualitypass-apply-37dde4 --apply`. `created_at` was not re-backdated (it is only the within-month tiebreak).
+- **2026-10-02** Sweep (`scripts/qualitypass/sweep.mjs`) over the post-removal export: 1,626 of 1,946 vendors / 2,007 of 3,248 entries carry a detected issue (added-after-drafting 1,282 entries, absence claims on unread sites 901, tooling language 385, missing service_region 103, price contradictions 57, over the bot cap 37 vendors, contamination 28, identity failures 8). Fix-pass pilot on 24 vendors in progress.
+
+Tooling: every cleanup write goes through `scripts/qualitypass/apply-changes.mjs` (bot rows only, compare-and-set against a fresh read, shared prose gates, snapshot + audit via `scripts/reconcile/audit.mjs`; undo with `scripts/reconcile/restore.mjs --work qualitypass-<list> --run <id>`). Working files (exports, change lists, packets) live in the gitignored `data/qualitypass/`.
