@@ -134,8 +134,9 @@ for (const c of changes) {
       ...guardProseEdit(before, after, ""),
       // A bare-number price is a 3+ digit figure with no $ ("starts at 2200");
       // list numbers ("3."), ordinals ("17th") and counts ("8 reviews") are not,
-      // and the drafting gate's looser test flagged them on cleanup edits.
-      ...added.flatMap((s) => guardProseEdit(before, before, s).filter((e) => !/bare number/.test(e) || /(?<![$\d,.])\d{3,}(?![\d%]|st|nd|rd|th)/.test(s.replace(/\b(19|20)\d\d\b/g, ""))) ),
+      // and the drafting gate's looser test flagged them on cleanup edits. Same
+      // for capacities and quantities ("250 for a reception", "200 guests").
+      ...added.flatMap((s) => guardProseEdit(before, before, s).filter((e) => !/bare number/.test(e) || /(?<![$\d,.])\d{3,}(?![\d%]|st|nd|rd|th|,?\s*(?:\+\s*)?(?:guests?|people|persons?|seated|seats?|standing|for an?\b|sq|square|rooms?|suites?|hours?|hrs?|miles?|mi\b|reviews?|pieces?|ft|feet|acres?|min))/i.test(s.replace(/\b(19|20)\d\d\b/g, ""))) ),
     ])];
     if (errs.length) { skipped.push(`${at}: prose gate - ${errs.join("; ")}`); continue; }
   }
