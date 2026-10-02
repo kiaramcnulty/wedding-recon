@@ -47,7 +47,7 @@ const WORK = `qualitypass-${NAME}`;
 
 const EDITABLE = {
   recon_entries: new Set(["notes", "price_text", "price_details", "service_region", "recon_collected_month", "recon_collected_year", "status"]),
-  vendors: new Set(["name", "website", "filters", "filters_meta"]),
+  vendors: new Set(["name", "website", "city", "location", "filters", "filters_meta"]),
 };
 const PROSE = ["notes", "price_text", "price_details"];
 

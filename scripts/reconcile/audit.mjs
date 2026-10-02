@@ -53,7 +53,7 @@ import { ROOT } from "./lib.mjs";
 export const SNAPSHOT_COLUMNS = {
   recon_entries:
     "id,vendor_id,author_id,status,notes,price_text,price_details,service_region,recon_collected_month,recon_collected_year,updated_at",
-  vendors: "id,name,website,filters,filters_meta,filters_source,filters_updated_at,filters_dirty_at",
+  vendors: "id,name,website,city,location,filters,filters_meta,filters_source,filters_updated_at,filters_dirty_at",
 };
 
 const git = (args) =>
