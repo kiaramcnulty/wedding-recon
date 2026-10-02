@@ -25,6 +25,13 @@ import { siteUnread, absenceClaims, identityBlocked, BOT_CAP } from "../../.clau
 
 const DIR = arg("dir", "data/qualitypass");
 const CONTAM = arg("contam");
+// The cleanup's own writes stamp updated_at too (date moves, fixes), so "edited
+// after drafting by the Aug reconcile pass" must be read off the PRE-cleanup
+// export, or every date-moved entry looks reconcile-edited.
+const BASELINE = arg("baseline");
+const baselineUpdated = BASELINE
+  ? new Map(JSON.parse(fs.readFileSync(BASELINE, "utf8")).map((e) => [e.id, e.updated_at]))
+  : null;
 const FIXED = new Set(["venue", "hotel", "dress"]); // FIXED_LOCATION_TYPES: no service_region
 
 const entries = JSON.parse(fs.readFileSync(path.join(DIR, "live-entries.json"), "utf8")).filter((e) => e.status === "active");
@@ -132,10 +139,11 @@ for (const [vid, es] of byVendor) {
     // Only entries the reconcile pass touched (it sets updated_at). Text that
     // differs from the drafts WITHOUT updated_at is the 0036 quote-only rewording
     // and the hand-applied SQL fixes, which never stamped updated_at - not appends.
-    const draftBlob = e.updated_at ? (drafts.get(vid) ?? []).map(norm).join(" || ") : "";
+    const reconTouched = baselineUpdated ? baselineUpdated.get(e.id) : e.updated_at;
+    const draftBlob = reconTouched ? (drafts.get(vid) ?? []).map(norm).join(" || ") : "";
     const added = draftBlob ? sentences(`${e.price_text ?? ""}\n${e.price_details ?? ""}\n${e.notes ?? ""}`).filter((s) => !draftBlob.includes(norm(s)) && !QUOTE_ONLY_REWORDING.test(s)) : [];
     if (added.length) issues.push({ kind: "added-after-drafting", detail: added });
-    else if (!draftBlob && e.updated_at) issues.push({ kind: "edited-no-draft-on-file", detail: `updated ${e.updated_at.slice(0, 10)}, no draft text found to diff against` });
+    else if (!draftBlob && reconTouched) issues.push({ kind: "edited-no-draft-on-file", detail: `updated ${e.updated_at.slice(0, 10)}, no draft text found to diff against` });
     for (const i of issues) bump(i.kind);
     entryIssues.push({ entry_id: e.id, author: e.author, collected: `${e.recon_collected_month}/${e.recon_collected_year}`, updated_at: e.updated_at, photos: (e.recon_media || []).length, issues });
   }
