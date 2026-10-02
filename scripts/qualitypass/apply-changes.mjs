@@ -47,7 +47,7 @@ const WORK = `qualitypass-${NAME}`;
 
 const EDITABLE = {
   recon_entries: new Set(["notes", "price_text", "price_details", "service_region", "recon_collected_month", "recon_collected_year", "status"]),
-  vendors: new Set(["name", "website", "city", "location", "filters", "filters_meta"]),
+  vendors: new Set(["name", "website", "city", "address_text", "location", "filters", "filters_meta"]),
 };
 const PROSE = ["notes", "price_text", "price_details"];
 
@@ -119,11 +119,12 @@ for (const c of changes) {
   if (c.table === "recon_entries" && PROSE.some((f) => f in c.set)) {
     const before = Object.fromEntries(PROSE.map((f) => [f, row[f] ?? ""]));
     const after = { ...before, ...Object.fromEntries(PROSE.filter((f) => f in c.set).map((f) => [f, c.set[f] ?? ""])) };
-    // Gate the text the change INTRODUCES, not the whole field: untouched
+    // Gate the text the change INTRODUCES, not the whole field (sentences AND
+    // inline " - " bullets, which much of this corpus uses): untouched
     // original sentences ("45 reviews", "since 2020") tripped the bare-number
     // price check on minimal fixes in the 2026-10-02 fix pilot. The card-level
     // checks in guardProseEdit still compare the whole before/after card.
-    const split = (t) => String(t ?? "").split(/(?<=[.!?])\s+|\n/).map((s) => s.trim()).filter(Boolean);
+    const split = (t) => String(t ?? "").split(/(?<=[.!?])\s+|\n|\s-\s+|\s-(?=\S)/).map((s) => s.trim()).filter(Boolean);
     const added = PROSE.filter((f) => f in c.set)
       .flatMap((f) => { const old = new Set(split(row[f])); return split(c.set[f]).filter((s) => !old.has(s)); });
     // Card-level checks once, then each new sentence ON ITS OWN: joined, a
@@ -131,7 +132,10 @@ for (const c of changes) {
     // check ("4 person minimum" next to an unrelated pricing sentence).
     const errs = [...new Set([
       ...guardProseEdit(before, after, ""),
-      ...added.flatMap((s) => guardProseEdit(before, before, s)),
+      // A bare-number price is a 3+ digit figure with no $ ("starts at 2200");
+      // list numbers ("3."), ordinals ("17th") and counts ("8 reviews") are not,
+      // and the drafting gate's looser test flagged them on cleanup edits.
+      ...added.flatMap((s) => guardProseEdit(before, before, s).filter((e) => !/bare number/.test(e) || /(?<![$\d,.])\d{3,}(?![\d%]|st|nd|rd|th)/.test(s.replace(/\b(19|20)\d\d\b/g, ""))) ),
     ])];
     if (errs.length) { skipped.push(`${at}: prose gate - ${errs.join("; ")}`); continue; }
   }
