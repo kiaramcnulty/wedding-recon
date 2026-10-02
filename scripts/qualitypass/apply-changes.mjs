@@ -119,15 +119,76 @@ for (const c of changes) {
   if (c.table === "recon_entries" && PROSE.some((f) => f in c.set)) {
     const before = Object.fromEntries(PROSE.map((f) => [f, row[f] ?? ""]));
     const after = { ...before, ...Object.fromEntries(PROSE.filter((f) => f in c.set).map((f) => [f, c.set[f] ?? ""])) };
-    const added = PROSE.filter((f) => f in c.set).map((f) => c.set[f] ?? "").join(" ");
+    // Gate the text the change INTRODUCES, not the whole field: untouched
+    // original sentences ("45 reviews", "since 2020") tripped the bare-number
+    // price check on minimal fixes in the 2026-10-02 fix pilot. The card-level
+    // checks in guardProseEdit still compare the whole before/after card.
+    const split = (t) => String(t ?? "").split(/(?<=[.!?])\s+|\n/).map((s) => s.trim()).filter(Boolean);
+    const added = PROSE.filter((f) => f in c.set)
+      .flatMap((f) => { const old = new Set(split(row[f])); return split(c.set[f]).filter((s) => !old.has(s)); })
+      .join(" ");
     const errs = guardProseEdit(before, after, added);
     if (errs.length) { skipped.push(`${at}: prose gate - ${errs.join("; ")}`); continue; }
   }
   plan.push(c);
 }
 
+// --- tag sync: a vendor's quoted tags must still be documented by its prose ---
+// Kiara, 2026-10-02: when information is added, removed or changed, the tags
+// move with it. The fix pilot showed they did not by default (O'Connor gained a
+// $3,000 fee with no price tag; Colorado Microweddings kept a $500 tag after its
+// prose moved to $1,300-$3,200). The mechanical half of that rule: after this
+// list, every price_quote / capacity_quote must still appear verbatim in one of
+// the vendor's ACTIVE entries, or the vendor's whole set of changes is refused.
+const normQ = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9$]+/g, " ").trim();
+const touchedVendors = new Set();
+for (const c of plan) touchedVendors.add(c.table === "vendors" ? c.id : fresh.recon_entries.get(c.id).vendor_id);
+const vendorRows = new Map();
+const vendorEntries = new Map();
+const tv = [...touchedVendors];
+for (let i = 0; i < tv.length; i += 200) {
+  const part = tv.slice(i, i + 200);
+  const { data: vs, error: ve } = await db.from("vendors").select("id,name,filters").in("id", part);
+  const { data: es, error: ee } = await db.from("recon_entries").select("id,vendor_id,status,notes,price_text,price_details").in("vendor_id", part);
+  if (ve || ee) { console.error(`tag-sync read: ${(ve || ee).message} - nothing written`); process.exit(1); }
+  for (const v of vs) vendorRows.set(v.id, v);
+  for (const e of es) { if (!vendorEntries.has(e.vendor_id)) vendorEntries.set(e.vendor_id, []); vendorEntries.get(e.vendor_id).push(e); }
+}
+const refusedVendors = new Map();
+const tagWarnings = [];
+const proseOf = (es) => es.filter((e) => e.status === "active").map((e) => normQ(`${e.price_text ?? ""} ${e.price_details ?? ""} ${e.notes ?? ""}`)).join(" || ");
+for (const vid of touchedVendors) {
+  const vChange = plan.find((c) => c.table === "vendors" && c.id === vid);
+  const was = vendorRows.get(vid)?.filters ?? {};
+  const now = vChange?.set.filters ?? was;
+  const es = vendorEntries.get(vid) ?? [];
+  const before = proseOf(es);
+  const after = proseOf(es.map((e) => ({ ...e, ...(plan.find((c) => c.table === "recon_entries" && c.id === e.id)?.set ?? {}) })));
+  const bad = [];
+  for (const k of ["price_quote", "capacity_quote"]) {
+    if (!now[k]) continue;
+    const q = normQ(now[k]);
+    const setHere = now[k] !== was[k];
+    if (after.includes(q)) continue;
+    // Refuse only what THIS list breaks: a quote the prose documented before and
+    // no longer does, or a quote this list sets that the final prose lacks.
+    // Extraction-era quotes that came from site text and were never in the
+    // prose are a pre-existing sync gap: warned, left to the fix pass.
+    if (setHere) bad.push(`${k} set to "${String(now[k]).slice(0, 60)}" but the final prose does not contain it`);
+    else if (before.includes(q)) bad.push(`${k} "${String(now[k]).slice(0, 60)}" was documented and this list removes it`);
+    else tagWarnings.push(`${vendorRows.get(vid)?.name}: ${k} "${String(now[k]).slice(0, 60)}" was never in the prose (pre-existing)`);
+  }
+  if (bad.length) refusedVendors.set(vid, bad.join("; "));
+}
+for (let i = plan.length - 1; i >= 0; i--) {
+  const c = plan[i];
+  const vid = c.table === "vendors" ? c.id : fresh.recon_entries.get(c.id).vendor_id;
+  if (refusedVendors.has(vid)) { skipped.push(`${c.table} ${c.id}: TAG SYNC - ${vendorRows.get(vid)?.name}: ${refusedVendors.get(vid)}; sync the vendor\'s filters in this list`); plan.splice(i, 1); }
+}
+
 console.log(`${LIST}: ${changes.length} change(s), ${plan.length} to write, ${skipped.length} skipped${APPLY ? "" : " (DRY RUN)"}`);
 for (const s of skipped) console.log(`  skip ${s}`);
+for (const w of tagWarnings) console.log(`  warn tag-sync ${w}`);
 
 await run.snapshot("recon_entries", plan.filter((c) => c.table === "recon_entries").map((c) => c.id));
 await run.snapshot("vendors", plan.filter((c) => c.table === "vendors").map((c) => c.id));
