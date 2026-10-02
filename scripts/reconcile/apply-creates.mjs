@@ -26,6 +26,25 @@ import { createHash } from "node:crypto";
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ROOT, serviceClient, readJsonl, has, bareNumberPrice } from "./lib.mjs";
+import { BANNED, EMDASH, gateText, toolingTell } from "./prose-gate.mjs";
+
+// DISABLED (2026-10-02, docs/bot-recon-quality-plan.md item 12). This writer
+// produced the 138 thin third-person template entries of 2026-08-09 ("X offers
+// hair services in studio and works with textured hair.", 30 near-identical
+// across vendors): restated tags, no research, no voice, no source - and the
+// tags it restated are exactly the ones the item-1 audit found unreliable.
+// Kiara ruled to remove those entries. New entries go through /enrichvendors,
+// which gives every one a dossier, a persona voice and the full prose gates.
+// Kept, not deleted, so the history of what made those entries stays readable.
+console.error(
+  [
+    "REFUSING: reconcile 'creates' is disabled (plan item 12, Kiara 2026-10-02).",
+    "It wrote thin, voice-less entries that restated tags with no source.",
+    "To give a tag-only vendor recon, run /enrichvendors <type> <region> for it instead",
+    "(dossier + persona voice + prose gates). See docs/bot-recon-quality-plan.md item 12.",
+  ].join("\n"),
+);
+process.exit(1);
 
 const APPLY = has("apply");
 const db = serviceClient();
@@ -35,9 +54,6 @@ const drafts = readJsonl(resolve(CREATES, "results.jsonl"));
 const { targets, bots } = JSON.parse(readFileSync(resolve(ROOT, "data/reconcile/creates-targets.json"), "utf8"));
 const vById = new Map(targets.map((v) => [v.id, v]));
 
-const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
-const PROCESS = /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?|launchintel|digest\w*)\b/i;
-const EMDASH = /[—–]/;
 
 const logPath = resolve(CREATES, "applied.jsonl");
 const done = new Set(
@@ -65,9 +81,9 @@ for (const d of drafts) {
 
   const notes = clean(d.notes);
   const priceText = clean(d.price_text);
-  const bad = notes.match(BANNED) || notes.match(PROCESS) || priceText.match(BANNED) || priceText.match(PROCESS);
+  const bad = gateText(`${notes} ${priceText}`).match(BANNED)?.[0] ?? toolingTell(`${notes} ${priceText}`)?.match;
   if (bad || EMDASH.test(notes) || EMDASH.test(priceText) || !notes) {
-    console.error(`  GATE ${v.name}: ${bad ? `"${bad[0]}"` : EMDASH.test(notes + priceText) ? "em dash" : "empty notes"}`);
+    console.error(`  GATE ${v.name}: ${bad ? `"${bad}"` : EMDASH.test(notes + priceText) ? "em dash" : "empty notes"}`);
     gated++;
     continue;
   }

@@ -145,6 +145,15 @@ RULES THAT CAUSE REAL DAMAGE IF BROKEN
    (range, starting_at, single_figure). A number you cannot place on a basis is
    worse than none, because it gets compared on the wrong axis. Skip it instead.
 
+7. Cite a HUMAN entry wherever one states the fact. A BOT entry is not a verified
+   source on its own (some bot sentences were written to match a tag), so a
+   write whose only support is a BOT entry is rejected at apply. If only a bot
+   entry supports a change, put it under "skipped" instead.
+
+8. A statement about a brand or chain in general ("any Marriott or Hilton hotel
+   will do a guaranteed block") is not a fact about this one property. Never
+   create, extend or overwrite a tag from one.
+
 MINING THE WEBSITE (only for a vendor whose block includes a WEBSITE section)
 
 The WEBSITE section is the vendor OWN site text. Read it for filter attributes
@@ -163,6 +172,14 @@ so you write the prose that documents it.
   price_details are REQUIRED (state what the site lists, or that it lists none).
 - Each mined tag carries a "quote" that is a VERBATIM substring of your own entry
   text (notes / price_text / price_details) - the tag and its evidence must agree.
+- Each mined tag ALSO carries "source_quote": the exact words from the WEBSITE
+  text that state the fact, copied character for character (at least a few
+  words, not a single term). This is checked against the site text you were
+  shown; a tag whose source_quote is not there is dropped, and the whole entry
+  with it. Your own entry is not evidence for itself. Every number in your entry
+  must appear in one of your source_quotes.
+- A statement about a brand or chain in general ("all Marriott hotels...") is not
+  a fact about this vendor. Do not mine it.
 - If the site yields nothing new, omit "site" entirely.
 
 OUTPUT
@@ -176,7 +193,7 @@ the bare {"vendor_id":"<id>"}. Omit arrays and objects that are empty.
  "retract":[{"key":"<tag key>","reason":"<the supporting entry is gone>"}],
  "skipped":[{"key":"<tag key>","why":"<short reason>"}],
  "site":{"entry":{"notes":"<one couple-voiced note capturing the mined facts>","price_text":"<required>","price_details":"<required>"},
-         "tags":[{"key":"<tag key>","value":<value>,"quote":"<verbatim substring of the entry above>","basis":"<price only>","kind":"<price only>"}]}}
+         "tags":[{"key":"<tag key>","value":<value>,"quote":"<verbatim substring of the entry above>","source_quote":"<verbatim words from the WEBSITE text>","basis":"<price only>","kind":"<price only>"}]}}
 
 human_support / bot_support / note are only needed on an "overwrite" (or a write
 whose value is false). "site" is only for a vendor whose block had a WEBSITE
@@ -240,6 +257,7 @@ const byType = {};
 for (const r of rows) (byType[r.vendor_type] ??= []).push(r);
 
 mkdirSync(join(dir, "calls"), { recursive: true });
+mkdirSync(join(dir, "sources"), { recursive: true });
 
 let n = 0;
 let built = 0;
@@ -263,6 +281,14 @@ for (const [type, list] of Object.entries(byType)) {
     const r = await fetchSiteText(effectiveWebsite(v));
     if (r?.text) {
       sites.set(v.id, r.text);
+      // Persist exactly what the model is shown, so daily-mine-apply can check
+      // each mined tag against the page text rather than against the model's
+      // own drafted entry (plan item 1, 2026-10-02). Before this the text lived
+      // only inside the call file.
+      writeFileSync(
+        join(dir, "sources", `${v.id}.json`),
+        JSON.stringify({ vendor_id: v.id, website: effectiveWebsite(v), fetched_at: new Date().toISOString(), pages: r.pages, text: r.text }),
+      );
       mined++;
     } else {
       siteFail++;

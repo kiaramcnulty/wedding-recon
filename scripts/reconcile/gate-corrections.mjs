@@ -13,12 +13,23 @@
  * `old` fails here rather than at apply. And `new` must state the fact: a price
  * correction has to contain a money figure, a capacity correction the number.
  *
- * Prose regexes mirror upload.mjs and gate.mjs. KEEP IN LOCKSTEP.
+ * Prose regexes come from prose-gate.mjs (the single definition).
+ *
+ * Plus (2026-10-02, plan item 1) the evidence + card checks apply-corrections
+ * re-runs before writing: the replacement must rest on a verbatim quote from a
+ * harvested source (the tag quote counts only if found in a page), every number
+ * in it must appear there, and it may not leave a card stating a figure while
+ * another field says no price is posted (the Et Voila contradiction).
  */
 
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { workdir, readJsonl, writeJsonl, arg } from "./lib.mjs";
+import { reviewProseChange, correctionEvidence } from "./evidence.mjs";
+import { BANNED, EMDASH, MONEY, gateText, toolingTell } from "./prose-gate.mjs";
+// The prose gates are imported from prose-gate.mjs, the single definition
+// (2026-10-02). This file used to carry its own copies "in lockstep", and the
+// copies drifted; matching runs on gateText() so curly apostrophes count.
 
 const WORK = arg("work");
 if (!WORK) {
@@ -27,26 +38,6 @@ if (!WORK) {
 }
 const dir = workdir(WORK);
 
-const BANNED =
-  /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
-const PROCESS =
-  /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?|launchintel|digest\w*)\b/i;
-const RESEARCH = new RegExp(
-  [
-    /\b404\b|\b403\w*/,
-    /\bunreachable\b|\bautomated (check|lookup|request|tool)s?\b/,
-    /\b(reviews (go|going) back to|no pricing to pull|nothing to pull)\b/,
-    /(?:(?:did|would|could|does|do|will|can)\s*(?:n'?t|not)|failed to|never)\s+load\b(?!\s*-?\s*in\b)/,
-    /\bsite (is|was)?\s*(down|unavailable|unreadable|inaccessible)\b/,
-    /\b(couldn'?t|could not|can'?t|cannot) (access|reach|open|read) (the |their )?(site|page|website)\b/,
-    /\bsite is (a )?dead link\b|\bper (their|the) (site|listing) copy\b/,
-  ]
-    .map((r) => r.source)
-    .join("|"),
-  "i",
-);
-const EMDASH = /[—–]/;
-const MONEY = /\$\s*\d|\d\s*\$|\d\s*(?:dollars|usd)\b/i;
 
 // The export snapshot of the entries, so `old` is checked against the text the
 // model was actually shown.
@@ -88,8 +79,8 @@ for (const r of results) {
   const nw = String(r.new ?? "").trim();
   if (!nw) errs.push(`${at}: empty replacement`);
   else {
-    const bad = nw.match(BANNED) || nw.match(PROCESS) || nw.match(RESEARCH);
-    if (bad) errs.push(`${at}: replacement contains a gated phrase "${bad[0]}"`);
+    const bad = gateText(nw).match(BANNED)?.[0] ?? toolingTell(nw)?.match;
+    if (bad) errs.push(`${at}: replacement contains a gated phrase "${bad}"`);
     if (EMDASH.test(nw)) errs.push(`${at}: em/en dash in replacement`);
     if (/\\{1,2}n/.test(nw)) errs.push(`${at}: literal escaped newline in replacement`);
   }
@@ -99,6 +90,18 @@ for (const r of results) {
   if (!errs.length) {
     if (key === "price" && !MONEY.test(nw))
       errs.push(`${at}: a price correction that states no figure`);
+  }
+
+  if (!errs.length) {
+    const v = vendors.get(r.vendor_id);
+    const full = v?.entries.find((x) => x.id === r.entry_id);
+    const rv = reviewProseChange({
+      vendorId: r.vendor_id,
+      entry: full,
+      card: { notes: e.notes, price_text: e.price_text, price_details: e.price_details },
+      change: { kind: "replace", field: r.field, old: r.old, text: nw, evidence: correctionEvidence(v?.filters, r) },
+    });
+    errs.push(...rv.errors.map((x) => `${at}: ${x}`));
   }
 
   if (errs.length) rejected.push({ ...r, errors: errs });

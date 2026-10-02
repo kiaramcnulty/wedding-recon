@@ -16,13 +16,23 @@
  *   decline      passes through to the report only.
  *
  * remove_tag and correct_tag are grouped in the report so a human reads every
- * destructive change before apply. Prose regexes mirror upload.mjs. LOCKSTEP.
+ * destructive change before apply. Prose regexes come from prose-gate.mjs.
+ *
+ * Plus (2026-10-02, plan items 1 and 15) the checks apply-contradictions
+ * re-runs before writing: fix_recon needs harvested-source evidence and may not
+ * create a MONEY + no-price card; correct_tag off a BOT entry needs source
+ * evidence and brand/chain wording may not set a property tag.
  */
 
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { workdir, readJsonl, writeJsonl, arg } from "./lib.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
+import { reviewProseChange, reviewTagWrite, correctionEvidence } from "./evidence.mjs";
+import { BANNED, EMDASH, gateText, toolingTell } from "./prose-gate.mjs";
+// The prose gates are imported from prose-gate.mjs, the single definition
+// (2026-10-02). This file used to carry its own copies "in lockstep", and the
+// copies drifted; matching runs on gateText() so curly apostrophes count.
 
 const WORK = arg("work");
 if (!WORK) {
@@ -31,21 +41,6 @@ if (!WORK) {
 }
 const dir = workdir(WORK);
 
-const BANNED =
-  /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
-const PROCESS =
-  /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?|launchintel|digest\w*)\b/i;
-const RESEARCH = new RegExp(
-  [
-    /\b404\b|\b403\w*/, /\bunreachable\b|\bautomated (check|lookup|request|tool)s?\b/,
-    /\b(reviews (go|going) back to|no pricing to pull|nothing to pull)\b/,
-    /(?:(?:did|would|could|does|do|will|can)\s*(?:n'?t|not)|failed to|never)\s+load\b(?!\s*-?\s*in\b)/,
-    /\bsite (is|was)?\s*(down|unavailable|unreadable|inaccessible)\b/,
-    /\b(couldn'?t|could not|can'?t|cannot) (access|reach|open|read) (the |their )?(site|page|website)\b/,
-    /\bsite is (a )?dead link\b|\bper (their|the) (site|listing) copy\b/,
-  ].map((r) => r.source).join("|"), "i",
-);
-const EMDASH = /[—–]/;
 const norm = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
 
 const vendors = new Map(readJsonl(join(dir, "vendors.jsonl")).map((v) => [v.id, v]));
@@ -82,10 +77,20 @@ for (const r of results) {
     const nw = String(r.new ?? "").trim();
     if (!nw) errs.push(`${at}: empty replacement`);
     else {
-      const bad = nw.match(BANNED) || nw.match(PROCESS) || nw.match(RESEARCH);
-      if (bad) errs.push(`${at}: gated phrase "${bad[0]}"`);
+      const bad = gateText(nw).match(BANNED)?.[0] ?? toolingTell(nw)?.match;
+      if (bad) errs.push(`${at}: gated phrase "${bad}"`);
       if (EMDASH.test(nw)) errs.push(`${at}: em/en dash`);
       if (/\\{1,2}n/.test(nw)) errs.push(`${at}: escaped newline`);
+    }
+    if (!errs.length) {
+      const e = entries.get(r.entry_id);
+      const rv = reviewProseChange({
+        vendorId: v.id,
+        entry: e,
+        card: { notes: e.notes ?? "", price_text: e.price_text ?? "", price_details: e.price_details ?? "" },
+        change: { kind: "replace", field: r.field, old: r.old, text: nw, evidence: correctionEvidence(v.filters, r) },
+      });
+      errs.push(...rv.errors.map((x) => `${at}: ${x}`));
     }
   } else if (r.verdict === "correct_tag") {
     const def = defs[r.key];
@@ -104,6 +109,10 @@ for (const r of results) {
       if (typeof r.value !== "boolean") errs.push(`${at}: expected boolean`);
     } else if (typeof r.value !== "number" || !Number.isFinite(r.value)) {
       errs.push(`${at}: expected a number`);
+    }
+    if (!errs.length) {
+      const tv = reviewTagWrite({ vendorId: v.id, write: r, entry: e });
+      errs.push(...tv.errors.map((x) => `${at}: ${x}`));
     }
   } else if (r.verdict === "remove_tag") {
     const present = v.filters[r.key] != null && !(Array.isArray(v.filters[r.key]) && !v.filters[r.key].length);

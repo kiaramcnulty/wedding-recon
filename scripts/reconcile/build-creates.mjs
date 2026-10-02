@@ -22,6 +22,24 @@ import { resolve, join } from "node:path";
 import { ROOT, arg } from "./lib.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
 
+// DISABLED (2026-10-02, docs/bot-recon-quality-plan.md item 12). This writer
+// produced the 138 thin third-person template entries of 2026-08-09 ("X offers
+// hair services in studio and works with textured hair.", 30 near-identical
+// across vendors): restated tags, no research, no voice, no source - and the
+// tags it restated are exactly the ones the item-1 audit found unreliable.
+// Kiara ruled to remove those entries. New entries go through /enrichvendors,
+// which gives every one a dossier, a persona voice and the full prose gates.
+// Kept, not deleted, so the history of what made those entries stays readable.
+console.error(
+  [
+    "REFUSING: reconcile 'creates' is disabled (plan item 12, Kiara 2026-10-02).",
+    "It wrote thin, voice-less entries that restated tags with no source.",
+    "To give a tag-only vendor recon, run /enrichvendors <type> <region> for it instead",
+    "(dossier + persona voice + prose gates). See docs/bot-recon-quality-plan.md item 12.",
+  ].join("\n"),
+);
+process.exit(1);
+
 const PER_CALL = Number(arg("per-call", 15));
 const MODEL = arg("model", "claude-sonnet-5");
 const MAX_TOKENS = Number(arg("max-tokens", 32000));

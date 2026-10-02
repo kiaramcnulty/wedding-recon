@@ -20,6 +20,7 @@ import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { workdir, readJsonl, arg } from "./lib.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
+import { renderSources } from "./evidence.mjs";
 
 const WORK = arg("work");
 if (!WORK) {
@@ -51,6 +52,12 @@ const LIMIT = Number(arg("limit", 0));
 // re-drafting the whole corpus. --calls-out keeps those call files in their own
 // subdir so they do not overwrite the main run.
 const IDS_FILE = arg("ids-file");
+
+// Per-vendor cap on harvested source text carried into the prompt. Direction A
+// may only append a fact it can quote from these (see CONTRACT), so a vendor
+// with no sources on file gets no appends at all. This is the main input-cost
+// driver of the pass now; 12k chars is roughly 3k tokens per vendor.
+const SOURCE_CHARS = Number(arg("source-chars", 12000));
 const CALLS_OUT = arg("calls-out", "calls");
 
 const dir = workdir(WORK);
@@ -87,14 +94,28 @@ const CONTRACT = `You are reconciling two records of the same wedding vendor so 
 
 One record is a set of structured tags. The other is recon: short notes written by
 people who looked into the vendor. They disagree, and your job is to close the gap
-in both directions, using ONLY what is in front of you. You have no research, no
-web access, and no knowledge of this vendor beyond this prompt.
+in both directions, using ONLY what is in front of you. You have no web access
+and no knowledge of this vendor beyond this prompt. Each vendor block carries
+SOURCES: text harvested from the vendor's own site pages, its Google reviews,
+and research excerpts. Those sources are the ONLY evidence for a new sentence.
 
 DIRECTION A - a tag exists, but no recon entry tells the reader about it.
 Append a short clause to one of the vendor's BOT entries so a couple reading the
-recon learns the fact. The test is whether they learn it, not whether the exact
-word appears: an entry saying "they let you bring in your own caterer" already
-documents catering_policy outside_allowed, and needs no edit.
+recon learns the fact - but ONLY if a SOURCE states that fact. The test is
+whether they learn it, not whether the exact word appears: an entry saying "they
+let you bring in your own caterer" already documents catering_policy
+outside_allowed, and needs no edit.
+
+THE TAG IS NOT EVIDENCE. Tags are sometimes wrong. An earlier run of this pass
+wrote a sentence to match every tag, and some of those sentences were false:
+"walk-ins are welcome" for a shop whose site says appointment only, "full
+planning is her main service tier" for a planner who sells only elopements.
+For every clause you append, copy into "evidence" the exact words from a SOURCE
+that state the fact, and name that source. If no source states it, do not write
+the clause - put the key under "skipped" with why "no source". If a source
+CONTRADICTS the tag, write nothing for it and report it under contradictions.
+A source marked CHAIN-LEVEL or REGION-LEVEL is not about this vendor and may not
+support anything. Every number in your clause must appear in its evidence.
 
 DIRECTION B - a recon entry states a fact, but the matching tag is missing.
 Propose the tag, with the verbatim sentence you read it from.
@@ -121,6 +142,11 @@ RULES THAT CAUSE REAL DAMAGE IF BROKEN
 
 6. If a tag CONTRADICTS what an entry says, write nothing for it - report it under
    contradictions. Do not write prose to match a tag the recon disagrees with.
+
+7. A tag you propose (Direction B) from a BOT entry also needs "evidence" from a
+   SOURCE, exactly as an appended clause does. A tag from a REAL PERSON entry
+   needs only the verbatim quote from that entry. A brand or chain policy ("any
+   Marriott will do a guaranteed block") never sets a tag for one property.
 
 WRITING THE CLAUSE
 
@@ -163,8 +189,8 @@ do: for a vendor with no edits, no writes, no contradictions, emit the bare
 that are empty.
 
 {"vendor_id":"<id>",
- "recon_edits":[{"entry_id":"<id>","field":"notes","append":"<clause>","documents":["<tag key>"]}],
- "filter_writes":[{"key":"<tag key>","value":<value>,"quote":"<verbatim sentence from the entry>","entry_id":"<id>"}],
+ "recon_edits":[{"entry_id":"<id>","field":"notes","append":"<clause>","documents":["<tag key>"],"evidence":[{"source":"<SOURCE id>","quote":"<exact words from that source>"}]}],
+ "filter_writes":[{"key":"<tag key>","value":<value>,"quote":"<verbatim sentence from the entry>","entry_id":"<id>","evidence":[{"source":"<SOURCE id>","quote":"<exact words>"}]}],
  "contradictions":[{"key":"<tag key>","tag":<current value>,"recon":"<what the entry says>","entry_id":"<id>"}],
  "skipped":[{"key":"<tag key>","why":"<short reason>"}]}
 
@@ -213,7 +239,11 @@ for (const [type, list] of Object.entries(byType)) {
               `      notes: ${e.notes ?? ""}`,
           )
           .join("\n");
-        return `VENDOR ${v.id}\n  name: ${v.name} (${v.city ?? "?"})\n  tags:\n${tags || "    (none)"}\n  recon:\n${entries}`;
+        const sources = renderSources(v.id, SOURCE_CHARS);
+        return (
+          `VENDOR ${v.id}\n  name: ${v.name} (${v.city ?? "?"})\n  tags:\n${tags || "    (none)"}\n  recon:\n${entries}` +
+          `\n  SOURCES:\n${sources || "    (none on file - append nothing for this vendor)"}`
+        );
       })
       .join("\n\n");
 

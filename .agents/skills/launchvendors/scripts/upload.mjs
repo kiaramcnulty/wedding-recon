@@ -1,6 +1,7 @@
 // Bulk-upload the working CSV into Supabase `vendors` (vendor-only placeholder rows, no recon).
 // Dry-run by default; nothing is written without --apply. Idempotent: re-runs re-check the DB.
 // usage: node --env-file=.env.local .agents/skills/launchvendors/scripts/upload.mjs <workdir> [--type photographer] [--apply]
+//        [--allow-no-location "Exact Name;Other Name"]   (reviewed exceptions only - see the location guard below)
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
@@ -128,7 +129,12 @@ for (const v of venues) {
   toInsert.push(v);
 }
 
-const hasLoc = (v) => v.lat !== '' && v.lng !== '' && !Number.isNaN(parseFloat(v.lat)) && !Number.isNaN(parseFloat(v.lng));
+// A usable coordinate: both present, finite, in range, and not the 0,0 a failed geocode leaves.
+const hasLoc = (v) => {
+  const lat = parseFloat(v.lat), lng = parseFloat(v.lng);
+  return v.lat !== '' && v.lng !== '' && Number.isFinite(lat) && Number.isFinite(lng)
+    && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+};
 // `instagram` is only included when a row actually has one, so venue runs (and any run
 // with no handles) never reference the column and work without migration 0016.
 const payload = toInsert.map((v) => ({
@@ -146,6 +152,24 @@ const payload = toInsert.map((v) => ({
 }));
 
 const noLoc = payload.filter((p) => !p.location).map((p) => p.name);
+
+// ── Location guard: a row with no location is REFUSED, not inserted ──────────
+// A vendor with location null is invisible on the Explore map AND in vendor
+// search (both read location), so it is a row nobody can reach. 97 such vendors
+// came from the July 2026 launch passes - resolve found no place, the centroid
+// fallback did not fire, hasLoc() was false and location went in as null with
+// nothing but a line in this report. 71 of them then received 106 bot recon
+// entries nobody could see (CLAUDE.md "Known outstanding"; docs/bot-recon-quality-
+// plan.md item 16). Fix the row instead: an address or city the centroid
+// fallback can place, or drop it. A genuinely reviewed exception (a vendor you
+// know has no fixed address and that you accept will have no pin) is named
+// explicitly with --allow-no-location "Name;Name" - by exact name, so it cannot
+// become a blanket switch.
+const allowArg = (() => { const i = process.argv.indexOf('--allow-no-location'); return i >= 0 ? process.argv[i + 1] || '' : ''; })();
+const allowNoLoc = new Set(allowArg.split(';').map((n) => n.trim().toLowerCase()).filter(Boolean));
+const noLocAllowed = noLoc.filter((n) => allowNoLoc.has(n.toLowerCase()));
+const noLocBlocked = noLoc.filter((n) => !allowNoLoc.has(n.toLowerCase()));
+const allowUnused = [...allowNoLoc].filter((n) => !noLoc.some((x) => x.toLowerCase() === n));
 const approx = toInsert.filter((v) => !v.place_id && hasLoc(v)).map((v) => v.name);
 
 // Reviewable export of exactly what would be inserted (download & spot-check before --apply).
@@ -166,7 +190,12 @@ if (backfill.length) lines.push(`BACKFILL on existing rows (${backfill.length}):
 lines.push(`TO INSERT: ${payload.length}  (google-matched ${payload.filter((p) => p.source === 'google').length}, approximate-pin ${approx.length}, NO LOCATION ${noLoc.length}${profile.captureInstagram ? `, with instagram ${toInsert.filter((v) => v.instagram).length}` : ''})`);
 if (profile.vendorTypes) lines.push(`  by type (from CSV subtype — review before --apply): ${typeScope.map((t) => `${t} ${payload.filter((p) => p.vendor_type === t).length}`).join(', ')}`);
 if (approx.length) lines.push(`  approximate (city-centroid, dashed pin): ${approx.join(', ')}`);
-if (noLoc.length) lines.push(`  no location — searchable by name but NO map pin: ${noLoc.join(', ')}`);
+if (noLocBlocked.length) {
+  lines.push(`BLOCKED — ${noLocBlocked.length} row(s) have NO LOCATION and would be invisible on the map and in search. --apply refuses until each is fixed (give it an address/city the centroid fallback can place, or remove it) or is named in --allow-no-location:`);
+  for (const n of noLocBlocked) lines.push(`  ${n}`);
+}
+if (noLocAllowed.length) lines.push(`  no location, ALLOWED by --allow-no-location (reviewed exception, no map pin): ${noLocAllowed.join(', ')}`);
+if (allowUnused.length) lines.push(`  note: --allow-no-location named rows that are not location-less in this batch: ${allowUnused.join(', ')}`);
 // Instagram collision guard. The research pass hunts handles by name-searching the open
 // web, so it can staple ANOTHER business's handle onto a similarly-named vendor — the
 // 2026-07-29 CO beauty run gave "Alchemy Face Bar" the handle @beautybarinc, which belongs
@@ -194,6 +223,14 @@ if (profile.captureInstagram) {
 }
 lines.push(`to-insert export (for review/download): ${toInsertCsv}`);
 console.log(lines.join('\n'));
+
+if (noLocBlocked.length) {
+  // Refused in BOTH modes: a dry run exits non-zero too, so a launch script or
+  // agent reading the exit code cannot read "dry run ok" past it.
+  fs.writeFileSync(path.join(workdir, 'upload-report.txt'), lines.join('\n') + '\n');
+  console.error(`\nREFUSING: ${noLocBlocked.length} location-less row(s) listed above. Nothing ${APPLY ? 'written' : 'would be written'}.`);
+  process.exit(1);
+}
 
 if (!APPLY) {
   console.log('\nDRY RUN — nothing written. Re-run with --apply after user confirmation.');

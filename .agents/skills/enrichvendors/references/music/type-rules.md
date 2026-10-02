@@ -15,7 +15,8 @@ Music vendors are stored under **two** `vendor_type`s — `dj` and `band` ("Live
 ## service_region — REQUIRED on every row
 - Where they perform, sourced from the dossier. **Multi-state service is common for this
   type — look for it and state it exactly** ("Colorado + Wyoming", "CO/UT/NM", "Front
-  Range + destination"). Narrowest sourced wins; a base city with stated travel gets the
+  Range + destination"). Match their FULL sourced coverage, naming every area listed (never pick one of several;
+  never widen past the sources); a base city with stated travel gets the
   travel scope. Nothing narrower sourced → the run's state. Never invent; never blank
   (upload hard-fails).
 

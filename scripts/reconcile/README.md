@@ -1,9 +1,36 @@
 # Filter / recon reconciliation
 
-Brings `vendors.filters` and `recon_entries` into agreement, using **only** a
-vendor's existing tags and the text of its existing recon entries. No research,
-no web access. Finding facts neither store holds is a separate, more expensive
-pass and is deliberately out of scope (Kiara, 2026-08-09).
+Brings `vendors.filters` and `recon_entries` into agreement. No web access.
+Finding facts neither store holds is a separate, more expensive pass and is
+deliberately out of scope (Kiara, 2026-08-09).
+
+**Changed 2026-10-02 (bot-recon quality audit, `docs/bot-recon-quality-plan.md`
+items 1, 12, 15).** The 2026-08-09/11 Direction-A run used only tags + recon, so
+for a tag with no prose it wrote a sentence to match the TAG: 1,301 live entries
+were edited, some falsely ("walk-ins welcome" on an appointment-only shop), and
+its snapshot lived in a since-deleted worktree, so there was no undo. Now:
+
+- **Every prose edit and every tag read off a BOT entry needs source evidence**:
+  a verbatim quote from a harvested source about this one vendor (its fetched
+  site pages, its Google reviews, a `[basis=property]` reddit excerpt, or this
+  run's fetched site text), checked by `evidence.mjs`. Tags and filters_meta
+  quotes, the model's own text, bot entries, dossiers and region-wide digests are
+  NOT evidence. Every number the new text states must appear in that evidence.
+  A HUMAN entry remains a primary source on its own quote.
+- **Brand/chain-level evidence never sets a property fact** (`brandLevel()`,
+  `tagBasisProblem()`): "any Marriott or Hilton brand hotel will do blocks", or
+  a reddit block labelled `[basis=region|chain]`, set `block_type: guaranteed`
+  on individual hotels. The enrich upload gate uses the same helper.
+- **An edit that fails takes its tags with it**: an unconfirmable fact gets
+  neither the sentence nor the tag (Kiara, 2026-10-02).
+- **Shared gate modules**: text gates in `prose-gate.mjs` (incl.
+  `priceContradiction()` and `dossierMarker()`), source checks in
+  `evidence.mjs`. `gate.mjs`, `gate-corrections.mjs`, `gate-contradictions.mjs`
+  and the apply scripts import them; none keeps its own copy.
+- **Retired writers**: `reconcile-mismatch.mjs` / `reconcile-remaining.mjs`
+  refuse `--apply` (they rewrote price_text from tags with no source: Et Voila),
+  and `apply-creates.mjs` refuses to run (the 138 templated "creates" entries,
+  plan item 12, are to be removed; new vendors go through the enrich drafter).
 
 Requires migration `0037` (per-key filter provenance) applied first.
 
@@ -40,8 +67,27 @@ gate-corrections    old must be a verbatim substring; new must state the fact
 apply-corrections   clause-level replace on the LIVE field; --apply to write
 ```
 
-`restore.mjs --work <name>` reverts filters and recon text to the export
-snapshot. It is the only undo - `recon_entries` keeps no history.
+**Undo lives outside any worktree** (`audit.mjs`). Every write goes through a
+`WriteRun`, which snapshots exactly the rows it will touch from a fresh read
+(fsynced) BEFORE the first write and appends one line per field write to an
+audit log. Both live in the **MAIN checkout**, found via `git rev-parse
+--git-common-dir`, so deleting the worktree a run came from can never delete its
+undo again:
+
+```
+<main checkout>/data/reconcile/<work>/runs/<run_id>/run.json
+<main checkout>/data/reconcile/<work>/runs/<run_id>/snapshot-<table>.jsonl
+<main checkout>/data/reconcile/<work>/audit.jsonl
+```
+
+There is no skip-snapshot flag: `WriteRun.update/insert/remove` throw unless the
+row was snapshotted first.
+
+`restore.mjs --work <name> --run <run_id> [--apply]` reverts one run,
+`--runs` every run of the work, `--from-export` the export snapshot (the old
+behaviour). With none of the three it lists the runs on file, or falls back to the
+export snapshot when there are no runs. It is the only undo -
+`recon_entries` keeps no history.
 
 ## Rules that cause real damage if broken
 
@@ -54,7 +100,10 @@ snapshot. It is the only undo - `recon_entries` keeps no history.
   appending to an existing one only adds matches. The gate counts the two
   separately for a human read.
 - **Every tag write carries its evidence** - a quote that must appear verbatim
-  in the entry it cites, checked mechanically by the gate.
+  in the entry it cites, checked mechanically by the gate, AND (when that entry
+  is a bot's) a verbatim quote from a harvested source (see above).
+- **Every prose edit carries source evidence** - see above. The same prose gates
+  as enrich run on the result, so an edit can never make a card worse.
 - **Corrections only from a tag you can trust** - published confidence, a quote
   that is not scrape concatenation. Everything else stays a report.
 
@@ -81,8 +130,12 @@ recon on an ongoing basis, instead of a one-off region sweep. A DB trigger
 (migration `0038`) stamps `vendors.filters_dirty_at` whenever recon changes
 (insert/update/delete, human or bot); a daily batch reconciles the stamped
 vendors from **all** of their active entries. It writes tags only and never edits
-a recon entry, so a couple's own entry is a valid source. See
-`docs/filter-recon-on-write.md`.
+a recon entry, so a couple's own entry is a valid source. **Since 2026-10-02 a
+BOT entry is not a source on its own**: the contract asks the model to cite a
+human entry wherever one states the fact, and a write whose only support is a bot
+entry is rejected at apply unless it also carries a verbatim harvested-source
+quote (`reviewTagWrite()` in `evidence.mjs`). In practice the daily pass takes
+tags from human entries. See `docs/filter-recon-on-write.md`.
 
 ```sh
 node scripts/reconcile/daily-export.mjs     --work daily-20260812   # dirty vendors + snapshot + watermark
@@ -97,5 +150,6 @@ node scripts/reconcile/daily-apply.mjs   --work daily-20260812 --apply
 Each write is classified create / extend / overwrite / retract (agree writes
 nothing). A contradiction is resolved human-over-bot then by weight of evidence,
 applied, and called out in `report.md` for review; `restore.mjs --work <name>
---apply` is the undo. `.github/workflows/filter-recon-daily.yml` runs the whole
-sequence (shipped disabled — manual dispatch, dry-run default).
+--apply` is the undo (`--run <run_id>` for one day's run). `.github/workflows/filter-recon-daily.yml`
+runs the whole sequence. It shipped disabled and has run on a writing daily cron
+since Kiara enabled it on 2026-08-13; whether to pause it is her call.

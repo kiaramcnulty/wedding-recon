@@ -36,11 +36,16 @@
  * and a filter-less vendor is drained (not re-probed). Without
  * GOOGLE_PLACES_API_KEY the backfill is skipped but the drain still runs - both
  * are additive and the rest of the reconcile does not depend on the site.
+ *
+ * Writes go through audit.mjs like every reconcile write (2026-10-02, plan item
+ * 1): the touched vendors are snapshotted into the MAIN checkout first and each
+ * write is logged, so restore.mjs --run <id> can put a wrong website back.
  */
 
 import { join } from "node:path";
 import { writeFileSync, readFileSync } from "node:fs";
 import { loadEnv, serviceClient, workdir, readJsonl, arg, has } from "./lib.mjs";
+import { WriteRun } from "./audit.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
 
 const WORK = arg("work");
@@ -66,6 +71,8 @@ console.log(
 if (!apiKey) console.log("No GOOGLE_PLACES_API_KEY set; website backfill skipped (drain still runs).");
 
 const db = APPLY ? serviceClient() : null;
+const run = new WriteRun({ work: WORK, script: "daily-websites", apply: APPLY, db });
+await run.snapshot("vendors", [...candidates, ...filterless].map((v) => v.id));
 
 // --- 1. website backfill ----------------------------------------------------
 
@@ -98,11 +105,11 @@ for (const v of candidates) {
   if (APPLY) {
     // Re-check `website is null` in the same write so a site that arrived since
     // the export (or a manual edit) is never overwritten.
-    const { error } = await db
-      .from("vendors")
-      .update({ website })
-      .eq("id", v.id)
-      .is("website", null);
+    const { error } = await run.update("vendors", v.id, { website }, {
+      evidence: [{ source: `google-places:${v.google_place_id}`, quote: website }],
+      reason: "website backfill from Places websiteUri",
+      refine: (q) => q.is("website", null),
+    });
     if (error) console.error(`    write failed: ${error.message}`);
     else wrote++;
   }
@@ -123,11 +130,10 @@ if (filterless.length) {
   if (APPLY && watermark) {
     let cleared = 0;
     for (const v of filterless) {
-      const { error } = await db
-        .from("vendors")
-        .update({ filters_dirty_at: null })
-        .eq("id", v.id)
-        .lte("filters_dirty_at", watermark);
+      const { error } = await run.update("vendors", v.id, { filters_dirty_at: null }, {
+        reason: "filter-less drain",
+        refine: (q) => q.lte("filters_dirty_at", watermark),
+      });
       if (error) console.error(`  drain ${v.name}: ${error.message}`);
       else cleared++;
     }
@@ -139,3 +145,5 @@ if (filterless.length) {
     console.log(`${filterless.length} filter-less dirty vendor(s) would be drained on --apply.`);
   }
 }
+
+if (APPLY) console.log(run.where());

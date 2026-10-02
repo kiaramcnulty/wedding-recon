@@ -23,6 +23,25 @@ import { join } from "node:path";
 import { serviceClient, ROOT, has } from "./lib.mjs";
 import { readFileSync } from "node:fs";
 
+// --apply DISABLED (2026-10-02, docs/bot-recon-quality-plan.md item 1). These
+// one-off 2026-08-09 adjudications rewrote a bot entry's price_text from the
+// TAG's min/max ("Runs about $65 to $85 per person.") without touching the
+// price_details or notes beside it. That is how the Et Voila card came to state
+// a figure in its headline while its details said the site "has no rate sheet"
+// and its notes said it "doesn't post any actual pricing" - the MONEY + no-price
+// contradiction. They also wrote no pre-write snapshot (remaining-backup.json
+// was written AFTER the updates). Their inputs are a finished run, so there is
+// nothing left for them to do; any further price_text fix goes through
+// apply-corrections.mjs, which requires source evidence, runs the shared prose
+// gates and the contradiction check, and snapshots first. Dry run still works.
+if (has("apply")) {
+  console.error(
+    "REFUSING --apply: this one-off writer rewrote price_text from tags with no source and no " +
+      "snapshot (the Et Voila contradiction). Use apply-corrections.mjs. See plan item 1.",
+  );
+  process.exit(1);
+}
+
 const APPLY = has("apply");
 const db = serviceClient();
 const data = JSON.parse(readFileSync(join(ROOT, "data/reconcile/mismatch-104.json"), "utf8"));
