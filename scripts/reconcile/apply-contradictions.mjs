@@ -16,11 +16,28 @@
  * misextraction, so there is nothing to keep provenance for. correct_tag writes
  * the recon value with recon provenance. Both bump the row-level filters_source
  * off extraction so a backfill re-run cannot reinstate the bad value.
+ *
+ * GUARDS (2026-10-02, plan items 1 and 15), re-checked here because the gate
+ * saw only the export and accepted-fix.jsonl is hand-filterable:
+ *   fix_recon    the replacement needs a verbatim quote from a harvested source
+ *                (the tag quote counts only if it is found in a page), passes
+ *                the shared prose gates, and may not create a MONEY + "no price
+ *                posted" card (the Et Voila contradiction). Numbers in it must
+ *                appear in the evidence.
+ *   correct_tag  the recon quote must be verbatim in its entry; off a BOT entry
+ *                it also needs source evidence; brand/chain wording may not set
+ *                a property tag; a number must be stated in its own quote.
+ *   remove_tag   removing is the safe direction, so no evidence bar - but it is
+ *                snapshotted and audited like every other write.
+ * Every touched row is snapshotted from a fresh read into the MAIN checkout
+ * before the first write (audit.mjs); restore.mjs --run <id> undoes the run.
  */
 
 import { join } from "node:path";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { serviceClient, workdir, readJsonl, arg, has } from "./lib.mjs";
+import { serviceClient, workdir, readJsonl, writeJsonl, arg, has } from "./lib.mjs";
+import { WriteRun, auditNote } from "./audit.mjs";
+import { reviewProseChange, reviewTagWrite, correctionEvidence } from "./evidence.mjs";
 
 const WORK = arg("work");
 if (!WORK) {
@@ -29,7 +46,6 @@ if (!WORK) {
 }
 const APPLY = has("apply");
 const ONLY = arg("only");
-const db = serviceClient();
 const dir = workdir(WORK);
 
 // --accepted points at a hand-filtered subset (e.g. only the removals whose
@@ -47,33 +63,62 @@ const done = new Set(
     : [],
 );
 
-const counts = { fix_recon: 0, remove_tag: 0, correct_tag: 0, skipped: 0 };
+const todo = accepted.filter((r) => !done.has(key(r)) && vendors.has(r.vendor_id));
+const db = APPLY ? serviceClient() : null;
+const run = new WriteRun({ work: WORK, script: `apply-contradictions${ONLY ? "-" + ONLY : ""}`, apply: APPLY, db });
+await run.snapshot("recon_entries", todo.filter((r) => r.verdict === "fix_recon").map((r) => r.entry_id));
+await run.snapshot("vendors", todo.filter((r) => r.verdict !== "fix_recon").map((r) => r.vendor_id));
 
-for (const r of accepted) {
-  if (done.has(key(r))) continue;
+const counts = { fix_recon: 0, remove_tag: 0, correct_tag: 0, skipped: 0, rejected: 0 };
+const rejected = [];
+const reject = (r, v, errors) => {
+  counts.rejected++;
+  rejected.push({ ...r, name: v.name, errors });
+  auditNote(run, { op: "rejected", vendor_id: r.vendor_id, key: r.key, verdict: r.verdict, errors });
+};
+
+for (const r of todo) {
   const v = vendors.get(r.vendor_id);
+  const entries = new Map(v.entries.map((e) => [e.id, e]));
 
   if (r.verdict === "fix_recon") {
-    const { data: live, error } = await db.from("recon_entries").select(r.field).eq("id", r.entry_id).single();
-    if (error) { console.error(`  ${r.entry_id}: ${error.message}`); continue; }
+    const ex = entries.get(r.entry_id);
+    const live = APPLY ? run.row("recon_entries", r.entry_id) : ex;
+    if (!live || !ex) { console.error(`  ${r.entry_id}: not in export or gone`); continue; }
     const cur = live[r.field] ?? "";
     if (!cur.includes(r.old)) { console.log(`  SKIP ${v.name} [${r.key}]: clause gone`); counts.skipped++; continue; }
-    if (!APPLY) console.log(`  fix_recon ${v.name} [${r.key}]\n    - ${r.old}\n    + ${r.new}`);
-    else {
-      const { error: e2 } = await db.from("recon_entries").update({ [r.field]: cur.replace(r.old, r.new), updated_at: new Date().toISOString() }).eq("id", r.entry_id);
+    const card = { notes: live.notes ?? "", price_text: live.price_text ?? "", price_details: live.price_details ?? "" };
+    const rv = reviewProseChange({
+      vendorId: v.id,
+      entry: { ...ex, ...card },
+      card,
+      change: { kind: "replace", field: r.field, old: r.old, text: r.new, evidence: correctionEvidence(v.filters, r) },
+    });
+    if (rv.errors.length) { reject(r, v, rv.errors); continue; }
+    if (!APPLY) {
+      console.log(`  fix_recon ${v.name} [${r.key}]\n    - ${r.old}\n    + ${r.new}`);
+      for (const q of rv.verified) console.log(`      evidence [${q.source}]: "${q.quote}"`);
+    } else {
+      const { error: e2 } = await run.update(
+        "recon_entries",
+        r.entry_id,
+        { [r.field]: rv.after[r.field], updated_at: new Date().toISOString() },
+        { evidence: rv.verified, reason: `fix_recon ${r.key}: ${r.reason ?? ""}` },
+      );
       if (e2) { console.error(`  ${r.entry_id}: ${e2.message}`); continue; }
     }
     counts.fix_recon++;
   } else {
-    // remove_tag / correct_tag both mutate filters. Read live so a value that
-    // moved since export is not clobbered by a stale copy.
-    const { data: live, error } = await db.from("vendors").select("filters,filters_meta,filters_source").eq("id", r.vendor_id).single();
-    if (error) { console.error(`  ${r.vendor_id}: ${error.message}`); continue; }
+    // remove_tag / correct_tag both mutate filters. The snapshot read is the
+    // fresh read, so a value that moved since export is not clobbered.
+    const live = APPLY ? run.row("vendors", r.vendor_id) : v;
+    if (!live) { console.error(`  ${r.vendor_id}: gone since export`); continue; }
     if (live.filters_meta?.[r.key]?.source === "manual") { console.log(`  SKIP ${v.name} [${r.key}]: manual`); counts.skipped++; continue; }
 
     const filters = { ...(live.filters ?? {}) };
     const meta = { ...(live.filters_meta ?? {}) };
     const stamp = new Date().toISOString();
+    const nextSource = live.filters_source === "manual" ? "manual" : "recon";
 
     if (r.verdict === "remove_tag") {
       if (filters[r.key] == null) { counts.skipped++; continue; }
@@ -82,24 +127,37 @@ for (const r of accepted) {
       delete meta[r.key];
       if (!APPLY) console.log(`  remove_tag ${v.name} [${r.key}=${JSON.stringify(was)}]  (${r.reason})`);
       else {
-        const { error: e2 } = await db.from("vendors").update({ filters, filters_meta: meta, filters_source: live.filters_source === "manual" ? "manual" : "recon", filters_updated_at: stamp }).eq("id", r.vendor_id);
+        const { error: e2 } = await run.update(
+          "vendors", r.vendor_id,
+          { filters, filters_meta: meta, filters_source: nextSource, filters_updated_at: stamp },
+          { reason: `remove_tag ${r.key}: ${r.reason ?? ""}` },
+        );
         if (e2) { console.error(`  ${r.vendor_id}: ${e2.message}`); continue; }
       }
       counts.remove_tag++;
     } else if (r.verdict === "correct_tag") {
+      const tv = reviewTagWrite({ vendorId: v.id, write: r, entry: entries.get(r.entry_id) });
+      if (tv.errors.length) { reject(r, v, tv.errors); continue; }
       const was = filters[r.key];
       filters[r.key] = r.value;
-      meta[r.key] = { source: "recon", updated_at: stamp, quote: r.quote };
+      meta[r.key] = { source: "recon", updated_at: stamp, quote: r.quote, entry_id: r.entry_id };
       if (!APPLY) console.log(`  correct_tag ${v.name} [${r.key}: ${JSON.stringify(was)} -> ${JSON.stringify(r.value)}]`);
       else {
-        const { error: e2 } = await db.from("vendors").update({ filters, filters_meta: meta, filters_source: live.filters_source === "manual" ? "manual" : "recon", filters_updated_at: stamp }).eq("id", r.vendor_id);
+        const { error: e2 } = await run.update(
+          "vendors", r.vendor_id,
+          { filters, filters_meta: meta, filters_source: nextSource, filters_updated_at: stamp },
+          { evidence: [{ quote: r.quote, source: `recon_entries/${r.entry_id}` }, ...tv.verified], reason: `correct_tag ${r.key}: ${r.reason ?? ""}` },
+        );
         if (e2) { console.error(`  ${r.vendor_id}: ${e2.message}`); continue; }
       }
       counts.correct_tag++;
     }
   }
-  if (APPLY) appendFileSync(logPath, JSON.stringify({ k: key(r) }) + "\n");
+  if (APPLY) appendFileSync(logPath, JSON.stringify({ k: key(r), run_id: run.runId }) + "\n");
 }
+
+writeJsonl(join(dir, `apply-fix-rejected${ONLY ? "-" + ONLY : ""}.jsonl`), rejected);
+for (const r of rejected) console.log(`  REJECT ${r.name} [${r.verdict} ${r.key}]: ${r.errors.join("; ")}`);
 
 console.log(
   [
@@ -109,6 +167,8 @@ console.log(
     `  remove_tag:  ${counts.remove_tag}`,
     `  correct_tag: ${counts.correct_tag}`,
     `  skipped:     ${counts.skipped}`,
-    APPLY ? "" : `\nRe-run with --apply. restore.mjs --work ${WORK} undoes it.`,
+    `  rejected:    ${counts.rejected}`,
+    "",
+    run.where(),
   ].join("\n"),
 );

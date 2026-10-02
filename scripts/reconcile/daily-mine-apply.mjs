@@ -19,6 +19,20 @@
  *     entry, never fails the run (unattended, so drop beats hard-fail).
  *   - every mined tag quote must be a VERBATIM substring of the drafted entry and
  *     a number must appear in its own quote -> invented evidence is dropped.
+ *   - (2026-10-02, plan item 1) AND every mined tag carries a `source_quote`
+ *     that is verbatim in the site text this run actually fetched (persisted by
+ *     daily-build-calls to <work>/sources/) or in the vendor's harvested
+ *     research. The check above only compared the model's tag quote with the
+ *     model's own entry - its output graded against itself, which is how a
+ *     sentence written to fit a tag passes. Every number the entry states must
+ *     appear in a verified source quote, the card may not state a figure while
+ *     saying no price is posted, and brand/chain wording may not set a tag.
+ *     Any unverifiable tag drops the WHOLE entry: the entry is the prose that
+ *     documents those tags, and an unconfirmable fact gets neither the sentence
+ *     nor the tag (Kiara, 2026-10-02).
+ *   - the insert and the tag write go through audit.mjs: the vendor row is
+ *     snapshotted into the MAIN checkout first, and the insert is logged
+ *     before and after, so restore.mjs --run <id> deletes it.
  *   - the entry author is a roster bot NOT already authoring for that vendor, so
  *     the one-entry-per-(vendor,author) index (0028) can never collide with an
  *     existing enrich or prior-run entry; a stale pick is caught at insert (23505).
@@ -36,6 +50,8 @@ import { existsSync, readFileSync, writeFileSync, appendFileSync } from "node:fs
 import { serviceClient, workdir, readJsonl, arg, has, ROOT } from "./lib.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
 import { checkProse, repairBreaks } from "./prose-gate.mjs";
+import { WriteRun } from "./audit.mjs";
+import { verifyEvidence, numbersIn, priceContradiction, brandLevel, runSources } from "./evidence.mjs";
 
 const WORK = arg("work");
 if (!WORK) {
@@ -83,7 +99,7 @@ function backdate(month, year) {
 const NORM = (s) => String(s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 
 /** Gate the mined tags against the vocabulary and their own drafted prose. */
-function gateTags(v, entryProse, tags) {
+function gateTags(v, entryProse, tags, extra) {
   const defs = Object.fromEntries((VENDOR_FILTERS[v.vendor_type] ?? []).map((d) => [d.key, d]));
   const rangeKeys = new Set();
   for (const d of Object.values(defs))
@@ -140,7 +156,21 @@ function gateTags(v, entryProse, tags) {
         continue;
       }
     }
-    out[t.key] = { value, quote: t.quote };
+    const brand = brandLevel(t.source_quote) || brandLevel(t.quote);
+    if (brand) {
+      errs.push(`[${t.key}] brand/chain-level wording ("${brand}") may not set a property tag`);
+      continue;
+    }
+    const ev = verifyEvidence(v.id, t.source_quote ? [{ quote: t.source_quote, source: t.source }] : [], {
+      numbers: typeof value === "number" ? [String(value)] : [],
+      extra,
+      claimText: t.quote,
+    });
+    if (!ev.ok) {
+      errs.push(`[${t.key}] not confirmed by the fetched site: ${ev.errors.join("; ")}`);
+      continue;
+    }
+    out[t.key] = { value, quote: t.quote, evidence: ev.verified };
   }
   return { out, errs };
 }
@@ -148,6 +178,10 @@ function gateTags(v, entryProse, tags) {
 // --- apply ------------------------------------------------------------------
 
 const db = APPLY ? serviceClient() : null;
+const run = new WriteRun({ work: WORK, script: "daily-mine-apply", apply: APPLY, db });
+// Snapshot every vendor that may gain tags BEFORE anything is written; the
+// snapshot read is also the live read the writable check below uses.
+await run.snapshot("vendors", sites.map((r) => r.vendor_id).filter((id) => vendors.has(id)));
 let created = 0;
 let skipped = 0;
 let tagsWritten = 0;
@@ -177,11 +211,34 @@ for (const r of sites) {
     continue;
   }
 
+  const contradiction = priceContradiction({ notes, price_text, price_details });
+  if (contradiction) {
+    skipped++;
+    lines.push(`- SKIP ${at}: ${contradiction}`);
+    continue;
+  }
+
   const entryProse = [notes, price_text, price_details].join(" ");
-  const { out, errs } = gateTags(v, entryProse, r.site.tags);
+  const extra = runSources(dir, v.id);
+  const { out, errs } = gateTags(v, entryProse, r.site.tags, extra);
   if (Object.keys(out).length === 0) {
     skipped++;
     lines.push(`- SKIP ${at}: no valid mined tags${errs.length ? ` (${errs.join("; ")})` : ""}`);
+    continue;
+  }
+  // The entry documents its tags; one it cannot confirm takes the entry down
+  // with it, since the sentence stating that fact is in there.
+  if (errs.length) {
+    skipped++;
+    lines.push(`- SKIP ${at}: ${errs.length} mined tag(s) failed, so the entry documenting them is dropped (${errs.join("; ")})`);
+    continue;
+  }
+  // Every number the entry states must come from a verified site quote.
+  const have = new Set(Object.values(out).flatMap((t) => t.evidence.flatMap((e) => numbersIn(e.quote))));
+  const unsourced = [...new Set(numbersIn(entryProse))].filter((n) => !have.has(n));
+  if (unsourced.length) {
+    skipped++;
+    lines.push(`- SKIP ${at}: entry states number(s) ${unsourced.join(", ")} that no verified site quote contains`);
     continue;
   }
 
@@ -191,14 +248,10 @@ for (const r of sites) {
   let baseMeta = v.filters_meta || {};
   let baseSource = v.filters_source;
   if (APPLY) {
-    const { data: live, error } = await db
-      .from("vendors")
-      .select("filters, filters_meta, filters_source")
-      .eq("id", v.id)
-      .single();
-    if (error || !live) {
+    const live = run.row("vendors", v.id);
+    if (!live) {
       skipped++;
-      lines.push(`- SKIP ${at}: could not read vendor (${error?.message ?? "gone"})`);
+      lines.push(`- SKIP ${at}: vendor gone since export`);
       continue;
     }
     baseFilters = live.filters || {};
@@ -241,9 +294,10 @@ for (const r of sites) {
   const now = new Date();
   const month = now.getUTCMonth() + 1;
   const year = now.getUTCFullYear();
-  const { data: ins, error: insErr } = await db
-    .from("recon_entries")
-    .insert({
+  const tagEvidence = writable.flatMap(([k, t]) => t.evidence.map((e) => ({ key: k, ...e })));
+  const { data: ins, error: insErr } = await run.insert(
+    "recon_entries",
+    {
       vendor_id: v.id,
       author_id: bot.user_id,
       recon_type: "virtual",
@@ -255,9 +309,9 @@ for (const r of sites) {
       recon_collected_year: year,
       status: "active",
       created_at: backdate(month, year),
-    })
-    .select("id")
-    .single();
+    },
+    { evidence: tagEvidence, reason: `own-site mining: ${writable.map(([k]) => k).join(", ")}` },
+  );
   if (insErr) {
     skipped++;
     lines[lines.length - 1] =
@@ -275,15 +329,17 @@ for (const r of sites) {
     meta[key] = { source: "recon", updated_at: tstamp, quote, entry_id: entryId };
     wrote++;
   }
-  const { error: upErr } = await db
-    .from("vendors")
-    .update({
+  const { error: upErr } = await run.update(
+    "vendors",
+    v.id,
+    {
       filters,
       filters_meta: meta,
       filters_source: baseSource === "manual" ? "manual" : "recon",
       filters_updated_at: tstamp,
-    })
-    .eq("id", v.id);
+    },
+    { evidence: tagEvidence, reason: `own-site mining for entry ${entryId}` },
+  );
   if (upErr) console.error(`  ${at}: tag write failed - ${upErr.message} (entry ${entryId} still inserted)`);
 
   created++;
@@ -297,6 +353,7 @@ for (const r of sites) {
       bot: bot.username,
       author_id: bot.user_id,
       tags: writable.map(([k]) => k),
+      run_id: run.runId,
     }) + "\n",
   );
 }
@@ -316,7 +373,7 @@ const report = [
   "",
   "Delete every recon entry this run inserted and revert the tags:",
   "```",
-  `node scripts/reconcile/restore.mjs --work ${WORK} --apply`,
+  APPLY ? `node scripts/reconcile/restore.mjs --work ${WORK} --run ${run.runId} --apply` : "(dry run - nothing to undo)",
   "```",
   "",
   "## Entries",

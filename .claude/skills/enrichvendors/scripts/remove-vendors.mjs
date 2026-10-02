@@ -60,11 +60,14 @@ if (idsFile) {
 
 // --strong-from <flags file> + --manifest <file>...: the auto-remove path. Resolves ONLY
 // the STRONG "!" tier (NOTAVENUE!, NOTCATERER!, ...) to vendor ids via the batch manifest;
-// soft NOT* and THIN/SHORT are left alone (they are reports the orchestrator vets by hand).
+// soft NOT* and THIN/SHORT/IDENTITY are left alone (they are reports the orchestrator vets by hand).
 // Accepts the API-mode drafts/<id>-flags.json ({custom_id: "flag string"}) OR a harness-mode
 // flags.txt (one "<FLAG> <slug>" per line).
 function strongSlugsFromFlagString(s) {
-  const re = /(NOT[A-Z]+!|NOT[A-Z]+|THIN|SHORT)\s*:/g;
+  // Every flag name must be listed, strong or not: the slug list of a strong flag runs to
+  // the NEXT flag name, so an unlisted one ("IDENTITY: x" after "NOTHOTEL!: y") would have
+  // its slugs auto-removed as if they were strong.
+  const re = /(NOT[A-Z]+!|NOT[A-Z]+|THIN|SHORT|IDENTITY)\s*:/g;
   const hits = []; let m;
   while ((m = re.exec(s)) !== null) hits.push({ flag: m[1], at: m.index, slugAt: re.lastIndex });
   const slugs = [];

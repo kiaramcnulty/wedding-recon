@@ -31,6 +31,14 @@
   minimum is the hidden cost that blows a budget, so never bury it or leave a sourced one
   out. Attribute it like any other fact; never invent, round up, or estimate a minimum no
   source states.
+- **Every figure says what it buys** — who (bride only vs bride + party, one musician vs
+  the band), how much (hours, guests, pieces), which tier (elopement vs full wedding, weekday
+  vs Saturday), and whether it is a base, an add-on, a deposit or a minimum. The 2026-10
+  audit's commonest high-severity price error was a true figure on the wrong unit: a $600
+  bride-only weekday package presented as the group price, a $3,200 elopement floor applied
+  to every planning tier, livestream add-ons listed as photo add-ons. If the source does
+  not say what a figure covers, say that rather than guessing. And a published rate card
+  or fee table is never "call for a quote": carry its figures.
 - **If you have a number ANYWHERE, you have a price data point — lead with it.** A
   headline that says pricing is quote-only while the same entry states a figure
   contradicts itself: "Quote only but The Knot says $8k" is two claims, and the second one
@@ -57,6 +65,11 @@
 - Use each entry's pre-assigned `date=M/YYYY` from the block.
 - Exception: a real source date wins. A Reddit comment from "3mo ago" on a thread
   captured July 2026 → collected 4/2026; a 2024 comment → 2024.
+- **Never earlier than the newest source the entry uses** (2026-10 audit: a card dated
+  4/2025 quoting "a recent review from may 2026" was the commonest defect found). Review
+  lines in the dossier carry their month; if you quote or paraphrase one newer than your
+  assigned date, the date moves up to that month. `pipeline.mjs` enforces this floor after
+  drafting and moves the date forward itself, so do not fight it with vaguer wording.
 
 ## recon_type
 - `online` is the default and should be ~all entries.
@@ -76,10 +89,30 @@
   on reddit warned..."). On a multi-entry vendor it rides the experience/review entry. It
   goes in the prose of `notes` like any other fact — there is no separate field, label, or
   "watch-out" heading in the entry itself.
+  **Only a genuine negative counts.** If a listed item actually reads as praise ("I wish I'd
+  stayed longer!"), skip it; never reword praise into a complaint to satisfy this rule, and
+  never soften a real one into something misleading.
 - **Never manufacture a negative.** No `## watch-outs` section (or nothing negative in the
   sources) means the entry stays positive — do NOT invent a downside for "balance".
   Unsourced criticism of a real business is worse than none; every wart traces to a named
   source in `sources`, exactly like every other fact.
+- **One source per anecdote, and only THIS vendor's sources.** Never merge two reviews into
+  "the same review", never read a press list ("as seen in ...") as a price source, and never
+  use a fact from another vendor's block in the same call file (2026-10 audit: a "1970s"
+  detail from one bridal shop's review landed on a different shop). A quote the dossier
+  marks as cut off stays cut off: never complete it.
+- **Never claim something does not exist unless a source shows its absence.** "No pricing
+  anywhere", "nothing says they do weddings", "not a wedding venue", "they don't offer X"
+  are claims about the VENDOR, and the audit found most of them false (Red Rocks runs a
+  weddings program; a florist had a separate weddings site). When the dossier is marked
+  `SITE CRAWL FAILED` or has no site, make no absence claim at all; the `price_text`
+  wording ("No quote found") is a claim about us and stays fine. Never narrate the research
+  either ("site wouldn't load", "kept 403ing", "couldn't check"): say what is true of the
+  vendor, or say nothing.
+- **If the dossier carries an `IDENTITY CHECK` marker, write no rows for that vendor** and
+  flag it ` IDENTITY:<slug>` (see the contract's Flags): the crawled site may belong to a
+  different business (2026-10 audit: a Denver chapel's row pointed at a cemetery in
+  Newark, NJ).
 
 ## Filter tags — write them, and every tag MUST live in the recon (hard rule)
 Each vendor also gets structured filter tags (the queryable half of the same facts;

@@ -136,13 +136,37 @@ function extractLinks(html, base) {
   return [...links];
 }
 
+// Images are recorded WITH PROVENANCE: { url, page, alt }. This used to return bare URLs
+// pooled across every crawled page, so photos.mjs could not tell a gallery shot from an
+// about-page headshot, or an act's own page from a sibling act's on a shared booking site
+// (2026-10 audit: Groove Nation Orchestra carried two OTHER bands' photos from
+// celebrationnationentertainment.com, and Sierra Sturt a "headshots" file). photos.mjs
+// still accepts the old string form, so existing harvests keep working.
+const decodeAttr = (v) => v.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+  .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d)).replace(/&amp;/g, '&');
+const attr = (tag, name) => tag.match(new RegExp(`\\s${name}=["']([^"']*)["']`, 'i'))?.[1];
 function extractImages(html, base) {
-  const imgs = new Set();
-  for (const m of html.matchAll(/(?:og:image["'][^>]*content|content=["'][^"']*["'][^>]*og:image)["']?\s*=?\s*["']?([^"'>\s]+)/gi)) { const u = abs(m[1], base); if (u) imgs.add(u); }
-  for (const m of html.matchAll(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/gi)) { const u = abs(m[1], base); if (u) imgs.add(u); }
-  for (const m of html.matchAll(/<img[^>]+(?:src|data-src)=["']([^"']+)["']/gi)) { const u = abs(m[1], base); if (u) imgs.add(u); }
-  return [...imgs].filter((u) => /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !/logo|icon|favicon|sprite|badge|avatar|arrow|\.svg/i.test(u));
+  const imgs = new Map();
+  const add = (raw, alt) => {
+    // Attribute values are HTML: Jimdo writes src="https&#x3A;&#x2F;&#x2F;primary.jwwb.nl..."
+    // which abs() otherwise resolves as a RELATIVE path on the vendor's own host (dead URL).
+    const u = raw && abs(decodeAttr(raw), base);
+    if (!u || imgs.has(u)) return;
+    imgs.set(u, { url: u, page: base, ...(alt ? { alt: decodeAttr(alt).trim().slice(0, 200) } : {}) });
+  };
+  for (const m of html.matchAll(/(?:og:image["'][^>]*content|content=["'][^"']*["'][^>]*og:image)["']?\s*=?\s*["']?([^"'>\s]+)/gi)) add(m[1]);
+  for (const m of html.matchAll(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/gi)) add(m[1]);
+  // First of src / data-src in attribute order, as before; alt rides along when present.
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) add(m[0].match(/\s(?:src|data-src)=["']([^"']+)["']/i)?.[1], attr(m[0], 'alt'));
+  return [...imgs.values()].filter(({ url: u }) => /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !/logo|icon|favicon|sprite|badge|avatar|arrow|\.svg/i.test(u));
 }
+
+// Pages that hold the vendor's WORK (portfolio/gallery/real weddings). The text crawl ranks
+// for pricing/capacity, so the gallery is often never fetched and the photo pass picks from
+// whatever the home and pricing pages carry -- which is where template stock lives (Emberlight
+// Media shipped four stock couples, 2026-10 audit). Fetched for IMAGES only; the same pattern
+// ranks pages in photos.mjs.
+const GALLERY_PAGE = /(gallery|galleries|portfolio|real-?weddings?|\/weddings?\/?$|\/our-?work|lookbook|\/work\/?$)/i;
 
 // Billed at Place Details Enterprise+Atmosphere ($25/1k) because of `reviews` — every
 // other field here rides along free, so the mask is as wide as it is useful. Routed
@@ -246,7 +270,26 @@ async function harvestOne(v) {
         out.pages.push({ url: u, file: fname });
         await sleep(300);
       }
-      out.images = [...new Set(out.images)].slice(0, 40);
+      // One gallery/portfolio page for images when the text crawl did not reach one. On a
+      // site where the vendor's website is a SUBPATH (an act's page on a booking agency's
+      // site), only a gallery under that same path counts, never a sibling act's.
+      const scope = new URL(base).pathname.replace(/\/+$/, '');
+      if (!out.pages.some((p) => GALLERY_PAGE.test(new URL(p.url).pathname))) {
+        const g = extractLinks(home.text, base).find((u) => {
+          try { const x = new URL(u); return x.host.replace(/^www\./, '') === host && GALLERY_PAGE.test(x.pathname) && x.pathname.startsWith(scope); } catch { return false; }
+        });
+        if (g) {
+          const p = await get(g);
+          if (!p.err) { out.images.push(...extractImages(p.text, g)); out.pages.push({ url: g, kind: 'gallery-images' }); }
+          await sleep(300);
+        }
+      }
+      // Dedupe by URL keeping the FIRST page an image was seen on, then put gallery-page
+      // images ahead of the cap so a long home page cannot crowd the portfolio out.
+      const seen = new Set();
+      out.images = out.images.filter((i) => !seen.has(i.url) && seen.add(i.url))
+        .map((i, n) => [i, n]).sort(([a, x], [b, y]) => (GALLERY_PAGE.test(new URL(b.page).pathname) - GALLERY_PAGE.test(new URL(a.page).pathname)) || x - y)
+        .map(([i]) => i).slice(0, 60);
       out.pdfs = [...new Set(out.pdfs)].sort((a, b) => filterScore(b) - filterScore(a)).slice(0, 8);
 
       // Fetch the most promising PDFs. Vendors very often publish the rate card ONLY as a

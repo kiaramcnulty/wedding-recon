@@ -32,6 +32,17 @@
  * never touched (per-key, migration 0037), and a whole vendor whose row-level
  * filters_source is manual is skipped outright.
  *
+ * Since 2026-10-02 (plan items 1 and 15), a write that cites a BOT entry also
+ * needs a verbatim quote from a harvested source (or this run's fetched site
+ * text): 1,301 bot entries carry sentences an earlier reconcile appended to
+ * match a tag, often with no source, and reading a tag back off one of those
+ * sentences is the same unsourced fact twice. A HUMAN entry is a primary source
+ * and stands on its own quote. Brand/chain wording ("any Marriott or Hilton
+ * brand hotel will do...") may not set a property tag. Every touched vendor is
+ * snapshotted from a fresh read into the MAIN checkout before the first write,
+ * and every write lands in the append-only audit.jsonl beside it (audit.mjs),
+ * so the undo survives the worktree or runner the run happened on.
+ *
  * dirty flag: a vendor that got a result is cleared (filters_dirty_at <= the
  * export watermark), so it is not reprocessed. A recon entry that landed after
  * the export keeps a newer stamp and survives to the next run. A vendor the
@@ -41,6 +52,8 @@
 import { writeFileSync, existsSync, readFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { serviceClient, workdir, readJsonl, arg, has } from "./lib.mjs";
+import { WriteRun } from "./audit.mjs";
+import { reviewTagWrite, runSources } from "./evidence.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
 
 const WORK = arg("work");
@@ -142,6 +155,11 @@ for (const r of results) {
     const haystack = norm([src.notes, src.price_text, src.price_details, src.service_region].join(" "));
     if (!haystack.includes(quote)) {
       errs.push(`${where}: quote not found in entry ${w.entry_id} - evidence invented`);
+      continue;
+    }
+    const tv = reviewTagWrite({ vendorId: v.id, write: w, entry: src, extra: runSources(dir, v.id) });
+    if (tv.errors.length) {
+      errs.push(...tv.errors.map((x) => `${where}: ${x}`));
       continue;
     }
 
@@ -253,6 +271,16 @@ function merge(live, p, stamp) {
 
 let wrote = 0;
 let clearedDirty = 0;
+const run = new WriteRun({ work: WORK, script: "daily-apply", apply: APPLY, db });
+// Snapshot every vendor this run may touch (tags or the dirty flag) BEFORE the
+// first write. The snapshot read doubles as the fresh read below.
+await run.snapshot("vendors", [...processed].filter((vid) => plan.has(vid) && !alreadyApplied.has(vid)));
+const clearDirty = (vid) =>
+  run.update("vendors", vid, { filters_dirty_at: null }, {
+    reason: "reconciled: clear dirty flag",
+    refine: (q) => q.lte("filters_dirty_at", watermark),
+  });
+
 for (const vid of processed) {
   const p = plan.get(vid);
   if (!p) continue;
@@ -262,13 +290,10 @@ for (const vid of processed) {
 
   if (!APPLY) continue;
 
-  // Fresh read - a value that changed since the export must not be clobbered by
-  // a stale copy, and the manual guard has to see current provenance.
-  const { data: live } = await db
-    .from("vendors")
-    .select("filters, filters_meta, filters_source, filters_dirty_at")
-    .eq("id", vid)
-    .single();
+  // Fresh read (the snapshot) - a value that changed since the export must not
+  // be clobbered by a stale copy, and the manual guard has to see current
+  // provenance.
+  const live = run.row("vendors", vid);
   if (!live) continue;
 
   const canClear = live.filters_dirty_at && watermark && live.filters_dirty_at <= watermark;
@@ -278,7 +303,7 @@ for (const vid of processed) {
     // it is not reprocessed forever.
     stats.skippedManual++;
     if (canClear) {
-      await db.from("vendors").update({ filters_dirty_at: null }).eq("id", vid).lte("filters_dirty_at", watermark);
+      await clearDirty(vid);
       clearedDirty++;
     }
     // Log any model skips here too, even though this vendor's tags are the
@@ -297,7 +322,10 @@ for (const vid of processed) {
     const { filters, meta } = merge(live, p, stamp);
     const patch = { filters, filters_meta: meta, filters_source: "recon", filters_updated_at: stamp };
     if (canClear) patch.filters_dirty_at = null;
-    const { error } = await db.from("vendors").update(patch).eq("id", vid);
+    const { error } = await run.update("vendors", vid, patch, {
+      evidence: p.changes.map((c) => ({ key: c.key, op: c.op, quote: c.quote ?? null, reason: c.reason ?? null })),
+      reason: "daily reconcile",
+    });
     if (error) {
       console.error(`  ${vid}: write failed - ${error.message}`);
       continue;
@@ -306,7 +334,7 @@ for (const vid of processed) {
     if (canClear) clearedDirty++;
   } else if (canClear) {
     // Reconciled, nothing to change: just clear the flag.
-    await db.from("vendors").update({ filters_dirty_at: null }).eq("id", vid).lte("filters_dirty_at", watermark);
+    await clearDirty(vid);
     clearedDirty++;
   }
 
@@ -369,8 +397,10 @@ const report = [
   "Revert every filter this run touched to the pre-run snapshot:",
   "",
   "```",
-  `node scripts/reconcile/restore.mjs --work ${WORK} --apply`,
+  APPLY ? `node scripts/reconcile/restore.mjs --work ${WORK} --run ${run.runId} --apply` : `(dry run - nothing to undo)`,
   "```",
+  "",
+  APPLY ? `Snapshot + audit log: ${run.runDir} and ${run.auditPath}` : "",
   "",
   `## Contradictions overwritten (${overwrites.length}) - REVIEW THESE`,
   "",

@@ -16,7 +16,8 @@
   validation — cite it.
 
 ## service_region — REQUIRED on every row
-- Where they serve, sourced: site copy, stated delivery radius. Narrowest sourced wins.
+- Where they serve, sourced: site copy, stated delivery radius. Match their FULL sourced coverage, naming every area listed (never pick one of several;
+  never widen past the sources).
   **A storefront's city/metro is an acceptable sourced fallback** ("Denver area" from a
   Denver address) — most florists are shops, so this is the common case. Nothing at all →
   the run's state. Never invent a narrow region; never blank (upload hard-fails).

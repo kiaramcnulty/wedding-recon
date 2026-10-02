@@ -86,3 +86,7 @@ next-env.d.ts
 # hooks.json: Codex wants an absolute command path, which is machine-specific, so
 # it is generated per checkout instead of committed. Run `npm run sync-codex`.
 /.codex/hooks.json
+/data/analyze/
+
+# bot-recon quality pass working artifacts (DB export, per-vendor packets, flags)
+/data/qualitypass/

@@ -32,7 +32,8 @@ or review/reddit language and put them in `notes` — never invent a specialty.
 
 ## service_region + travel fees — REQUIRED on every row
 - WHERE they plan, sourced: site copy ("serving Denver and the mountain towns"), base city
-  + stated travel radius, name clues. Narrowest SOURCED region wins ("Denver metro", "Summit
+  + stated travel radius, name clues. Match their FULL sourced coverage, naming every area listed (never pick one of several;
+  never widen past the sources) ("Denver metro", "Summit
   County + mountains"). **If no service area is stated anywhere, default to the run's state**
   (e.g. `Colorado`) — planners travel to the couple's venue, so statewide is the safe floor.
   If they clearly go further ("destination", "will travel", "worldwide"), append

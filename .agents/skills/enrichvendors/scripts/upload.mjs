@@ -10,6 +10,15 @@ import { createClient } from '@supabase/supabase-js';
 import { parseCSV, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
 import { etype } from './etype.mjs';
 import { VENDOR_FILTERS } from '../../../../lib/constants/vendor-filters.ts';
+// ONE definition of every prose gate, shared with pipeline.mjs status and the reconcile
+// writers: see the header of prose-gate.mjs for why the hand-kept copies were retired.
+import { BANNED, EMDASH, ESCAPES, QUOTE_ONLY, MONEY, toolingTell, dossierMarker, priceContradiction } from '../../../../scripts/reconcile/prose-gate.mjs';
+// The chain/region-basis rule for tags, shared with the reconcile writers (plan item 15).
+import { tagBasisProblem } from '../../../../scripts/reconcile/evidence.mjs';
+import {
+  slugOf, parseCallFile, contaminationHits, siteUnread, absenceClaims, identityBlocked,
+  planDateMoves, reviewsFromHarvest, harvestCeiling, workdirDocFreq, dossierBackground, BOT_CAP,
+} from './provenance.mjs';
 
 const workdir = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -36,77 +45,61 @@ const recons = rows.slice(1).filter((r) => r.some((c) => c && c.trim()))
 
 // ── Validate ──────────────────────────────────────────────────────────────────
 const RECON_TYPES = new Set(['online', 'virtual', 'in_person']);
-// AI-slop tells; entries containing these must be rephrased before upload.
-// Empty-evaluative filler is banned too: judgments must be tied to a number or a sourced fact.
-const BANNED = /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
-// Process tells: research-tooling OR pipeline/batch self-references no real couple would
-// write. Two families: (1) crawler language — rephrase as a person would ("their site
-// doesn't list pricing", "couldn't get the page to load"); (2) any hint that this entry
-// is part of a scripted set being processed ("from this batch", "the enrichment run",
-// "seeded venues") — a couple's note references the venue, never how the note was made.
-const PROCESS = /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?|launchintel|digest\w*)\b/i;
-// Research-artifact narration: describing the SOURCE MATERIAL instead of the vendor. A
-// couple writes "they don't post prices anywhere"; only a script writes "reviews go back
-// to 2020-2023" or "site didn't load (404)". Added 2026-07-29 — PROCESS missed this whole
-// family, so it reached the CO beauty CSV and needed a 76-row rewrite pass.
-// The load-failure half must be SUBJECT-AGNOSTIC. Anchoring it to "site|page|website" let
-// eight real variants through in the 2026-07-29 CO hotel run — "kept 403ing on me", "their
-// site 403s to any automated check", "rate card PDFs did not load", "Site pricing wouldn't
-// load", "sites dont load for automated lookups" — because the subject was a PDF, a bare
-// noun, or the failure was named by status code instead of by verb. Each escape cost a
-// rewrite pass, and each narrower patch found one more spelling.
-// The negation is REQUIRED before `load` so legitimate wedding usage survives: "vendor
-// load-in starts at 9am" and "guests can load in through the side door" must NOT match.
-const RESEARCH = new RegExp([
-  /\b404\b|\b403\w*/,                                             // status codes, incl. "403s"/"403ing"
-  /\bunreachable\b|\bautomated (check|lookup|request|tool)s?\b/,   // how it failed / who it failed for
-  /\b(reviews (go|going) back to|no pricing to pull|nothing to pull)\b/,
-  /(?:(?:did|would|could|does|do|will|can)\s*(?:n'?t|not)|failed to|never)\s+load\b(?!\s*-?\s*in\b)/,
-  /\bsite (is|was)?\s*(down|unavailable|unreadable|inaccessible)\b/,
-  /\b(couldn'?t|could not|can'?t|cannot) (access|reach|open|read) (the |their )?(site|page|website)\b/,
-  /\bsite is (a )?dead link\b|\bper (their|the) (site|listing) copy\b/,
-].map((r) => r.source).join('|'), 'i');
-// NO bullet-style check here, deliberately. A NOTESTYLE regex briefly flagged notes that
-// OPEN with a bullet as "a research scratchpad" — Kiara reversed that on 2026-07-29:
-// "the bullets are okay and encouraged, the variety is good." Real people jot notes both
-// ways, and a corpus where every entry is uniform prose reads MORE synthetic, not less.
-// `debullet()` below already turns bullet boundaries into real newlines at insert, and the
-// vendor page renders them with whitespace-pre-line, so this is a supported format that
-// displays correctly. Do not re-add the check.
-const EMDASH = /[—–]/; // no em/en dashes anywhere in entry text — real users type hyphens
-// Literal line-break ESCAPES (backslash + n) rather than real newlines. Workers hand back
-// one JSON object per row and the draft contract asks for `notes` on one logical line, so
-// a worker wanting a break between bullets writes the escape. Nothing upstream undoes it:
-// pipeline.mjs strips only REAL newlines, csvEsc sees nothing to quote, and debullet()
-// below keys off WHITESPACE before a bullet — which an escape is not, so it never fires.
-// It reached the DB verbatim and the vendor card, which renders whitespace-pre-line,
-// printed "on shoots\n-she's described as" as literal text (reported 2026-08-04; the rows
-// already written are repaired by migration 0031).
-// This is REPAIRED, not rejected: the row is otherwise fine and the fix is unambiguous,
-// so failing the whole upload over it would be pure friction. The count is reported below
-// so a run that produces a lot of them is still visible.
-const ESCAPES = /\\{1,2}[rnt]/;
-// "Quote only" and its family — the retired price_text sentinel for a vendor that
-// publishes nothing (Kiara, 2026-08-07). It was wrong twice over: asserted even on
-// entries that DID state a number, which contradicts itself on the card ("Quote only but
-// The Knot says $8k" — if we have a number we have a price data point), and read as a
-// category label rather than as something a couple would say. Rows already in the DB were
-// rewritten by migration 0036; the drafting contract now asks for plain wordings.
-// Handled in two halves, exactly as that migration split them:
-//   - wording alone       -> REPAIRED at insert by plainQuoteOnly() below, because the
-//                            fix is unambiguous and failing an upload over a word choice
-//                            would be pure friction (same call as ESCAPES).
-//   - wording + a figure  -> HARD GATE here. What that headline should say instead is an
-//                            editorial decision (lead with the number, in the entry's own
-//                            voice), and a script amputating the clause would hide a
-//                            drafting error rather than fix it. The migration had to do
-//                            it mechanically only because legacy rows have no drafter to
-//                            send back to.
-// Keep both regexes in lockstep with pipeline.mjs, which counts them at the cheap
-// pre-check so neither first surfaces here.
-const QUOTE_ONLY = /(?:(?:pricing|price|prices|rates?|available|custom|by|on|via|per)\s+)*quotes?[\s-]+only|only\s+(?:available\s+)?(?:by|upon|on|via)\s+quotes?/i;
-// Twin of MONEY in lib/recon-sort.ts and of the money pattern in migration 0036.
-const MONEY = /\$\s*\d|\d\s*\$|\d\s*(?:dollars|usd)\b/i;
+// The prose gates are imported from scripts/reconcile/prose-gate.mjs (provenance and
+// reasoning for every pattern live there): BANNED marketing/AI phrases, PROCESS tells and
+// RESEARCH-artifact narration (both via toolingTell, which also folds curly apostrophes
+// so "wouldn\u2019t load" cannot slip past a straight-quote pattern), EMDASH, ESCAPES
+// (repaired at insert, not a gate) and QUOTE_ONLY (wording repaired at insert; next to a
+// MONEY figure in the same field, a hard gate).
+// NO bullet-style check, deliberately (Kiara, 2026-07-29: "the bullets are okay and
+// encouraged, the variety is good"). debullet() below renders them. Do not re-add.
+
+// Research-backed gates (provenance.mjs), the same ones `pipeline.mjs status` runs, so a
+// hand-edited CSV or a CSV merged by an older pipeline cannot skip them:
+//   - date floor: an entry may not be dated before the newest source it uses (merge moves
+//     such dates forward; this catches a CSV that never went through that merge),
+//   - absence claims on a vendor whose dossier never read a site,
+//   - cross-vendor contamination against the batch call file the row was drafted from,
+//   - the identity gate: no row for a vendor whose dossier says IDENTITY CHECK: FAILED
+//     (or whose identity.json is flagged), plan item 7.
+// Text-only gates added in 2026-10 alongside them: dossier labels/markers copied into the
+// prose (dossierMarker) and a figure + "no price posted" on one card (priceContradiction).
+// Research is looked up by the row's NAME slug, like every other enrich step, and only
+// trusted when the dossier's first line carries this row's vendor_id (twin guard).
+const researchByVid = new Map();
+for (const r of recons) {
+  if (researchByVid.has(r.vendor_id)) continue;
+  const dir = path.join(workdir, 'research', slugOf(r.venue));
+  const read = (f) => (fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f), 'utf8') : null);
+  const dossier = read('dossier.md') || '';
+  if (!dossier.split('\n', 1)[0].includes(`vendor_id=${r.vendor_id}`)) { researchByVid.set(r.vendor_id, null); continue; }
+  let harvest = null;
+  try { harvest = JSON.parse(read('harvest.json') || 'null'); } catch { harvest = null; }
+  researchByVid.set(r.vendor_id, { name: r.venue, dossier, harvest, identity: identityBlocked(dossier, dir), dir });
+}
+const noResearch = [...researchByVid.values()].filter((v) => !v).length;
+const docFreq = workdirDocFreq(workdir);   // same corpus merge used, so the two agree
+const datePlan = planDateMoves(recons.map((r, i) => ({ key: i, vendor_id: r.vendor_id, month: r.month, year: r.year, text: `${r.price_text} ${r.price_details} ${r.notes}` })), {
+  docFreq,
+  reviewsFor: (vid) => reviewsFromHarvest(researchByVid.get(vid)?.harvest),
+  ceilingFor: (vid) => harvestCeiling(researchByVid.get(vid)?.harvest),
+  backgroundFor: (vid) => `${researchByVid.get(vid)?.name || ''}\n${dossierBackground(researchByVid.get(vid)?.dossier)}`,
+});
+const floorByRow = new Map(datePlan.moves.map((m) => [m.key, m]));
+// The batch's call files (recons-<batch>.csv -> drafts/<batch>-call-NN.md) for the
+// contamination check; vendor_id -> {own block, sibling blocks, header}.
+const callByVid = new Map();
+{
+  const batchId = (/^recons-(.+?)(?:\.prephotos|\.backup)?\.csv$/.exec(path.basename(argValue('csv') || 'recons.csv')) || [])[1];
+  const dd = path.join(workdir, 'drafts');
+  const calls = batchId && fs.existsSync(dd) ? fs.readdirSync(dd).filter((f) => f.startsWith(`${batchId}-call-`) && f.endsWith('.md')) : [];
+  for (const f of calls) {
+    const c = parseCallFile(fs.readFileSync(path.join(dd, f), 'utf8'));
+    for (const b of c.blocks) callByVid.set(b.vendor_id, { own: b, siblings: c.blocks.filter((x) => x !== b), header: c.header });
+  }
+  if (!calls.length) console.log('NOTE: no call files found for this CSV\'s batch, so the cross-vendor contamination check is skipped');
+}
+if (noResearch) console.log(`NOTE: ${noResearch} vendor(s) have no matching research dir (by name slug + vendor_id), so their date-floor / absence checks are skipped`);
 const errors = [];
 const perBot = new Map(), perBotVenue = new Set();
 let escaped = 0, quoteOnly = 0;
@@ -121,11 +114,28 @@ for (const [i, r] of recons.entries()) {
   const text = `${r.price_text} ${r.price_details} ${r.notes}`;
   const banned = text.match(BANNED);
   if (banned) errors.push(`${at}: banned marketing/AI phrase "${banned[0]}" — rephrase in the entry's voice`);
-  const tell = text.match(PROCESS);
-  if (tell) errors.push(`${at}: process-tell "${tell[0]}" — rephrase as a person would (never reference scraping, batches, or how this entry was produced)`);
-  const artifact = text.match(RESEARCH);
-  if (artifact) errors.push(`${at}: research-artifact narration "${artifact[0]}" — say what's true of the VENDOR ("they don't post pricing"), not what the source material looked like`);
+  const tell = toolingTell(text);
+  if (tell?.kind === 'process-tell') errors.push(`${at}: process-tell "${tell.match}" — rephrase as a person would (never reference scraping, batches, or how this entry was produced)`);
+  else if (tell) errors.push(`${at}: research-artifact narration "${tell.match}" — say what's true of the VENDOR ("they don't post pricing"), not what the source material looked like or how it was fetched`);
+  const floor = floorByRow.get(i);
+  if (floor) errors.push(`${at}: dated ${floor.from.month}/${floor.from.year} but uses a newer source (${floor.evidence.join('; ')}) — re-run pipeline.mjs merge, which moves it to ${floor.to.month}/${floor.to.year}, or redate it`);
+  const res = researchByVid.get(r.vendor_id);
+  const unread = res && siteUnread(res.dossier);
+  if (unread) {
+    const claims = absenceClaims(text);
+    if (claims.length) errors.push(`${at}: absence claim "${claims[0].match}" but the dossier never read a site (${unread}) — nobody knows what that site lacks; drop the claim (a "No quote found" headline is fine)`);
+  }
+  const call = callByVid.get(r.vendor_id);
+  if (call) {
+    const hits = contaminationHits(text, call.own.text, call.siblings, call.header);
+    if (hits.length) errors.push(`${at}: cross-vendor contamination ${hits.map((h) => `"${h.phrase}" (found only in ${h.siblings.join(', ')}'s research)`).join('; ')} — that fact belongs to another vendor in the same call file`);
+  }
   if (EMDASH.test(text)) errors.push(`${at}: em/en dash in entry text — use a comma, period, or hyphen`);
+  const mk = dossierMarker(text);
+  if (mk) errors.push(`${at}: dossier label/marker "${mk}" copied into the entry — those are drafting scaffolding, never card text`);
+  const pc = priceContradiction(r);
+  if (pc) errors.push(`${at}: ${pc} — keep the figure and drop the no-price clause, or vice versa`);
+  if (res?.identity) errors.push(`${at}: IDENTITY CHECK failed for this vendor (${res.identity}) — the crawled site likely belongs to another business; drop the row and fix the vendors row`);
   if (ESCAPES.test(text)) escaped++;
   // Per FIELD, not per entry. A plain "no quote found" headline above a price_details
   // that cites a third-party figure is honest and must not fail: it says we did not get a
@@ -154,6 +164,7 @@ for (const [i, r] of recons.entries()) {
   }
 }
 for (const [b, n] of perBot) if (n > 50) errors.push(`bot "${b}" has ${n} entries (max 50 per run)`);
+for (const c of datePlan.conflicts) console.log(`  WARNING row ${c.key + 2} (${recons[c.key].venue}): its source-floor month ${c.to.month}/${c.to.year} is shared with a sibling entry`);
 if (errors.length) { console.error('VALIDATION FAILED:\n' + errors.join('\n')); process.exit(1); }
 
 // Cross-entry redundancy check: two entries sharing a long word-run read as botty.
@@ -177,6 +188,16 @@ const known = new Set((vendors || []).map((v) => v.id));
 const vendorById = new Map((vendors || []).map((v) => [v.id, v]));
 const missingVendors = vendorIds.filter((id) => !known.has(id));
 if (missingVendors.length) { console.error('unknown vendor_ids:\n' + missingVendors.join('\n')); process.exit(1); }
+// --type must match the vendors being uploaded. The profile decides whether service_region
+// is required and kept; the 2026-07 supplemental CSVs were uploaded with no --type, so the
+// venue profile skipped the service_region gate and nulled the column: 185 live
+// service-area entries have no region (bot-recon quality plan, item 13).
+const typeOk = new Set(profile.vendorTypes ?? [profile.vendorType]);
+const wrongType = (vendors || []).filter((v) => !typeOk.has(v.vendor_type));
+if (wrongType.length) {
+  console.error(`TYPE MISMATCH: this run is --type ${profile.key} (${[...typeOk].join('/')}) but ${wrongType.length} vendor(s) are another type, e.g. ${wrongType.slice(0, 5).map((v) => `${v.name} (${v.vendor_type})`).join('; ')} — re-run with that vendor type's --type`);
+  process.exit(1);
+}
 
 // ── Filter tags — the structured half, gated against the recon prose ───────────
 // The HARD RULE (draft-contract.md): a tag may exist only if a sentence in this
@@ -234,6 +255,14 @@ function gateFilters(vid, obj) {
         if (!nums.includes(String(value))) { errs.push(`${v?.name} [${key}]=${value}: the number is not in its own quote ("${String(quote).slice(0, 50)}") - cite the sentence that states it`); continue; }
       }
     }
+    // Basis (plan item 15): brand/chain wording, or a reddit-based sentence when every
+    // reddit excerpt on file for the vendor is region/chain-level, may not set a property tag.
+    if (!isDesc) {
+      const res = researchByVid.get(vid);
+      const rs = res?.dir && path.join(res.dir, 'reddit-slice.txt');
+      const why = tagBasisProblem(quote, { prose, redditSlice: rs && fs.existsSync(rs) ? fs.readFileSync(rs, 'utf8') : null });
+      if (why) { errs.push(`${v?.name} [${key}]: ${why}`); continue; }
+    }
     out[key] = { value, quote: quote ?? null };
   }
   return { out, errs };
@@ -263,6 +292,27 @@ const done = new Set((existing || []).map((e) => `${e.author_id}|${e.vendor_id}`
 
 const toInsert = recons.filter((r) => !botByKey.get(r.bot).user_id || !done.has(`${botByKey.get(r.bot).user_id}|${r.vendor_id}`));
 const skipped = recons.length - toInsert.length;
+
+// BOT_CAP (provenance.mjs): at most 3 BOT entries per vendor, counting the ACTIVE bot
+// entries already live (any roster, any run) plus the rows this upload would insert. Real
+// users' entries do not count. The per-run check above (one entry per bot per vendor)
+// never saw earlier runs, which is how 37 vendors reached 4-6 bot entries. Read-only, in
+// chunks of 100 ids so the `.in()` list stays well under the URL limit (see verify).
+const liveBots = new Map();
+for (let k = 0; k < vendorIds.length; k += 100) {
+  const { data, error: cErr } = await selectAll(() => supabase.from('recon_entries')
+    .select('id, vendor_id, status, profiles!inner(is_bot)').in('vendor_id', vendorIds.slice(k, k + 100)).order('id'));
+  if (cErr) { console.error('DB read failed (live bot-entry count):', cErr.message); process.exit(1); }
+  for (const e of data || []) if (e.status === 'active' && e.profiles?.is_bot) liveBots.set(e.vendor_id, (liveBots.get(e.vendor_id) || 0) + 1);
+}
+const newPerVendor = new Map();
+for (const r of toInsert) newPerVendor.set(r.vendor_id, (newPerVendor.get(r.vendor_id) || 0) + 1);
+const overCap = [...newPerVendor].filter(([vid, n]) => (liveBots.get(vid) || 0) + n > BOT_CAP);
+if (overCap.length) {
+  console.error(`BOT CAP — ${overCap.length} vendor(s) would exceed ${BOT_CAP} bot entries (live + this upload); drop rows for them, nothing written:\n  `
+    + overCap.map(([vid, n]) => `${vendorById.get(vid)?.name} (${vid}): ${liveBots.get(vid) || 0} live + ${n} new`).join('\n  '));
+  process.exit(1);
+}
 
 console.log(`upload ${APPLY ? 'APPLY' : 'DRY RUN'} — ${recons.length} rows, ${skipped} already uploaded, ${toInsert.length} to insert`);
 for (const [b, n] of perBot) console.log(`  ${b}: ${n} entries`);

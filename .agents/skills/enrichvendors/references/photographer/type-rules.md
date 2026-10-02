@@ -14,7 +14,9 @@
 - Where they shoot, sourced from the dossier: site copy ("serving Denver and the Front
   Range"), name clues ("Danielle Hart Colorado Weddings" → Colorado), instagram bio
   ("Colorado + destination"), base town + stated travel.
-- Prefer the narrowest SOURCED region: "Denver metro", "Front Range", "Western Slope",
+- Match their FULL sourced coverage, naming every area the sources list (never pick one
+  of several, never widen past the sources; 2026-10 audit: "Boulder area" for a team serving
+  Denver + destination): "Denver metro", "Front Range", "Western Slope",
   "Summit County + destination". Nothing narrower sourced → `Colorado` (the run's state).
   If they clearly travel ("destination", "worldwide", "will travel"), append
   " + destination". Never invent a narrow region; never leave blank (upload hard-fails).

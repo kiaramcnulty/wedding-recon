@@ -1,10 +1,15 @@
 # Filters reconcile on every recon write
 
-**Status: BUILT (2026-08-12), pending a credentialed pilot.** Code is on branch
-`claude/filter-tags-vendor-entries-2ewmy5`. The daily Action is shipped
-**disabled** (manual dispatch, dry-run default, cron commented) — it mutates
-user-visible data on model judgment and the snapshot is the only undo, so it must
-be piloted by hand before the cron is enabled.
+**Status: LIVE.** Built 2026-08-12, piloted by hand on 8 vendors, and the daily
+cron has been **enabled and writing since 2026-08-13** (Kiara; a hand dispatch
+still defaults to a dry run). It originally shipped disabled; the sections below
+that describe that state are history, superseded by the 2026-08-17 update further
+down. Since 2026-10-02 (bot-recon quality audit, `docs/bot-recon-quality-plan.md`
+items 1 and 15) a write citing a BOT entry also needs a verbatim harvested-source
+quote, brand/chain-level wording may not set a property tag, and every run
+snapshots + audits into the MAIN checkout's `data/reconcile/<work>/runs/<run_id>/`
+(`scripts/reconcile/README.md`). Whether to pause the cron while the corpus is
+remediated is Kiara's call.
 
 **Scope: TAGS ONLY.** This loop writes `vendors.filters` from recon and never
 edits a recon entry. That is the whole of what was asked (create / agree / extend
@@ -180,7 +185,7 @@ clear-dirty, and uploads the report artifact. The Batch API is async; if a batch
 has not `ended` in the poll window the job exits leaving the vendors dirty, so
 the next run re-exports them.
 
-**Shipped disabled:** `workflow_dispatch` only, cron commented out, `dry_run`
+**Shipped disabled (history; enabled 2026-08-13, see the update below):** `workflow_dispatch` only, cron commented out, `dry_run`
 input defaulting **true**. Pilot by hand (dry run → read the report → a small
 `--apply`) before uncommenting the schedule.
 

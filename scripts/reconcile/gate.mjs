@@ -7,9 +7,8 @@
  * Reads  results.jsonl  (one model JSON object per vendor, from collect)
  * Writes accepted.jsonl, rejected.jsonl, gate-report.txt
  *
- * The prose regexes below are duplicated from
- * .claude/skills/enrichvendors/scripts/upload.mjs, which does not export them.
- * KEEP THEM IN LOCKSTEP - each one is there because it caught a real defect that
+ * The prose regexes come from prose-gate.mjs, the one definition shared with
+ * the enrich gates - each one is there because it caught a real defect that
  * reached production.
  *
  * The check that does the most work here is none of those, though: it is
@@ -18,12 +17,23 @@
  * entry. A model that infers a tag rather than reading one cannot produce a
  * quote that survives a substring test, so fabricated evidence fails
  * mechanically instead of needing a human to catch it.
+ *
+ * That check alone was not enough (2026-10-02 audit of the 2026-08-09/11 run):
+ * the appends this pass wrote to match a tag became the "recon quote" the next
+ * pass read the tag back from. So every append now also needs `evidence` - a
+ * verbatim quote from a harvested source page or review - and a tag read off a
+ * BOT entry needs the same, both checked by evidence.mjs (shared with apply.mjs,
+ * which re-runs every check before it writes). An edit that fails takes the
+ * tags it documents with it: an unconfirmable fact gets neither the sentence
+ * nor the tag (Kiara, 2026-10-02).
  */
 
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { workdir, readJsonl, writeJsonl, arg } from "./lib.mjs";
 import { VENDOR_FILTERS } from "../../lib/constants/vendor-filters.ts";
+import { reviewProseChange, reviewTagWrite } from "./evidence.mjs";
+import { MONEY } from "./prose-gate.mjs";
 
 const WORK = arg("work");
 if (!WORK) {
@@ -32,31 +42,12 @@ if (!WORK) {
 }
 const dir = workdir(WORK);
 
-// --- gates, mirrored from upload.mjs ---------------------------------------
-
-const BANNED =
-  /\b(stunning|breathtaking|nestled|boasts?|elevate[sd]?|unforgettable|magical|dream wedding|exquisite|picturesque|tucked away gem|genuine value|can't go wrong|won't disappoint|something for everyone|truly special)\b/i;
-const PROCESS =
-  /\b(crawl\w*|scrape\w*|fetch\w*|dossier|harvest\w*|parse\w*|garbled text|boilerplate|batch\w*|enrich\w*|seeded|roster|pipeline|dataset|databases?|bots?|launchintel|digest\w*)\b/i;
-const RESEARCH = new RegExp(
-  [
-    /\b404\b|\b403\w*/,
-    /\bunreachable\b|\bautomated (check|lookup|request|tool)s?\b/,
-    /\b(reviews (go|going) back to|no pricing to pull|nothing to pull)\b/,
-    /(?:(?:did|would|could|does|do|will|can)\s*(?:n'?t|not)|failed to|never)\s+load\b(?!\s*-?\s*in\b)/,
-    /\bsite (is|was)?\s*(down|unavailable|unreadable|inaccessible)\b/,
-    /\b(couldn'?t|could not|can'?t|cannot) (access|reach|open|read) (the |their )?(site|page|website)\b/,
-    /\bsite is (a )?dead link\b|\bper (their|the) (site|listing) copy\b/,
-  ]
-    .map((r) => r.source)
-    .join("|"),
-  "i",
-);
-const EMDASH = /[—–]/;
-const QUOTE_ONLY =
-  /(?:(?:pricing|price|prices|rates?|available|custom|by|on|via|per)\s+)*quotes?[\s-]+only|only\s+(?:available\s+)?(?:by|upon|on|via)\s+quotes?/i;
-const MONEY = /\$\s*\d|\d\s*\$|\d\s*(?:dollars|usd)\b/i;
+// --- gates -------------------------------------------------------------------
+// The prose gates are imported from prose-gate.mjs, the single definition
+// (2026-10-02). This file used to carry its own copies "in lockstep", and the
+// copies drifted; matching runs on gateText() so curly apostrophes count.
 const ESCAPED_NL = /\\{1,2}n/;
+
 
 const norm = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
 
@@ -107,6 +98,8 @@ for (const r of results) {
 
   // --- prose edits ---------------------------------------------------------
   const edits = [];
+  const cards = new Map();
+  const failedKeys = new Set();
   for (const e of r.recon_edits ?? []) {
     const target = entries.get(e.entry_id);
     const where = `${at} entry ${e.entry_id}`;
@@ -134,19 +127,22 @@ for (const r of results) {
       stats.repairedEscapes++;
     }
 
-    const bad = text.match(BANNED);
-    if (bad) errs.push(`${where}: marketing filler "${bad[0]}"`);
-    const tell = text.match(PROCESS);
-    if (tell) errs.push(`${where}: pipeline self-reference "${tell[0]}"`);
-    const artifact = text.match(RESEARCH);
-    if (artifact) errs.push(`${where}: research narration "${artifact[0]}"`);
-    if (EMDASH.test(text)) errs.push(`${where}: em/en dash - use a comma, period, or hyphen`);
-    if (QUOTE_ONLY.test(text) && MONEY.test(text))
-      errs.push(`${where}: quote-only wording next to an actual figure`);
+    // The text-only prose gates (BANNED, PROCESS/RESEARCH, EMDASH, QUOTE_ONLY next to a
+    // figure, dossier markers) run inside reviewProseChange below, via guardProseEdit ->
+    // checkProse. They used to ALSO run here, so one "stunning" was reported twice.
 
     const after = (target.length ?? 0) + text.length;
     if (after > 1200) stats.longEntries.push(`${where}: ${target.length} -> ${after} chars`);
 
+    const field = MONEY.test(text) && e.field === "notes" ? "price_details" : e.field;
+    const card = cards.get(e.entry_id) ?? { notes: target.notes ?? "", price_text: target.price_text ?? "", price_details: target.price_details ?? "" };
+    const rv = reviewProseChange({ vendorId: v.id, entry: target, card, change: { kind: "append", field, text, evidence: e.evidence } });
+    if (rv.errors.length) {
+      errs.push(...rv.errors.map((x) => `${where}: ${x}`));
+      for (const k of e.documents ?? []) failedKeys.add(k);
+      continue;
+    }
+    cards.set(e.entry_id, rv.after);
     edits.push({ ...e, append: text });
   }
 
@@ -177,6 +173,15 @@ for (const r of results) {
     );
     if (!haystack.includes(quote)) {
       errs.push(`${where}: quote not found in entry ${w.entry_id} - evidence is invented`);
+      continue;
+    }
+    if (failedKeys.has(w.key)) {
+      errs.push(`${where}: its documenting edit was rejected - an unconfirmable fact gets neither the sentence nor the tag`);
+      continue;
+    }
+    const tv = reviewTagWrite({ vendorId: v.id, write: w, entry: src });
+    if (tv.errors.length) {
+      errs.push(...tv.errors.map((x) => `${where}: ${x}`));
       continue;
     }
 

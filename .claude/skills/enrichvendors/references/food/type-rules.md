@@ -19,7 +19,8 @@
 
 ## service_region — REQUIRED on every row
 - WHERE they serve, sourced: site copy ("serving Denver and across Colorado"), base city
-  + stated delivery radius. Narrowest sourced wins ("Denver metro", "Front Range");
+  + stated delivery radius. Match their FULL sourced coverage, naming every area listed (never pick one of several;
+  never widen past the sources) ("Denver metro", "Front Range");
   a storefront/kitchen address with no stated service area supports its city/metro
   ("Denver area"). Nothing narrower sourced → the run's state. Never invent; never blank
   (upload hard-fails).
