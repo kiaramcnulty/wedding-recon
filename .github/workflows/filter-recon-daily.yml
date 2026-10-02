@@ -28,9 +28,16 @@ name: filter-recon-daily
 # ANTHROPIC_BATCH_API_KEY (same set the SessionStart hook reads). Scheduled runs
 # only fire from the DEFAULT branch, so this has no effect until it is on main.
 
+# PAUSED 2026-10-02 (Kiara) until the bot-recon cleanup in
+# docs/bot-recon-quality-plan.md is complete: the cleanup is auditing exactly the
+# tags and recon text this job writes, and a daily writer underneath it would
+# move the target. The workflow is ALSO disabled in the GitHub Actions UI.
+# TO RESUME (both steps): uncomment the two schedule lines below, and run
+#   gh workflow enable filter-recon-daily.yml
+# Tracked in issue #62, the plan's final step, and CLAUDE.md "Known outstanding".
 on:
-  schedule:
-    - cron: "40 9 * * *"
+  # schedule:
+  #   - cron: "40 9 * * *"
   workflow_dispatch:
     inputs:
       dry_run:

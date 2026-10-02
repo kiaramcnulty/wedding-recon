@@ -18,7 +18,7 @@ Scale = corpus-wide count where it is mechanically countable; otherwise the pilo
 ### 1. Post-draft prose edits by the filter reconciliation pass
 - **What:** 1,301 live entries have `updated_at` set (1,118 on 2026-08-09, 158 on 08-11, 25 later). 1,269 contain sentences that appear in no draft CSV. Pilot: several are false ("walk-ins welcome", "full planning is her main tier", "spots don't cost anything") and one rewrote a price headline into a self-contradiction (Et Voila).
 - **Cause:** Direction A of `docs/filter-recon-reconciliation.md` (filters -> prose) wrote a sentence to back each tag. The tag came first; the sentence was written to match it, sometimes with no source. The main run's work dir and snapshot are gone (worktree deleted), so there is no undo file.
-- **Upstream fix:** reconcile may only append a fact that carries a verbatim evidence quote from a harvested source page (not from the tag itself); run the full prose gates; persist the audit log + snapshot outside any worktree. Whether to pause `filter-recon-daily.yml` (it has run on a writing cron since Kiara enabled it on 2026-08-13) until this lands is Kiara's call; the daily pass now takes tags only from human entries.
+- **Upstream fix:** reconcile may only append a fact that carries a verbatim evidence quote from a harvested source page (not from the tag itself); run the full prose gates; persist the audit log + snapshot outside any worktree. `filter-recon-daily.yml` is PAUSED for the whole cleanup (Kiara, 2026-10-02); see the final step of the Sequence.
 - **Remediation:** rebuild each edited entry's pre-edit text from the draft CSVs/worker JSONLs (`data/qualitypass/live-vs-draft-drift.json` already isolates the added sentences). For every added sentence, an agent checks it against the filter-extraction evidence (`data/filter-extraction/vendor-filters.jsonl`, `data/enrichvendors/filterpass-*/research/`) and the live site: **keep / reword / drop**. Where a sentence is dropped, the tag it backed is dropped too unless independently sourced. Output is a change list for review, then a snapshot-backed apply.
 
 ### 2. Collected dates earlier than the sources they cite
@@ -123,6 +123,7 @@ Runs after the mechanical sweeps and re-dossiers, so reviewers spend their judgm
 5. **Remediation change lists** for items 1, 2, 5, 10, 12, 13, 15: Kiara reviews each list -> snapshot-backed apply.
 6. **Full review pass** (item 18) -> verified `flags.csv` -> Kiara decides -> snapshot-backed apply.
 7. Re-export and re-run the sweeps to confirm the counts went to zero.
+8. **Turn `filter-recon-daily` back on** (paused 2026-10-02 for this cleanup): uncomment the `schedule:` block in `.github/workflows/filter-recon-daily.yml` AND run `gh workflow enable filter-recon-daily.yml`, then remove the PAUSED line from CLAUDE.md "Known outstanding". Watch the first run's report artifact: it is the first run under the new evidence rules.
 
 ## Rulings (Kiara, 2026-10-02)
 
