@@ -79,6 +79,15 @@ for (const c of changes) {
   // duplicate vendor about to be deleted); the list must say so.
   if (c.set?.vendor_id !== undefined && !/duplicate/i.test(c.reason ?? "")) problems.push(`${at}: vendor_id moves are only for merging a duplicate vendor (say so in reason)`);
 }
+// Multi-select filter keys must be arrays: match.ts only matches arrays, so a plain
+// string ("paid") is silently "unknown" forever (2026-10 cleanup: 94 vendors, mostly
+// trial_policy). Keys come from lib/constants/vendor-filters.ts.
+const MULTI = new Set([...readFileSync(new URL("../../lib/constants/vendor-filters.ts", import.meta.url), "utf8")
+  .matchAll(/key:\s*"([a-z_]+)"[^{}]*?kind:\s*"multi"/gs)].map((m) => m[1]));
+for (const c of changes) {
+  for (const [k, v] of Object.entries(c.set?.filters ?? {}))
+    if (MULTI.has(k) && v != null && !Array.isArray(v)) problems.push(`line ${c.line} (${c.id}): filter "${k}" is multi-select and must be an array, got ${JSON.stringify(v)}`);
+}
 const ids = new Map();
 for (const c of changes) {
   const k = `${c.table}|${c.id}`;
