@@ -47,7 +47,7 @@ const WORK = `qualitypass-${NAME}`;
 
 const EDITABLE = {
   recon_entries: new Set(["vendor_id", "notes", "price_text", "price_details", "service_region", "recon_collected_month", "recon_collected_year", "status"]),
-  vendors: new Set(["name", "website", "city", "address_text", "location", "filters", "filters_meta"]),
+  vendors: new Set(["name", "vendor_type", "website", "city", "address_text", "location", "filters", "filters_meta"]),
 };
 const PROSE = ["notes", "price_text", "price_details"];
 
@@ -75,6 +75,12 @@ for (const c of changes) {
   if (!c.reason) problems.push(`${at}: no reason`);
   if (!c.set || !Object.keys(c.set).length) problems.push(`${at}: empty set`);
   if (c.set?.status !== undefined && c.set.status !== "removed") problems.push(`${at}: status may only become "removed"`);
+  // Retypes are Kiara's call (CLAUDE.md hotel/venue rule and type cards): only with
+  // her approval named in the reason, only to a selectable type.
+  if (c.set?.vendor_type !== undefined) {
+    if (!["venue", "photos", "food", "dj", "band", "flowers", "dress", "beauty", "hotel", "planner"].includes(c.set.vendor_type)) problems.push(`${at}: vendor_type "${c.set.vendor_type}" is not a selectable type`);
+    if (!/kiara/i.test(c.reason ?? "")) problems.push(`${at}: a retype needs Kiara's approval named in the reason`);
+  }
   // Moving an entry is only for merging two rows of the SAME business (a
   // duplicate vendor about to be deleted); the list must say so.
   if (c.set?.vendor_id !== undefined && !/duplicate/i.test(c.reason ?? "")) problems.push(`${at}: vendor_id moves are only for merging a duplicate vendor (say so in reason)`);
