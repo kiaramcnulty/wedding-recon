@@ -131,7 +131,9 @@ for (const [i, r] of recons.entries()) {
     if (hits.length) errors.push(`${at}: cross-vendor contamination ${hits.map((h) => `"${h.phrase}" (found only in ${h.siblings.join(', ')}'s research)`).join('; ')} — that fact belongs to another vendor in the same call file`);
   }
   if (EMDASH.test(text)) errors.push(`${at}: em/en dash in entry text — use a comma, period, or hyphen`);
-  const mk = dossierMarker(text);
+  // service_region is card text too (it renders on the vendor page), and it is where the
+  // 2026-10 cleanup found leaked "RICH:<slug>" drafting flags.
+  const mk = dossierMarker(text) || dossierMarker(r.service_region || '');
   if (mk) errors.push(`${at}: dossier label/marker "${mk}" copied into the entry — those are drafting scaffolding, never card text`);
   const pc = priceContradiction(r);
   if (pc) errors.push(`${at}: ${pc} — keep the figure and drop the no-price clause, or vice versa`);

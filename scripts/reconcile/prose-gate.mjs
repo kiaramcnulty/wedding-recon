@@ -142,6 +142,9 @@ const MARKER_PARTS = [
   /\[site: [^\]]*\]/,                                // [site: page-venues]
   /\[other pricing\/offering mentions\]/,
   /\[basis=[a-z_-]+\]|\bbasis=(?:property|region|chain)\b|\bvendor_id=/,
+  // Drafting flag tokens ("RICH:<slug>", "THIN:<slug>"...) are for the orchestrator; the
+  // 2026-10 cleanup found 19 photographer service_regions ending in "RICH:<slug>".
+  /\b(?:RICH|THIN|SHORT|IDENTITY|NOT[A-Z]+!?):\s*[a-z0-9][a-z0-9-]*/,
   /\b(?:source truncated|other acts excluded|identity check(?::? failed)?|site crawl failed|site text thin|site pages unread|no website on file)\b/i,
 ];
 const DOSSIER_MARKER = new RegExp(MARKER_PARTS.map((r) => r.source).join("|"));

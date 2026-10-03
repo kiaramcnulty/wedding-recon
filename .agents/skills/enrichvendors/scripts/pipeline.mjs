@@ -516,7 +516,7 @@ function cmdStatus() {
       }
       if (ESCAPES.test(text)) escapes++;
       // A dossier label or marker echoed onto the card ("[rest of review omitted]", "[r3]").
-      const mk = dossierMarker(text);
+      const mk = dossierMarker(text) || (i('service_region') >= 0 ? dossierMarker(r[i('service_region')] || '') : null);
       if (mk) { markers++; if (markerRows.length < 8) markerRows.push(`${r[i('venue')]} ("${mk}")`); }
       // A figure in the price fields while some field says no price is posted (Et Voila).
       const pc = priceContradiction({ price_text: r[i('price_text')], price_details: r[i('price_details')], notes: r[i('notes')] });

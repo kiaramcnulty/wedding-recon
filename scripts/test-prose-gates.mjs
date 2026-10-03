@@ -218,3 +218,13 @@ ok("bot cap is 3 (Kiara, 2026-10-02)", BOT_CAP === 3);
 
 console.log(`${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);
+
+// 2026-10 cleanup: drafting flag tokens leaked into service_region
+{
+  const { dossierMarker: dm } = await import("./reconcile/prose-gate.mjs");
+  const cases = [["Colorado + destination RICH:tayler-carlisle-photography", true], ["Denver metro + 100 miles", false], ["rich colors, thin crust", false]];
+  for (const [t, want] of cases) {
+    const got = Boolean(dm(t));
+    if (got !== want) { console.error(`FAIL drafting-flag marker: ${t} -> ${got}`); process.exitCode = 1; } else console.log(`  ok   drafting-flag marker: ${t.slice(0, 40)}`);
+  }
+}
