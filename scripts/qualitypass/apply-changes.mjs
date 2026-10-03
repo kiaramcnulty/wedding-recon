@@ -46,7 +46,7 @@ const NAME = basename(LIST).replace(/\.jsonl$/, "");
 const WORK = `qualitypass-${NAME}`;
 
 const EDITABLE = {
-  recon_entries: new Set(["notes", "price_text", "price_details", "service_region", "recon_collected_month", "recon_collected_year", "status"]),
+  recon_entries: new Set(["vendor_id", "notes", "price_text", "price_details", "service_region", "recon_collected_month", "recon_collected_year", "status"]),
   vendors: new Set(["name", "website", "city", "address_text", "location", "filters", "filters_meta"]),
 };
 const PROSE = ["notes", "price_text", "price_details"];
@@ -75,6 +75,9 @@ for (const c of changes) {
   if (!c.reason) problems.push(`${at}: no reason`);
   if (!c.set || !Object.keys(c.set).length) problems.push(`${at}: empty set`);
   if (c.set?.status !== undefined && c.set.status !== "removed") problems.push(`${at}: status may only become "removed"`);
+  // Moving an entry is only for merging two rows of the SAME business (a
+  // duplicate vendor about to be deleted); the list must say so.
+  if (c.set?.vendor_id !== undefined && !/duplicate/i.test(c.reason ?? "")) problems.push(`${at}: vendor_id moves are only for merging a duplicate vendor (say so in reason)`);
 }
 const ids = new Map();
 for (const c of changes) {
