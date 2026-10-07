@@ -87,6 +87,15 @@ export interface FilterDef {
   rare?: boolean;
   /** Companion filter id whose selection re-scales this range's histogram. */
   rescaledBy?: string;
+  /**
+   * `range` price filters only. Adds the **Weddings | Elopements** mode pair to
+   * this filter (plan step 7b, Kiara 2026-10-07). Weddings mode is the filter as
+   * declared; Elopements mode swaps its keys for `ELOPEMENT_PRICE_KEYS` and
+   * keeps the same overlap rule, unit, `basis` and `basisScale`. The keys and
+   * the mode helpers live in `lib/filters/match.ts` (`ELOPEMENT_PRICE_KEYS`,
+   * `priceModeOf()`), next to the matcher branch that reads them.
+   */
+  elopement?: boolean;
   hint?: string;
 }
 
@@ -176,6 +185,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       lo: "price_min",
       hi: "price_max",
       unit: "usd",
+      elopement: true,
       basis: "package",
       // The conversion the sheet's footnote promises the couple. Only these two
       // bases are convertible: `per_night` is a hotel room rate that happens to
@@ -237,6 +247,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       lo: "price_min",
       hi: "price_max",
       unit: "usd",
+      elopement: true,
       basis: "package",
     },
     { key: "does_elopements", label: "Elopements", kind: "bool" },
@@ -401,6 +412,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       lo: "price_min",
       hi: "price_max",
       unit: "usd",
+      elopement: true,
       rescaledBy: "service_tier",
     },
     {
@@ -526,6 +538,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       lo: "price_min",
       hi: "price_max",
       unit: "usd",
+      elopement: true,
       rescaledBy: "engagement_model",
     },
     {
