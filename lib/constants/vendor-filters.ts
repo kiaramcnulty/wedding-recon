@@ -250,7 +250,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       elopement: true,
       basis: "package",
     },
-    { key: "does_elopements", label: "Elopements", kind: "bool" },
+    { key: "does_elopements", label: "Offers elopements", kind: "bool" },
     { key: "travels_destination", label: "Destination weddings", kind: "bool" },
     { key: "includes_engagement", label: "Engagement session included", kind: "bool" },
     { key: "shoots_film", label: "Also shoots film", kind: "bool", rare: true },

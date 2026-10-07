@@ -261,7 +261,7 @@ export function vendorTags(
       built.push({
         key: `${def.key}:elopement`,
         label: elopementLabel,
-        matched: spec?.kind === "range" && ranged && !!spec.elopement,
+        matched: spec?.kind === "range" && !!spec.elopement,
         rare,
       });
     }

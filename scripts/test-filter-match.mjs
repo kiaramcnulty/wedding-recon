@@ -227,8 +227,31 @@ console.log("\nunit — weddings | elopements price mode\n");
       basis: "package", scale: { per_person: 100, per_hour: 5 }, season: "peak", day: "saturday" } });
   eq("default state with no range builds no price spec",
     buildSelection(photoDefs, {}), {});
-  eq("Elopements mode with no range narrows nothing",
-    buildSelection(photoDefs, { price_mode: "elopement" }), {});
+  // Elopements mode is a filter by itself (Kiara, 2026-10-07): with no range it
+  // keeps exactly the vendors carrying an elopement signal.
+  const eloNoRange = buildSelection(photoDefs, { price_mode: "elopement" });
+  eq("Elopements mode with no range builds a spec with no min/max",
+    eloNoRange.price,
+    { kind: "range", mode: "overlap", lo: "elopement_price_min", hi: "elopement_price_max",
+      basis: "package", basisKey: "elopement_price_basis", kindKey: "elopement_price_kind", elopement: true });
+  eq("Elopements mode with no range counts as one active filter",
+    countSelections({ photos: eloNoRange }), 1);
+  eq("no range: a vendor with no elopement signal is excluded",
+    filterRank({ price_min: 3000, style: ["moody"] }, eloNoRange), -1);
+  eq("no range: does_elopements: false is not a signal",
+    filterRank({ does_elopements: false, price_min: 3000 }, eloNoRange), -1);
+  eq("no range: does_elopements-only vendor is included (full match)",
+    filterRank({ does_elopements: true }, eloNoRange), 1);
+  eq("no range: elopement_only-only vendor is included",
+    filterRank({ elopement_only: true }, eloNoRange), 1);
+  eq("no range: elopement-price-only vendor is included (min)",
+    filterRank({ elopement_price_min: 1800 }, eloNoRange), 1);
+  eq("no range: elopement-price-only vendor is included (max)",
+    filterRank({ elopement_price_max: 2500 }, eloNoRange), 1);
+  eq("no range: a vendor known to have no attributes is excluded",
+    filterRank(null, eloNoRange), -1);
+  eq("no range: attributes not loaded yet never vanish",
+    filterRank(undefined, eloNoRange), 0);
   eq("types without the pair ignore a stray mode key",
     buildSelection(VENDOR_FILTERS.dj, { price: range, price_mode: "elopement" }).price.lo, "price_min");
 
@@ -276,6 +299,8 @@ console.log("\nunit — weddings | elopements price mode\n");
     elo({ price_min: 3000, price_max: 3500 }).rank, -1);
   eq("Elopements: does_elopements with no price lands unpriced (partial), not excluded",
     elo({ does_elopements: true, price_min: 6000 }), { rank: 0, unknown: 1, active: 1 });
+  eq("Elopements: elopement_only with no elopement price demotes, not excluded",
+    elo({ elopement_only: true, price_min: 3000 }).rank, 0);
   eq("Elopements: neither elopement price nor does_elopements is excluded",
     elo({ style: ["moody"] }).rank, -1);
   eq("Elopements: does_elopements false is excluded",
@@ -307,9 +332,9 @@ console.log("\nunit — weddings | elopements price mode\n");
     ["Elopements typically $4k–$6k"]);
   eq("elopement per-hour keeps its unit",
     labels("photos", { elopement_price_min: 600, elopement_price_basis: "per_hour" }), ["Elopements from $600/hour"]);
-  // (The trailing "Elopements" is the does_elopements bool pill, unchanged.)
+  // (The trailing pill is the does_elopements bool, labelled "Offers elopements".)
   eq("an elopement-only vendor shows its price once, as an elopement price",
-    labels("photos", eloOnly), ["Elopements from $2.5k", "Elopements"]);
+    labels("photos", eloOnly), ["Elopements from $2.5k", "Offers elopements"]);
   eq("types without the pair never show an elopement pill",
     labels("dj", { price_min: 1500, price_kind: "starting_at", elopement_price_min: 500 }), ["From $1.5k"]);
   eq("Elopements-mode selection marks the elopement pill matched, not the wedding one",

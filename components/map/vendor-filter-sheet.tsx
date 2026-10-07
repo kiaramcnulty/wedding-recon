@@ -76,9 +76,9 @@ function money(n: number): string {
 
 /**
  * How many filters a type's UI state actually applies — counted off the spec
- * the matcher receives, not off the raw state keys. The Weddings | Elopements
- * pair stores a mode key that is not a filter by itself (Elopements with no
- * range set narrows nothing), so `Object.keys(state).length` would overcount.
+ * the matcher receives, not off the raw state keys. A price filter with the
+ * Weddings | Elopements pair is ONE filter however many of its keys are set
+ * (range, mode, checkbox), so `Object.keys(state).length` would overcount.
  */
 export function activeFilterCount(t: VendorType, state: FilterState | undefined): number {
   return state ? Object.keys(buildSelection(filtersForType(t), state)).length : 0;
@@ -91,7 +91,7 @@ const MODE_LABEL: Record<PriceMode, string> = {
 
 /** The Elopements-mode footnote (Kiara, 2026-10-07). */
 const ELOPEMENT_NOTE =
-  "Shows vendors' elopement packages. Vendors that do elopements but don't post a price appear after priced ones.";
+  "Shows vendors that offer elopements. Vendors that don't post an elopement price appear after priced ones.";
 
 function fmt(def: FilterDef, n: number): string {
   if (def.unit === "usd") return money(n);
@@ -439,12 +439,14 @@ function TypeSection({
 
   /**
    * The closed-row pill for a price filter with the mode pair. A range reads
-   * "Weddings · $X – $Y" / "Elopements · $X – $Y". With no range, only an
+   * "Weddings · $X – $Y" / "Elopements · $X – $Y". With no range, Elopements
+   * mode is itself a filter ("Elopements"), and in Weddings mode only an
    * unticked elopement-only checkbox is doing anything, so that is what it says.
    */
   const summarizePrice = (def: FilterDef): string | null => {
     const ranged = summarize(def);
     if (ranged || !def.elopement) return ranged;
+    if (priceModeOf(def, state) === "elopement") return MODE_LABEL.elopement;
     if (priceModeOf(def, state) === "wedding" && !includesElopementOnly(def, state)) {
       return "Weddings · no elopement-only";
     }
