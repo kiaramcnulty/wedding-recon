@@ -54,6 +54,8 @@ export const HERO = {
   reassurance: `${PRICE_PER_MONTH}, ${PRICE_BILLING_NOTE}. Cancel anytime.`,
 } as const;
 
+export type BenefitId = "visibility" | "checkmark" | "details" | "cta";
+
 /**
  * What a vendor gets for verification. Shared with the in-portal pitch
  * (`components/portal/verification-intro.tsx`) so the page a vendor reads before
@@ -65,31 +67,49 @@ export const HERO = {
  * promises a perk the app does not ship.
  */
 export const VERIFICATION_BENEFITS: readonly {
+  /** Stable key: the /for-vendors screenshots place their markers by it. */
+  id: BenefitId;
   icon: LucideIcon;
   title: string;
   body: string;
 }[] = [
   {
-    icon: BadgeCheck,
-    title: "A verified checkmark",
-    body: "A trust signal on your profile and in couples' search results.",
-  },
-  {
+    id: "visibility",
     icon: TrendingUp,
     title: "Higher visibility",
     body: "Verified vendors sort ahead of unverified ones in the same Explore results.",
   },
   {
-    icon: ArrowUpRight,
-    title: "Guide couples onward",
-    body: "A call-to-action button that links straight to your inquiry or booking page.",
+    id: "checkmark",
+    icon: BadgeCheck,
+    title: "A verified checkmark",
+    body: "A trust signal on your profile and in couples' search results.",
   },
   {
+    id: "details",
     icon: PencilRuler,
     title: "Your own verified details",
     body: "Add pricing, photos, website, and the services couples filter by.",
   },
+  {
+    id: "cta",
+    icon: ArrowUpRight,
+    title: "Guide couples onward",
+    body: "A call-to-action button that links straight to your inquiry or booking page.",
+  },
 ];
+
+/**
+ * Labels for the screenshots inside the "What you get" band
+ * (`components/vendors/verification-preview.tsx`). They are STYLIZED mock-ups
+ * of a fictional venue (sample name, prices and photos), not live captures - so
+ * the caption says so.
+ */
+export const PREVIEW_SECTION = {
+  pageLabel: "Your vendor page",
+  feedLabel: "Search results",
+  caption: "Illustrative example with a sample venue.",
+} as const;
 
 export const BENEFITS_SECTION = {
   eyebrow: "What you get",
