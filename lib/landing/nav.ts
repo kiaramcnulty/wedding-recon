@@ -19,8 +19,32 @@
  */
 export const VISIT_COOKIE = "wr_seen";
 
-/** One year. Long enough that a couple planning over a season isn't re-pitched. */
-export const VISIT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+/**
+ * 30 days, written ONCE (MarkVisited skips the write when the cookie is
+ * present), so it lapses 30 days after the first product visit even for a
+ * visitor who keeps using the app signed out - and they see the landing page
+ * once more. Accepted on purpose (Kiara, 2026-10-11): it was one year, and the
+ * cookies that steer `/` now share a 30-day lifetime. A signed-in visitor is
+ * unaffected, since the gate recognises them without the cookie.
+ */
+export const VISIT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+
+/**
+ * Marks this browser as BUSINESS-side: someone who has reached the vendor
+ * portal signed in (any step - claiming, drafting, paying, or already
+ * verified). Its presence sends a later visit to `/` to the portal instead of
+ * Explore, so a vendor who comes back to finish verifying, or to manage a live
+ * listing, is not dropped on the couples product.
+ *
+ * Written client-side by <MarkVendor> on the portal dashboard, for the same
+ * prefetch reason as VISIT_COOKIE (the profile menu prefetches /portal on every
+ * app screen). Never written for site admins. Cleared only by the "Not a
+ * vendor?" link on the portal, or by expiring.
+ */
+export const VENDOR_COOKIE = "wr_vendor";
+
+/** 30 days, RENEWED on every portal dashboard render, so it lapses only after 30 days away. */
+export const VENDOR_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
 /**
  * Query marker meaning "show me the landing page even though I've been here."
@@ -35,6 +59,36 @@ export const LANDING_HREF = `/?${LANDING_REF_PARAM}=${LANDING_REF_APP}`;
 
 /** Where the landing page's CTAs send people, and where the gate redirects. */
 export const APP_HREF = "/explore";
+
+/** Where the gate sends a business-side browser (VENDOR_COOKIE). */
+export const PORTAL_HREF = "/portal";
+
+/**
+ * Where a request for `/` should be redirected, or null to render the landing
+ * page. Pure (no Next imports) so the routing rule is testable on its own -
+ * see scripts/test-first-visit-gate.mjs. In order:
+ *
+ *   1. `/?ref=app`            -> landing (the in-app links back to it)
+ *   2. business-side browser  -> the portal
+ *   3. signed in, or has used the product -> Explore
+ *   4. otherwise              -> landing
+ *
+ * The portal decides the rest: signed in, it resumes the dashboard; signed
+ * out, it redirects to the /for-vendors pitch (which has the sign-in link).
+ */
+export function firstVisitRedirect(input: {
+  pathname: string;
+  ref: string | null;
+  seen: boolean;
+  vendor: boolean;
+  signedIn: boolean;
+}): string | null {
+  if (input.pathname !== "/") return null;
+  if (input.ref === LANDING_REF_APP) return null;
+  if (input.vendor) return PORTAL_HREF;
+  if (input.seen || input.signedIn) return APP_HREF;
+  return null;
+}
 
 /**
  * Which screens count as "has used the product" is now decided by where

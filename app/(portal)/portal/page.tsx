@@ -12,6 +12,8 @@ import { ClaimBusiness } from "@/components/portal/claim-business";
 import { BillingControl } from "@/components/portal/billing-control";
 import { VerificationIntro } from "@/components/portal/verification-intro";
 import { Step, type StepStatus } from "@/components/portal/verification-steps";
+import { MarkVendor } from "@/components/mark-vendor";
+import { NotAVendorLink } from "@/components/portal/not-a-vendor-link";
 import { PRICE_PER_MONTH, PRICE_BILLING_NOTE } from "@/lib/portal/verification";
 
 /** Stripe statuses that mean a subscription exists (manage, not activate). */
@@ -131,32 +133,39 @@ export default async function PortalPage() {
 
   return (
     <div className="flex flex-col gap-8 py-2">
+      {/* Any signed-in visit here makes this browser business-side, so `/`
+          returns to the portal rather than Explore - at every step, verified
+          included. Admins are excluded (and cleared). See lib/landing/nav.ts. */}
+      <MarkVendor enabled={!isAdmin} />
       <VerificationIntro />
 
       {claims.length === 0 ? (
         // Brand-new vendor: the three steps, step 1 active.
-        <div className="rounded-xl border p-4">
-          <Step
-            n={1}
-            title="Find or create your business"
-            status="current"
-            description="Search for your business below. If it is not listed yet, you can add it."
-          >
-            <ClaimBusiness hideHeading />
-          </Step>
-          <Step
-            n={2}
-            title="Create your verified listing"
-            status="upcoming"
-            description="Add your intro, pricing, photos, and a link for couples to take the next step."
-          />
-          <Step
-            n={3}
-            title="Subscribe to verification"
-            status="upcoming"
-            description={`${PRICE_PER_MONTH}, ${PRICE_BILLING_NOTE}. Publishes your listing and adds your checkmark.`}
-            last
-          />
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border p-4">
+            <Step
+              n={1}
+              title="Find or create your business"
+              status="current"
+              description="Search for your business below. If it is not listed yet, you can add it."
+            >
+              <ClaimBusiness hideHeading />
+            </Step>
+            <Step
+              n={2}
+              title="Create your verified listing"
+              status="upcoming"
+              description="Add your intro, pricing, photos, and a link for couples to take the next step."
+            />
+            <Step
+              n={3}
+              title="Subscribe to verification"
+              status="upcoming"
+              description={`${PRICE_PER_MONTH}, ${PRICE_BILLING_NOTE}. Publishes your listing and adds your checkmark.`}
+              last
+            />
+          </div>
+          <NotAVendorLink />
         </div>
       ) : (
         <div className="flex flex-col gap-4">
