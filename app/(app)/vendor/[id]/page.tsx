@@ -36,6 +36,7 @@ import { ShareButton } from "@/components/vendor/share-button";
 import { BackButton } from "@/components/vendor/back-button";
 import { ExternalLink } from "@/components/external-link";
 import { BrandFooter } from "@/components/brand-lockup";
+import { cn } from "@/lib/utils";
 
 /** One row of a verified vendor's published listing (RPC verified_listing_public). */
 interface VerifiedListingRow {
@@ -315,8 +316,17 @@ export default async function VendorPage({
 
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col pb-6">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b px-4 py-3">
+      {/* Header. A verified vendor's gets a soft blue wash and a blue rule —
+          both stops opaque, since the header is sticky and content scrolls
+          under it. */}
+      <div
+        className={cn(
+          "sticky top-0 z-10 px-4 py-3",
+          isVerified
+            ? "border-b-2 border-verified-line bg-linear-to-b from-verified-wash to-background"
+            : "border-b bg-background",
+        )}
+      >
         <div className="flex items-start gap-3">
           <BackButton from={backHref} />
           {/* Category icon chip */}

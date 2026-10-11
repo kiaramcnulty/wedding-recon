@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, BadgeCheck } from "lucide-react";
+import { ChevronDown, BadgeCheck, CalendarCheck } from "lucide-react";
 
 import { ExternalLink } from "@/components/external-link";
 import { buttonVariants } from "@/components/ui/button";
@@ -35,6 +35,15 @@ export interface ListingContent {
 }
 
 const INTRO_CLAMP_THRESHOLD = 160;
+
+/**
+ * The CTA is the one action a paying vendor gets on their page, so it is drawn
+ * in the Vendor Verification blue and taller than a default button, rather than
+ * the neutral `primary` every other button uses. Shared by the live link and the
+ * editor's inert preview so the two cannot drift.
+ */
+const CTA_CLASS =
+  "h-13 w-full gap-2 rounded-[14px] bg-verified text-base font-bold text-white shadow-[0_6px_16px_rgb(29_78_216/0.35)] hover:bg-verified/90";
 
 export function VendorListingContent({
   content,
@@ -98,15 +107,17 @@ export function VendorListingContent({
                   cta_label: ctaLabel,
                 });
             }}
-            className={cn(buttonVariants({ size: "lg" }), "w-full no-underline!")}
+            className={cn(buttonVariants({ size: "lg" }), CTA_CLASS, "no-underline!")}
           >
+            <CalendarCheck className="size-[18px]" aria-hidden />
             {ctaLabel}
           </ExternalLink>
         ) : (
           <span
             aria-hidden
-            className={cn(buttonVariants({ size: "lg" }), "pointer-events-none w-full opacity-90")}
+            className={cn(buttonVariants({ size: "lg" }), CTA_CLASS, "pointer-events-none")}
           >
+            <CalendarCheck className="size-[18px]" aria-hidden />
             {ctaLabel}
           </span>
         )
