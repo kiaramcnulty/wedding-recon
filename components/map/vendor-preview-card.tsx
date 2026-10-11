@@ -352,7 +352,13 @@ export function VendorPreviewCard({
         // and town labels bleed through and made the card unreadable on web
         // (reported 2026-08-12). --muted is oklch(0.97 0 0), a near-white that
         // reads as the same subtle tint the /40 intended, but fully opaque.
-        "overflow-hidden rounded-xl border bg-card transition-colors hover:bg-muted",
+        "overflow-hidden rounded-xl transition-colors",
+        // A verified vendor's card carries the Vendor Verification tint, on
+        // every surface this card renders (feed, cluster sheet, pin peek, Hub).
+        // Both fills are opaque tokens, for the same reason as above.
+        item.verified
+          ? "border-[1.5px] border-verified-line bg-verified-soft hover:bg-verified-wash"
+          : "border bg-card hover:bg-muted",
         className,
       )}
     >
@@ -387,13 +393,13 @@ export function VendorPreviewCard({
             )}
             {/* Name + verified badge. The badge is a sibling of the truncating
                 name (not inside it) so `truncate`'s nowrap/overflow never clips
-                the check; `min-w-0` lets the name shrink past it. iconOnly keeps
-                the card compact — the full label lives on the vendor page. */}
-            <span className="flex min-w-0 items-center gap-1">
+                the pill; `min-w-0` lets the name shrink past it. `compact` is the
+                short "Verified" pill — the full label lives on the vendor page. */}
+            <span className="flex min-w-0 items-center gap-1.5">
               <span className="min-w-0 truncate font-heading text-sm font-semibold">
                 {item.name}
               </span>
-              {item.verified && <VerifiedBadge iconOnly />}
+              {item.verified && <VerifiedBadge compact />}
             </span>
             {/* "City, ST" of the address behind the pin — shown for every
                 vendor type, including the service-region ones whose pin marks
@@ -417,7 +423,7 @@ export function VendorPreviewCard({
         )}
       </div>
       {item.slides.length > 0 && (
-        <ReconPreviewCarousel slides={item.slides} onOpen={go} />
+        <ReconPreviewCarousel slides={item.slides} onOpen={go} onTint={item.verified} />
       )}
     </div>
   );
@@ -434,9 +440,13 @@ export function VendorPreviewCard({
 function ReconPreviewCarousel({
   slides,
   onOpen,
+  onTint = false,
 }: {
   slides: ReconSlide[];
   onOpen: () => void;
+  /** On a verified (tinted) card the muted slide fill disappears into the
+   * tint, so the slides go solid instead. */
+  onTint?: boolean;
 }) {
   return (
     <div
@@ -448,7 +458,8 @@ function ReconPreviewCarousel({
         <div
           key={i}
           className={cn(
-            "flex shrink-0 snap-start flex-col gap-0.5 rounded-lg bg-muted/50 px-3 py-2",
+            "flex shrink-0 snap-start flex-col gap-0.5 rounded-lg px-3 py-2",
+            onTint ? "bg-background" : "bg-muted/50",
             slides.length === 1 ? "w-full" : "w-[85%]",
           )}
         >

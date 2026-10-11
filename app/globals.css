@@ -28,6 +28,10 @@
   --color-brand: var(--brand);
   --color-brand-ink: var(--brand-ink);
   --color-brand-soft: var(--brand-soft);
+  --color-verified: var(--verified);
+  --color-verified-soft: var(--verified-soft);
+  --color-verified-wash: var(--verified-wash);
+  --color-verified-line: var(--verified-line);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
@@ -87,6 +91,14 @@
   --brand: #1d9e75;
   --brand-ink: #085041;
   --brand-soft: #e1f5ee;
+  /* Vendor Verification blue: the badge fill, and the tint / wash / line a
+     verified vendor gets on its card and page header. Deliberately NOT the brand
+     green, and deeper than the photos category blue (#378ADD), so the marks
+     never read as each other. See components/vendor/verified-badge.tsx. */
+  --verified: #1d4ed8;
+  --verified-soft: #f5f8ff;
+  --verified-wash: #eef3ff;
+  --verified-line: #bfd0fa;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -127,6 +139,10 @@
   --brand: #2fb88c;
   --brand-ink: #a7e3ce;
   --brand-soft: #0e3b30;
+  --verified: #6b8cff;
+  --verified-soft: #121a33;
+  --verified-wash: #172246;
+  --verified-line: #2c3d73;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
