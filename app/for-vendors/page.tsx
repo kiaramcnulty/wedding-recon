@@ -5,6 +5,7 @@ import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { Section, SectionHeading } from "@/components/landing/section";
 import { PortalCtaLink } from "@/components/vendors/portal-cta-link";
+import { VerificationPreview } from "@/components/vendors/verification-preview";
 import { buttonVariants } from "@/components/ui/button";
 import { CONTACT_EMAIL } from "@/lib/landing/content";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,6 @@ import {
   META,
   STEPS,
   STEPS_SECTION,
-  VERIFICATION_BENEFITS,
 } from "@/lib/vendors/content";
 
 /**
@@ -117,28 +117,14 @@ export default function VendorsPage() {
         </section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* What you get. VERIFICATION_BENEFITS is the same constant the       */}
-        {/* in-portal intro renders.                                           */}
+        {/* What you get. VERIFICATION_BENEFITS (the same constant the in-     */}
+        {/* portal intro renders), each keyed to a marker on the screenshots. */}
         {/* ---------------------------------------------------------------- */}
         <Section className="border-y bg-muted/30">
           <SectionHeading eyebrow={BENEFITS_SECTION.eyebrow}>
             {BENEFITS_SECTION.heading}
           </SectionHeading>
-          <ul className="mt-10 grid gap-6 sm:grid-cols-2">
-            {VERIFICATION_BENEFITS.map((b) => (
-              <li key={b.title} className="flex items-start gap-3">
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft">
-                  <b.icon className="size-[18px] text-brand-ink" aria-hidden />
-                </span>
-                <div>
-                  <p className="font-heading font-semibold">{b.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {b.body}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <VerificationPreview />
         </Section>
 
         {/* ---------------------------------------------------------------- */}
