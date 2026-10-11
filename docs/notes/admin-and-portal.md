@@ -106,6 +106,13 @@ straight onto a sign-in form with no idea what they were signing up for.
   decides for every surface, so a signed-in vendor never detours through
   marketing and a new link cannot be wired up wrong. Keep pointing new COLD
   vendor links at `/portal`, not at `/for-vendors`.
+- **`/` returns a business-side browser to `/portal` (2026-10-11).** Reaching the
+  portal dashboard signed in sets the `wr_vendor` cookie (`<MarkVendor>`), and
+  the first-visit gate then sends a bare `weddingrecon.com` to `/portal` -- which
+  resumes the dashboard signed in, or falls through to `/for-vendors` signed
+  out. Set at every step including verified, never for admins, cleared only by
+  the step-1 "Not a vendor? Back to Explore" link. Full rule:
+  `docs/notes/landing-and-seo.md`.
 - **But a CTA on `/for-vendors` must NOT point at `/portal`** -- the router sends a
   signed-out visitor to `/for-vendors`, so the button reloads the page it is on.
   Both "Get started" buttons shipped that way on 2026-09-20 and were caught by

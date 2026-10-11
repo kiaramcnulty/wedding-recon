@@ -1,18 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
-  APP_HREF,
-  LANDING_REF_APP,
   LANDING_REF_PARAM,
+  VENDOR_COOKIE,
   VISIT_COOKIE,
+  firstVisitRedirect,
 } from "./nav";
 
 /**
  * Routes `/` by whether the visitor has used the product before.
  *
  * - First-time (and crawler) visitors get the landing page at `/`.
- * - Anyone who has reached a product path before — or is signed in — is sent
- *   straight to Explore, so the pitch is shown exactly once.
+ * - A business-side browser (it has reached the vendor portal) is sent to the
+ *   portal, so a vendor never lands on the couples product.
+ * - Anyone else who has reached a product path before — or is signed in — is
+ *   sent straight to Explore, so the pitch is shown exactly once.
  * - `/?ref=app` always renders the landing page (see LANDING_HREF): it's how
  *   the in-app links back reach a page the gate would otherwise redirect away
  *   from.
@@ -29,18 +31,25 @@ export function applyFirstVisitGate(
 ): NextResponse {
   const { pathname, searchParams } = request.nextUrl;
 
-  // Only `/` is decided here. The cookie itself is written client-side by
-  // <MarkVisited> in the (app) layout: a Next prefetch of a product link is a
-  // real request but not a real visit, and the header that would identify one
-  // is not visible to the proxy. See components/mark-visited.tsx.
+  // Only `/` is decided here. Both cookies are written client-side - by
+  // <MarkVisited> in the (app) layout and <MarkVendor> on the portal
+  // dashboard: a Next prefetch of a product link is a real request but not a
+  // real visit, and the header that would identify one is not visible to the
+  // proxy. See components/mark-visited.tsx.
   if (pathname !== "/") return response;
 
-  const seen = request.cookies.get(VISIT_COOKIE)?.value === "1";
-  if (searchParams.get(LANDING_REF_PARAM) === LANDING_REF_APP) return response;
-  if (!seen && !signedIn) return response;
+  // The rule itself lives in nav.ts (pure, unit-tested); this is the plumbing.
+  const destination = firstVisitRedirect({
+    pathname,
+    ref: searchParams.get(LANDING_REF_PARAM),
+    seen: request.cookies.get(VISIT_COOKIE)?.value === "1",
+    vendor: request.cookies.get(VENDOR_COOKIE)?.value === "1",
+    signedIn,
+  });
+  if (!destination) return response;
 
   const url = request.nextUrl.clone();
-  url.pathname = APP_HREF;
+  url.pathname = destination;
 
   // NextResponse.redirect() starts from a blank response, so anything
   // updateSession() just wrote — a refreshed Supabase access/refresh token pair
