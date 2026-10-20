@@ -23,7 +23,7 @@ interface PlacesPhoto {
 // (2026-08): the third strip tile was the least-viewed and cost a fetch on every
 // vendor-page load. The card uses only i=0, so it is unaffected.
 const MAX_PHOTOS = 2;
-const TTL_MS = 30 * 24 * 60 * 60 * 1000; // re-resolve photo refs at most monthly
+const TTL_MS = 90 * 24 * 60 * 60 * 1000; // expired media names still refresh on demand
 
 // A well-formed Places photo resource name. Anything with path/query metachars is
 // rejected so a stored name can't reshape the media URL it gets spliced into.
@@ -35,14 +35,14 @@ export function isValidPhotoName(name: string): boolean {
 }
 
 /**
- * The vendor's top ≤3 Google Places photo *references* (not bytes). Returns the
+ * The vendor's top ≤2 Google Places photo *references* (not bytes). Returns the
  * cached refs when fresh; otherwise resolves them from Place Details and stores
  * them on the row. Cheap on the common path (a cache read); only hits Google on
- * a cache miss (first view, or once the stamp is >30d old).
+ * a cache miss (first view, or once the stamp is ≥90d old).
  *
- * Photo bytes are served on demand by /api/vendor-photo and CDN-cached — never
- * stored — so this stays within Google's no-caching terms and uses no Supabase
- * Storage.
+ * Photo bytes use Next's persistent Data Cache beneath the CDN — never
+ * Supabase Storage. These TTLs describe our implementation, not an
+ * exception to Google's Places content caching restrictions.
  */
 export async function getVendorGooglePhotos(
   vendor: VendorPhotoRow,
@@ -54,7 +54,7 @@ export async function getVendorGooglePhotos(
     vendor.google_photos_fetched_at != null &&
     Date.now() - new Date(vendor.google_photos_fetched_at).getTime() < TTL_MS;
   // Slice on read, not just at fetch time, so a row cached with the old cap of 3
-  // renders the new cap immediately instead of waiting out its 30-day TTL.
+  // renders the new cap immediately instead of waiting out its TTL.
   if (fresh) return (vendor.google_photos as GooglePhotoRef[]).slice(0, MAX_PHOTOS);
 
   return refreshVendorGooglePhotos(vendor.id, vendor.google_place_id);
@@ -86,7 +86,7 @@ export async function refreshVendorGooglePhotos(
   return photos;
 }
 
-/** One Place Details call (photos field only), mapped to our ≤3 stored refs. */
+/** One Place Details call (photos field only), mapped to our ≤2 stored refs. */
 async function fetchGooglePhotoRefs(placeId: string): Promise<GooglePhotoRef[]> {
   const key = process.env.GOOGLE_PLACES_API_KEY;
   if (!key) return [];
@@ -96,7 +96,7 @@ async function fetchGooglePhotoRefs(placeId: string): Promise<GooglePhotoRef[]> 
       `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
       {
         headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "id,photos" },
-        cache: "no-store", // we do our own 30-day cache on the row
+        cache: "no-store", // we do our own 90-day cache on the row
       },
     );
     if (!res.ok) {

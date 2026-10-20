@@ -31,9 +31,9 @@ export interface Vendor {
   source: VendorSource;
   created_by: string | null;
   created_at: string;
-  /** Cached references (not bytes) to the venue's top ≤3 Google Places photos; null until first resolved. See lib/google-photos.ts. */
+  /** Cached references (not bytes) to the venue's top ≤2 Google Places photos; null until first resolved. See lib/google-photos.ts. */
   google_photos: GooglePhotoRef[] | null;
-  /** When google_photos was last resolved; rows older than ~30d are re-resolved on next view. */
+  /** When google_photos was last resolved; rows ≥90d old are re-resolved on next view. */
   google_photos_fetched_at: string | null;
   /**
    * Extracted filter attributes, keyed per vendor type — see

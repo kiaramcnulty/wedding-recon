@@ -1,5 +1,49 @@
 # Where the Google Places money goes
 
+## October 20, 2026 update
+
+The October billing report shows 4,725 photo downloads costing $26.08; 971
+IDs-only lookups, 92 autocomplete requests, and 3 Enterprise Details calls cost
+$0. The `id,photos` mask is IDs-only (unlimited free), correcting the older
+Essentials classification below.
+
+Photo references now have a 90-day row TTL, and image responses request a
+90-day shared/CDN freshness lifetime (browser caching stays one day). Rotated
+photo names still trigger a refresh. Google documents restrictions on caching
+Places content, explicitly including photo names; these settings describe the
+implementation and do not establish an exception to those restrictions.
+
+The photo endpoint redirects URL variants to a canonical lowercase vendor UUID
+with exactly `?i=<index>&w=<width>`, before any DB or Google call. Duplicate `i`
+or `w` values and invalid indices/widths are rejected. This prevents unused query
+parameters, parameter order, or numeric aliases from creating separately billed
+image responses.
+
+**A cache lifetime is not a spend ceiling.** Vercel keys CDN entries by deployment,
+URL, and host; caches are regional and can evict early. One photo can therefore
+be downloaded from Google multiple times during its TTL. The media fetch now
+explicitly uses Next's persistent Data Cache (`force-cache`, 90-day revalidation)
+beneath the CDN. That cache survives deployments: a cold CDN after a deploy can
+reuse the Google response instead of paying Google again. The handler uses
+`revalidate = 0` to keep rate limits and vendor reads dynamic while allowing this
+individual fetch to be cached. No additional service or credentials are needed.
+The Data Cache is still regional and subject to eviction and a 2 MB serialized
+entry limit (including the base64 image body and metadata). Oversized images,
+rotated photo names, API-key changes, expiry, or a manual purge can cause another
+Google fetch. This is not durable object storage or a hard spending cap.
+See [Vercel's cross-deployment cache guide](https://vercel.com/kb/guide/share-vercel-cache-across-deployments-nextjs).
+
+At the current catalog
+size, one ideal fill of the 3,238 known photos at 600px costs $15.67; including
+1200px costs $38.33, assuming the 1,000 free monthly photo calls are available.
+
+Sources: [Google pricing](https://developers.google.com/maps/billing-and-pricing/pricing),
+[photo-name restrictions](https://developers.google.com/maps/documentation/places/web-service/place-photos),
+[Vercel cache keys](https://vercel.com/docs/caching/cdn-cache/purge),
+[cache retention](https://vercel.com/docs/caching/cdn-cache).
+
+The dated audits below retain their historical settings and conclusions.
+
 Written after a $76 Google Cloud bill in July 2026 — a month whose "expected spend"
 per `SETUP.md` was ~$0. Both numbers were right about different things: `SETUP.md`
 was costing the *app*, and the app really is nearly free. The bill is the
