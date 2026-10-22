@@ -141,6 +141,13 @@ export default async function VendorPage({
     typeof from === "string" && from.startsWith("/") && !from.startsWith("//")
       ? from
       : null;
+  // This page's own URL *including* its return path. Handed to the Add and
+  // Edit recon forms so they return to a vendor page that still knows where
+  // it came from; dropping the `from` here is what used to strand people
+  // bouncing between a form and this page.
+  const selfHref = backHref
+    ? `/vendor/${id}?from=${encodeURIComponent(backHref)}`
+    : `/vendor/${id}`;
 
   const supabase = await createClient();
 
@@ -526,7 +533,7 @@ export default async function VendorPage({
             accent) so it pops against the otherwise grayscale UI. */}
         {!userHasRecon && (
           <Link
-            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${encodeURIComponent(`/vendor/${vendor.id}`)}`}
+            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${encodeURIComponent(selfHref)}`}
             style={{ backgroundColor: colorHex }}
             className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
           >
@@ -541,15 +548,7 @@ export default async function VendorPage({
             entry={entry}
             isMine={!!userId && entry.author_id === userId}
             viewerIsAdmin={viewerIsAdmin}
-            // This page's own URL *including* its return path, so the edit
-            // page can send the user back to a vendor page that still knows
-            // where it came from. Dropping the `from` here is what used to
-            // strand people bouncing between edit and vendor.
-            returnTo={
-              backHref
-                ? `/vendor/${id}?from=${encodeURIComponent(backHref)}`
-                : `/vendor/${id}`
-            }
+            returnTo={selfHref}
           />
         ))}
       </div>

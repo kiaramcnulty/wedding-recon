@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { captureServer } from "@/lib/analytics/posthog-server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRegion } from "@/lib/normalize-region";
@@ -27,6 +27,12 @@ export interface CreateReconInput {
   manualRegion?: string | null;
   manualLat?: number | null;
   manualLng?: number | null;
+
+  /**
+   * The page the add form was opened from (`from`). Either the vendor page
+   * itself, carrying its own `from`, or another page such as the Hub.
+   */
+  returnTo?: string;
 
   // Common vendor metadata
   vendorType: VendorType;
@@ -218,5 +224,20 @@ export async function createRecon(input: CreateReconInput) {
   });
 
   // ── 6. Redirect to vendor page ────────────────────────────────────────────
-  redirect(`/vendor/${vendorId}`);
+  // Keep the return context so the vendor page back button still reaches
+  // Explore/Hub: reuse the vendor URL when the form came from it, otherwise
+  // hand the origin page on as its `from`. Internal paths only.
+  const returnTo =
+    input.returnTo?.startsWith("/") && !input.returnTo.startsWith("//")
+      ? input.returnTo
+      : null;
+  const vendorPath = `/vendor/${vendorId}`;
+  const target = !returnTo
+    ? vendorPath
+    : returnTo === vendorPath || returnTo.startsWith(`${vendorPath}?`)
+      ? returnTo
+      : `${vendorPath}?from=${encodeURIComponent(returnTo)}`;
+
+  // `replace`, not push: a saved form should not be reachable by pressing back.
+  redirect(target, RedirectType.replace);
 }

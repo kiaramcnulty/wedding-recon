@@ -5,8 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, ChevronLeft } from "lucide-react";
-import Link from "next/link";
+import { Loader2 } from "lucide-react";
 
 import { Mail } from "lucide-react";
 
@@ -50,6 +49,7 @@ import {
 import { useIsStandalone } from "@/lib/use-standalone";
 import { BrandFooter } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
+import { HistoryBackButton } from "@/components/history-back-button";
 import { createRecon } from "./actions";
 import { uploadReconImages } from "@/lib/recon-upload";
 
@@ -170,6 +170,9 @@ function AddReconForm() {
   // republishes byte-for-byte identical data.
   const buildInputPayload = React.useCallback(
     (values: FormValues) => ({
+      // Where the post-save redirect sends the user, so the vendor page they
+      // land on still knows where they came from (Explore/Hub).
+      ...(backHref ? { returnTo: backHref } : {}),
       // A pre-resolved vendor (URL param) or an existing vendor picked from
       // search both resolve straight to a vendor id — no new row is created.
       ...(preVendorId
@@ -208,7 +211,7 @@ function AddReconForm() {
       serviceRegion: values.serviceRegion,
       notes: values.notes,
     }),
-    [preVendorId, vendorState],
+    [backHref, preVendorId, vendorState],
   );
 
   // Restore the editable form from a draft (used as the resume fallback when an
@@ -537,11 +540,10 @@ function AddReconForm() {
     <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
       {/* Header */}
       <header className="flex items-center gap-2 border-b px-4 py-3">
-        {backHref && (
-          <Link href={backHref} aria-label="Go back">
-            <ChevronLeft className="size-5 text-muted-foreground" />
-          </Link>
-        )}
+        {/* Steps back through history rather than linking to `backHref`: a
+            pushed /vendor/X is what used to trap people bouncing between this
+            page and the vendor page. See HistoryBackButton. */}
+        {backHref && <HistoryBackButton cameFromApp fallback={backHref} />}
         <h1 className="text-base font-semibold">Add recon</h1>
         <ProfileMenu className="ml-auto shrink-0" />
       </header>
