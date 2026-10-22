@@ -135,7 +135,8 @@ export default async function VendorPage({
 
   // Where to send the back button: when navigated from another page (e.g. the
   // Planning Hub) a `from` return path is passed. Restrict to internal paths.
-  // If absent, BackButton falls back to browser history (router.back()).
+  // If absent, BackButton steps back through history, or goes to Explore on a
+  // cold arrival (shared link, search result) with nothing to step back to.
   const { from } = await searchParams;
   const backHref =
     typeof from === "string" && from.startsWith("/") && !from.startsWith("//")

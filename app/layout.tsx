@@ -12,6 +12,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+import { InAppHistoryTracker } from "@/components/in-app-history";
 import { Toaster } from "@/components/ui/sonner";
 import { SITE_URL } from "@/lib/site";
 
@@ -61,6 +62,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <InAppHistoryTracker />
         {children}
         <Toaster position="top-center" />
       </body>

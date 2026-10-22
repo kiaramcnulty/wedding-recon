@@ -38,7 +38,16 @@ export default async function EditReconPage({
   const userId = claimsData?.claims.sub;
 
   if (!userId) {
-    redirect(`/login?from=${encodeURIComponent(`/recon/${id}/edit`)}`);
+    // `back` must not be this page: it is the one bouncing a signed-out
+    // visitor to login, so a back link to it lands on login again. Return to
+    // the vendor page the edit link came from (or Explore), and keep this
+    // page's own `from` in the landing URL so its back button survives sign-in.
+    const self = backHref
+      ? `/recon/${id}/edit?from=${encodeURIComponent(backHref)}`
+      : `/recon/${id}/edit`;
+    redirect(
+      `/login?from=${encodeURIComponent(self)}&back=${encodeURIComponent(backHref ?? "/explore")}`,
+    );
   }
 
   const { data: entry, error } = await supabase
