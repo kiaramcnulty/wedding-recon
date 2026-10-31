@@ -90,3 +90,5 @@ next-env.d.ts
 
 # bot-recon quality pass working artifacts (DB export, per-vendor packets, flags)
 /data/qualitypass/
+# Per-service price pass: evidence packs, extracted offers, review CSV.
+/data/price-offers/

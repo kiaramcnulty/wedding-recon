@@ -81,7 +81,27 @@ export function GuidedJourney() {
   React.useEffect(() => {
     const t = setTimeout(() => {
       const stored = loadJourney();
-      const restore = new URLSearchParams(window.location.search).get("restore");
+      const params = new URLSearchParams(window.location.search);
+      const restore = params.get("restore");
+      const venueParam = params.get("venue");
+      const typeParam = params.get("type");
+      if (venueParam || typeParam) window.history.replaceState(null, "", "/start");
+      // From the welcome popup: the venue question is already answered.
+      if ((venueParam === "yes" || venueParam === "no") && !stored) {
+        const hasVenue = venueParam === "yes";
+        const next = { ...emptyJourney(), hasVenue, step: (hasVenue ? "venue" : "city") as JourneyStep };
+        saveJourney(next);
+        setState(next);
+        return;
+      }
+      // From the welcome-back popup: straight to that type's preferences.
+      if (isGuidedType(typeParam) && stored?.location) {
+        resumedRef.current = true;
+        const next = { ...stored, selectedVendorType: typeParam, manualRadius: null, step: "prefs" as JourneyStep };
+        saveJourney(next);
+        setState(next);
+        return;
+      }
       if (restore && stored?.step === "results") {
         // Back from a vendor page: straight to where the couple was.
         setView(restore === "list" ? "list" : "suggestions");

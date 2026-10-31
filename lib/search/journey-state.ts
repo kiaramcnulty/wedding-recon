@@ -13,6 +13,8 @@ import { isGuidedType, type GuidedPrefs, type GuidedType } from "./guided";
 
 export const JOURNEY_STORAGE_KEY = "wr:journey";
 
+export { JOURNEY_HREF } from "@/lib/landing/nav";
+
 export type JourneyStep =
   | "welcome"
   | "venue"

@@ -238,6 +238,12 @@ Both types price a service whose scope the couple chooses, and both store one fl
 - **First release (no new data):** a price is confirmed only when its scope is unambiguous. For planners, that means the vendor lists exactly one `service_tier` and it is one the couple selected; a multi-tier planner with one flattened price is partial on price. For florists, a `per_item` price, or a single price on a florist offering both engagement models, is partial against a total budget.
 - **Second step (`price_offers`):** per-scope offers, below, let a multi-tier planner or mixed-scope florist be confirmed or excluded against the tier the couple actually asked for.
 
+**Planner status (31 October):** extraction done, NOT yet written to the database.
+- Shape and validator: `lib/filters/price-offers.ts` (`parseOffer`, `offerFor`), checked by `scripts/test-price-offers-shape.mjs`. An offer may carry a `label_quote` (the verbatim package name) when a page prints it far from the price.
+- Pipeline, all local, no Batch API and no Google: `scripts/price-offers/pack-planners.mjs` builds evidence packs from the archived research (Reddit excerpts excluded: they discuss many vendors at once); Opus read the packs and wrote offers with verbatim quotes, plus a hand-checked second pass for pages where the package name sat far from its price; `scripts/price-offers/verify-planners.mjs` checks every quote and figure against the source and writes `data/price-offers/planner/review.csv`.
+- Result: 65 offers, all passing checks. 21 planners have 2+ tiers priced, 12 have 1, and 42 of the 75 planners with any price evidence have none we could tie to a tier. 7 rows across 3 planners are marked `check` (a possible wrong-business site, a flattened price table, 2021-dated pages).
+- To go live: Kiara edits the `approve` column, then runs `node scripts/price-offers/apply-planners.mjs` (dry run) and `--apply`. It replaces only `filters.price_offers`, records provenance in `filters_meta`, skips `filters_source = manual` rows, and lifts extraction rows to `recon`, because `scripts/backfill-vendor-filters.mjs` replaces `filters` wholesale on extraction rows and would otherwise erase the offers. The matcher wiring for planners is still to do.
+
 The audit found seven explicit bouquet-priced florists and mixed-scope package rows. Two examples to turn into fixtures:
 
 - Buckley House of Flowers: a bridal bouquet starting at $175; not a complete wedding-flower package.
