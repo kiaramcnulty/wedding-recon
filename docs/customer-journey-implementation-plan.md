@@ -74,7 +74,7 @@ Every field below already exists in `lib/constants/vendor-filters.ts`; no new ta
 | Florist | Budget, style, structure | `price` + `minimum_spend`, `style`, `engagement_model` | Selecting both Full service and À la carte means either; replaces the earlier three-way question |
 | Dress shop | Budget, in-house alterations (off) | `price`, `in_house_alterations` | Per gown |
 | Hair & makeup | Bride budget, where they work | `bride_price`, `work_mode` | Per-bridesmaid price moves to Advanced |
-| Hotel blocks | Courtesy vs guaranteed | `block_type` | No price by default; parking and breakfast under Advanced. Check field coverage before launch |
+| Hotel blocks | Courtesy vs guaranteed | `block_type` | No price by default; parking and breakfast under Advanced. Block type is recorded on only 7 of 255 hotels (open question 6), so hold this control until it is researched |
 | Planner | Budget, service type | `price`, `service_tier` | Per-tier comparison (requirement 17) |
 | Photographer | Budget, style | `price`, `style` | |
 | Other | None | none | Location and suggestions only |
@@ -480,11 +480,34 @@ Possible fast follows for couples who answered "yes, we have a venue" (deferred 
 Undecided unless marked decided; each has a recommendation.
 
 1. **Bouquet count for florists: decided, not asked.** A bouquet count times a `per_item` price is only a bouquet subtotal: it can exclude a florist but never confirm one, because centerpieces, ceremony and installs are still unknown, and it helps 7 of 60 priced florists. Bouquet-only prices stay partial (requirement 9).
-2. **Success metric.** Usage as of 2026-09-24: about 640 people, about 20 couples signed up, 18 of 25 never returned, and no human recon saved since 2026-08-29. Recommendation: primary metric is the share of new visitors who save at least one vendor in their first session, with D7 return as secondary, compared flag-on vs flag-off.
-3. **Thin slice first.** Recommendation: ship Venue + Photos guided paths into the existing feed, device-local state plus the existing pending-save intent, behind the flag in Denver, and measure before the other types, the map ring and Milestone 6 server sync. Server sync serves returning signed-in couples, a group that barely exists yet.
+2. **Success metric: decided, skipped** for now (31 October). The coarse `journey_step` / `journey_results` PostHog events in the slice still record funnel and result counts.
+3. **Thin slice: decided, built** on branch `journey/venue-photos-slice` (31 October), at the unlinked, `noindex` route `/start`. It covers:
+   - both first-visit branches (booked venue via our own directory, or a Colorado town), optional month/year, the 11-type grid with only Venue and Photos enabled, Venue and Photos default controls, suggestions, the full feed (`VendorFeed`), vendor round trips, resume and the returning-visitor screen;
+   - the radius ladder, banded distance and a manual radius slider with reset (no map ring);
+   - effective attributes through the edge cache (`/api/map/vendors?attrs=1`);
+   - device-local state only (`wr:journey` in localStorage).
+
+   Not in the slice: Advanced sheets, the map ring and single-type Explore, server sync, a pending-save intent (signed-out Save still goes through the existing login redirect from the vendor page), the other nine types, and any entry point that sends visitors to `/start`. Pure checks: `scripts/test-guided-search.mjs`.
 4. **Who sees the welcome screen.** Recommendation: never interrupt a deep link (`/vendor/[id]`, typed `/explore` URLs, Reddit and SEO arrivals); show screen 11 only on bare `/explore`, at most once per day; change the landing page CTA to start the journey.
-5. **Venue fee vs all-inclusive pricing.** Venues with `catering_policy: in_house_required` often quote an all-inclusive per-person price that includes food ($150 × 150 guests = $22,500), compared against a budget couples may read as a rental fee. Recommendation: label converted all-inclusive totals as "includes catering" on cards, and decide whether the venue budget question says "venue only" or "venue + food".
-6. **Default-control coverage.** The audit did not measure `block_type`, `includes_mc`, `genre`, `cuisine`, `service_style`, `in_house_alterations`, `work_mode` or `service_tier` coverage. Recommendation: run a read-only Denver coverage check before PR 4 so a single default tap does not routinely produce No confirmed matches.
+5. **Venue fee vs all-inclusive pricing.** Coverage on 31 October: 83 of 644 venues have `catering_policy: in_house_required` (66 of them priced), and only 32 venues quote per person (15 of those in-house). The slice shows the failure mode: Mount Vernon Canyon Club quotes "$6,000 rental + $8k-$10k food minimum" and matches a $10,000 venue budget on its $6,000 floor. Recommendation: keep one budget question, no second one, and label in-house-catering venues on their cards ("In-house catering") so a couple can tell that food is bundled or extra. Revisit only if couples report it.
+6. **Default-control coverage: checked 31 October** (read-only, all of Colorado, with the number within 50 miles of Denver in brackets):
+
+   | Type | Field coverage |
+   | --- | --- |
+   | Venue (644) | price 366 (193), capacity 425 (213), setting 473 (216) |
+   | Caterer (177) | price 80 (54), cuisine 119 (73), service style 122 (72) |
+   | DJ (91) | price 48 (32), emcee 65 (46) |
+   | Live music (106) | price 48 (41), genre 69 (61) |
+   | Florist (188) | price 60 (49), minimum spend 38 (30), style 59 (40), structure 132 (88) |
+   | Dress (61) | price 39 (30), in-house alterations 33 (25) |
+   | Hair & makeup (191) | bride price 91 (45), where they work 133 (65) |
+   | Hotel blocks (255) | **block type 7 (4)**: 6 guaranteed, 1 courtesy, 248 missing |
+   | Planner (162) | price 89 (66), service type 131 (92) |
+   | Photographer (275) | price 207 (127), style 163 (88) |
+
+   Two findings change the plan:
+   - **Hotel block type is effectively empty**, so any selection would leave every hotel partial. Recommendation: launch hotels with no default control (location only, like Other) until block type is researched.
+   - **75 of 87 priced planners list more than one service tier.** Under the first-release planner rule those stay partial on price, so a planner budget would confirm almost nobody. The per-tier `price_offers` data (PR 2b) has to land before planners join the journey, not after.
 
 ## Definition of done
 

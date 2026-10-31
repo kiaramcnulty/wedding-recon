@@ -154,7 +154,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       label: "Setting",
       kind: "multi",
       options: opt({
-        mountain: "Mountain",
+        mountain: "Mountain views",
         ranch: "Ranch",
         garden: "Garden",
         barn_rustic: "Barn / rustic",

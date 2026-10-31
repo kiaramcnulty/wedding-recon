@@ -3,7 +3,14 @@ import { createClient } from "@supabase/supabase-js";
 import { ALL_VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 
 /**
- * GET /api/map/vendors?min_lng&min_lat&max_lng&max_lat&type&max_rows
+ * GET /api/map/vendors?min_lng&min_lat&max_lng&max_lat&type&max_rows[&attrs=1]
+ *
+ * `attrs=1` also merges each vendor's EFFECTIVE filter attributes
+ * (`vendor_filters_in_bbox`: evidence quotes stripped, verified overrides on
+ * top) onto its row as `filters`. The guided search needs them for every
+ * visitor's first result, which made them unsafe to keep fetching from the
+ * browser uncached; riding on this route puts them behind the same edge cache.
+ * Without the flag the response is unchanged, so the map's callers are too.
  *
  * Edge-cacheable proxy for ONE vendor type's pins in a bounding box — the
  * per-type split the Explore map already does. Returns the raw `vendors_in_bbox`
@@ -90,14 +97,29 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const supabase = createClient(url, key, { auth: { persistSession: false } });
 
-  const { data, error } = await supabase.rpc("vendors_in_bbox", {
+  const args = {
     min_lng: minLng,
     min_lat: minLat,
     max_lng: maxLng,
     max_lat: maxLat,
     p_types: [type as VendorType],
     max_rows: maxRows,
-  });
+  };
+  const withAttrs = sp.get("attrs") === "1";
+  const [pins, attrs] = await Promise.all([
+    supabase.rpc("vendors_in_bbox", args),
+    withAttrs ? supabase.rpc("vendor_filters_in_bbox", args) : null,
+  ]);
+  const error = pins.error ?? attrs?.error;
+  let data: Record<string, unknown>[] | null = pins.data;
+  if (attrs && data) {
+    // Vendors with no attributes at all are absent from the second RPC; they
+    // come back with `filters: null`, which the matcher reads as silence.
+    const byId = new Map<string, unknown>(
+      (attrs.data ?? []).map((r: { id: string; filters: unknown }) => [r.id, r.filters]),
+    );
+    data = data.map((row) => ({ ...row, filters: byId.get(row.id as string) ?? null }));
+  }
 
   if (error) {
     // Surface upstream trouble as a transient 503 the client retries on, and

@@ -59,6 +59,8 @@ export function VendorFeed({
   className,
   pending = false,
   scrollRef: externalScrollRef,
+  returnTo = "/explore?restore=1",
+  emptyText = "No vendors here. Try moving the map or loosening a filter.",
 }: {
   /** Vendors to list, in display order. Each carries its OWN type, so a feed can mix them. */
   entries: VendorListEntry[];
@@ -86,6 +88,10 @@ export function VendorFeed({
    * scroll the list closes the sheet instead.
    */
   scrollRef?: React.RefObject<HTMLDivElement | null>;
+  /** Where a card's vendor page sends its back button. Explore by default. */
+  returnTo?: string;
+  /** Shown when the source reported and nothing is in it. */
+  emptyText?: string;
 }) {
   const ownScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef ?? ownScrollRef;
@@ -196,7 +202,7 @@ export function VendorFeed({
 
   // `from` returns the back button here: /explore?restore=1 restores the view.
   const vendorHref = (id: string) =>
-    `/vendor/${id}?from=${encodeURIComponent("/explore?restore=1")}`;
+    `/vendor/${id}?from=${encodeURIComponent(returnTo)}`;
 
   /** Remember where we are so returning here lands in the same spot. */
   function rememberScroll() {
@@ -227,7 +233,7 @@ export function VendorFeed({
         </div>
       ) : items.length === 0 ? (
         <p className="px-4 py-12 text-center text-sm text-muted-foreground">
-          No vendors here. Try moving the map or loosening a filter.
+          {emptyText}
         </p>
       ) : (
         <>
