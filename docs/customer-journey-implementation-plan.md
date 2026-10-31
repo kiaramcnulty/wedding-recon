@@ -74,7 +74,7 @@ Every field below already exists in `lib/constants/vendor-filters.ts`; no new ta
 | Florist | Budget, style, structure | `price` + `minimum_spend`, `style`, `engagement_model` | Selecting both Full service and À la carte means either; replaces the earlier three-way question |
 | Dress shop | Budget, in-house alterations (off) | `price`, `in_house_alterations` | Per gown |
 | Hair & makeup | Bride budget, where they work | `bride_price`, `work_mode` | Per-bridesmaid price moves to Advanced |
-| Hotel blocks | Courtesy vs guaranteed | `block_type` | No price by default; parking and breakfast under Advanced. Block type is recorded on only 7 of 255 hotels (open question 6), so hold this control until it is researched |
+| Hotel blocks | None for now (later: courtesy vs guaranteed) | (`block_type`) | Location only until block type is researched: it is recorded on 7 of 255 hotels (open question 6). Price, parking and breakfast under Advanced |
 | Planner | Budget, service type | `price`, `service_tier` | Per-tier comparison (requirement 17) |
 | Photographer | Budget, style | `price`, `style` | |
 | Other | None | none | Location and suggestions only |
@@ -488,7 +488,11 @@ Undecided unless marked decided; each has a recommendation.
    - device-local state only (`wr:journey` in localStorage).
 
    Not in the slice: Advanced sheets, the map ring and single-type Explore, server sync, a pending-save intent (signed-out Save still goes through the existing login redirect from the vendor page), the other nine types, and any entry point that sends visitors to `/start`. Pure checks: `scripts/test-guided-search.mjs`.
-4. **Who sees the welcome screen.** Recommendation: never interrupt a deep link (`/vendor/[id]`, typed `/explore` URLs, Reddit and SEO arrivals); show screen 11 only on bare `/explore`, at most once per day; change the landing page CTA to start the journey.
+4. **Who sees the welcome screen: decided 31 October.**
+   - Screen 01 (first-visit welcome) shows on **every first arrival, including deep links** (a `/vendor/[id]` link, a typed `/explore` URL, Reddit and Google arrivals), as an overlay with an **X to dismiss**. Dismissing or finishing it stops it reappearing on that device; the page underneath (for example the vendor the link pointed at) is what remains after the X.
+   - Screen 11 (returning visitor) shows only on bare `/explore`, at most once a day.
+   - The landing page's main call to action starts the journey.
+   - Risk to watch: Google treats an overlay covering the main content on arrival from search as an intrusive interstitial on mobile, even when it can be dismissed, which can lower ranking for those pages. See `docs/seo-aeo-plan.md`; if vendor-page search traffic drops after launch, the fallback is a bottom sheet that leaves the vendor content visible for search arrivals.
 5. **Venue fee vs all-inclusive pricing.** Coverage on 31 October: 83 of 644 venues have `catering_policy: in_house_required` (66 of them priced), and only 32 venues quote per person (15 of those in-house). The slice shows the failure mode: Mount Vernon Canyon Club quotes "$6,000 rental + $8k-$10k food minimum" and matches a $10,000 venue budget on its $6,000 floor. Recommendation: keep one budget question, no second one, and label in-house-catering venues on their cards ("In-house catering") so a couple can tell that food is bundled or extra. Revisit only if couples report it.
 6. **Default-control coverage: checked 31 October** (read-only, all of Colorado, with the number within 50 miles of Denver in brackets):
 
@@ -506,8 +510,8 @@ Undecided unless marked decided; each has a recommendation.
    | Photographer (275) | price 207 (127), style 163 (88) |
 
    Two findings change the plan:
-   - **Hotel block type is effectively empty**, so any selection would leave every hotel partial. Recommendation: launch hotels with no default control (location only, like Other) until block type is researched.
-   - **75 of 87 priced planners list more than one service tier.** Under the first-release planner rule those stay partial on price, so a planner budget would confirm almost nobody. The per-tier `price_offers` data (PR 2b) has to land before planners join the journey, not after.
+   - **Hotel block type is effectively empty**, so any selection would leave every hotel partial. **Decided 31 October:** hotels launch with no default control (location only, like Other) until block type is researched.
+   - **75 of 87 priced planners list more than one service tier.** Planner rows store which tiers a planner offers (`service_tier`) and ONE price range across all of them (for example $6,500–$20,000 for a planner offering day-of through full planning); the only separately stored price is `elopement_price_min` (12 planners). Under the first-release planner rule those stay partial on price, so a planner budget would confirm almost nobody. **Decided 31 October:** the per-tier `price_offers` data (PR 2b) lands before planners join the journey.
 
 ## Definition of done
 

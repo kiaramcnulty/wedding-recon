@@ -444,9 +444,10 @@ function VenueStep({
       try {
         // Our own directory only: no Google call on the first screen. Hotels
         // are included because some properties couples book are typed hotel.
-        const res = await fetch(`/api/vendor-search?q=${encodeURIComponent(q)}`);
-        const rows = res.ok ? ((await res.json()) as VenueMatch[]) : [];
-        setResults(rows.filter((r) => r.vendorType === "venue" || r.vendorType === "hotel"));
+        const res = await fetch(
+          `/api/vendor-search?q=${encodeURIComponent(q)}&types=venue,hotel`,
+        );
+        setResults(res.ok ? ((await res.json()) as VenueMatch[]) : []);
       } catch {
         setResults([]);
       } finally {

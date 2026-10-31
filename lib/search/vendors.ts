@@ -87,6 +87,12 @@ export interface SearchVendorsOptions {
   maxRows?: number;
   /** Drop rows with no coordinates (Explore needs a pin to fly to). */
   requireCoords?: boolean;
+  /**
+   * Keep only these vendor types, BEFORE the `limit` cut. Filtering the
+   * returned rows instead would let other types fill the top slots: a venue
+   * lookup for "denver" could come back with six "Denver ..." photographers.
+   */
+  types?: readonly string[];
 }
 
 /**
@@ -130,7 +136,7 @@ export async function searchVendors(
   query: string,
   options: SearchVendorsOptions = {},
 ): Promise<VendorMatch[]> {
-  const { limit = 6, maxRows = DEFAULT_MAX_ROWS, requireCoords = false } = options;
+  const { limit = 6, maxRows = DEFAULT_MAX_ROWS, requireCoords = false, types } = options;
   const q = query.trim();
   if (q.length < MIN_SEARCH_QUERY_LENGTH) return [];
   // Only punctuation/wildcards typed → the RPC would match everything, so skip
@@ -150,6 +156,7 @@ export async function searchVendors(
 
   return (data as SearchVendorsRow[])
     .filter((v) => !requireCoords || (v.lng != null && v.lat != null))
+    .filter((v) => !types || types.includes(v.vendor_type))
     .map((v) => {
       // Which tier produced this row: literal (every token present in
       // name/address/city, the RPC's strict rule) vs. typo-tolerant near-miss.
