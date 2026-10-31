@@ -1,0 +1,902 @@
+{
+  "auditDate": "2026-10-31",
+  "scope": "Read-only live vendor data; verified published overrides merged; 2223 vendors. Denver radius samples use the existing matcher with budget ceiling and capacity minimum. Current fixed venue conversion: 100 guests / 5 hours.",
+  "summary": {
+    "band": {
+      "total": 106,
+      "coordinates": 106,
+      "verified": 0,
+      "headlinePrice": 48,
+      "basis": {
+        "package": 45,
+        "missing": 3
+      },
+      "confidence": {
+        "listing": 33,
+        "published": 11,
+        "missing": 3,
+        "inferred": 1
+      },
+      "priceMin": 48,
+      "onlyMax": 0,
+      "onlyTiers": 0,
+      "settingOrStyle": 0,
+      "capacityMax": 0,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 0,
+      "approximate": 70
+    },
+    "beauty": {
+      "total": 191,
+      "coordinates": 191,
+      "verified": 0,
+      "headlinePrice": 0,
+      "basis": {},
+      "confidence": {},
+      "priceMin": 0,
+      "onlyMax": 0,
+      "onlyTiers": 0,
+      "settingOrStyle": 0,
+      "capacityMax": 0,
+      "bridePrice": 91,
+      "partyPrice": 68,
+      "minimumSpend": 0,
+      "approximate": 47
+    },
+    "dj": {
+      "total": 91,
+      "coordinates": 91,
+      "verified": 1,
+      "headlinePrice": 48,
+      "basis": {
+        "package": 42,
+        "per_hour": 1,
+        "missing": 5
+      },
+      "confidence": {
+        "published": 27,
+        "listing": 16,
+        "missing": 5
+      },
+      "priceMin": 48,
+      "onlyMax": 0,
+      "onlyTiers": 0,
+      "settingOrStyle": 0,
+      "capacityMax": 0,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 0,
+      "approximate": 38
+    },
+    "dress": {
+      "total": 61,
+      "coordinates": 61,
+      "verified": 0,
+      "headlinePrice": 41,
+      "basis": {
+        "per_gown": 41
+      },
+      "confidence": {
+        "published": 40,
+        "inferred": 1
+      },
+      "priceMin": 39,
+      "onlyMax": 2,
+      "onlyTiers": 0,
+      "settingOrStyle": 0,
+      "capacityMax": 0,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 0,
+      "approximate": 3
+    },
+    "flowers": {
+      "total": 194,
+      "coordinates": 188,
+      "verified": 2,
+      "headlinePrice": 60,
+      "basis": {
+        "package": 49,
+        "missing": 3,
+        "per_person": 1,
+        "per_item": 7
+      },
+      "confidence": {
+        "published": 47,
+        "missing": 3,
+        "listing": 9,
+        "inferred": 1
+      },
+      "priceMin": 60,
+      "onlyMax": 0,
+      "onlyTiers": 0,
+      "settingOrStyle": 59,
+      "capacityMax": 0,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 38,
+      "approximate": 31
+    },
+    "food": {
+      "total": 178,
+      "coordinates": 177,
+      "verified": 0,
+      "headlinePrice": 80,
+      "basis": {
+        "per_person": 67,
+        "package": 8,
+        "per_item": 4,
+        "missing": 1
+      },
+      "confidence": {
+        "published": 53,
+        "listing": 23,
+        "missing": 1,
+        "inferred": 3
+      },
+      "priceMin": 80,
+      "onlyMax": 0,
+      "onlyTiers": 0,
+      "settingOrStyle": 0,
+      "capacityMax": 0,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 9,
+      "approximate": 28
+    },
+    "hotel": {
+      "total": 255,
+      "coordinates": 255,
+      "verified": 0,
+      "headlinePrice": 1,
+      "basis": {
+        "package": 1
+      },
+      "confidence": {
+        "published": 1
+      },
+      "priceMin": 1,
+      "onlyMax": 0,
+      "onlyTiers": 0,
+      "settingOrStyle": 1,
+      "capacityMax": 1,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 0,
+      "approximate": 0
+    },
+    "other": {
+      "total": 32,
+      "coordinates": 32,
+      "verified": 1,
+      "headlinePrice": 0,
+      "basis": {},
+      "confidence": {},
+      "priceMin": 0,
+      "onlyMax": 0,
+      "onlyTiers": 0,
+      "settingOrStyle": 0,
+      "capacityMax": 0,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 0,
+      "approximate": 18
+    },
+    "photos": {
+      "total": 307,
+      "coordinates": 276,
+      "verified": 0,
+      "headlinePrice": 210,
+      "basis": {
+        "package": 172,
+        "missing": 36,
+        "per_hour": 2
+      },
+      "confidence": {
+        "published": 154,
+        "missing": 37,
+        "listing": 18,
+        "inferred": 1
+      },
+      "priceMin": 210,
+      "onlyMax": 0,
+      "onlyTiers": 0,
+      "settingOrStyle": 165,
+      "capacityMax": 0,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 0,
+      "approximate": 121
+    },
+    "planner": {
+      "total": 164,
+      "coordinates": 162,
+      "verified": 1,
+      "headlinePrice": 90,
+      "basis": {
+        "package": 82,
+        "missing": 8
+      },
+      "confidence": {
+        "published": 66,
+        "listing": 17,
+        "missing": 7
+      },
+      "priceMin": 89,
+      "onlyMax": 1,
+      "onlyTiers": 0,
+      "settingOrStyle": 0,
+      "capacityMax": 0,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 0,
+      "approximate": 95
+    },
+    "venue": {
+      "total": 644,
+      "coordinates": 644,
+      "verified": 1,
+      "headlinePrice": 367,
+      "basis": {
+        "package": 313,
+        "per_hour": 12,
+        "per_night": 3,
+        "per_person": 32,
+        "missing": 7
+      },
+      "confidence": {
+        "published": 245,
+        "listing": 106,
+        "inferred": 8,
+        "missing": 8
+      },
+      "priceMin": 366,
+      "onlyMax": 1,
+      "onlyTiers": 0,
+      "settingOrStyle": 473,
+      "capacityMax": 425,
+      "bridePrice": 0,
+      "partyPrice": 0,
+      "minimumSpend": 0,
+      "approximate": 8
+    }
+  },
+  "intersections": {
+    "venues": 644,
+    "priceAndCapacity": 326,
+    "priceCapacitySetting": 288,
+    "capacity150Exact": 44,
+    "venuePriceKind": {
+      "range": 262,
+      "single_figure": 27,
+      "starting_at": 71,
+      "undefined": 7
+    },
+    "beautyAnyPrice": 92
+  },
+  "scenarios": [
+    {
+      "name": "venue10k100",
+      "center": "App Denver default",
+      "byRadius": [
+        {
+          "radius": 25,
+          "candidates": 231,
+          "full": 91,
+          "partial": 110,
+          "excluded": 30,
+          "verifiedFull": 0
+        },
+        {
+          "radius": 50,
+          "candidates": 313,
+          "full": 138,
+          "partial": 133,
+          "excluded": 42,
+          "verifiedFull": 0
+        }
+      ],
+      "top3at50": [
+        {
+          "name": "Denver Art Museum",
+          "miles": 0.1,
+          "verified": false
+        },
+        {
+          "name": "First Baptist Church of Denver",
+          "miles": 0.3,
+          "verified": false
+        },
+        {
+          "name": "Rooftop1630",
+          "miles": 0.4,
+          "verified": false
+        }
+      ]
+    },
+    {
+      "name": "venue10k100MountainGarden",
+      "center": "App Denver default",
+      "byRadius": [
+        {
+          "radius": 25,
+          "candidates": 231,
+          "full": 32,
+          "partial": 88,
+          "excluded": 111,
+          "verifiedFull": 0
+        },
+        {
+          "radius": 50,
+          "candidates": 313,
+          "full": 67,
+          "partial": 108,
+          "excluded": 138,
+          "verifiedFull": 0
+        }
+      ],
+      "top3at50": [
+        {
+          "name": "Denver Botanic Gardens",
+          "miles": 1.6,
+          "verified": false
+        },
+        {
+          "name": "Denver City Park Pavilion",
+          "miles": 2.1,
+          "verified": false
+        },
+        {
+          "name": "The Lumber Baron Inn & Gardens",
+          "miles": 2.5,
+          "verified": false
+        }
+      ]
+    },
+    {
+      "name": "photos5kDocMoody",
+      "center": "App Denver default",
+      "byRadius": [
+        {
+          "radius": 25,
+          "candidates": 138,
+          "full": 36,
+          "partial": 58,
+          "excluded": 44,
+          "verifiedFull": 0
+        },
+        {
+          "radius": 50,
+          "candidates": 151,
+          "full": 40,
+          "partial": 61,
+          "excluded": 50,
+          "verifiedFull": 0
+        }
+      ],
+      "top3at50": [
+        {
+          "name": "Kenna Banks",
+          "miles": 0,
+          "verified": false
+        },
+        {
+          "name": "Taylored Wedding and Portraits",
+          "miles": 0,
+          "verified": false
+        },
+        {
+          "name": "MSW Photos (Matt Wilson)",
+          "miles": 0,
+          "verified": false
+        }
+      ]
+    },
+    {
+      "name": "photos1500DocMoody",
+      "center": "App Denver default",
+      "byRadius": [
+        {
+          "radius": 25,
+          "candidates": 138,
+          "full": 4,
+          "partial": 23,
+          "excluded": 111,
+          "verifiedFull": 0
+        },
+        {
+          "radius": 50,
+          "candidates": 151,
+          "full": 4,
+          "partial": 26,
+          "excluded": 121,
+          "verifiedFull": 0
+        }
+      ],
+      "top3at50": [
+        {
+          "name": "Authentic Moments Photography",
+          "miles": 13.7,
+          "verified": false
+        },
+        {
+          "name": "Wild Iris Media",
+          "miles": 21.5,
+          "verified": false
+        },
+        {
+          "name": "Dog Daze Photo",
+          "miles": 22,
+          "verified": false
+        }
+      ]
+    },
+    {
+      "name": "photos1000DocMoody",
+      "center": "App Denver default",
+      "byRadius": [
+        {
+          "radius": 25,
+          "candidates": 138,
+          "full": 3,
+          "partial": 20,
+          "excluded": 115,
+          "verifiedFull": 0
+        },
+        {
+          "radius": 50,
+          "candidates": 151,
+          "full": 3,
+          "partial": 23,
+          "excluded": 125,
+          "verifiedFull": 0
+        }
+      ],
+      "top3at50": [
+        {
+          "name": "Authentic Moments Photography",
+          "miles": 13.7,
+          "verified": false
+        },
+        {
+          "name": "Dog Daze Photo",
+          "miles": 22,
+          "verified": false
+        },
+        {
+          "name": "HoneyLensPhoto Colorado",
+          "miles": 24,
+          "verified": false
+        }
+      ]
+    },
+    {
+      "name": "venue3k150Mountain",
+      "center": "App Denver default",
+      "byRadius": [
+        {
+          "radius": 25,
+          "candidates": 231,
+          "full": 7,
+          "partial": 61,
+          "excluded": 163,
+          "verifiedFull": 0
+        },
+        {
+          "radius": 50,
+          "candidates": 313,
+          "full": 12,
+          "partial": 78,
+          "excluded": 223,
+          "verifiedFull": 0
+        }
+      ],
+      "top3at50": [
+        {
+          "name": "Table Mountain Event and Wedding Venue",
+          "miles": 10.4,
+          "verified": false
+        },
+        {
+          "name": "Crystal Rose (JR Clark Venues)",
+          "miles": 13.7,
+          "verified": false
+        },
+        {
+          "name": "Mount Vernon Canyon Club",
+          "miles": 15.6,
+          "verified": false
+        }
+      ]
+    }
+  ],
+  "special": {
+    "onlyMax": [
+      {
+        "name": "Rita Rose Events",
+        "type": "venue",
+        "max": 9500,
+        "basis": "package"
+      },
+      {
+        "name": "Affair of the Heart",
+        "type": "dress",
+        "max": 1200,
+        "basis": "per_gown"
+      },
+      {
+        "name": "Eleven Eleven Bridal Boutique",
+        "type": "dress",
+        "max": 3000,
+        "basis": "per_gown"
+      },
+      {
+        "name": "Velvet Pine Weddings",
+        "type": "planner",
+        "max": 4500,
+        "basis": "package"
+      }
+    ],
+    "zeroPrice": [],
+    "venueOtherBasis": [
+      {
+        "name": "Denver Press Club",
+        "basis": "per_hour",
+        "min": 100,
+        "max": 500,
+        "quote": "$100-$500/hr depending on room and day, 2 hr minimum"
+      },
+      {
+        "name": "Dunton Hot Springs",
+        "basis": "per_night",
+        "min": 40000,
+        "max": 75000,
+        "quote": "$40k-$75k per night depending on season and buyout size"
+      },
+      {
+        "name": "Four Seasons Resort and Residences Vail",
+        "basis": "per_person",
+        "min": 300,
+        "max": 300,
+        "quote": "their A Season to Remember wedding package is $300 per person"
+      },
+      {
+        "name": "First Baptist Church of Denver",
+        "min": 1700,
+        "max": 5100
+      },
+      {
+        "name": "Oceana's Gardens",
+        "min": 19500
+      },
+      {
+        "name": "Pinecrest Weddings & Event Center",
+        "basis": "per_person",
+        "min": 59,
+        "max": 149,
+        "quote": "Classic $59-$106pp, Luxury $79-$149pp"
+      },
+      {
+        "name": "Parlur",
+        "basis": "per_person",
+        "min": 119,
+        "max": 229,
+        "quote": "Runs about $119 to $229 per person."
+      },
+      {
+        "name": "Tapestry House by Wedgewood",
+        "basis": "per_person",
+        "min": 67,
+        "max": 137,
+        "quote": "packages from $67 to $137 per guest"
+      },
+      {
+        "name": "The Vista at Applewood Golf Course",
+        "basis": "per_person",
+        "min": 45,
+        "quote": "a here comes the guide listing puts the ceremony at $1,000-$2,500 and the reception at $45/person and up"
+      },
+      {
+        "name": "Void Studios",
+        "basis": "per_hour",
+        "min": 35,
+        "max": 250,
+        "quote": "~$250/hr on peerspace, studio rates from $35/hr"
+      },
+      {
+        "name": "Hudson Gardens",
+        "basis": "per_hour",
+        "min": 200,
+        "max": 750,
+        "quote": "$200-$750/hr rental by season and day, listings put weddings ~$1,600-$5,600"
+      },
+      {
+        "name": "Curtis Ballroom",
+        "basis": "per_person",
+        "min": 25,
+        "max": 55,
+        "quote": "High season (May-Oct + Dec): Mon-Wed $30pp, Thu/Fri $45pp, Sat $55pp, Sun $40pp."
+      },
+      {
+        "name": "Urban Farmer Denver",
+        "basis": "per_person",
+        "min": 85,
+        "max": 130,
+        "quote": "$85-$130 per person for the set private dinner menus, drinks extra"
+      },
+      {
+        "name": "TWS Events",
+        "basis": "per_hour",
+        "min": 150,
+        "max": 250,
+        "quote": "$150/hr (seats 90) or $250/hr (seats 120)"
+      },
+      {
+        "name": "Clay Venues",
+        "basis": "per_person",
+        "min": 121,
+        "quote": "Starts around $121 per person"
+      },
+      {
+        "name": "Briarhurst Manor by Wedgewood Weddings",
+        "basis": "per_person",
+        "min": 77,
+        "max": 147,
+        "quote": "$77-147 per person"
+      },
+      {
+        "name": "Apache Ranch",
+        "basis": "per_night",
+        "min": 850,
+        "quote": "lists it at $850/night to rent the whole home"
+      },
+      {
+        "name": "Chief Hosa Lodge",
+        "basis": "per_hour",
+        "min": 230,
+        "max": 420,
+        "quote": "Peak season (May through September) runs $420/hour on Friday through Sunday and holidays, versus $230/hour off-peak (October through April)."
+      },
+      {
+        "name": "Castle MVP Wedding Venue",
+        "min": 8000,
+        "max": 8000
+      },
+      {
+        "name": "The Aerie",
+        "min": 30000,
+        "max": 40000
+      },
+      {
+        "name": "The Kitchen Lounge",
+        "basis": "per_person",
+        "min": 80,
+        "quote": "a three course family-style dinner at $80pp"
+      },
+      {
+        "name": "Hiwan Golf Club",
+        "basis": "per_person",
+        "min": 100,
+        "max": 170,
+        "quote": "reception packages at $100, $135 or $170 per person"
+      },
+      {
+        "name": "Western Colorado Botanical Gardens",
+        "basis": "per_hour",
+        "min": 75,
+        "max": 100,
+        "quote": "Wedding Spot lists $75/hr Mon-Thu and $100/hr Fri-Sun for ceremony and reception"
+      },
+      {
+        "name": "Burning Sky Farm",
+        "min": 30000,
+        "max": 30000
+      },
+      {
+        "name": "Table Mountain Inn",
+        "basis": "per_person",
+        "min": 89,
+        "max": 149,
+        "quote": "Runs about $89 to $149 per person."
+      },
+      {
+        "name": "The Franciscan Event Center",
+        "basis": "per_person",
+        "min": 40,
+        "max": 55,
+        "quote": "$40-$55 for the venue alone"
+      },
+      {
+        "name": "The Curtis Hotel",
+        "basis": "per_person",
+        "min": 125,
+        "max": 175,
+        "quote": "Runs about $125 to $175 per person"
+      },
+      {
+        "name": "The Benson Hotel",
+        "basis": "per_person",
+        "min": 145,
+        "max": 185,
+        "quote": "$145-$185/person packages"
+      },
+      {
+        "name": "Mountain View Ranch by Wedgewood Weddings",
+        "basis": "per_person",
+        "min": 91,
+        "max": 156,
+        "quote": "$91-$156 per guest + venue from $2,995 and ceremony from $995"
+      },
+      {
+        "name": "Hotel Boulderado",
+        "basis": "per_person",
+        "min": 109,
+        "max": 136,
+        "quote": "wedding packages run $109-$136 per guest, plus a 24% service charge and tax"
+      },
+      {
+        "name": "Steamboat Resort Weddings",
+        "basis": "per_person",
+        "min": 70,
+        "max": 110,
+        "quote": "Runs about $70 to $110 per person."
+      },
+      {
+        "name": "Creekside Terrace by Wedgewood Weddings",
+        "basis": "per_person",
+        "min": 68,
+        "max": 138,
+        "quote": "Build Your Own from $68, Classic $83, Premier $113 (adds an enhanced menu and open bar) and Elite $138"
+      },
+      {
+        "name": "Old Town Guesthouse B&B",
+        "basis": "per_night",
+        "min": 2000,
+        "max": 2400,
+        "quote": "Whole-inn rental is $2,000 per night November through April and $2,400 per night May through October"
+      },
+      {
+        "name": "Ivywild Events",
+        "basis": "per_hour",
+        "min": 375,
+        "max": 625,
+        "quote": "$375-$625/hr for the main room depending on day/season, 4hr min"
+      },
+      {
+        "name": "The Pines by Wedgewood Weddings",
+        "basis": "per_person",
+        "min": 67,
+        "max": 137,
+        "quote": "all-inclusive packages run $67 a guest (Build Your Own) up to $82 Classic, $112 Premier and $137 Elite"
+      },
+      {
+        "name": "The Lariat",
+        "basis": "per_person",
+        "min": 80,
+        "max": 95,
+        "quote": "$80 to $95 per person for a family style dinner"
+      },
+      {
+        "name": "Matsuhisa",
+        "basis": "per_person",
+        "min": 150,
+        "max": 250,
+        "quote": "THE SIGNATURE $150"
+      },
+      {
+        "name": "Leon Gallery",
+        "basis": "per_hour",
+        "min": 175,
+        "max": 175,
+        "quote": "$175 an hour with a 4 hour minimum"
+      },
+      {
+        "name": "The Club at Flying Horse",
+        "basis": "per_person",
+        "min": 210,
+        "quote": "Starts at $210 per guest (all-inclusive)"
+      },
+      {
+        "name": "The Fort",
+        "basis": "per_person",
+        "min": 85,
+        "max": 120,
+        "quote": "Dinner packages run $85 to $120 per person"
+      },
+      {
+        "name": "Boulder Creek by Wedgewood Weddings",
+        "basis": "per_person",
+        "min": 92,
+        "max": 157,
+        "quote": "Build Your Own $92, Classic $102, Premier $132 (enhanced menu + open bar), Elite $157"
+      },
+      {
+        "name": "Ken Caryl Vista by Wedgewood Weddings",
+        "basis": "per_person",
+        "min": 67,
+        "max": 137,
+        "quote": "Packages $67-$137 per guest"
+      },
+      {
+        "name": "Brittany Hill by Wedgewood Weddings",
+        "basis": "per_person",
+        "min": 67,
+        "quote": "their brittany hill page says packages start at $67 per guest"
+      },
+      {
+        "name": "Brookside Gardens by Wedgewood Weddings",
+        "basis": "per_person",
+        "min": 63,
+        "max": 133,
+        "quote": "$1k-$8k venue, $500-$1500 ceremony, $63-$133 per person"
+      },
+      {
+        "name": "The Ranch Country Club",
+        "basis": "per_person",
+        "min": 140,
+        "max": 300,
+        "quote": "Silver, Gold and Platinum packages at $140-$165, $165-$215 and $215-$300 per person"
+      },
+      {
+        "name": "Heritage Lakewood Belmar Park",
+        "basis": "per_hour",
+        "min": 89,
+        "max": 299,
+        "quote": "$89-$299/hr depending on the space, 3hr minimum"
+      },
+      {
+        "name": "Creative Littleton",
+        "basis": "per_hour",
+        "min": 150,
+        "max": 500,
+        "quote": "$150 per hour ... $500 per hour"
+      },
+      {
+        "name": "The Little Nell",
+        "basis": "per_person",
+        "min": 550,
+        "quote": "Here Comes the Guide lists $550 per person and up"
+      },
+      {
+        "name": "Clear Creek Inn",
+        "basis": "per_person",
+        "min": 49,
+        "max": 73,
+        "quote": "Facility fee $49 to $73 per person, plus food and bar"
+      },
+      {
+        "name": "Lakehouse At Southshore",
+        "basis": "per_hour",
+        "min": 10,
+        "max": 50,
+        "quote": "Room rates from $10-50/hr depending on which room, plus a $125 cleaning fee"
+      },
+      {
+        "name": "St Julien Hotel & Spa",
+        "basis": "per_person",
+        "min": 162,
+        "quote": "Zola lists $162 per person off-peak with a $14,000 minimum"
+      },
+      {
+        "name": "Thrive Workplace Arvada",
+        "basis": "per_hour",
+        "min": 125,
+        "quote": "$125/hr for the 40 person training room"
+      },
+      {
+        "name": "The Arabella",
+        "min": 5000,
+        "max": 12000
+      },
+      {
+        "name": "The Oaks at Plum Creek",
+        "min": 11000,
+        "max": 12000
+      }
+    ],
+    "reversedPrice": [
+      "Rocky Mountain Fun Machine"
+    ]
+  }
+}
