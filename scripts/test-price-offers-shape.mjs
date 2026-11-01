@@ -5,17 +5,7 @@
  *
  *   node scripts/test-price-offers-shape.mjs
  */
-import { registerHooks } from "node:module";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-registerHooks({
-  resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) return next(pathToFileURL(resolve(ROOT, `${specifier.slice(2)}.ts`)).href, context);
-    return next(specifier, context);
-  },
-});
+import "./ts-alias.mjs";
 const { parseOffer, offerFor } = await import("../lib/filters/price-offers.ts");
 
 let pass = 0, fail = 0;
@@ -40,6 +30,7 @@ eq("missing quote rejected", err({ ...base, quote: "" }), "missing quote");
 eq("percent of budget needs a percent", err({ ...base, basis: "percent_of_budget", price_min: undefined }), "percent_of_budget needs a percent 0-100");
 eq("percent of budget with dollar minimum accepted", err({ ...base, basis: "percent_of_budget", percent: 10, price_min: 6500, price_kind: "starting_at" }), "accepted");
 eq("offerFor finds the scope", offerFor({ price_offers: [base, { ...base, scope: "full_planning" }] }, "full_planning")?.scope, "full_planning");
+eq("offerFor is strict: a month-of offer is not a day-of price", offerFor({ price_offers: [{ ...base, scope: "month_of" }] }, "day_of"), undefined);
 eq("offerFor with no offers", offerFor({ price_min: 3000 }, "day_of"), undefined);
 
 console.log(`\n${pass} passed, ${fail} failed`);

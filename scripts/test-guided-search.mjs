@@ -9,19 +9,7 @@
  * guided.ts imports through the `@/` path alias, which Node does not know, so
  * a resolve hook maps it onto the repo root before the module is loaded.
  */
-import { registerHooks } from "node:module";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-registerHooks({
-  resolve(specifier, context, next) {
-    if (specifier.startsWith("@/")) {
-      return next(pathToFileURL(resolve(ROOT, `${specifier.slice(2)}.ts`)).href, context);
-    }
-    return next(specifier, context);
-  },
-});
+import "./ts-alias.mjs";
 
 const {
   guidedSelection,

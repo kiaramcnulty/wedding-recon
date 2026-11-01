@@ -1,4 +1,5 @@
 import type { FilterDef } from "@/lib/constants/vendor-filters";
+import { offerFor, type PriceOffer } from "@/lib/filters/price-offers";
 
 /**
  * Attribute matching for the Explore filters. **This is the only
@@ -38,6 +39,11 @@ export type FilterSpec =
       /** Multipliers converting an off-`basis` quote onto `basis`, by the
        * vendor's own `price_basis`. See `FilterDef.basisScale`. */
       scale?: Record<string, number>;
+      /** Picked price scopes (planner service tiers): judge the budget per
+       * scope. See `FilterDef.priceScopedBy` and `scopedPrice` below. */
+      scopes?: string[];
+      /** The vendor tag key that lists which scopes a vendor offers. */
+      scopeKey?: string;
     };
 
 export type FilterSelection = Record<string, FilterSpec>;
@@ -183,6 +189,17 @@ export function filterMatch(
 
     // range
     //
+    // Scoped price (planners): judged per picked service tier. "match" and
+    // "exclude" end this filter; "legacy" falls through to the one flattened
+    // price below, which is only safe when every tier the vendor offers is one
+    // the couple picked.
+    if (spec.scopes?.length) {
+      const v = scopedPrice(filters, spec);
+      if (v === "exclude") return { rank: -1, unknown, active };
+      if (v === "unknown") unknown++;
+      if (v !== "legacy") continue;
+    }
+
     // An off-basis quote is either convertible or incomparable. A venue quoting
     // per person can be put on the package axis by assuming a guest count (the
     // sheet states the assumption in so many words), so it is scaled and then
@@ -267,6 +284,89 @@ function isNum(v: number | undefined): v is number {
   return v !== undefined;
 }
 
+type RangeSpec = Extract<FilterSpec, { kind: "range" }>;
+
+/**
+ * One per-scope offer against the budget. An hourly rate has no package total
+ * to compare, so it is silence; a percent-of-budget fee counts only through
+ * its stated dollar minimum, read as a floor.
+ */
+function offerVerdict(o: PriceOffer, spec: RangeSpec): "match" | "exclude" | "unknown" {
+  if (o.basis === "per_hour") return "unknown";
+  let lo = num(o.price_min) ?? num(o.price_max);
+  let hi = num(o.price_max);
+  if (o.basis === "percent_of_budget") {
+    lo = num(o.price_min);
+    hi = undefined;
+  }
+  if (lo === undefined) return "unknown";
+  const open = o.price_kind === "starting_at" || o.basis === "percent_of_budget";
+  const vHi = hi ?? (open && spec.mode === "overlap" ? OPEN_HI : lo);
+  if ((spec.max != null && lo > spec.max) || (spec.min != null && vHi < spec.min)) return "exclude";
+  return "match";
+}
+
+/**
+ * The budget against a planner's price for the tier(s) the couple picked.
+ *
+ * - Any picked tier priced within budget: match. Tiers are strict: a
+ *   month-of price says nothing about day-of (Kiara, 2026-11-01, choosing
+ *   simplicity over a day-of / month-of fallback).
+ * - Every picked tier priced and all outside budget: exclude.
+ * - Otherwise the flattened `price_min`/`price_max` decides, and only as far
+ *   as it can. It is one range across ALL the tiers a vendor offers, so it is
+ *   a fair comparison only when each of those tiers is one the couple picked
+ *   ("legacy"). Its floor still rules a vendor out when even the cheapest
+ *   service is over budget. Anything else is silence, never a match: a $1,500
+ *   floor that is the day-of price says nothing about full planning.
+ *
+ * Decided 2026-11-01; docs/customer-journey-implementation-plan.md
+ * (requirement 17, Milestone 2).
+ */
+function scopedPrice(
+  filters: Record<string, unknown>,
+  spec: RangeSpec,
+): "match" | "exclude" | "unknown" | "legacy" {
+  const scopes = spec.scopes ?? [];
+  let priced = 0;
+  for (const s of scopes) {
+    const hit = offerFor(filters, s);
+    if (!hit) continue;
+    const v = offerVerdict(hit, spec);
+    if (v === "match") return "match";
+    if (v === "exclude") priced++;
+  }
+  if (priced === scopes.length) return "exclude";
+
+  const tiers = spec.scopeKey ? filters[spec.scopeKey] : undefined;
+  const covered =
+    priced === 0 &&
+    Array.isArray(tiers) &&
+    tiers.length > 0 &&
+    tiers.every((t) => scopes.includes(String(t)));
+  if (covered) return "legacy";
+
+  const floor = num(filters[spec.lo]) ?? num(filters[spec.hi ?? spec.lo]);
+  if (floor !== undefined && spec.max != null && floor > spec.max) return "exclude";
+  return "unknown";
+}
+
+/**
+ * The offer a card should quote for the couple's picked tiers: the first one
+ * within budget, else the first priced one. Undefined when no picked tier is
+ * priced.
+ */
+export function offerForSelection(
+  filters: VendorFilters,
+  spec: FilterSpec | undefined,
+): PriceOffer | undefined {
+  if (!filters || spec?.kind !== "range" || !spec.scopes?.length) return undefined;
+  const hits = spec.scopes
+    .map((s) => offerFor(filters, s))
+    .filter((o): o is PriceOffer => !!o);
+  return hits.find((o) => offerVerdict(o, spec) === "match") ?? hits[0];
+}
+
 /** Build the RPC argument from the UI state plus the type config. */
 export function buildSelection(
   defs: FilterDef[],
@@ -285,6 +385,8 @@ export function buildSelection(
     } else if (d.kind === "range" && typeof v === "object") {
       const r = v as { min?: number; max?: number };
       if (r.min == null && r.max == null) continue;
+      const picked = d.priceScopedBy ? state[d.priceScopedBy] : undefined;
+      const scopes = Array.isArray(picked) && picked.length ? (picked as string[]) : undefined;
       out[d.key] = {
         kind: "range",
         mode: d.mode ?? "overlap",
@@ -294,6 +396,7 @@ export function buildSelection(
         ...(r.max != null && { max: r.max }),
         ...(d.basis && { basis: d.basis }),
         ...(d.basisScale && { scale: d.basisScale }),
+        ...(scopes && { scopes, scopeKey: d.priceScopedBy }),
         ...(d.rescaledBy === "date_context" && dateContext?.season && { season: dateContext.season }),
         ...(d.rescaledBy === "date_context" && dateContext?.day && { day: dateContext.day }),
       };

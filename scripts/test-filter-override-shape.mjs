@@ -15,7 +15,9 @@
  * Run after touching the editor, the sanitizer, or match.ts.
  */
 
-import { filterMatchFor } from "../lib/filters/match.ts";
+import "./ts-alias.mjs";
+
+const { filterMatchFor } = await import("../lib/filters/match.ts");
 
 let pass = 0,
   fail = 0;

@@ -37,12 +37,11 @@ const { parseOffer } = await import("../../lib/filters/price-offers.ts");
 
 const DIR = resolve(ROOT, "data/price-offers/planner");
 
-// Rows a person should look at before they go live (2026-10-31 spot check).
-const FLAGGED = {
-  "Forget Me Knot Weddings": "archived site lists a New York (631) number: may be a different business",
-  "KM Flowers and Events": "price table was flattened; tiers matched by column order",
-  "Bella Notte Weddings and Events": "pages carry a 2021 copyright; prices may be stale",
-};
+// Rows a person should look at before they go live. The 2026-10-31 spot
+// check flagged Forget Me Knot (631 number; confirmed legit, Lakewood CO),
+// KM Flowers (flattened table) and Bella Notte (2021 pages); Kiara approved
+// all three on 2026-11-01.
+const FLAGGED = {};
 const norm = (s) => s.replace(/\s+/g, " ").replace(/[’‘]/g, "'").replace(/[“”]/g, '"').trim().toLowerCase();
 
 // Pack sections by "### file:" header, per vendor.

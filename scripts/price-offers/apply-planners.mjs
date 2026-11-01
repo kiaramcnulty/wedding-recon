@@ -26,11 +26,22 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const APPLY = process.argv.includes("--apply");
 const REVIEW = resolve(ROOT, "data/price-offers/planner/review.csv");
 
+// .env.local wins over the shell for the two keys this needs: a stale export
+// left in a terminal would otherwise point the write at the wrong project.
+// Tolerates `export`, spaces around `=`, quotes and trailing comments.
 const envFile = resolve(ROOT, ".env.local");
+const fromFile = new Set();
 if (existsSync(envFile)) {
-  for (const line of readFileSync(envFile, "utf8").split("\n")) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+  for (const line of readFileSync(envFile, "utf8").split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*)$/);
+    if (!m) continue;
+    let v = m[2].trim();
+    const q = v.match(/^(["'])(.*)\1/);
+    v = q ? q[2] : v.replace(/\s+#.*$/, "").trim();
+    if (["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].includes(m[1]) || !process.env[m[1]]) {
+      process.env[m[1]] = v;
+      fromFile.add(m[1]);
+    }
   }
 }
 
@@ -82,6 +93,15 @@ if (!url || !key) {
   console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.");
   process.exit(1);
 }
+if (!/^https?:\/\//i.test(url)) {
+  const where = fromFile.has("NEXT_PUBLIC_SUPABASE_URL") ? ".env.local" : "your shell environment";
+  console.error(
+    `NEXT_PUBLIC_SUPABASE_URL from ${where} is not an http(s) URL ` +
+      `(starts ${JSON.stringify(url.slice(0, 8))}, ${url.length} chars).`,
+  );
+  process.exit(1);
+}
+console.log(`Supabase: ${new URL(url).host}\n`);
 const db = createClient(url, key, { auth: { persistSession: false } });
 
 let written = 0, unchanged = 0, manual = 0, missing = 0;

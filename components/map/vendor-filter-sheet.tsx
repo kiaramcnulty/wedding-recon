@@ -24,6 +24,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { offerFor } from "@/lib/filters/price-offers";
 import { cn } from "@/lib/utils";
 
 /**
@@ -346,9 +347,9 @@ function TypeSection({
     const h = hist[def.lo ?? def.key];
     if (!h) return undefined;
 
+    const picked =
+      def.rescaledBy === "date_context" ? undefined : (state[def.rescaledBy!] as string[] | undefined);
     const subset = pool.filter((v) => {
-      if (def.rescaledBy === "date_context") return true;
-      const picked = state[def.rescaledBy!] as string[] | undefined;
       if (!picked?.length) return true;
       const own = v.filters?.[def.rescaledBy!];
       return Array.isArray(own) && own.some((x) => picked.includes(String(x)));
@@ -357,7 +358,7 @@ function TypeSection({
 
     return h.bins.map((b) =>
       subset.filter((v) => {
-        const n = priceForContext(v, def, dateContext);
+        const n = priceForContext(v, def, dateContext, picked);
         return typeof n === "number" && n >= b.lo && n <= b.hi;
       }).length,
     );
@@ -943,9 +944,20 @@ function priceForContext(
   v: Vendor,
   def: FilterDef,
   dc: DateContext,
+  picked?: string[],
 ): number | undefined {
   const f = v.filters;
   if (!f) return undefined;
+
+  // Per-tier planner prices: bin the picked tier's own price, as the matcher
+  // judges it, rather than a range spanning every tier the planner offers.
+  if (def.priceScopedBy && picked?.length) {
+    const mins = picked
+      .map((s) => offerFor(f, s))
+      .map((o) => (o?.basis === "package" ? (o.price_min ?? o.price_max) : undefined))
+      .filter((n): n is number => typeof n === "number");
+    if (mins.length) return Math.min(...mins);
+  }
 
   let scale = 1;
   const basis = f.price_basis;

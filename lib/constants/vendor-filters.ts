@@ -87,6 +87,14 @@ export interface FilterDef {
   rare?: boolean;
   /** Companion filter id whose selection re-scales this range's histogram. */
   rescaledBy?: string;
+  /**
+   * `range` only. Companion `multi` filter whose picked values are price
+   * SCOPES: the budget is judged against the vendor's `price_offers` for those
+   * scopes, not its one flattened `price_min`/`price_max`. Planners only today
+   * (scope = service tier); see `lib/filters/price-offers.ts` and the scoped
+   * branch of `filterMatch`.
+   */
+  priceScopedBy?: string;
   hint?: string;
 }
 
@@ -402,6 +410,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       hi: "price_max",
       unit: "usd",
       rescaledBy: "service_tier",
+      priceScopedBy: "service_tier",
     },
     {
       key: "pricing_model",
