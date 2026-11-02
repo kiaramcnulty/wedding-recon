@@ -36,6 +36,13 @@ export interface JourneyState {
   version: 1;
   hasVenue: boolean | null;
   location: JourneyLocation | null;
+  /**
+   * The last venue and the last town picked, kept apart from `location` (the
+   * one in use) so switching between "search our venue" and "pick a town"
+   * never throws away the other answer.
+   */
+  venueLocation?: JourneyLocation;
+  cityLocation?: JourneyLocation;
   guestCount?: number;
   /** Optional; 1-12. Picks the season price tier. */
   weddingMonth?: number;
@@ -82,6 +89,29 @@ function parsePrefs(raw: unknown): GuidedPrefs {
   };
 }
 
+function parseLocation(raw: unknown): JourneyLocation | null {
+  const l = raw as Record<string, unknown> | null | undefined;
+  if (
+    !l ||
+    typeof l !== "object" ||
+    (l.kind !== "city" && l.kind !== "venue") ||
+    typeof l.label !== "string" ||
+    typeof l.lat !== "number" ||
+    typeof l.lng !== "number" ||
+    !Number.isFinite(l.lat) ||
+    !Number.isFinite(l.lng)
+  ) {
+    return null;
+  }
+  return {
+    kind: l.kind,
+    label: l.label,
+    lat: l.lat,
+    lng: l.lng,
+    ...(typeof l.vendorId === "string" && { vendorId: l.vendorId }),
+  };
+}
+
 /**
  * Validate a stored payload. Anything malformed degrades to a fresh journey
  * rather than throwing, so a corrupt or outdated entry can never stop the app.
@@ -91,25 +121,9 @@ export function parseJourney(raw: unknown): JourneyState | null {
   const r = raw as Record<string, unknown>;
   if (r.version !== 1) return null;
 
-  let location: JourneyLocation | null = null;
-  const l = r.location as Record<string, unknown> | null | undefined;
-  if (
-    l &&
-    (l.kind === "city" || l.kind === "venue") &&
-    typeof l.label === "string" &&
-    typeof l.lat === "number" &&
-    typeof l.lng === "number" &&
-    Number.isFinite(l.lat) &&
-    Number.isFinite(l.lng)
-  ) {
-    location = {
-      kind: l.kind,
-      label: l.label,
-      lat: l.lat,
-      lng: l.lng,
-      ...(typeof l.vendorId === "string" && { vendorId: l.vendorId }),
-    };
-  }
+  const location = parseLocation(r.location);
+  const venueLocation = parseLocation(r.venueLocation);
+  const cityLocation = parseLocation(r.cityLocation);
 
   const byType: Partial<Record<GuidedType, GuidedPrefs>> = {};
   if (r.byType && typeof r.byType === "object") {
@@ -124,6 +138,8 @@ export function parseJourney(raw: unknown): JourneyState | null {
     version: 1,
     hasVenue: typeof r.hasVenue === "boolean" ? r.hasVenue : null,
     location,
+    ...(venueLocation?.kind === "venue" && { venueLocation }),
+    ...(cityLocation?.kind === "city" && { cityLocation }),
     guestCount: finitePositive(r.guestCount),
     weddingMonth: month && month <= 12 ? Math.round(month) : undefined,
     weddingYear: finitePositive(r.weddingYear),

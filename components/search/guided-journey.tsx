@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronLeft, Loader2, MapPin, Search } from "lucide-react";
+import { CalendarHeart, ChevronLeft, Loader2, MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandMark } from "@/components/brand-mark";
+import { ChoiceCard } from "@/components/search/choice-card";
 import { captureClient } from "@/lib/analytics/posthog";
 import {
   CATEGORIES,
@@ -76,6 +77,8 @@ export function GuidedJourney() {
   const [state, setState] = React.useState<JourneyState | null>(null);
   const [resumeOffer, setResumeOffer] = React.useState<JourneyState | null>(null);
   const [view, setView] = React.useState<ResultsView>("suggestions");
+  // What the couple typed into the town box before switching to venue search.
+  const [venueQuery, setVenueQuery] = React.useState<string | undefined>();
   const resumedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -203,29 +206,34 @@ export function GuidedJourney() {
     case "welcome":
       return (
         <Shell>
-          <BrandMark className="mb-6" />
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome to Wedding Recon</h1>
-          <p className="mt-2 text-muted-foreground">
-            Real prices and notes from Colorado couples. A few quick questions and
-            we&apos;ll find vendors that fit.
-          </p>
-          <p className="mt-8 font-medium">Do you have a venue yet?</p>
-          <div className="mt-3 flex flex-col gap-3">
-            <Button
-              size="lg"
-              className="h-12 text-base"
+          {/* -mt-16 pulls the wash up under the empty back-button row of Shell. */}
+          <div className="-mx-5 -mt-16 bg-gradient-to-b from-brand-soft via-brand-soft/40 to-background px-5 pb-2 pt-16 text-center">
+            <BrandMark className="mx-auto size-14" />
+            <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-brand-ink">
+              Welcome to Wedding Recon
+            </p>
+            <h1 className="mt-1.5 text-2xl font-semibold leading-tight tracking-tight text-balance">
+              Let&rsquo;s find vendors you&rsquo;ll love
+            </h1>
+            <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground text-balance">
+              Real prices and honest notes from Colorado couples. Answer a few quick questions and
+              we&rsquo;ll do the digging.
+            </p>
+          </div>
+          <p className="mt-6 text-center text-sm font-medium">Do you have a venue yet?</p>
+          <div className="mt-3 grid gap-2.5">
+            <ChoiceCard
+              icon={CalendarHeart}
+              title="Yes, we’ve booked one"
+              hint="We’ll look for vendors near it"
               onClick={() => go("venue", { hasVenue: true })}
-            >
-              Yes, we&apos;ve booked one
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-12 text-base"
+            />
+            <ChoiceCard
+              icon={Search}
+              title="Not yet"
+              hint="We’ll help you find the one"
               onClick={() => go("city", { hasVenue: false })}
-            >
-              Not yet
-            </Button>
+            />
           </div>
           <Link
             href="/explore"
@@ -241,10 +249,11 @@ export function GuidedJourney() {
         <Shell onBack={() => go(back)}>
           <VenueStep
             state={state}
-            onPick={(location) => update({ location })}
+            initialQuery={venueQuery}
+            onPick={(location) => update({ location, venueLocation: location })}
             onDate={(weddingMonth, weddingYear) => update({ weddingMonth, weddingYear })}
             onCityInstead={() => go("city")}
-            onContinue={() => go(afterLocation(state), { manualRadius: null })}
+            onContinue={(location) => go(afterLocation(state), { location, manualRadius: null })}
           />
         </Shell>
       );
@@ -254,10 +263,15 @@ export function GuidedJourney() {
         <Shell onBack={() => go(back)}>
           <CityStep
             state={state}
-            onPick={(location) => update({ location })}
+            onPick={(location) => update({ location, cityLocation: location })}
             onDate={(weddingMonth, weddingYear) => update({ weddingMonth, weddingYear })}
-            onContinue={() =>
+            onVenueInstead={(query) => {
+              setVenueQuery(query);
+              go("venue", { hasVenue: true });
+            }}
+            onContinue={(location) =>
               go(afterLocation(state), {
+                location,
                 manualRadius: null,
                 // No venue yet: they are looking for one, so skip the type grid.
                 ...(!state.selectedVendorType && state.hasVenue === false && { selectedVendorType: "venue" }),
@@ -437,19 +451,22 @@ interface VenueMatch {
 
 function VenueStep({
   state,
+  initialQuery,
   onPick,
   onDate,
   onCityInstead,
   onContinue,
 }: {
   state: JourneyState;
+  initialQuery?: string;
   onPick: (l: JourneyLocation) => void;
   onDate: (m?: number, y?: number) => void;
   onCityInstead: () => void;
-  onContinue: () => void;
+  onContinue: (l: JourneyLocation) => void;
 }) {
-  const picked = state.location?.kind === "venue" ? state.location : null;
-  const [query, setQuery] = React.useState(picked?.label ?? "");
+  // The venue in use, else the last one picked before switching to a town.
+  const picked = state.location?.kind === "venue" ? state.location : (state.venueLocation ?? null);
+  const [query, setQuery] = React.useState(initialQuery || picked?.label || "");
   const [results, setResults] = React.useState<VenueMatch[] | null>(null);
   const [searching, setSearching] = React.useState(false);
 
@@ -530,7 +547,7 @@ function VenueStep({
         Can&apos;t find it? Choose the town instead
       </button>
       <WhenField month={state.weddingMonth} year={state.weddingYear} onChange={onDate} />
-      <PrimaryButton disabled={!picked} onClick={onContinue}>
+      <PrimaryButton disabled={!picked} onClick={() => picked && onContinue(picked)}>
         Continue
       </PrimaryButton>
     </>
@@ -541,21 +558,40 @@ function CityStep({
   state,
   onPick,
   onDate,
+  onVenueInstead,
   onContinue,
 }: {
   state: JourneyState;
   onPick: (l: JourneyLocation) => void;
   onDate: (m?: number, y?: number) => void;
-  onContinue: () => void;
+  onVenueInstead: (query?: string) => void;
+  onContinue: (l: JourneyLocation) => void;
 }) {
-  const picked = state.location?.kind === "city" ? state.location : null;
+  // The town in use, else the last one picked before switching to a venue.
+  const picked = state.location?.kind === "city" ? state.location : (state.cityLocation ?? null);
   const [filter, setFilter] = React.useState("");
+  // Once a town is picked the list folds away to that one row, so Continue
+  // comes into view; a long list left open looked like the tap did nothing.
+  const [browsing, setBrowsing] = React.useState(!picked);
   const f = filter.trim().toLowerCase();
   const matches = COLORADO_PLACES.filter((p) => !f || p.label.toLowerCase().includes(f));
   const regions = [...new Set(matches.map((p) => p.region))];
 
-  const pick = (p: PlaceOption) =>
+  const pick = (p: PlaceOption) => {
     onPick({ kind: "city", label: `${p.label}, CO`, lat: p.lat, lng: p.lng });
+    setFilter("");
+    setBrowsing(false);
+  };
+
+  const venueLink = (
+    <button
+      type="button"
+      className="mt-4 self-start text-sm text-muted-foreground underline underline-offset-4"
+      onClick={() => onVenueInstead()}
+    >
+      {state.hasVenue ? "Search for your venue instead" : "Already booked a venue? Search for it"}
+    </button>
+  );
 
   return (
     <>
@@ -568,47 +604,73 @@ function CityStep({
           placeholder="Search Colorado towns"
           className="h-11 pl-9 text-base"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(e) => {
+            setFilter(e.target.value);
+            setBrowsing(true);
+          }}
         />
       </div>
-      <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border">
-        {regions.length === 0 && (
-          <p className="px-3 py-3 text-sm text-muted-foreground">
-            No match. We only cover Colorado for now.
-          </p>
-        )}
-        {regions.map((region) => (
-          <div key={region}>
-            <p className="sticky top-0 bg-muted px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {region}
-            </p>
-            <ul>
-              {matches
-                .filter((p) => p.region === region)
-                .map((p) => {
-                  const selected = picked?.label === `${p.label}, CO`;
-                  return (
-                    <li key={p.label}>
-                      <button
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => pick(p)}
-                        className={cn(
-                          "w-full px-3 py-2.5 text-left text-sm hover:bg-muted",
-                          selected && "bg-foreground font-medium text-background hover:bg-foreground",
-                        )}
-                      >
-                        {p.label}
-                      </button>
-                    </li>
-                  );
-                })}
-            </ul>
-          </div>
-        ))}
-      </div>
+      {picked && !browsing ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-foreground px-3 py-3">
+          <span className="flex items-center gap-2 font-medium">
+            <MapPin className="size-4 text-brand" /> {picked.label}
+          </span>
+          <button
+            type="button"
+            className="text-sm text-muted-foreground underline underline-offset-4"
+            onClick={() => setBrowsing(true)}
+          >
+            Change
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 max-h-72 overflow-y-auto overscroll-contain rounded-lg border">
+          {regions.length === 0 && (
+            <div className="px-3 py-3 text-sm text-muted-foreground">
+              <p>No town by that name. We only cover Colorado for now.</p>
+              <button
+                type="button"
+                className="mt-2 font-medium text-foreground underline underline-offset-4"
+                onClick={() => onVenueInstead(filter.trim())}
+              >
+                Is &ldquo;{filter.trim()}&rdquo; a venue? Search venues
+              </button>
+            </div>
+          )}
+          {regions.map((region) => (
+            <div key={region}>
+              <p className="sticky top-0 bg-muted px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {region}
+              </p>
+              <ul>
+                {matches
+                  .filter((p) => p.region === region)
+                  .map((p) => {
+                    const selected = picked?.label === `${p.label}, CO`;
+                    return (
+                      <li key={p.label}>
+                        <button
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => pick(p)}
+                          className={cn(
+                            "w-full px-3 py-2.5 text-left text-sm hover:bg-muted",
+                            selected && "bg-foreground font-medium text-background hover:bg-foreground",
+                          )}
+                        >
+                          {p.label}
+                        </button>
+                      </li>
+                    );
+                  })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+      {venueLink}
       <WhenField month={state.weddingMonth} year={state.weddingYear} onChange={onDate} />
-      <PrimaryButton disabled={!picked} onClick={onContinue}>
+      <PrimaryButton disabled={!picked} onClick={() => picked && onContinue(picked)}>
         Continue
       </PrimaryButton>
     </>

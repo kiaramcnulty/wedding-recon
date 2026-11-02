@@ -3,12 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { buttonVariants } from "@/components/ui/button";
+import { CalendarHeart, Search } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
+import { ChoiceCard } from "@/components/search/choice-card";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CATEGORIES } from "@/lib/constants/categories";
@@ -93,52 +94,81 @@ export function WelcomePopup() {
     setMode(null);
   };
 
-  const primary = cn(buttonVariants({ size: "lg" }), "h-12 w-full text-base");
-  const secondary = cn(buttonVariants({ size: "lg", variant: "outline" }), "h-12 w-full text-base");
+  const header = (title: string, description: string, kicker?: string) => (
+    <div className="bg-gradient-to-b from-brand-soft via-brand-soft/40 to-popover px-6 pb-1 pt-8 text-center">
+      <BrandMark className="mx-auto size-14" />
+      {kicker && (
+        <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-brand-ink">{kicker}</p>
+      )}
+      <DialogTitle className={cn("text-2xl font-semibold leading-tight tracking-tight text-balance", kicker ? "mt-1.5" : "mt-4")}>
+        {title}
+      </DialogTitle>
+      <DialogDescription className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-balance">
+        {description}
+      </DialogDescription>
+    </div>
+  );
 
   return (
     <Dialog open={mode !== null} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="gap-0 p-6">
+      <DialogContent className="gap-0 overflow-hidden rounded-3xl p-0 sm:max-w-md">
         {mode === "welcome" && (
           <>
-            <DialogHeader>
-              <DialogTitle className="text-xl">Welcome to Wedding Recon</DialogTitle>
-              <DialogDescription>
-                Real prices and notes from Colorado couples. Answer a few quick questions and
-                we&apos;ll find vendors that fit.
-              </DialogDescription>
-            </DialogHeader>
-            <p className="mt-5 font-medium">Do you have a venue yet?</p>
-            <div className="mt-3 flex flex-col gap-2.5">
-              <Link href={`${JOURNEY_HREF}?venue=yes`} className={primary} onClick={close}>
-                Yes, we&apos;ve booked one
-              </Link>
-              <Link href={`${JOURNEY_HREF}?venue=no`} className={secondary} onClick={close}>
-                Not yet
-              </Link>
+            {header(
+              "Let’s find vendors you’ll love",
+              "Real prices and honest notes from Colorado couples. Answer a few quick questions and we’ll do the digging.",
+              "Welcome to Wedding Recon",
+            )}
+            <div className="px-6 pb-6 pt-5">
+              <p className="text-center text-sm font-medium">Do you have a venue yet?</p>
+              <div className="mt-3 grid gap-2.5">
+                <ChoiceCard
+                  href={`${JOURNEY_HREF}?venue=yes`}
+                  icon={CalendarHeart}
+                  title="Yes, we’ve booked one"
+                  hint="We’ll look for vendors near it"
+                  onClick={close}
+                />
+                <ChoiceCard
+                  href={`${JOURNEY_HREF}?venue=no`}
+                  icon={Search}
+                  title="Not yet"
+                  hint="We’ll help you find the one"
+                  onClick={close}
+                />
+              </div>
+              <button
+                type="button"
+                className="mt-4 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+                onClick={close}
+              >
+                I&apos;m just browsing
+              </button>
             </div>
           </>
         )}
         {mode === "welcomeBack" && (
           <>
-            <DialogHeader>
-              <DialogTitle className="text-xl">Welcome back!</DialogTitle>
-              <DialogDescription>Which vendor are you looking for today?</DialogDescription>
-            </DialogHeader>
-            <div className="mt-5 flex flex-col gap-2.5">
-              {GUIDED_TYPES.map((t, i) => (
-                <Link
-                  key={t}
-                  href={`${JOURNEY_HREF}?type=${t}`}
-                  className={i === 0 ? primary : secondary}
-                  onClick={close}
-                >
-                  {CATEGORIES[t].label}
-                </Link>
-              ))}
+            {header("Welcome back!", "Which vendor are you looking for today?")}
+            <div className="px-6 pb-6 pt-5">
+              <div className="grid gap-2.5">
+                {GUIDED_TYPES.map((t) => {
+                  const c = CATEGORIES[t];
+                  return (
+                    <ChoiceCard
+                      key={t}
+                      href={`${JOURNEY_HREF}?type=${t}`}
+                      icon={c.icon}
+                      iconStyle={{ backgroundColor: c.lightHex, color: c.textHex }}
+                      title={c.label}
+                      onClick={close}
+                    />
+                  );
+                })}
+              </div>
               <Link
                 href={JOURNEY_HREF}
-                className="mt-1 text-center text-sm text-muted-foreground underline underline-offset-4"
+                className="mt-4 block text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
                 onClick={close}
               >
                 See all vendor types
