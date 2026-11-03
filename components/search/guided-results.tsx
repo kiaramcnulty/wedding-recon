@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, Loader2, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VendorFeed } from "@/components/map/vendor-feed";
+import { SaveButton } from "@/components/vendor/save-button";
 import {
   VendorPreviewCard,
   useVendorPreviews,
@@ -260,6 +261,14 @@ export function GuidedResults({
                         href={`/vendor/${item.id}?from=${encodeURIComponent("/start?restore=suggestions")}`}
                         selection={selection}
                         showCategoryPill={false}
+                        photoAction={
+                          <SaveButton
+                            vendorId={item.id}
+                            vendorType={type}
+                            returnTo="/start?restore=suggestions"
+                            variant="overlay"
+                          />
+                        }
                       />
                     </li>
                   ))}

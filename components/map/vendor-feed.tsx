@@ -8,6 +8,7 @@ import {
   VendorPreviewCard,
   useVendorPreviews,
 } from "@/components/map/vendor-preview-card";
+import { SaveButton } from "@/components/vendor/save-button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -268,6 +269,14 @@ export function VendorFeed({
                     href={vendorHref(item.id)}
                     onNavigate={rememberScroll}
                     selection={selections?.[typeById.get(item.id) ?? "other"]}
+                    photoAction={
+                      <SaveButton
+                        vendorId={item.id}
+                        vendorType={typeById.get(item.id) ?? "other"}
+                        returnTo={returnTo}
+                        variant="overlay"
+                      />
+                    }
                   />
                 </li>
               </React.Fragment>

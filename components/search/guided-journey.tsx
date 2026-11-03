@@ -216,8 +216,7 @@ export function GuidedJourney() {
               Let&rsquo;s find vendors you&rsquo;ll love
             </h1>
             <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground text-balance">
-              Real prices and honest notes from Colorado couples. Answer a few quick questions and
-              we&rsquo;ll do the digging.
+              Real prices and intel from couples and vendor websites.
             </p>
           </div>
           <p className="mt-6 text-center text-sm font-medium">Do you have a venue yet?</p>
@@ -225,7 +224,7 @@ export function GuidedJourney() {
             <ChoiceCard
               icon={CalendarHeart}
               title="Yes, we’ve booked one"
-              hint="We’ll look for vendors near it"
+              hint="We’ll look for nearby vendors"
               onClick={() => go("venue", { hasVenue: true })}
             />
             <ChoiceCard
@@ -497,7 +496,7 @@ function VenueStep({
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight">Where is your venue?</h1>
-      <p className="mt-2 text-muted-foreground">We&apos;ll look for vendors near it.</p>
+      <p className="mt-2 text-muted-foreground">We&apos;ll look for nearby vendors.</p>
       <div className="relative mt-6">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -701,7 +700,12 @@ function CategoryStep({
         </p>
       )}
       <div className="mt-6 grid grid-cols-2 gap-3">
-        {VENDOR_TYPES.map((t: VendorType) => {
+        {/* A couple who has booked a venue is not shopping for one. The types
+            the journey covers come first, so they never sit under a page of
+            "Coming soon" tiles. */}
+        {VENDOR_TYPES.filter((t) => !(t === "venue" && state.hasVenue))
+          .sort((x, y) => Number(isGuidedType(y)) - Number(isGuidedType(x)))
+          .map((t: VendorType) => {
           const c = CATEGORIES[t];
           const Icon = c.icon;
           const enabled = isGuidedType(t);

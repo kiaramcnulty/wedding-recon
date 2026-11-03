@@ -294,6 +294,7 @@ export function VendorPreviewCard({
   showCategoryPill = true,
   selection,
   action,
+  photoAction,
   className,
 }: {
   item: VendorPreview;
@@ -326,6 +327,13 @@ export function VendorPreviewCard({
    * element in a button is invalid and swallows its taps.
    */
   action?: React.ReactNode;
+  /**
+   * Optional small control floated over the photo's top-right corner (the
+   * save heart). Over the photo rather than in the `action` column, which
+   * would take width from the name and the tag pills. Also a sibling of the
+   * Link, positioned against the card.
+   */
+  photoAction?: React.ReactNode;
   className?: string;
 }) {
   const router = useRouter();
@@ -352,7 +360,7 @@ export function VendorPreviewCard({
         // and town labels bleed through and made the card unreadable on web
         // (reported 2026-08-12). --muted is oklch(0.97 0 0), a near-white that
         // reads as the same subtle tint the /40 intended, but fully opaque.
-        "overflow-hidden rounded-xl transition-colors",
+        "relative overflow-hidden rounded-xl transition-colors",
         // A verified vendor's card carries the Vendor Verification tint, on
         // every surface this card renders (feed, cluster sheet, pin peek, Hub).
         // Both fills are opaque tokens, for the same reason as above.
@@ -421,6 +429,9 @@ export function VendorPreviewCard({
         {action && (
           <div className="flex shrink-0 items-center pr-2 pl-1">{action}</div>
         )}
+        {/* The photo is size-24 inside the Link's p-2, so its top-right corner
+            sits at left 104px / top 8px of the card. */}
+        {photoAction && <div className="absolute left-[72px] top-3">{photoAction}</div>}
       </div>
       {item.slides.length > 0 && (
         <ReconPreviewCarousel slides={item.slides} onOpen={go} onTint={item.verified} />

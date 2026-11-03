@@ -64,6 +64,8 @@ type Mode = "welcome" | "welcomeBack" | null;
 export function WelcomePopup() {
   const pathname = usePathname();
   const [mode, setMode] = React.useState<Mode>(null);
+  // A couple who has booked a venue is not offered Venue on welcome back.
+  const [hasVenue, setHasVenue] = React.useState(false);
   const decidedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -85,7 +87,10 @@ export function WelcomePopup() {
       write(WELCOME_BACK_KEY, today());
     }
     if (!next) return;
-    const t = setTimeout(() => setMode(next), 0);
+    const t = setTimeout(() => {
+      setHasVenue(journey?.hasVenue === true);
+      setMode(next);
+    }, 0);
     return () => clearTimeout(t);
   }, [pathname]);
 
@@ -116,7 +121,7 @@ export function WelcomePopup() {
           <>
             {header(
               "Let’s find vendors you’ll love",
-              "Real prices and honest notes from Colorado couples. Answer a few quick questions and we’ll do the digging.",
+              "Real prices and intel from couples and vendor websites.",
               "Welcome to Wedding Recon",
             )}
             <div className="px-6 pb-6 pt-5">
@@ -126,7 +131,7 @@ export function WelcomePopup() {
                   href={`${JOURNEY_HREF}?venue=yes`}
                   icon={CalendarHeart}
                   title="Yes, we’ve booked one"
-                  hint="We’ll look for vendors near it"
+                  hint="We’ll look for nearby vendors"
                   onClick={close}
                 />
                 <ChoiceCard
@@ -152,7 +157,7 @@ export function WelcomePopup() {
             {header("Welcome back!", "Which vendor are you looking for today?")}
             <div className="px-6 pb-6 pt-5">
               <div className="grid gap-2.5">
-                {GUIDED_TYPES.map((t) => {
+                {GUIDED_TYPES.filter((t) => !(t === "venue" && hasVenue)).map((t) => {
                   const c = CATEGORIES[t];
                   return (
                     <ChoiceCard
