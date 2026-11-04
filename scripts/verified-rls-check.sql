@@ -26,10 +26,16 @@ values
   ('ffffffff-0000-0000-0000-00000000aaaa', 'RLS check verified', 'venue', 'google'),
   ('ffffffff-0000-0000-0000-00000000bbbb', 'RLS check draft', 'venue', 'google');
 
+-- user_id references auth.users, so a made-up uuid fails the foreign key
+-- (23503). Borrow any existing account: the claim is a fixture row inside this
+-- transaction and is rolled back with everything else, and the one-live-claim
+-- index is per VENDOR, so it cannot collide with a real claim.
 insert into vendor_claims (vendor_id, user_id, status, contact_email)
-values
-  ('ffffffff-0000-0000-0000-00000000aaaa', '00000000-0000-0000-0000-000000000000', 'approved', 'x@example.com'),
-  ('ffffffff-0000-0000-0000-00000000bbbb', '00000000-0000-0000-0000-000000000000', 'approved', 'x@example.com');
+select x.vendor_id, (select id from auth.users order by created_at limit 1), 'approved', 'x@example.com'
+from (values
+  ('ffffffff-0000-0000-0000-00000000aaaa'::uuid),
+  ('ffffffff-0000-0000-0000-00000000bbbb'::uuid)
+) as x(vendor_id);
 
 insert into vendor_subscriptions (vendor_id, stripe_customer_id, status)
 values
