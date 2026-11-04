@@ -121,7 +121,8 @@ export async function GET(
 
   let result = await fetchPhotoBytes(ref.name, key, w);
   if (result === "rotated") {
-    // Genuine rotation (Google 404/403 on the media name) — re-resolve once.
+    // Genuine rotation or expiry (Google 400/403/404 on the media name) —
+    // re-resolve once.
     photos = await refreshVendorGooglePhotos(vendor.id, vendor.google_place_id);
     ref = photos[i];
     result = ref ? await fetchPhotoBytes(ref.name, key, w) : "transient";
@@ -169,7 +170,16 @@ async function fetchPhotoBytes(
       },
     );
     if (!res.ok) {
-      return res.status === 404 || res.status === 403 ? "rotated" : "transient";
+      // An EXPIRED media name comes back 400 INVALID_ARGUMENT ("The photo
+      // resource in the request is invalid. Please retrieve it from Places API
+      // endpoints."), not 404. Names expire well inside our 90-day reference
+      // TTL, so treating 400 as transient left a vendor on a permanent 404
+      // (and its cards on the category icon) until the TTL ran out:
+      // SANCTUARY Floral, 2026-11-04, names 77 days old. The name is already
+      // shape-checked above, so a 400 here means Google rejected the name.
+      return res.status === 400 || res.status === 404 || res.status === 403
+        ? "rotated"
+        : "transient";
     }
     return {
       buf: await res.arrayBuffer(),
