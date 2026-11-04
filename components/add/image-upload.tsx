@@ -99,9 +99,9 @@ export function ImageUpload({
                 type="button"
                 aria-label={`Remove image ${idx + 1}`}
                 onClick={() => removeImage(idx)}
-                className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm ring-1 ring-border transition-colors hover:bg-background"
               >
-                <X className="size-3" />
+                <X className="size-3.5" />
               </button>
             </div>
           ))}
