@@ -79,7 +79,8 @@ or table a migration adds, using the service-role client. Parameter names matter
 | 0046 | `0046_verified_listing_public.sql` | Vendor Verification: the public read of a verified vendor's listing content, for the vendor page |
 | 0047 | `0047_vendor_media_bucket.sql` | Storage for vendor-uploaded listing photos (Vendor Verification) |
 | 0048 | `0048_stripe_webhook_events.sql` | Vendor Verification billing: idempotency ledger for the Stripe webhook |
-| 0050 | `0050_has_photo_listing_photos.sql` | `vendors_in_bbox.has_photo` counts a verified vendor's own listing photos (via the definer set `verified_listing_photo_ids`). **Hand-apply pending** as of 2026-11-04 |
+| 0049 | `0049_connector_candidates.sql` | Vendor connector API: `connector_vendor_candidates` for the Muse connector. Applied (confirmed callable as anon 2026-11-04) |
+| 0050 | `0050_has_photo_listing_photos.sql` | `vendors_in_bbox.has_photo` counts a verified vendor's own listing photos (via the definer set `verified_listing_photo_ids`). Applied 2026-11-04 (checked as anon: Sanctuary Floral reads `has_photo` true) |
 
 ## Groups worth knowing as a set
 
