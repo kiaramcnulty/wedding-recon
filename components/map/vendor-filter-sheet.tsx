@@ -16,6 +16,15 @@ import {
   DAY_TYPES,
   type FilterDef,
 } from "@/lib/constants/vendor-filters";
+import {
+  buildSelection,
+  includesElopementOnly,
+  priceModeOf,
+  rangeKeysFor,
+  INCLUDE_ELOPEMENT_ONLY_SUFFIX,
+  PRICE_MODE_SUFFIX,
+  type PriceMode,
+} from "@/lib/filters/match";
 import HISTOGRAMS from "@/lib/constants/filter-histograms.json";
 import type { Vendor } from "@/lib/types";
 import {
@@ -64,6 +73,25 @@ function money(n: number): string {
   if (n >= 1000) return `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
   return `$${n}`;
 }
+
+/**
+ * How many filters a type's UI state actually applies — counted off the spec
+ * the matcher receives, not off the raw state keys. A price filter with the
+ * Weddings | Elopements pair is ONE filter however many of its keys are set
+ * (range, mode, checkbox), so `Object.keys(state).length` would overcount.
+ */
+export function activeFilterCount(t: VendorType, state: FilterState | undefined): number {
+  return state ? Object.keys(buildSelection(filtersForType(t), state)).length : 0;
+}
+
+const MODE_LABEL: Record<PriceMode, string> = {
+  wedding: "Weddings",
+  elopement: "Elopements",
+};
+
+/** The Elopements-mode footnote (Kiara, 2026-10-07). */
+const ELOPEMENT_NOTE =
+  "Shows vendors that offer elopements. Vendors that don't post an elopement price appear after priced ones.";
 
 function fmt(def: FilterDef, n: number): string {
   if (def.unit === "usd") return money(n);
@@ -343,7 +371,8 @@ function TypeSection({
    */
   const rescaledCounts = (def: FilterDef): number[] | undefined => {
     if (!def.rescaledBy) return undefined;
-    const h = hist[def.lo ?? def.key];
+    const mode = priceModeOf(def, state);
+    const h = hist[rangeKeysFor(def, mode).lo];
     if (!h) return undefined;
 
     const subset = pool.filter((v) => {
@@ -357,7 +386,7 @@ function TypeSection({
 
     return h.bins.map((b) =>
       subset.filter((v) => {
-        const n = priceForContext(v, def, dateContext);
+        const n = priceForContext(v, def, dateContext, mode);
         return typeof n === "number" && n >= b.lo && n <= b.hi;
       }).length,
     );
@@ -400,10 +429,53 @@ function TypeSection({
     }
     const r = v as { min?: number; max?: number };
     if (r.min == null && r.max == null) return null;
-    const h = hist[def.lo ?? def.key];
+    const mode = priceModeOf(def, state);
+    const h = hist[rangeKeysFor(def, mode).lo];
     const lo = r.min ?? h?.min ?? 0;
     const hi = r.max ?? h?.max ?? 0;
-    return `${fmt(def, lo)} – ${fmt(def, hi)}`;
+    const span = `${fmt(def, lo)} – ${fmt(def, hi)}`;
+    return def.elopement ? `${MODE_LABEL[mode]} · ${span}` : span;
+  };
+
+  /**
+   * The closed-row pill for a price filter with the mode pair. A range reads
+   * "Weddings · $X – $Y" / "Elopements · $X – $Y". With no range, Elopements
+   * mode is itself a filter ("Elopements"), and in Weddings mode only an
+   * unticked elopement-only checkbox is doing anything, so that is what it says.
+   */
+  const summarizePrice = (def: FilterDef): string | null => {
+    const ranged = summarize(def);
+    if (ranged || !def.elopement) return ranged;
+    if (priceModeOf(def, state) === "elopement") return MODE_LABEL.elopement;
+    if (priceModeOf(def, state) === "wedding" && !includesElopementOnly(def, state)) {
+      return "Weddings · no elopement-only";
+    }
+    return null;
+  };
+
+  /**
+   * Switch a price filter between Weddings and Elopements. Exactly one mode is
+   * always selected and re-tapping the current one is a no-op, so this is a
+   * radio pair, unlike the season/day chips. The range is CLEARED on a switch:
+   * the two modes have different axes, and a $6k-$8k wedding band carried onto
+   * the elopement histogram would be a filter nobody chose. Weddings is stored
+   * as the key's absence, so switching back restores the exact default state.
+   */
+  const setMode = (def: FilterDef, mode: PriceMode) => {
+    if (priceModeOf(def, state) === mode) return;
+    const next = { ...state };
+    delete next[def.key];
+    if (mode === "elopement") next[def.key + PRICE_MODE_SUFFIX] = "elopement";
+    else delete next[def.key + PRICE_MODE_SUFFIX];
+    onChange(next);
+  };
+
+  /** The checkbox. Ticked (the default) is stored as the key's absence. */
+  const setIncludeElopementOnly = (def: FilterDef, include: boolean) => {
+    const next = { ...state };
+    if (include) delete next[def.key + INCLUDE_ELOPEMENT_ONLY_SUFFIX];
+    else next[def.key + INCLUDE_ELOPEMENT_ONLY_SUFFIX] = false;
+    onChange(next);
   };
 
   const groups = (
@@ -413,10 +485,15 @@ function TypeSection({
       className="divide-y divide-border"
     >
       {defs.map((def) => {
-        const h = hist[def.lo ?? def.key];
+        const mode = priceModeOf(def, state);
+        const h = hist[rangeKeysFor(def, mode).lo];
+        // Season/day tiers are wedding prices; in Elopements mode they would
+        // re-scale nothing, so the chips are not offered there.
         const isPriceWithDate =
-          def.rescaledBy === "date_context" && vendorType === "venue";
-        const summary = summarize(def);
+          def.rescaledBy === "date_context" &&
+          vendorType === "venue" &&
+          mode === "wedding";
+        const summary = summarizePrice(def);
 
         return (
           <AccordionItem key={def.key} value={def.key} className="border-none">
@@ -469,8 +546,33 @@ function TypeSection({
                 </Chip>
               )}
 
-              {def.kind === "range" && h && (
+              {def.kind === "range" && (h || def.elopement) && (
                 <div>
+                  {/* Weddings | Elopements (plan step 7b). Same small chip and
+                      category colour as the season/day chips below, but a RADIO
+                      pair: Weddings is filled from first open because it is the
+                      absence of a mode key, and re-tapping the selected chip
+                      does nothing (Kiara, 2026-10-07). */}
+                  {def.elopement && (
+                    <div
+                      role="group"
+                      aria-label={`${def.label}: weddings or elopements`}
+                      className="mb-3 flex flex-wrap gap-1.5"
+                    >
+                      {(["wedding", "elopement"] as const).map((m) => (
+                        <Chip
+                          key={m}
+                          size="sm"
+                          meta={meta}
+                          on={mode === m}
+                          onClick={() => setMode(def, m)}
+                        >
+                          {MODE_LABEL[m]}
+                        </Chip>
+                      ))}
+                    </div>
+                  )}
+
                   {/* The rescale control sits directly above the histogram it
                       rescales, inside the same group, so the two read as one
                       thing (Kiara, 2026-08-05). */}
@@ -519,14 +621,35 @@ function TypeSection({
                     </div>
                   )}
 
-                  <RangeControl
-                    def={def}
-                    hist={h}
-                    value={state[def.key] as { min?: number; max?: number }}
-                    accent={meta.colorHex}
-                    onChange={(v) => set(def.key, v)}
-                    scaled={rescaledCounts(def)}
-                  />
+                  {h ? (
+                    <RangeControl
+                      def={def}
+                      hist={h}
+                      value={state[def.key] as { min?: number; max?: number }}
+                      accent={meta.colorHex}
+                      onChange={(v) => set(def.key, v)}
+                      scaled={rescaledCounts(def)}
+                    />
+                  ) : (
+                    <p className="text-[12px] text-muted-foreground">
+                      Not enough {MODE_LABEL[mode].toLowerCase()} prices to chart yet.
+                    </p>
+                  )}
+
+                  {/* Weddings mode only: every vendor in Elopements mode sells
+                      elopements, so there is nothing for it to include. */}
+                  {def.elopement && mode === "wedding" && (
+                    <label className="mt-2 flex items-center gap-2 text-[13px]">
+                      <input
+                        type="checkbox"
+                        checked={includesElopementOnly(def, state)}
+                        onChange={(e) => setIncludeElopementOnly(def, e.target.checked)}
+                        className="size-4"
+                        style={{ accentColor: meta.colorHex }}
+                      />
+                      Include elopement-only vendors
+                    </label>
+                  )}
 
                   {/* Any slider that converts an off-basis quote says so, from
                       the def's own `basisNote` — the assumption is the filter's,
@@ -534,6 +657,11 @@ function TypeSection({
                   {def.basisNote && (
                     <p className="mt-2 text-[11px] text-muted-foreground">
                       {def.basisNote}
+                    </p>
+                  )}
+                  {def.elopement && mode === "elopement" && (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      {ELOPEMENT_NOTE}
                     </p>
                   )}
                 </div>
@@ -712,7 +840,7 @@ export function VendorFilterSheet({
 
   const matched = Math.max(0, visibleTotal - visiblePartial);
   const totalActive = selectedTypes.reduce(
-    (n, t) => n + Object.keys(states[t] ?? {}).length,
+    (n, t) => n + activeFilterCount(t, states[t]),
     0,
   );
 
@@ -820,7 +948,7 @@ export function VendorFilterSheet({
             const m = CATEGORIES[t];
             const on = selectedTypes.includes(t);
             const isFocused = on && focusedType === t;
-            const count = Object.keys(states[t] ?? {}).length;
+            const count = activeFilterCount(t, states[t]);
             const Icon = m.icon;
             return (
               <span
@@ -943,19 +1071,21 @@ function priceForContext(
   v: Vendor,
   def: FilterDef,
   dc: DateContext,
+  mode: PriceMode = "wedding",
 ): number | undefined {
   const f = v.filters;
   if (!f) return undefined;
+  const keys = rangeKeysFor(def, mode);
 
   let scale = 1;
-  const basis = f.price_basis;
+  const basis = f[keys.basis];
   if (def.basis && typeof basis === "string" && basis !== def.basis) {
     const factor = def.basisScale?.[basis];
     if (factor === undefined) return undefined;
     scale = factor;
   }
 
-  if (def.rescaledBy === "date_context" && (dc.season || dc.day) && Array.isArray(f.price_tiers)) {
+  if (mode === "wedding" && def.rescaledBy === "date_context" && (dc.season || dc.day) && Array.isArray(f.price_tiers)) {
     const hits = (f.price_tiers as Array<Record<string, unknown>>).filter(
       (t) =>
         (!dc.season || t.season == null || t.season === dc.season) &&
@@ -964,7 +1094,7 @@ function priceForContext(
     const mins = hits.map((t) => t.min).filter((n): n is number => typeof n === "number");
     if (mins.length) return Math.min(...mins) * scale;
   }
-  const n = f[def.lo ?? def.key];
+  const n = f[keys.lo];
   return typeof n === "number" ? n * scale : undefined;
 }
 

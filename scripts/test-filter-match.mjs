@@ -12,14 +12,21 @@
  */
 
 import { readFileSync } from "node:fs";
+import { register } from "node:module";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   filterRank, filterRankFor, filterMatch, filterMatchFor, matchedFraction,
-  hasAnySelection, countSelections,
+  hasAnySelection, countSelections, buildSelection,
 } from "../lib/filters/match.ts";
+import { VENDOR_FILTERS } from "../lib/constants/vendor-filters.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+// vendor-tags.ts imports through the `@/` alias, which plain type-stripping
+// cannot resolve; the cost-sheet hook maps it (and adds the .ts extension).
+process.env.WR_ROOT = ROOT;
+register("./cost-sheet/hooks.mjs", import.meta.url);
+const { vendorTags } = await import("../lib/filters/vendor-tags.ts");
 const rows = readFileSync(resolve(ROOT, "data/filter-extraction/vendor-filters.jsonl"), "utf8")
   .trim().split("\n").map((l) => JSON.parse(l));
 
@@ -200,6 +207,141 @@ eq("1 of 2 missing ranks below 1 of 3 missing",
   matchedFraction(filterMatch({ setting: ["mountain"] }, {
     setting: three.setting, has_lodging: three.has_lodging,
   })) < matchedFraction(filterMatch({ setting: ["mountain"], has_lodging: true }, three)), true);
+
+
+// --- weddings | elopements (plan step 7b) ----------------------------------
+console.log("\nunit — weddings | elopements price mode\n");
+{
+  const photoDefs = VENDOR_FILTERS.photos;
+  const venueDefs = VENDOR_FILTERS.venue;
+  const range = { min: 2000, max: 4000 };
+
+  // Default = Weddings with the checkbox ticked, stored as the ABSENCE of both
+  // modifier keys. The spec must be byte-for-byte what it was before the toggle.
+  eq("default (Weddings, checkbox on) builds the pre-toggle spec",
+    buildSelection(photoDefs, { price: range }),
+    { price: { kind: "range", mode: "overlap", lo: "price_min", hi: "price_max", min: 2000, max: 4000, basis: "package" } });
+  eq("default venue spec keeps its scale and season/day",
+    buildSelection(venueDefs, { price: range }, { season: "peak", day: "saturday" }),
+    { price: { kind: "range", mode: "overlap", lo: "price_min", hi: "price_max", min: 2000, max: 4000,
+      basis: "package", scale: { per_person: 100, per_hour: 5 }, season: "peak", day: "saturday" } });
+  eq("default state with no range builds no price spec",
+    buildSelection(photoDefs, {}), {});
+  // Elopements mode is a filter by itself (Kiara, 2026-10-07): with no range it
+  // keeps exactly the vendors carrying an elopement signal.
+  const eloNoRange = buildSelection(photoDefs, { price_mode: "elopement" });
+  eq("Elopements mode with no range builds a spec with no min/max",
+    eloNoRange.price,
+    { kind: "range", mode: "overlap", lo: "elopement_price_min", hi: "elopement_price_max",
+      basis: "package", basisKey: "elopement_price_basis", kindKey: "elopement_price_kind", elopement: true });
+  eq("Elopements mode with no range counts as one active filter",
+    countSelections({ photos: eloNoRange }), 1);
+  eq("no range: a vendor with no elopement signal is excluded",
+    filterRank({ price_min: 3000, style: ["moody"] }, eloNoRange), -1);
+  eq("no range: does_elopements: false is not a signal",
+    filterRank({ does_elopements: false, price_min: 3000 }, eloNoRange), -1);
+  eq("no range: does_elopements-only vendor is included (full match)",
+    filterRank({ does_elopements: true }, eloNoRange), 1);
+  eq("no range: elopement_only-only vendor is included",
+    filterRank({ elopement_only: true }, eloNoRange), 1);
+  eq("no range: elopement-price-only vendor is included (min)",
+    filterRank({ elopement_price_min: 1800 }, eloNoRange), 1);
+  eq("no range: elopement-price-only vendor is included (max)",
+    filterRank({ elopement_price_max: 2500 }, eloNoRange), 1);
+  eq("no range: a vendor known to have no attributes is excluded",
+    filterRank(null, eloNoRange), -1);
+  eq("no range: attributes not loaded yet never vanish",
+    filterRank(undefined, eloNoRange), 0);
+  eq("types without the pair ignore a stray mode key",
+    buildSelection(VENDOR_FILTERS.dj, { price: range, price_mode: "elopement" }).price.lo, "price_min");
+
+  const wed = (f, state = { price: range }) => filterRank(f, buildSelection(photoDefs, state));
+  const eloOnly = { price_min: 2500, price_kind: "starting_at", price_basis: "package",
+    elopement_only: true, does_elopements: true, elopement_price_min: 2500 };
+  eq("Weddings mode unchanged: a wedding-priced vendor in range matches",
+    wed({ price_min: 3000, price_max: 5000, price_basis: "package" }), 1);
+  eq("Weddings mode unchanged: elopement keys are not read",
+    wed({ price_min: 6000, elopement_price_min: 2500, does_elopements: true }), -1);
+  eq("checkbox on (default): an elopement-only vendor stays in Weddings results",
+    wed(eloOnly), 1);
+  eq("checkbox off: an elopement-only vendor is excluded",
+    wed(eloOnly, { price: range, price_include_elopement_only: false }), -1);
+  eq("checkbox off: a normal wedding vendor is untouched",
+    wed({ price_min: 3000, price_max: 5000 }, { price: range, price_include_elopement_only: false }), 1);
+  eq("checkbox off with no range is still a filter (and judges no price)",
+    [wed(eloOnly, { price_include_elopement_only: false }),
+     wed({ style: ["moody"] }, { price_include_elopement_only: false })], [-1, 1]);
+  eq("checkbox off counts as one active filter",
+    countSelections({ photos: buildSelection(photoDefs, { price_include_elopement_only: false }) }), 1);
+  eq("checkbox is ignored in Elopements mode",
+    filterRank(eloOnly, buildSelection(photoDefs,
+      { price: range, price_mode: "elopement", price_include_elopement_only: false })), 1);
+
+  const elo = (f, r = range, defs = photoDefs) =>
+    filterMatch(f, buildSelection(defs, { price: r, price_mode: "elopement" }));
+  eq("Elopements mode reads the elopement keys",
+    buildSelection(photoDefs, { price: range, price_mode: "elopement" }).price,
+    { kind: "range", mode: "overlap", lo: "elopement_price_min", hi: "elopement_price_max", min: 2000, max: 4000,
+      basis: "package", basisKey: "elopement_price_basis", kindKey: "elopement_price_kind", elopement: true });
+  eq("Elopements: overlapping elopement range matches",
+    elo({ price_min: 6000, elopement_price_min: 1500, elopement_price_max: 2500 }).rank, 1);
+  eq("Elopements: non-overlapping elopement range is ruled out",
+    elo({ elopement_price_min: 4500, elopement_price_max: 6000 }).rank, -1);
+  eq("Elopements: touching the boundary counts as overlap",
+    elo({ elopement_price_min: 4000, elopement_price_max: 6000 }).rank, 1);
+  eq("Elopements: a bare min is a floor (the backfill omits max for 'from $X')",
+    elo({ elopement_price_min: 1200 }, { min: 3000, max: 4000 }).rank, 1);
+  eq("Elopements: a floor above the band is still ruled out",
+    elo({ elopement_price_min: 4800 }, { min: 1000, max: 2000 }).rank, -1);
+  eq("Elopements: an explicit single_figure is NOT a floor",
+    elo({ elopement_price_min: 1200, elopement_price_kind: "single_figure" }, { min: 3000, max: 4000 }).rank, -1);
+  eq("Elopements: a wedding price does not stand in for an elopement one",
+    elo({ price_min: 3000, price_max: 3500 }).rank, -1);
+  eq("Elopements: does_elopements with no price lands unpriced (partial), not excluded",
+    elo({ does_elopements: true, price_min: 6000 }), { rank: 0, unknown: 1, active: 1 });
+  eq("Elopements: elopement_only with no elopement price demotes, not excluded",
+    elo({ elopement_only: true, price_min: 3000 }).rank, 0);
+  eq("Elopements: neither elopement price nor does_elopements is excluded",
+    elo({ style: ["moody"] }).rank, -1);
+  eq("Elopements: does_elopements false is excluded",
+    elo({ does_elopements: false }).rank, -1);
+  eq("Elopements: a vendor known to have no attributes (null) is excluded",
+    elo(null).rank, -1);
+  eq("Elopements: attributes not loaded yet (undefined) never vanish",
+    elo(undefined).rank, 0);
+  eq("Elopements: off-basis elopement quote with no factor reads as silence",
+    elo({ elopement_price_min: 600, elopement_price_basis: "per_hour" }).rank, 0);
+  eq("Elopements: venue per-person elopement is scaled like price_basis",
+    elo({ elopement_price_min: 30, elopement_price_basis: "per_person" }, range, venueDefs).rank, 1);
+  eq("Elopements: venue ignores wedding season tiers and drops season/day",
+    buildSelection(venueDefs, { price: range, price_mode: "elopement" }, { season: "peak" }).price.season, undefined);
+
+  // The pills: typical wording and the elopement headline.
+  const labels = (t, f) => vendorTags(t, f).map((x) => x.label);
+  eq("typical range reads 'Typically $X–$Y'",
+    labels("photos", { price_min: 4000, price_max: 6000, price_kind: "typical" }), ["Typically $4k–$6k"]);
+  eq("typical single figure reads 'Typically $X'",
+    labels("photos", { price_min: 5000, price_kind: "typical" }), ["Typically $5k"]);
+  eq("starting_at wording unchanged",
+    labels("photos", { price_min: 5000, price_kind: "starting_at" }), ["From $5k"]);
+  eq("elopement price shows next to the wedding price",
+    labels("photos", { price_min: 5000, price_kind: "starting_at", elopement_price_min: 1800 }),
+    ["From $5k", "Elopements from $1.8k"]);
+  eq("elopement typical wording",
+    labels("photos", { elopement_price_min: 4000, elopement_price_max: 6000, elopement_price_kind: "typical" }),
+    ["Elopements typically $4k–$6k"]);
+  eq("elopement per-hour keeps its unit",
+    labels("photos", { elopement_price_min: 600, elopement_price_basis: "per_hour" }), ["Elopements from $600/hour"]);
+  // (The trailing pill is the does_elopements bool, labelled "Offers elopements".)
+  eq("an elopement-only vendor shows its price once, as an elopement price",
+    labels("photos", eloOnly), ["Elopements from $2.5k", "Offers elopements"]);
+  eq("types without the pair never show an elopement pill",
+    labels("dj", { price_min: 1500, price_kind: "starting_at", elopement_price_min: 500 }), ["From $1.5k"]);
+  eq("Elopements-mode selection marks the elopement pill matched, not the wedding one",
+    vendorTags("photos", { price_min: 5000, elopement_price_min: 1800 },
+      buildSelection(photoDefs, { price: range, price_mode: "elopement" })).map((x) => [x.key, x.matched]),
+    [["price:elopement", true], ["price", false]]);
+}
 
 // --- corpus behaviour ------------------------------------------------------
 console.log("\ncorpus — what real selections return\n");

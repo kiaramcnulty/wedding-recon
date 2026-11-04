@@ -3,7 +3,11 @@ import {
   type FilterDef,
 } from "@/lib/constants/vendor-filters";
 import type { VendorType } from "@/lib/constants/categories";
-import type { FilterSelection, VendorFilters } from "@/lib/filters/match";
+import {
+  ELOPEMENT_PRICE_KEYS,
+  type FilterSelection,
+  type VendorFilters,
+} from "@/lib/filters/match";
 
 /**
  * Human-readable "filter tags" for a vendor — the same attributes the Explore
@@ -84,6 +88,48 @@ function usdRange(loRaw: unknown, hiRaw: unknown): string | null {
   return a === b ? fmtUsd(a) : `${fmtUsd(a)}–${fmtUsd(b)}`;
 }
 
+/**
+ * A low-high in one basis, worded by its price kind. Shared by the wedding and
+ * the elopement headline so the two can never phrase the same kind differently.
+ *
+ * `typical` is an average or usual spend the vendor states ("most couples
+ * spend $4k-$6k"), not a floor and not a quote, so it says so: "Typically
+ * $4k–$6k", or "Typically $5k" for a single figure.
+ */
+function formatKindRange(
+  a: number,
+  b: number,
+  kind: unknown,
+  suffix: string,
+): string {
+  const span = a === b ? fmtUsd(a) : `${fmtUsd(a)}–${fmtUsd(b)}`;
+  if (kind === "typical") return `Typically ${span}${suffix}`;
+  if (kind === "starting_at") return `From ${fmtUsd(a)}${suffix}`;
+  if (kind === "single_figure") return `${fmtUsd(a)}${suffix}`;
+  return `${span}${suffix}`;
+}
+
+/**
+ * The elopement headline, shown next to the wedding price (plan step 7b).
+ * "Elopements from $X" — the backfill omits the max for an open-ended "from
+ * $X", and a closed range still leads with its cheapest package, which is the
+ * number a couple comparing elopement prices is after. A `typical` figure keeps
+ * the typical wording instead, since an average is not a floor.
+ */
+function formatElopementPrice(filters: Record<string, unknown>): string | null {
+  const lo = num(filters[ELOPEMENT_PRICE_KEYS.lo]);
+  const hi = num(filters[ELOPEMENT_PRICE_KEYS.hi]);
+  const a = lo ?? hi;
+  const b = hi ?? lo;
+  if (a === undefined || b === undefined) return null;
+  const basisRaw = filters[ELOPEMENT_PRICE_KEYS.basis];
+  const suffix = BASIS_SUFFIX[typeof basisRaw === "string" ? basisRaw : "package"] ?? "";
+  if (filters[ELOPEMENT_PRICE_KEYS.kind] === "typical") {
+    return `Elopements typically ${a === b ? fmtUsd(a) : `${fmtUsd(a)}–${fmtUsd(b)}`}${suffix}`;
+  }
+  return `Elopements from ${fmtUsd(a)}${suffix}`;
+}
+
 /** The headline price of the main `price` facet, in the vendor's own basis. */
 function formatPrice(filters: Record<string, unknown>): string | null {
   let lo = num(filters.price_min);
@@ -106,9 +152,7 @@ function formatPrice(filters: Record<string, unknown>): string | null {
   const basis = typeof filters.price_basis === "string" ? filters.price_basis : "package";
   const suffix = BASIS_SUFFIX[basis] ?? "";
 
-  if (filters.price_kind === "starting_at") return `From ${fmtUsd(a)}${suffix}`;
-  if (filters.price_kind === "single_figure" || a === b) return `${fmtUsd(a)}${suffix}`;
-  return `${fmtUsd(a)}–${fmtUsd(b)}${suffix}`;
+  return formatKindRange(a, b, filters.price_kind, suffix);
 }
 
 /** Format a `range` facet into pill text, or null when the vendor is silent. */
@@ -197,14 +241,30 @@ export function vendorTags(
     }
 
     // range
-    const label = formatRange(def, filters);
-    if (!label) continue;
-    built.push({
-      key: def.key,
-      label,
-      matched: !!selection?.[def.key],
-      rare,
-    });
+    const spec = selection?.[def.key];
+    const elopementLabel = def.elopement ? formatElopementPrice(filters) : null;
+    // An elopement-only vendor's wedding price IS its elopement price (the
+    // cleanup tags it there so it still shows in Weddings-mode searches), so
+    // printing both would say the same number twice under two names.
+    const skipWedding = !!elopementLabel && filters.elopement_only === true;
+    const label = skipWedding ? null : formatRange(def, filters);
+    const ranged = spec?.kind === "range" && (spec.min != null || spec.max != null);
+    if (label) {
+      built.push({
+        key: def.key,
+        label,
+        matched: !!spec && (spec.kind !== "range" || (ranged && !spec.elopement)),
+        rare,
+      });
+    }
+    if (elopementLabel) {
+      built.push({
+        key: `${def.key}:elopement`,
+        label: elopementLabel,
+        matched: spec?.kind === "range" && !!spec.elopement,
+        rare,
+      });
+    }
   }
 
   // Stable sort: user-applied first, then rare last, then importance (index).

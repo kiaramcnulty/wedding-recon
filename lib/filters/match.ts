@@ -38,6 +38,32 @@ export type FilterSpec =
       /** Multipliers converting an off-`basis` quote onto `basis`, by the
        * vendor's own `price_basis`. See `FilterDef.basisScale`. */
       scale?: Record<string, number>;
+      /** jsonb key holding the vendor's basis. Defaults to `price_basis`. */
+      basisKey?: string;
+      /** jsonb key holding the vendor's price kind. Defaults to `price_kind`. */
+      kindKey?: string;
+      /**
+       * Elopements mode of a price filter (plan step 7b). Selecting the mode
+       * is a filter by itself, with or without a range (Kiara, 2026-10-07):
+       * - a vendor with no ELOPEMENT SIGNAL is EXCLUDED -- the one place
+       *   silence excludes, because elopement mode asks "who sells elopements".
+       *   The signals are an elopement price, `elopement_only: true` or
+       *   `does_elopements: true` (see `hasElopementSignal`);
+       * - with no `min`/`max`, a vendor with a signal is a full match;
+       * - with a range, the overlap rule applies on top, and a vendor with a
+       *   signal but no elopement price demotes to the unpriced partial tier;
+       * - a bare min with no kind is a floor, since the backfill omits the max
+       *   for an open-ended "from $X";
+       * - season/day tiers are wedding prices and are never consulted.
+       */
+      elopement?: boolean;
+      /**
+       * Exclude the vendor outright when `filters[excludeIfTrue] === true`.
+       * Weddings mode with "Include elopement-only vendors" unticked sets it to
+       * `elopement_only`. A spec may carry this with no `min`/`max`: the
+       * checkbox is a filter in its own right, and the price is then not judged.
+       */
+      excludeIfTrue?: string;
     };
 
 export type FilterSelection = Record<string, FilterSpec>;
@@ -53,6 +79,71 @@ export type VendorFilters = Record<string, unknown> | null | undefined;
  * query. A type with no entry here is unfiltered and every vendor of it ranks 1.
  */
 export type FilterSelections = Partial<Record<string, FilterSelection>>;
+
+/* ------------------------------------------------ weddings | elopements */
+
+/**
+ * The vendors.filters keys an elopement price lives in, mirroring the wedding
+ * `price_*` family one for one. Backfilled from the recon prose (plan step 7b):
+ * `elopement_price_max` is OMITTED for an open-ended "from $X", so a bare min
+ * reads as a floor unless `elopement_price_kind` says otherwise.
+ * `elopement_price_quote` / `elopement_price_confidence` describe the price
+ * and are display-only, like their wedding twins.
+ */
+export const ELOPEMENT_PRICE_KEYS = {
+  lo: "elopement_price_min",
+  hi: "elopement_price_max",
+  basis: "elopement_price_basis",
+  kind: "elopement_price_kind",
+} as const;
+
+/**
+ * UI-state keys (never vendors.filters keys) for the elopement mode pair. Both
+ * are stored ONLY when they differ from the default, so a default sheet
+ * (Weddings, "Include elopement-only vendors" ticked) serializes to exactly the
+ * same persisted state as before the toggle existed.
+ *
+ * - `price_mode: "elopement"` -- Elopements mode. Absent means Weddings.
+ * - `price_include_elopement_only: false` -- the checkbox unticked. Absent
+ *   means ticked.
+ */
+export const PRICE_MODE_SUFFIX = "_mode";
+export const INCLUDE_ELOPEMENT_ONLY_SUFFIX = "_include_elopement_only";
+
+export type PriceMode = "wedding" | "elopement";
+
+/** Which mode a price filter is in under this UI state. */
+export function priceModeOf(def: FilterDef, state: Record<string, unknown>): PriceMode {
+  return def.elopement && state[def.key + PRICE_MODE_SUFFIX] === "elopement"
+    ? "elopement"
+    : "wedding";
+}
+
+/** Whether elopement-only vendors are kept in Weddings mode (the checkbox). */
+export function includesElopementOnly(def: FilterDef, state: Record<string, unknown>): boolean {
+  return !def.elopement || state[def.key + INCLUDE_ELOPEMENT_ONLY_SUFFIX] !== false;
+}
+
+/**
+ * The jsonb keys a range filter reads under the current mode: the declared
+ * `lo`/`hi`/`price_basis`/`price_kind` in Weddings mode, the elopement family
+ * in Elopements mode. One function so the matcher spec, the histogram lookup
+ * and the bin counter cannot drift apart.
+ */
+export function rangeKeysFor(
+  def: FilterDef,
+  mode: PriceMode,
+): { lo: string; hi?: string; basis: string; kind: string } {
+  if (mode === "elopement" && def.elopement) {
+    return {
+      lo: ELOPEMENT_PRICE_KEYS.lo,
+      hi: ELOPEMENT_PRICE_KEYS.hi,
+      basis: ELOPEMENT_PRICE_KEYS.basis,
+      kind: ELOPEMENT_PRICE_KEYS.kind,
+    };
+  }
+  return { lo: def.lo ?? def.key, hi: def.hi, basis: "price_basis", kind: "price_kind" };
+}
 
 /**
  * A rank plus the arithmetic behind it: how many of the active filters the
@@ -154,7 +245,24 @@ export function filterMatch(
   if (active === 0) return { rank: 1, unknown: 0, active: 0 };
   // No attributes at all: silent on every one of them. Bottom of the partial
   // tier, since it met none of the ask, but still visible.
-  if (!filters) return { rank: 0, unknown: active, active };
+  //
+  // One exception, and only for a vendor KNOWN to have no attributes (`null`):
+  // Elopements mode rules it out, since it carries no elopement signal (see
+  // `FilterSpec.elopement`).
+  // `undefined` means the attributes have not been fetched yet (migration 0034
+  // loads them lazily), and a not-yet-loaded vendor must never vanish.
+  if (!filters) {
+    if (
+      filters === null &&
+      keys.some((k) => {
+        const s = selection[k];
+        return s.kind === "range" && s.elopement;
+      })
+    ) {
+      return { rank: -1, unknown: 0, active };
+    }
+    return { rank: 0, unknown: active, active };
+  }
 
   let unknown = 0;
 
@@ -182,13 +290,26 @@ export function filterMatch(
     }
 
     // range
-    //
+    if (spec.excludeIfTrue && filters[spec.excludeIfTrue] === true) {
+      return { rank: -1, unknown, active };
+    }
+    // A modifier-only spec (the elopement-only checkbox with no range set)
+    // has no price to compare: it has done its whole job above.
+    if (spec.excludeIfTrue && spec.min == null && spec.max == null) continue;
+
+    // Elopements mode is a filter even with no range: it keeps only vendors we
+    // know do elopements, and with no range there is no price to judge.
+    if (spec.elopement && !hasElopementSignal(filters)) {
+      return { rank: -1, unknown, active };
+    }
+    if (spec.elopement && spec.min == null && spec.max == null) continue;
+
     // An off-basis quote is either convertible or incomparable. A venue quoting
     // per person can be put on the package axis by assuming a guest count (the
     // sheet states the assumption in so many words), so it is scaled and then
     // judged normally. A caterer's per-person rate against a per-package slider
     // has no such factor, and reads as silence rather than as a miss.
-    const basis = filters["price_basis"];
+    const basis = filters[spec.basisKey ?? "price_basis"];
     let scale = 1;
     if (spec.basis && typeof basis === "string" && basis !== spec.basis) {
       const factor = spec.scale?.[basis];
@@ -202,7 +323,7 @@ export function filterMatch(
     let lo = num(filters[spec.lo]);
     let hi = num(filters[spec.hi ?? spec.lo]);
 
-    if ((spec.season || spec.day) && Array.isArray(filters["price_tiers"])) {
+    if (!spec.elopement && (spec.season || spec.day) && Array.isArray(filters["price_tiers"])) {
       const tiers = (filters["price_tiers"] as Array<Record<string, unknown>>).filter(
         (t) =>
           (!spec.season || t.season == null || t.season === spec.season) &&
@@ -222,6 +343,9 @@ export function filterMatch(
     }
 
     if (lo === undefined && hi === undefined) {
+      // Elopements mode: a vendor that does elopements but posts no elopement
+      // price demotes like any unpriced vendor. (One with no signal at all was
+      // already ruled out above.)
       unknown++;
       continue;
     }
@@ -239,10 +363,9 @@ export function filterMatch(
     if (vHi === undefined) {
       // "starting at 5000" is a floor, not an exact figure: reading it as
       // exactly 5000 would wrongly drop it from any search above that.
-      vHi =
-        filters["price_kind"] === "starting_at" && spec.mode === "overlap"
-          ? OPEN_HI
-          : vLo;
+      const kind = filters[spec.kindKey ?? "price_kind"];
+      const floor = kind === "starting_at" || (spec.elopement && kind == null);
+      vHi = floor && spec.mode === "overlap" ? OPEN_HI : vLo;
     }
 
     if (spec.mode === "point") {
@@ -258,6 +381,21 @@ export function filterMatch(
   }
 
   return { rank: unknown ? 0 : 1, unknown, active };
+}
+
+/**
+ * Whether a vendor is KNOWN to do elopements: it has an elopement price, is
+ * tagged `elopement_only`, or says `does_elopements: true` (photos). Never
+ * inferred from silence -- a vendor with none of these is excluded in
+ * Elopements mode.
+ */
+export function hasElopementSignal(filters: Record<string, unknown>): boolean {
+  return (
+    num(filters[ELOPEMENT_PRICE_KEYS.lo]) !== undefined ||
+    num(filters[ELOPEMENT_PRICE_KEYS.hi]) !== undefined ||
+    filters["elopement_only"] === true ||
+    filters["does_elopements"] === true
+  );
 }
 
 function num(v: unknown): number | undefined {
@@ -276,6 +414,37 @@ export function buildSelection(
   const out: FilterSelection = {};
   for (const d of defs) {
     const v = state[d.key];
+
+    // A price filter carrying the Weddings | Elopements pair. Handled before
+    // the `v == null` skip because Elopements mode and the unticked
+    // elopement-only checkbox are each a filter even with no range set. Both
+    // modifiers are absent in the default state, so a default sheet builds
+    // exactly the spec it always did.
+    if (d.kind === "range" && d.elopement) {
+      const mode = priceModeOf(d, state);
+      const keys = rangeKeysFor(d, mode);
+      const r = (v && typeof v === "object" ? v : {}) as { min?: number; max?: number };
+      const hasRange = r.min != null || r.max != null;
+      const hideElopementOnly = mode === "wedding" && !includesElopementOnly(d, state);
+      const elope = mode === "elopement";
+      if (!hasRange && !hideElopementOnly && !elope) continue;
+      out[d.key] = {
+        kind: "range",
+        mode: d.mode ?? "overlap",
+        lo: keys.lo,
+        ...(keys.hi && { hi: keys.hi }),
+        ...(r.min != null && { min: r.min }),
+        ...(r.max != null && { max: r.max }),
+        ...(d.basis && { basis: d.basis }),
+        ...(d.basisScale && { scale: d.basisScale }),
+        ...(elope && { basisKey: keys.basis, kindKey: keys.kind, elopement: true }),
+        ...(hideElopementOnly && { excludeIfTrue: "elopement_only" }),
+        ...(!elope && d.rescaledBy === "date_context" && dateContext?.season && { season: dateContext.season }),
+        ...(!elope && d.rescaledBy === "date_context" && dateContext?.day && { day: dateContext.day }),
+      };
+      continue;
+    }
+
     if (v == null) continue;
 
     if (d.kind === "multi" && Array.isArray(v) && v.length) {

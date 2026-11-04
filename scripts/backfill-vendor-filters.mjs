@@ -10,6 +10,7 @@
  *
  *   node scripts/backfill-vendor-filters.mjs [--dry] [--limit N]
  *   node scripts/backfill-vendor-filters.mjs --hist-only   (no DB, no creds)
+ *   node scripts/backfill-vendor-filters.mjs --hist-only --elopement-src <live-vendors.json>
  *
  * Source: data/filter-extraction/vendor-filters.jsonl (2,163 rows, one per
  * vendor). Requires migration 0032. Safe to re-run: it only overwrites rows
@@ -29,11 +30,12 @@
  *      would need to know that; expanding it here keeps the SQL simple.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { VENDOR_FILTERS } from "../lib/constants/vendor-filters.ts";
+import { ELOPEMENT_PRICE_KEYS } from "../lib/filters/match.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = resolve(ROOT, "data/filter-extraction/vendor-filters.jsonl");
@@ -42,6 +44,19 @@ const HIST_OUT = resolve(ROOT, "lib/constants/filter-histograms.json");
 const args = process.argv.slice(2);
 const DRY = args.includes("--dry");
 const HIST_ONLY = args.includes("--hist-only");
+/**
+ * Elopement-price axes (plan step 7b). The committed extraction JSONL predates
+ * the elopement keys -- they were backfilled straight into vendors.filters from
+ * the recon prose -- so their histograms are binned from a vendor-row export
+ * instead: a JSON array (or JSONL) of rows carrying `vendor_type` + `filters`,
+ * e.g. the cleanup pass `data/qualitypass/live-vendors.json`. Without the flag
+ * the elopement axes already in filter-histograms.json are carried over
+ * untouched, so a plain `--hist-only` re-run never drops them.
+ */
+const ELOPEMENT_SRC = (() => {
+  const i = args.indexOf("--elopement-src");
+  return i >= 0 ? resolve(process.cwd(), args[i + 1]) : null;
+})();
 const LIMIT = (() => {
   const i = args.indexOf("--limit");
   return i >= 0 ? Number(args[i + 1]) : Infinity;
@@ -234,11 +249,11 @@ const HIST_KEYS = ["price_min", "capacity_max", "minimum_spend", "bride_price_mi
  * venues quoting $25-$150 into the $0-499 bar while the matcher was reading
  * them as $2.5k-$15k, and let a single $22,000 room rate pad the top bin.
  */
-function valueFor(f, key, def) {
+function valueFor(f, key, def, basisKey = "price_basis") {
   const n = f[key];
   if (typeof n !== "number") return undefined;
   if (!def?.basis) return n;
-  const basis = f.price_basis;
+  const basis = f[basisKey];
   if (typeof basis !== "string" || basis === def.basis) return n;
   const factor = def.basisScale?.[basis];
   return factor === undefined ? undefined : n * factor;
@@ -254,6 +269,34 @@ for (const [t, list] of Object.entries(byType)) {
     if (b) h[key] = b;
   }
   if (Object.keys(h).length) hist[t] = h;
+}
+
+// Elopement axes: same bins(), same valueFor() (so a per-person venue
+// elopement is scaled exactly as the sheet scales it), reading the elopement
+// basis key. Only types whose price filter carries the mode pair.
+{
+  const ELOPE_KEY = ELOPEMENT_PRICE_KEYS.lo;
+  const previous = existsSync(HIST_OUT) ? JSON.parse(readFileSync(HIST_OUT, "utf8")) : {};
+  let elopeRows = null;
+  if (ELOPEMENT_SRC) {
+    const raw = readFileSync(ELOPEMENT_SRC, "utf8").trim();
+    elopeRows = raw.startsWith("[") ? JSON.parse(raw) : raw.split("\n").map((l) => JSON.parse(l));
+  }
+  for (const [t, defs] of Object.entries(VENDOR_FILTERS)) {
+    const def = defs.find((d) => d.kind === "range" && d.elopement);
+    if (!def) continue;
+    let b;
+    if (elopeRows) {
+      const values = elopeRows
+        .filter((r) => r.vendor_type === t && r.filters)
+        .map((r) => valueFor(r.filters, ELOPE_KEY, def, ELOPEMENT_PRICE_KEYS.basis))
+        .filter((n) => n !== undefined);
+      b = bins(values);
+    } else {
+      b = previous[t]?.[ELOPE_KEY];
+    }
+    if (b) (hist[t] ||= {})[ELOPE_KEY] = b;
+  }
 }
 
 console.log(`${rows.length} rows read, ${payload.length} carry at least one attribute`);
