@@ -66,6 +66,7 @@ export function VendorPhotoPicker({
         <h3 className="text-sm font-semibold">Photos</h3>
         <p className="text-xs text-muted-foreground">
           Up to {MAX}. These lead your photo strip, badged as yours.
+          {!canAdd && " To swap one, tap its ✕, then add the new photo."}
         </p>
       </div>
 
@@ -77,13 +78,17 @@ export function VendorPhotoPicker({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={it.url} alt={`Photo ${idx + 1}`} className="size-full object-cover" />
+            {/* Always visible, never hover-revealed: Tailwind v4 puts hover:
+                behind @media (hover: hover), so on a phone a hover-revealed
+                remove button never appears, and at MAX photos (add tile
+                hidden) a vendor had no visible way to replace one. */}
             <button
               type="button"
               aria-label={`Remove photo ${idx + 1}`}
               onClick={() => remove(idx)}
-              className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm ring-1 ring-border transition-colors hover:bg-background"
             >
-              <X className="size-3" />
+              <X className="size-3.5" />
             </button>
           </div>
         ))}
