@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * SQL validation for Vendor Verification (migrations 0044 + 0045), run against
+ * SQL validation for Vendor Verification (migrations 0044 + 0045 + 0050), run against
  * an embedded Postgres (pglite, WASM — no native deps, no Docker).
  *
  *   node scripts/test-verified-sql.mjs
@@ -15,6 +15,9 @@
  *   - vendor_is_verified(): the scalar wrapper agrees with the set.
  *   - vendors_in_bbox().verified: the set-based left join reads is-not-null,
  *     and is false (never null) for an unverified row.
+ *   - vendors_in_bbox().has_photo (0050): a verified vendor whose ONLY photos
+ *     are its own listing uploads counts; a draft or unpaid listing with photos,
+ *     and a verified listing with an empty photos array, do not.
  *   - vendor_filters_in_bbox(): the read-time jsonb merge — override keys win,
  *     extracted keys survive, an unverified row is unchanged (0034 behavior),
  *     a null-filters-but-has-overrides verified row appears, and a DRAFT
@@ -105,6 +108,7 @@ await db.exec(`
   );
   create table vendor_listings (
     vendor_id uuid primary key, filter_overrides jsonb default '{}'::jsonb,
+    photos jsonb not null default '[]'::jsonb,
     published boolean default false
   );
   create table recon_entries (id uuid primary key default gen_random_uuid(), vendor_id uuid, status text);
@@ -115,8 +119,13 @@ await db.exec(`
 // Stub the type as text-domain array so the real signatures load.
 await db.exec(`create domain vendor_type as text;`);
 
-// Load the REAL function bodies from 0044 then 0045.
-for (const fn of [...extractFunctions("0044_vendor_subscriptions.sql"), ...extractFunctions("0045_vendors_in_bbox_verified.sql")]) {
+// Load the REAL function bodies from 0044, then 0045, then 0050 (which
+// replaces vendors_in_bbox, so the bbox assertions below test the 0050 body).
+for (const fn of [
+  ...extractFunctions("0044_vendor_subscriptions.sql"),
+  ...extractFunctions("0045_vendors_in_bbox_verified.sql"),
+  ...extractFunctions("0050_has_photo_listing_photos.sql"),
+]) {
   await db.exec(fn);
 }
 
@@ -235,6 +244,34 @@ eq("bbox verified=false (not null) for an unverified vendor", bbox.get(V.unclaim
 eq("bbox verified=false for a draft vendor", bbox.get(V.draft), false);
 const anyNull = (await db.query(`select count(*)::int as n from vendors_in_bbox(0,0,1,1) where verified is null`)).rows[0].n;
 eq("no row has a null verified flag", anyNull, 0);
+
+
+// --- vendors_in_bbox.has_photo (0050): verified listing uploads count --------
+// Every fixture vendor above has no google_place_id, no google_photos and no
+// recon media, so before any listing photos exist has_photo is false for all.
+const photoBefore = new Map((await db.query(`select id, has_photo from vendors_in_bbox(0,0,1,1)`)).rows.map((r) => [r.id, r.has_photo]));
+eq("verified vendor with no photos anywhere: has_photo false", photoBefore.get(V.verified), false);
+
+const pic = '[{"storage_path":"x/full.jpg","thumb_path":"x/thumb.jpg"}]';
+await db.query(`update vendor_listings set photos = $2::jsonb where vendor_id = $1`, [V.verified, pic]);
+await db.query(`update vendor_listings set photos = $2::jsonb where vendor_id = $1`, [V.draft, pic]);
+await db.query(`update vendor_listings set photos = $2::jsonb where vendor_id = $1`, [V.noSub, pic]);
+await db.query(`update vendor_listings set photos = $2::jsonb where vendor_id = $1`, [V.revoked, pic]);
+// nullFilters stays verified with an EMPTY photos array.
+const photoIds = (await db.query(`select vendor_id from verified_listing_photo_ids()`)).rows.map((r) => r.vendor_id);
+eq("verified_listing_photo_ids returns only the verified vendor with photos", photoIds, [V.verified]);
+const photoAfter = new Map((await db.query(`select id, has_photo from vendors_in_bbox(0,0,1,1)`)).rows.map((r) => [r.id, r.has_photo]));
+eq("verified vendor whose only photos are listing uploads: has_photo true", photoAfter.get(V.verified), true);
+eq("draft listing photos do not count", photoAfter.get(V.draft), false);
+eq("unpaid (no subscription) listing photos do not count", photoAfter.get(V.noSub), false);
+eq("revoked claim listing photos do not count", photoAfter.get(V.revoked), false);
+eq("verified vendor with an empty photos array: has_photo false", photoAfter.get(V.nullFilters), false);
+const nullPhoto = (await db.query(`select count(*)::int as n from vendors_in_bbox(0,0,1,1) where has_photo is null`)).rows[0].n;
+eq("no row has a null has_photo flag", nullPhoto, 0);
+// The 0035 paths still hold under the new body.
+await db.query(`update vendors set google_place_id = 'g' where id = $1`, [V.unclaimed]);
+eq("unclaimed vendor with a google_place_id and no cache: has_photo true (0035 optimistic path)",
+  (await db.query(`select has_photo from vendors_in_bbox(0,0,1,1) where id = $1`, [V.unclaimed])).rows[0].has_photo, true);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 await db.close();

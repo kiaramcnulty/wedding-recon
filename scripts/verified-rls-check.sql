@@ -10,7 +10,7 @@
 -- whole file at once. The final SELECT returns one row per check with a
 -- passed boolean; every row must read true.
 --
--- Prerequisites: migrations 0042-0045 applied.
+-- Prerequisites: migrations 0042-0045 applied (checks 6 and 7 also need 0050).
 --
 -- No apostrophes in comments; no dollar-quoted bodies anywhere in this file
 -- (deliberately: the Supabase editor lexer mis-handles apostrophes inside a
@@ -36,10 +36,12 @@ values
   ('ffffffff-0000-0000-0000-00000000aaaa', 'cus_rlscheck', 'active'),
   ('ffffffff-0000-0000-0000-00000000bbbb', 'cus_rlscheck', 'active');
 
-insert into vendor_listings (vendor_id, published)
+insert into vendor_listings (vendor_id, published, photos)
 values
-  ('ffffffff-0000-0000-0000-00000000aaaa', true),
-  ('ffffffff-0000-0000-0000-00000000bbbb', false);  -- draft: NOT published
+  ('ffffffff-0000-0000-0000-00000000aaaa', true,
+    '[{"storage_path":"rls/full.jpg","thumb_path":"rls/thumb.jpg"}]'::jsonb),
+  ('ffffffff-0000-0000-0000-00000000bbbb', false,  -- draft: NOT published
+    '[{"storage_path":"rls/full.jpg","thumb_path":"rls/thumb.jpg"}]'::jsonb);
 
 -- Switch to the anonymous public role — the way a logged-out couple reads the
 -- map. RLS is now enforced; the definer functions must still see past it.
@@ -53,6 +55,9 @@ set local role anon;
 --   3. anon cannot read vendor_subscriptions directly (deny-all RLS) - which is
 --      what makes the definer boundary necessary in the first place.
 --   4/5. The scalar wrapper agrees under anon.
+--   6/7. The 0050 photo set sees the verified listing photos through the
+--      definer boundary (anon cannot read vendor_listings), and never the
+--      photos of a draft listing.
 select *
 from (
   values
@@ -65,7 +70,11 @@ from (
     ('4. scalar vendor_is_verified true for verified vendor',
       vendor_is_verified('ffffffff-0000-0000-0000-00000000aaaa')),
     ('5. scalar vendor_is_verified false for draft vendor',
-      not vendor_is_verified('ffffffff-0000-0000-0000-00000000bbbb'))
+      not vendor_is_verified('ffffffff-0000-0000-0000-00000000bbbb')),
+    ('6. anon sees verified listing photos via definer boundary',
+      (select count(*) from verified_listing_photo_ids(array['ffffffff-0000-0000-0000-00000000aaaa'::uuid])) = 1),
+    ('7. anon does not see draft listing photos',
+      (select count(*) from verified_listing_photo_ids(array['ffffffff-0000-0000-0000-00000000bbbb'::uuid])) = 0)
 ) as t(check_name, passed)
 order by check_name;
 
