@@ -108,7 +108,6 @@ type ClientEvents = {
     partial: number;
     radius_miles: number;
     expanded: boolean;
-    manual_radius: boolean;
   };
 };
 

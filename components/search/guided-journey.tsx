@@ -44,15 +44,11 @@ const STYLE_FIELD: Record<GuidedType, { key: string; label: string }> = {
   photos: { key: "style", label: "Style" },
 };
 
-const BUDGET_LABEL: Record<GuidedType, { label: string; hint: string }> = {
-  venue: {
-    label: "Venue budget",
-    hint: "Your total for the venue. Per-person and hourly quotes are converted using your guest count and a 5-hour event.",
-  },
-  photos: {
-    label: "Photography budget",
-    hint: "Your total for a wedding-day package.",
-  },
+// A total; per-person and hourly venue quotes are converted using the guest
+// count and a 5-hour event (see guidedSelection).
+const BUDGET_LABEL: Record<GuidedType, string> = {
+  venue: "Venue budget",
+  photos: "Photography budget",
 };
 
 const MONTHS = [
@@ -100,7 +96,7 @@ export function GuidedJourney() {
       // From the welcome-back popup: straight to that type's preferences.
       if (isGuidedType(typeParam) && stored?.location) {
         resumedRef.current = true;
-        const next = { ...stored, selectedVendorType: typeParam, manualRadius: null, step: "prefs" as JourneyStep };
+        const next = { ...stored, selectedVendorType: typeParam, step: "prefs" as JourneyStep };
         saveJourney(next);
         setState(next);
         return;
@@ -252,7 +248,7 @@ export function GuidedJourney() {
             onPick={(location) => update({ location, venueLocation: location })}
             onDate={(weddingMonth, weddingYear) => update({ weddingMonth, weddingYear })}
             onCityInstead={() => go("city")}
-            onContinue={(location) => go(afterLocation(state), { location, manualRadius: null })}
+            onContinue={(location) => go(afterLocation(state), { location })}
           />
         </Shell>
       );
@@ -271,7 +267,6 @@ export function GuidedJourney() {
             onContinue={(location) =>
               go(afterLocation(state), {
                 location,
-                manualRadius: null,
                 // No venue yet: they are looking for one, so skip the type grid.
                 ...(!state.selectedVendorType && state.hasVenue === false && { selectedVendorType: "venue" }),
               })
@@ -285,7 +280,7 @@ export function GuidedJourney() {
         <Shell onBack={state.status === "completed" ? undefined : () => go(back)}>
           <CategoryStep
             state={state}
-            onPick={(t) => go("prefs", { selectedVendorType: t, manualRadius: null })}
+            onPick={(t) => go("prefs", { selectedVendorType: t })}
             onEditLocation={() => go(state.hasVenue ? "venue" : "city")}
           />
         </Shell>
@@ -324,7 +319,6 @@ export function GuidedJourney() {
           onEdit={() => go("prefs")}
           onEditLocation={() => go(state.hasVenue ? "venue" : "city")}
           onChangeType={() => go("category")}
-          onRadius={(miles) => update({ manualRadius: miles })}
           onShown={() => {
             if (state.status !== "completed") update({ status: "completed" });
           }}
@@ -404,9 +398,6 @@ function WhenField({
       <legend className="font-medium">
         When is the wedding? <span className="font-normal text-muted-foreground">(optional)</span>
       </legend>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Some vendors charge more in peak season, so this helps us compare prices.
-      </p>
       <div className="mt-3 flex gap-2">
         <select
           aria-label="Wedding month"
@@ -777,15 +768,14 @@ function PrefsStep({
       <p className="text-sm font-medium" style={{ color: c.textHex }}>
         {c.label}
       </p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tell us what you&apos;re looking for</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Everything is optional. Leave a field blank and we won&apos;t filter on it.
-      </p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+        Tell us what you&apos;re looking for{" "}
+        <span className="text-base font-normal text-muted-foreground">(optional)</span>
+      </h1>
 
       <label className="mt-6 font-medium" htmlFor="journey-budget">
-        {BUDGET_LABEL[type].label}
+        {BUDGET_LABEL[type]}
       </label>
-      <p className="text-sm text-muted-foreground">{BUDGET_LABEL[type].hint}</p>
       <div className="relative mt-2">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
         <Input

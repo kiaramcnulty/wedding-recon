@@ -493,7 +493,7 @@ Undecided unless marked decided; each has a recommendation.
 2. **Success metric: decided, skipped** for now (31 October). The coarse `journey_step` / `journey_results` PostHog events in the slice still record funnel and result counts.
 3. **Thin slice: decided, built** on branch `journey/venue-photos-slice` (31 October), at the unlinked, `noindex` route `/start`. It covers:
    - both first-visit branches (booked venue via our own directory, or a Colorado town), optional month/year, the 11-type grid with only Venue and Photos enabled, Venue and Photos default controls, suggestions, the full feed (`VendorFeed`), vendor round trips, resume and the returning-visitor screen;
-   - the radius ladder, banded distance and a manual radius slider with reset (no map ring);
+   - the radius ladder and banded distance, automatic only. The manual radius slider was built and then removed from the results screen (Kiara, 4 November): the ladder handles radius internally, and the results header shows only "Near <place>", which opens the location step. `runGuidedSearch` keeps its manual mode for the later map controls;
    - effective attributes through the edge cache (`/api/map/vendors?attrs=1`);
    - device-local state only (`wr:journey` in localStorage).
 

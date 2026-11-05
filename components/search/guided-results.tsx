@@ -15,14 +15,11 @@ import { CATEGORIES } from "@/lib/constants/categories";
 import { filtersForType } from "@/lib/constants/vendor-filters";
 import {
   guidedSelection,
-  maxRadius,
-  radiusLadder,
   runGuidedSearch,
   suggestionsOf,
   type GuidedType,
 } from "@/lib/search/guided";
 import type { JourneyState } from "@/lib/search/journey-state";
-import { cn } from "@/lib/utils";
 import { useGuidedCandidates } from "./use-guided-candidates";
 
 export type ResultsView = "suggestions" | "list";
@@ -44,7 +41,6 @@ export function GuidedResults({
   onEdit,
   onEditLocation,
   onChangeType,
-  onRadius,
   onShown,
 }: {
   state: JourneyState;
@@ -53,7 +49,6 @@ export function GuidedResults({
   onEdit: () => void;
   onEditLocation: () => void;
   onChangeType: () => void;
-  onRadius: (miles: number | null) => void;
   onShown: () => void;
 }) {
   const type = state.selectedVendorType as GuidedType;
@@ -81,9 +76,9 @@ export function GuidedResults({
       type,
       selection,
       anchor,
-      state.manualRadius ? { mode: "manual", miles: state.manualRadius } : { mode: "auto" },
+      { mode: "auto" },
     );
-  }, [candidates, type, selection, anchor, state.manualRadius]);
+  }, [candidates, type, selection, anchor]);
 
   // Mark the search completed and log it once per distinct result.
   const resultKey = result
@@ -98,7 +93,6 @@ export function GuidedResults({
       partial: result.partialCount,
       radius_miles: result.radiusMiles,
       expanded: result.expanded,
-      manual_radius: state.manualRadius != null,
     });
     // resultKey stands in for `result`, which is a new object on every recompute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,11 +117,17 @@ export function GuidedResults({
         <button
           type="button"
           onClick={onChangeType}
-          className="text-sm text-muted-foreground underline underline-offset-4"
+          className="shrink-0 text-sm text-muted-foreground underline underline-offset-4"
         >
-          Change vendor type
+          Change type
         </button>
       </div>
+      <p className="mt-0.5 truncate text-sm text-muted-foreground">
+        Near{" "}
+        <button type="button" onClick={onEditLocation} className="underline underline-offset-4">
+          {location.label}
+        </button>
+      </p>
       {pills.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Your preferences">
           {pills.map((p) => (
@@ -147,18 +147,6 @@ export function GuidedResults({
         </Button>
       </div>
     </div>
-  );
-
-  const radiusBlock = result && (
-    <RadiusControl
-      type={type}
-      miles={result.radiusMiles}
-      manual={state.manualRadius != null}
-      expanded={result.expanded}
-      placeLabel={location.label}
-      onEditLocation={onEditLocation}
-      onChange={onRadius}
-    />
   );
 
   if (candidates.status === "error") {
@@ -207,7 +195,7 @@ export function GuidedResults({
             scrollKey={SCROLL_KEY}
             selections={{ [type]: selection }}
             returnTo="/start?restore=list"
-            emptyText="Nothing in this radius. Try a wider radius or fewer preferences."
+            emptyText="Nothing nearby yet. Try fewer preferences."
             className="min-h-0 flex-1"
             footnote={
               incomplete
@@ -227,11 +215,8 @@ export function GuidedResults({
       <div className="px-5 pt-5">
         {result.confirmedCount === 0 ? (
           <div className="rounded-xl border px-4 py-6 text-center">
-            <h1 className="text-lg font-semibold">No confirmed matches yet</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Nothing within {result.radiusMiles} miles meets everything you asked for. Try a
-              higher budget or fewer preferences.
-            </p>
+            <h1 className="text-lg font-semibold">No exact matches yet</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Try a higher budget or fewer preferences.</p>
             <Button className="mt-4" onClick={onEdit}>
               Adjust filters
             </Button>
@@ -290,7 +275,6 @@ export function GuidedResults({
           </p>
         )}
       </div>
-      {radiusBlock}
       <p className="px-5 pt-6 text-center text-sm">
         <Link
           href={`/explore?types=${type}`}
@@ -299,72 +283,6 @@ export function GuidedResults({
           Browse the map instead
         </Link>
       </p>
-    </div>
-  );
-}
-
-function RadiusControl({
-  type,
-  miles,
-  manual,
-  expanded,
-  placeLabel,
-  onEditLocation,
-  onChange,
-}: {
-  type: GuidedType;
-  miles: number;
-  manual: boolean;
-  expanded: boolean;
-  placeLabel: string;
-  onEditLocation: () => void;
-  onChange: (miles: number | null) => void;
-}) {
-  const max = maxRadius(type);
-  const first = radiusLadder(type)[0];
-  return (
-    <div className="mx-5 mt-6 rounded-xl border p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor="journey-radius" className="text-sm font-medium">
-          Within {miles} miles
-        </label>
-        <button
-          type="button"
-          onClick={onEditLocation}
-          className="truncate text-sm text-muted-foreground underline underline-offset-4"
-        >
-          of {placeLabel}
-        </button>
-      </div>
-      <input
-        id="journey-radius"
-        type="range"
-        min={5}
-        max={max}
-        step={5}
-        value={miles}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-3 w-full accent-foreground"
-      />
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>5 mi</span>
-        <span>{max} mi</span>
-      </div>
-      {!manual && expanded && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Expanded from {first} to {miles} miles for more matches.
-          {miles > 50 && " Vendors this far away may charge travel fees."}
-        </p>
-      )}
-      {manual && (
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className={cn("mt-2 text-xs text-muted-foreground underline underline-offset-4")}
-        >
-          Reset to automatic radius
-        </button>
-      )}
     </div>
   );
 }

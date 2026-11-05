@@ -50,8 +50,6 @@ export interface JourneyState {
   selectedVendorType: GuidedType | null;
   /** Answers per type, kept when the couple switches type and back. */
   byType: Partial<Record<GuidedType, GuidedPrefs>>;
-  /** null = automatic ladder; a number = the couple moved the slider. */
-  manualRadius: number | null;
   step: JourneyStep;
   status: "in_progress" | "completed";
   updatedAt: number;
@@ -64,7 +62,6 @@ export function emptyJourney(): JourneyState {
     location: null,
     selectedVendorType: null,
     byType: {},
-    manualRadius: null,
     step: "welcome",
     status: "in_progress",
     updatedAt: Date.now(),
@@ -145,7 +142,6 @@ export function parseJourney(raw: unknown): JourneyState | null {
     weddingYear: finitePositive(r.weddingYear),
     selectedVendorType: isGuidedType(r.selectedVendorType) ? r.selectedVendorType : null,
     byType,
-    manualRadius: finitePositive(r.manualRadius) ?? null,
     // A step that needs a location cannot be resumed without one.
     step: !location && (step === "category" || step === "prefs" || step === "results") ? "welcome" : step,
     status: r.status === "completed" ? "completed" : "in_progress",
