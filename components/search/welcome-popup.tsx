@@ -59,6 +59,11 @@ function write(key: string, value: string) {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+// TESTING ONLY (Kiara, 2026-11-05): lifts the once-a-day limit on welcome back
+// so it shows on every fresh /explore load. Set back to false BEFORE this
+// branch merges to main.
+const SKIP_DAILY_LIMIT_FOR_TESTING = true;
+
 type Mode = "welcome" | "welcomeBack" | null;
 
 export function WelcomePopup() {
@@ -81,7 +86,7 @@ export function WelcomePopup() {
       pathname === "/explore" &&
       !window.location.search &&
       journey?.status === "completed" &&
-      read(WELCOME_BACK_KEY) !== today()
+      (SKIP_DAILY_LIMIT_FOR_TESTING || read(WELCOME_BACK_KEY) !== today())
     ) {
       next = "welcomeBack";
       write(WELCOME_BACK_KEY, today());

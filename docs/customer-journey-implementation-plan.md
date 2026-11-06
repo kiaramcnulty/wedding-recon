@@ -367,6 +367,8 @@ Use the existing design system: Geist, white surfaces, neutral primary buttons, 
 
 ## Milestone 8 Test and release in small changes
 
+**Before merging `journey/venue-photos-slice` to main:** set `SKIP_DAILY_LIMIT_FOR_TESTING` in `components/search/welcome-popup.tsx` back to `false`. It was turned on 2026-11-05 so Kiara could test the welcome-back popup on the preview without waiting a day; left on, production shows it on every bare `/explore` load.
+
 Suggested pull requests, in dependency order:
 
 | PR | Scope | Completion evidence |
