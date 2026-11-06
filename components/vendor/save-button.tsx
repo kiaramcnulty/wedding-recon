@@ -7,7 +7,14 @@ import { toast } from "sonner";
 import { captureClient } from "@/lib/analytics/posthog";
 import type { VendorType } from "@/lib/constants/categories";
 import { createClient } from "@/lib/supabase/client";
-import { setSaved, useIsSaved } from "@/lib/saved-vendors";
+import {
+  SAVED_TOAST,
+  markJustSaved,
+  rememberPendingSave,
+  setSaved,
+  useIsSaved,
+  useJustSaved,
+} from "@/lib/saved-vendors";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -16,13 +23,15 @@ interface SaveButtonProps {
   vendorType: VendorType;
   /** Where sign-in returns a guest to; defaults to the current URL. */
   returnTo?: string;
-  /** `overlay`: a small round heart floated over a preview card's photo. */
+  /** `overlay`: a small round heart pinned to a preview card's top-right corner. */
   variant?: "default" | "overlay";
 }
 
 export function SaveButton({ vendorId, vendorType, returnTo, variant = "default" }: SaveButtonProps) {
   // Shared across every heart on the page, so a card and the vendor page agree.
   const saved = useIsSaved(vendorId) === true;
+  // Plays the pop on a save here AND on the save completed after sign-in.
+  const popping = useJustSaved(vendorId);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -38,7 +47,10 @@ export function SaveButton({ vendorId, vendorType, returnTo, variant = "default"
 
       if (!user) {
         // Send guests to login, remembering this page so the login back button
-        // returns here instead of defaulting to Explore.
+        // returns here instead of defaulting to Explore, and remembering the tap
+        // itself so the save completes once they are signed in
+        // (`lib/saved-vendors.ts`).
+        rememberPendingSave(vendorId, vendorType);
         const back = returnTo ?? window.location.pathname + window.location.search;
         router.push(`/login?from=${encodeURIComponent(back)}`);
         return;
@@ -56,7 +68,7 @@ export function SaveButton({ vendorId, vendorType, returnTo, variant = "default"
           toast.error("Could not remove from saved.");
         } else {
           setSaved(vendorId, false);
-          toast("Removed from saved vendors.");
+          toast("Removed from Planning Hub");
         }
       } else {
         // Save — ignore unique-violation (23505) gracefully
@@ -68,7 +80,8 @@ export function SaveButton({ vendorId, vendorType, returnTo, variant = "default"
           toast.error("Could not save vendor.");
         } else {
           setSaved(vendorId, true);
-          toast("Saved to your hub!");
+          markJustSaved(vendorId);
+          toast(SAVED_TOAST);
           // Only the save (insert) direction counts as intent — not the unsave
           // branch above, and not the implicit auto-save createRecon does.
           captureClient("vendor_saved", { vendor_type: vendorType });
@@ -98,7 +111,10 @@ export function SaveButton({ vendorId, vendorType, returnTo, variant = "default"
             saved && "text-brand",
           )}
         >
-          <Heart className={cn("size-4", saved && "fill-current")} strokeWidth={2} />
+          <Heart
+            className={cn("size-4", saved && "fill-current", popping && "animate-heart-pop")}
+            strokeWidth={2}
+          />
         </span>
       </button>
     );
@@ -113,7 +129,7 @@ export function SaveButton({ vendorId, vendorType, returnTo, variant = "default"
       aria-label={label}
       className={cn(saved && "text-primary border-primary/40 bg-primary/5")}
     >
-      <Heart className={cn("size-4", saved && "fill-current")} />
+      <Heart className={cn("size-4", saved && "fill-current", popping && "animate-heart-pop")} />
     </Button>
   );
 }

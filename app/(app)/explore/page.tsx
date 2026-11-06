@@ -39,6 +39,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 import { ProfileMenu } from "@/components/profile-menu";
 import { LANDING_HREF } from "@/lib/landing/nav";
+import { MAP_VIEW_KEY } from "@/lib/map/map-view";
 import { cn } from "@/lib/utils";
 
 interface GeocodeSuggestion {
@@ -256,7 +257,7 @@ export default function ExplorePage() {
   const [initialView] = useState<{ lng: number; lat: number; zoom: number } | null>(() => {
     if (typeof window === "undefined") return null;
     try {
-      const raw = sessionStorage.getItem("wr:mapView");
+      const raw = sessionStorage.getItem(MAP_VIEW_KEY);
       if (!raw) return null;
       const d = JSON.parse(raw) as { center?: [number, number]; zoom?: number };
       if (!d.center || typeof d.zoom !== "number") return null;
@@ -317,7 +318,7 @@ export default function ExplorePage() {
   const saveMapView = useCallback(
     (view: { center: [number, number]; zoom: number }) => {
       try {
-        sessionStorage.setItem("wr:mapView", JSON.stringify(view));
+        sessionStorage.setItem(MAP_VIEW_KEY, JSON.stringify(view));
       } catch {
         // sessionStorage unavailable (e.g. private mode) — restore-on-return is
         // lost, nothing else breaks.

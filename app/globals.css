@@ -201,3 +201,30 @@
     opacity: 0;
   }
 }
+
+/* The save heart: a quick pop when a vendor lands in the Planning Hub, both on
+   a direct tap and when a save started before sign-in completes on return. */
+@keyframes heart-pop {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.45);
+  }
+  55% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-heart-pop {
+  animation: heart-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-heart-pop {
+    animation: none;
+  }
+}

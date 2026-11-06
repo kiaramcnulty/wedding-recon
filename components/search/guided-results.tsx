@@ -4,13 +4,17 @@ import * as React from "react";
 import Link from "next/link";
 import { ChevronLeft, Loader2, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { VendorFeed } from "@/components/map/vendor-feed";
+import { VendorFeed, ViewToggle } from "@/components/map/vendor-feed";
+import { VendorMap } from "@/components/map/vendor-map";
+import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import { SaveButton } from "@/components/vendor/save-button";
 import {
   VendorPreviewCard,
   useVendorPreviews,
 } from "@/components/map/vendor-preview-card";
 import { captureClient } from "@/lib/analytics/posthog";
+import { writeMapView } from "@/lib/map/map-view";
+import { zoomToFitRing } from "@/lib/map/ring";
 import { CATEGORIES } from "@/lib/constants/categories";
 import { filtersForType } from "@/lib/constants/vendor-filters";
 import {
@@ -22,12 +26,16 @@ import {
 import type { JourneyState } from "@/lib/search/journey-state";
 import { useGuidedCandidates } from "./use-guided-candidates";
 
-export type ResultsView = "suggestions" | "list";
+export type ResultsView = "suggestions" | "list" | "map";
 
 const SCROLL_KEY = "wr:journeyScroll";
 const STYLE_KEY: Record<GuidedType, string> = { venue: "setting", photos: "style" };
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
+
+// "Browse the map instead" zoom: about 25 miles across on a phone, the size of
+// the first radius step.
+const MAP_ZOOM = 10;
 
 /**
  * Suggestions (up to three confirmed matches) and the full feed behind them,
@@ -176,20 +184,30 @@ export function GuidedResults({
     );
   }
 
-  if (view === "list") {
+  if (view === "list" || view === "map") {
     return (
       <div className="relative flex-1">
         <div className="absolute inset-0 mx-auto flex w-full max-w-[480px] flex-col">
-          <div className="px-3 pt-3">
+          <div className="flex items-center justify-between gap-2 px-3 pt-3">
             <Button variant="ghost" size="sm" className="h-8" onClick={() => onViewChange("suggestions")}>
               <ChevronLeft className="size-4" /> Top matches
             </Button>
+            <ViewToggle view={view} onChange={onViewChange} />
           </div>
-          <p className="px-5 pt-1 text-sm text-muted-foreground">
+          <p className="px-5 pb-2 pt-1 text-sm text-muted-foreground">
             {result.confirmedCount} {result.confirmedCount === 1 ? "match" : "matches"}
             {result.partialCount > 0 && `, ${result.partialCount} partial`} within {result.radiusMiles} miles of{" "}
             {location.label}
           </p>
+          {view === "map" ? (
+            <ResultsMap
+              type={type}
+              center={anchor}
+              miles={result.radiusMiles}
+              ranked={result.ranked}
+              selection={selection}
+            />
+          ) : (
           <VendorFeed
             entries={result.ranked.map((r) => ({ id: r.id, vendorType: type, rank: r.rank }))}
             scrollKey={SCROLL_KEY}
@@ -203,6 +221,7 @@ export function GuidedResults({
                 : "Partial matches are missing a price, guest count or style we could check."
             }
           />
+          )}
         </div>
       </div>
     );
@@ -246,7 +265,7 @@ export function GuidedResults({
                         href={`/vendor/${item.id}?from=${encodeURIComponent("/start?restore=suggestions")}`}
                         selection={selection}
                         showCategoryPill={false}
-                        photoAction={
+                        cornerAction={
                           <SaveButton
                             vendorId={item.id}
                             vendorType={type}
@@ -278,11 +297,73 @@ export function GuidedResults({
       <p className="px-5 pt-6 text-center text-sm">
         <Link
           href={`/explore?types=${type}`}
+          // Open the map on this search, not on Explore's Denver default.
+          onClick={() => writeMapView({ center: [location.lng, location.lat], zoom: MAP_ZOOM })}
           className="text-muted-foreground underline underline-offset-4"
         >
           Browse the map instead
         </Link>
       </p>
+    </div>
+  );
+}
+
+/**
+ * The result set on the shared map: only these vendors get pins, with the
+ * journey's own match/partial verdicts, inside a ring at the search radius.
+ * Framed on the ring when it opens; panning never moves the search.
+ */
+function ResultsMap({
+  type,
+  center,
+  miles,
+  ranked,
+  selection,
+}: {
+  type: GuidedType;
+  center: { lat: number; lng: number };
+  miles: number;
+  ranked: readonly { id: string; rank: 0 | 1 }[];
+  selection: ReturnType<typeof guidedSelection>;
+}) {
+  const [pin, setPin] = React.useState<string | null>(null);
+  const results = React.useMemo(() => new Map(ranked.map((r) => [r.id, r.rank])), [ranked]);
+  const ring = React.useMemo(() => ({ lng: center.lng, lat: center.lat, miles }), [center.lng, center.lat, miles]);
+  const selectedTypes = React.useMemo(() => [type], [type]);
+  // Read once: the map takes its starting view at init only. The frame is the
+  // app column (max 480px) under the header and above the bottom nav.
+  const [initialView] = React.useState(() => ({
+    lng: center.lng,
+    lat: center.lat,
+    zoom:
+      typeof window === "undefined"
+        ? 8
+        : zoomToFitRing(center.lat, miles, Math.min(window.innerWidth, 480), window.innerHeight - 220),
+  }));
+  const closePin = React.useCallback(() => setPin(null), []);
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <VendorMap
+        initialView={initialView}
+        selectedTypes={selectedTypes}
+        results={results}
+        ring={ring}
+        selectedVendorId={pin}
+        onVendorOpen={(p) => setPin(p.id)}
+        onBackgroundTap={closePin}
+      />
+      {pin && (
+        <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-9 pt-3">
+          <VendorPinPreview
+            vendorId={pin}
+            vendorType={type}
+            selection={selection}
+            onClose={closePin}
+            returnTo="/start?restore=map"
+          />
+        </div>
+      )}
     </div>
   );
 }

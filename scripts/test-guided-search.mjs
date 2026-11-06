@@ -169,5 +169,21 @@ console.log("ranking");
   eq("ties break the same way whatever the input order", order1, order2);
 }
 
+// ---- search-radius ring (lib/map/ring.ts) ----
+{
+  const { ringCoordinates, zoomToFitRing } = await import("../lib/map/ring.ts");
+  const VAIL = { lat: 39.64, lng: -106.37 };
+  for (const miles of [25, 50, 100]) {
+    const pts = ringCoordinates(VAIL.lng, VAIL.lat, miles);
+    const off = Math.max(...pts.map(([lng, lat]) => Math.abs(milesBetween(VAIL, { lat, lng }) - miles)));
+    eq(`ring at ${miles} mi: every point within 0.5% of ${miles} mi`, off < miles * 0.005, true);
+    eq(`ring at ${miles} mi is closed`, pts[0][0] === pts.at(-1)[0] && pts[0][1] === pts.at(-1)[1], true);
+  }
+  eq("ring zoom: a wider ring zooms out", zoomToFitRing(39.6, 100, 390, 600) < zoomToFitRing(39.6, 25, 390, 600), true);
+  // 25 mi across ~390px at Denver latitude is about zoom 8.1.
+  const z25 = zoomToFitRing(39.7, 25, 390, 600);
+  eq("ring zoom: 25 mi on a phone is about zoom 8", z25 > 7.6 && z25 < 8.6, true);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

@@ -15,6 +15,8 @@ interface VendorPinPreviewProps {
   /** Active attribute filters for this vendor's type, so matched tags sort first. */
   selection?: FilterSelection;
   onClose: () => void;
+  /** Where the vendor page's back button returns. Defaults to Explore with this peek reopened. */
+  returnTo?: string;
 }
 
 /**
@@ -32,6 +34,7 @@ export function VendorPinPreview({
   vendorType,
   selection,
   onClose,
+  returnTo = "/explore?restore=1",
 }: VendorPinPreviewProps) {
   const items = useVendorPreviews([vendorId]);
   const item = items?.[0] ?? null;
@@ -139,8 +142,8 @@ export function VendorPinPreview({
           item={item}
           vendorType={vendorType}
           selection={selection}
-          // `from` returns the back button to the map with this peek reopened.
-          href={`/vendor/${item.id}?from=${encodeURIComponent("/explore?restore=1")}`}
+          // `from` returns the back button to the map it was opened from.
+          href={`/vendor/${item.id}?from=${encodeURIComponent(returnTo)}`}
           className="shadow-xl"
         />
       )}

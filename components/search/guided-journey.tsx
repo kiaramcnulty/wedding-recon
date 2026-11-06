@@ -108,7 +108,7 @@ export function GuidedJourney() {
       }
       if (restore && stored?.step === "results") {
         // Back from a vendor page: straight to where the couple was.
-        setView(restore === "list" ? "list" : "suggestions");
+        setView(restore === "list" || restore === "map" ? restore : "suggestions");
         setState(stored);
         window.history.replaceState(null, "", "/start");
         return;

@@ -294,7 +294,7 @@ export function VendorPreviewCard({
   showCategoryPill = true,
   selection,
   action,
-  photoAction,
+  cornerAction,
   className,
 }: {
   item: VendorPreview;
@@ -328,12 +328,13 @@ export function VendorPreviewCard({
    */
   action?: React.ReactNode;
   /**
-   * Optional small control floated over the photo's top-right corner (the
-   * save heart). Over the photo rather than in the `action` column, which
-   * would take width from the name and the tag pills. Also a sibling of the
-   * Link, positioned against the card.
+   * Optional small control pinned to the card's top-right corner (the save
+   * heart). Floated rather than given its own column, which would take the
+   * full card height of width from the name and the tag pills; the text column
+   * only gives up a heart's width. A sibling of the Link, positioned against
+   * the card.
    */
-  photoAction?: React.ReactNode;
+  cornerAction?: React.ReactNode;
   className?: string;
 }) {
   const router = useRouter();
@@ -403,7 +404,10 @@ export function VendorPreviewCard({
                 name (not inside it) so `truncate`'s nowrap/overflow never clips
                 the pill; `min-w-0` lets the name shrink past it. `compact` is the
                 short "Verified" pill — the full label lives on the vendor page. */}
-            <span className="flex min-w-0 items-center gap-1.5">
+            {/* Only the name line clears the corner heart: it is the one row
+                long enough to run under it, and padding the whole column would
+                push tag pills off their single line. */}
+            <span className={cn("flex min-w-0 items-center gap-1.5", cornerAction && "pr-8")}>
               <span className="min-w-0 truncate font-heading text-sm font-semibold">
                 {item.name}
               </span>
@@ -429,9 +433,7 @@ export function VendorPreviewCard({
         {action && (
           <div className="flex shrink-0 items-center pr-2 pl-1">{action}</div>
         )}
-        {/* The photo is size-24 inside the Link's p-2, so its top-right corner
-            sits at left 104px / top 8px of the card. */}
-        {photoAction && <div className="absolute left-[72px] top-3">{photoAction}</div>}
+        {cornerAction && <div className="absolute right-2.5 top-2.5">{cornerAction}</div>}
       </div>
       {item.slides.length > 0 && (
         <ReconPreviewCarousel slides={item.slides} onOpen={go} onTint={item.verified} />

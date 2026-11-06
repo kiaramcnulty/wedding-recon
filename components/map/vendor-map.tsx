@@ -20,6 +20,7 @@ import { isApproximateLocation } from "@/lib/map/vendor-location";
 import { bboxForView, padBbox, snapBbox, type ViewportBbox } from "@/lib/map/viewport";
 import { mapWithConcurrency, withRpcRetry } from "@/lib/map/rpc-fanout";
 import { compareRanked, type RankedVendor } from "@/lib/map/rank";
+import { ringFeature } from "@/lib/map/ring";
 import {
   filterRankFor,
   filterMatchFor,
@@ -39,6 +40,10 @@ const MAP_STYLE_URL =
 // Denver, CO
 const DEFAULT_CENTER: [number, number] = [-104.9903, 39.7392];
 const DEFAULT_ZOOM = 9;
+const RING_SOURCE = "search-ring";
+// The brand green (--brand, #1d9e75), not a category color: the ring belongs
+// to the search, whatever type is shown.
+const RING_COLOR = "#1d9e75";
 const DEBOUNCE_MS = 150;
 // PostgREST caps EVERY response at this many rows (Supabase `db-max-rows`), and
 // the RPC's own max_rows argument cannot lift it — ask for 5000 and you still
@@ -412,6 +417,7 @@ function buildFeatureCollectionsByType(
   vendors: Vendor[],
   positions: Map<string, { lng: number; lat: number }>,
   filterSelections?: FilterSelections,
+  results?: ReadonlyMap<string, 0 | 1> | null,
 ): Record<VendorType, GeoJSON.FeatureCollection> {
   const byType = Object.fromEntries(
     VENDOR_TYPES.map((t) => [
@@ -429,10 +435,20 @@ function buildFeatureCollectionsByType(
     // hidden by a layer filter, so the cluster counts drawn on screen agree
     // with the pins — MapLibre clusters the source, not the visible subset.
     const t = bucketType(vendor.vendor_type);
-    // Each vendor is judged against ITS OWN type's filters, so several types can
-    // be filtered at once without one type's criteria touching another.
-    const rank = active ? filterRankFor(t, vendor.filters, filterSelections) : 1;
-    if (rank < 0) continue;
+    let rank: number;
+    if (results) {
+      // A caller-ranked result set (the guided journey): only its vendors get
+      // pins, each with the verdict the caller already reached, so the map and
+      // the list beside it can never disagree about who matched.
+      const r = results.get(vendor.id);
+      if (r === undefined) continue;
+      rank = r;
+    } else {
+      // Each vendor is judged against ITS OWN type's filters, so several types
+      // can be filtered at once without one type's criteria touching another.
+      rank = active ? filterRankFor(t, vendor.filters, filterSelections) : 1;
+      if (rank < 0) continue;
+    }
     // Migration 0034 computes this server-side (a boolean is far cheaper than
     // the three columns the heuristic reads). Pre-0034 the column is absent and
     // those columns are still present, so fall back to the shared client-side
@@ -599,6 +615,19 @@ interface VendorMapProps {
    * second query for rows the map is holding anyway.
    */
   onVendorsChange?: (vendors: Vendor[]) => void;
+  /**
+   * A result set ranked elsewhere (the guided journey), as vendor id -> rank.
+   * When set, ONLY these vendors get pins, with these ranks, and
+   * `filterSelections` is ignored for pin building. Rows still come from the
+   * normal bbox fetch, so pin styling, fan-out and caching are unchanged.
+   */
+  results?: ReadonlyMap<string, 0 | 1> | null;
+  /**
+   * A search-radius ring to draw under the pins: a geographic circle
+   * (`lib/map/ring.ts`), subdued fill and thin stroke. Display only; it does
+   * not filter anything (pass `results` for that).
+   */
+  ring?: { lng: number; lat: number; miles: number } | null;
 }
 
 export function VendorMap({
@@ -615,6 +644,8 @@ export function VendorMap({
   withFilters,
   onVisibleVendorsChange,
   onVendorsChange,
+  results,
+  ring,
 }: VendorMapProps) {
   const router = useRouter();
   // Latest onClusterOpen, callable from the run-once init effect's handlers.
@@ -637,6 +668,9 @@ export function VendorMap({
   // Latest attribute filter, same reason — and read by applyVendors, which runs
   // both on new rows and on a filter change.
   const filterSelectionsRef = useRef(filterSelections);
+  // Latest caller-ranked result set and ring, same reason.
+  const resultsRef = useRef(results);
+  const ringRef = useRef(ring);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -924,6 +958,7 @@ export function VendorMap({
     for (const v of vendorsRef.current) {
       const vendorType = bucketType(v.vendor_type);
       if (!showAll && !sel.includes(vendorType)) continue;
+      if (resultsRef.current && !resultsRef.current.has(v.id)) continue; // not pinned
       const pos = positionsRef.current.get(v.id);
       if (!pos) continue; // no coordinates — never drawn, so never "on screen"
       if (!bounds.contains([pos.lng, pos.lat])) continue;
@@ -978,6 +1013,7 @@ export function VendorMap({
         vendors,
         positions,
         filterSelectionsRef.current,
+        resultsRef.current,
       );
       for (const t of VENDOR_TYPES) {
         map.getSource(srcId(t))?.setData(byType[t]);
@@ -1056,6 +1092,22 @@ export function VendorMap({
     if (vendorsRef.current.length) applyVendors(vendorsRef.current);
     reportVisibleVendors();
   }, [filterSelections, applyVendors, reportVisibleVendors]);
+
+  // A new result set rebuilds the sources from the rows in hand, no network.
+  useEffect(() => {
+    resultsRef.current = results;
+    if (vendorsRef.current.length) applyVendors(vendorsRef.current);
+  }, [results, applyVendors]);
+
+  // Redraw the ring when it changes. A no-op until the load handler has added
+  // its source, which then draws the latest value itself.
+  useEffect(() => {
+    ringRef.current = ring;
+    const src = mapRef.current?.getSource(RING_SOURCE) as
+      | import("maplibre-gl").GeoJSONSource
+      | undefined;
+    src?.setData(ring ? ringFeature(ring.lng, ring.lat, ring.miles) : EMPTY_FC);
+  }, [ring]);
 
   /**
    * Load the filter attributes the first time this session needs them.
@@ -1224,6 +1276,27 @@ export function VendorMap({
         // Pre-rasterize category pins + cluster discs before layers use them.
         await registerPinImages(map);
         if (!mapRef.current) return; // unmounted mid-load
+
+        // The search-radius ring, added before the pin layers so it draws
+        // under them. Always present (empty when there is no ring) so the ring
+        // effect only ever has to swap its data.
+        const r = ringRef.current;
+        map.addSource(RING_SOURCE, {
+          type: "geojson",
+          data: r ? ringFeature(r.lng, r.lat, r.miles) : EMPTY_FC,
+        });
+        map.addLayer({
+          id: `${RING_SOURCE}-fill`,
+          type: "fill",
+          source: RING_SOURCE,
+          paint: { "fill-color": RING_COLOR, "fill-opacity": 0.06 },
+        });
+        map.addLayer({
+          id: `${RING_SOURCE}-line`,
+          type: "line",
+          source: RING_SOURCE,
+          paint: { "line-color": RING_COLOR, "line-width": 1.5, "line-opacity": 0.6 },
+        });
 
         // Individual vendor pins (added first so cluster bubbles sit on top).
         // From LABEL_MIN_ZOOM up each pin also carries its vendor's name beneath

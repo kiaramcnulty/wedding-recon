@@ -269,7 +269,7 @@ export function VendorFeed({
                     href={vendorHref(item.id)}
                     onNavigate={rememberScroll}
                     selection={selections?.[typeById.get(item.id) ?? "other"]}
-                    photoAction={
+                    cornerAction={
                       <SaveButton
                         vendorId={item.id}
                         vendorType={typeById.get(item.id) ?? "other"}
