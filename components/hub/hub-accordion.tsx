@@ -11,6 +11,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { buttonVariants } from "@/components/ui/button";
+import { SaveButton } from "@/components/vendor/save-button";
 import {
   VendorPreviewCard,
   useVendorPreviews,
@@ -134,6 +135,16 @@ export function HubAccordion({ vendors }: HubAccordionProps) {
                           // category's accordion section.
                           showCategoryPill={false}
                           href={`/vendor/${vendor.id}?from=${HUB_RETURN}`}
+                          // Unhearting here leaves the card in place until the
+                          // next visit, so a mis-tap can be undone on the spot.
+                          cornerAction={
+                            <SaveButton
+                              vendorId={vendor.id}
+                              vendorType={vendor.vendor_type}
+                              returnTo="/hub"
+                              variant="overlay"
+                            />
+                          }
                           // Only "Add" lives on the card. Editing happens on
                           // the recon entry itself (vendor page), so a vendor
                           // you have already reconned gets no card action.

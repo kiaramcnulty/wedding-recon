@@ -431,7 +431,11 @@ export function VendorPreviewCard({
           </div>
         </Link>
         {action && (
-          <div className="flex shrink-0 items-center pr-2 pl-1">{action}</div>
+          // With a corner heart above it, the action drops to the bottom of
+          // its column so the two never overlap.
+          <div className={cn("flex shrink-0 pr-2 pl-1", cornerAction ? "items-end pb-2.5" : "items-center")}>
+            {action}
+          </div>
         )}
         {cornerAction && <div className="absolute right-2.5 top-2.5">{cornerAction}</div>}
       </div>
