@@ -17,6 +17,7 @@ import { filtersForType } from "@/lib/constants/vendor-filters";
 import { isGuidedType, type GuidedPrefs, type GuidedType } from "@/lib/search/guided";
 import {
   clearJourney,
+  onJourneyChange,
   emptyJourney,
   loadJourney,
   saveJourney,
@@ -84,7 +85,21 @@ export function GuidedJourney() {
       const restore = params.get("restore");
       const venueParam = params.get("venue");
       const typeParam = params.get("type");
-      if (venueParam || typeParam) window.history.replaceState(null, "", "/start");
+      const editParam = params.get("edit");
+      if (venueParam || typeParam || editParam) window.history.replaceState(null, "", "/start");
+      // From the Planning Hub's venue / town card: straight to that step, no
+      // resume prompt. Continue then goes where an edit always does
+      // (afterLocation): back to results when there are answers already.
+      if (editParam === "venue" || editParam === "city") {
+        const next: JourneyState = {
+          ...(stored ?? emptyJourney()),
+          hasVenue: editParam === "venue",
+          step: editParam,
+        };
+        saveJourney(next);
+        setState(next);
+        return;
+      }
       // From the welcome popup: the venue question is already answered.
       if ((venueParam === "yes" || venueParam === "no") && !stored) {
         const hasVenue = venueParam === "yes";
@@ -126,6 +141,31 @@ export function GuidedJourney() {
     }, 0);
     return () => clearTimeout(t);
   }, []);
+
+  // A journey synced down from the account after this page loaded (a second
+  // device): adopt it, but only while this screen still holds nothing of its
+  // own. Someone mid-answer is never yanked to another copy.
+  const stateRef = React.useRef(state);
+  React.useEffect(() => {
+    stateRef.current = state;
+  });
+  React.useEffect(
+    () =>
+      onJourneyChange((change, s) => {
+        if (change !== "remote" || !s) return;
+        const prev = stateRef.current;
+        const fresh = !prev || (prev.hasVenue === null && !prev.location && prev.step === "welcome");
+        if (!fresh) return;
+        if (s.status === "completed" && s.location) {
+          resumedRef.current = true;
+          setState({ ...s, step: "category" });
+        } else if (s.step !== "welcome") {
+          setResumeOffer(s);
+          setState(s);
+        }
+      }),
+    [],
+  );
 
   const update = React.useCallback((patch: Partial<JourneyState>) => {
     setState((prev) => {

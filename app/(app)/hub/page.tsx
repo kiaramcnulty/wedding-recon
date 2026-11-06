@@ -5,6 +5,7 @@ import { MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { type Vendor } from "@/lib/types";
 import { HubAccordion } from "@/components/hub/hub-accordion";
+import { WeddingPlaceCard } from "@/components/hub/wedding-place-card";
 import { BrandFooter } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 
@@ -91,6 +92,10 @@ export default async function HubPage() {
         </div>
         <ProfileMenu className="shrink-0" />
       </header>
+
+      {/* The booked venue or wedding town from the guided journey. Device-local
+          (journey state), so it renders client-side and only when present. */}
+      <WeddingPlaceCard />
 
       {isEmpty ? (
         /* Empty state */

@@ -1,10 +1,11 @@
-import { isGuidedType, type GuidedPrefs, type GuidedType } from "./guided";
+import { isGuidedType, type GuidedPrefs, type GuidedType } from "@/lib/search/guided";
 
 /**
  * The guided journey's saved state: what the couple has answered, and where in
- * the flow they are. Kept on THIS device only (localStorage) in the first
- * slice; signed-in cross-device sync is a later milestone, so nothing here
- * should be described to the couple as following them to another device.
+ * the flow they are. Kept in this browser (localStorage) for everyone; for a
+ * signed-in couple `lib/search/journey-sync.ts` also keeps a copy on the
+ * account (table `planning_contexts`, migration 0050) and brings it to their
+ * other devices. Anonymous progress stays on this device only.
  *
  * Separate from the map's per-tab sessionStorage keys (`wr:mapView`,
  * `wr:vendorFilters`, ...), which restore a view across a vendor round trip.
@@ -158,16 +159,77 @@ export function loadJourney(): JourneyState | null {
   }
 }
 
-export function saveJourney(state: JourneyState): void {
+/**
+ * Where a change came from, for the listeners below:
+ * - `local`: the couple changed something here (the sync pushes it up);
+ * - `remote`: the account copy replaced this one (screens already showing the
+ *   journey may pick it up; nothing is pushed back);
+ * - `cleared`: the couple started over (the sync deletes the account copy, or
+ *   it would come straight back on the next load).
+ */
+export type JourneyChange = "local" | "remote" | "cleared";
+const changeListeners = new Set<(c: JourneyChange, s: JourneyState | null) => void>();
+
+export function onJourneyChange(cb: (c: JourneyChange, s: JourneyState | null) => void): () => void {
+  changeListeners.add(cb);
+  return () => changeListeners.delete(cb);
+}
+
+function emitChange(c: JourneyChange, s: JourneyState | null) {
+  for (const cb of changeListeners) cb(c, s);
+}
+
+/**
+ * Store the journey. A local save stamps `updatedAt` (the clock the sync
+ * compares); a remote one keeps the stamp it arrived with, so the copy the
+ * account had and the copy here stay recognisably the same version.
+ */
+export function saveJourney(state: JourneyState, opts: { remote?: boolean } = {}): void {
+  const next = opts.remote ? state : { ...state, updatedAt: Date.now() };
   try {
-    localStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify({ ...state, updatedAt: Date.now() }));
+    localStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify(next));
   } catch {
     // Storage unavailable (private mode, quota): the journey still works for
     // this visit, it just cannot be resumed.
   }
+  emitChange(opts.remote ? "remote" : "local", next);
 }
 
+/**
+ * Which copy of the journey wins when a signed-in page loads (see
+ * `lib/search/journey-sync.ts`). Pure, so `scripts/test-journey-sync.mjs` can
+ * check every case.
+ *
+ * - `drop-local` first, separately: a browser copy owned by a different
+ *   account is never uploaded or kept;
+ * - then the newer `updatedAt` wins: `pull` writes the account copy here,
+ *   `push` sends the browser copy up, `none` when they match or both are
+ *   missing. A tie keeps both as they are.
+ */
+export function syncDecision(
+  local: { updatedAt: number } | null,
+  remote: { updatedAt: number } | null,
+  owner: string | null,
+  accountId: string,
+): { dropLocal: boolean; action: "pull" | "push" | "none" } {
+  const dropLocal = !!local && !!owner && owner !== accountId;
+  const mine = dropLocal ? null : local;
+  if (remote && (!mine || remote.updatedAt > mine.updatedAt)) return { dropLocal, action: "pull" };
+  if (mine && (!remote || mine.updatedAt > remote.updatedAt)) return { dropLocal, action: "push" };
+  return { dropLocal, action: "none" };
+}
+
+/** Start over: forget the journey here AND on the account. */
 export function clearJourney(): void {
+  clearLocalJourney();
+  emitChange("cleared", null);
+}
+
+/**
+ * Forget the journey in this browser only (sign-out): the account copy stays,
+ * and the next person on a shared device does not see this couple's venue.
+ */
+export function clearLocalJourney(): void {
   try {
     localStorage.removeItem(JOURNEY_STORAGE_KEY);
   } catch {

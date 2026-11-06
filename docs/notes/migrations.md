@@ -79,6 +79,7 @@ or table a migration adds, using the service-role client. Parameter names matter
 | 0046 | `0046_verified_listing_public.sql` | Vendor Verification: the public read of a verified vendor's listing content, for the vendor page |
 | 0047 | `0047_vendor_media_bucket.sql` | Storage for vendor-uploaded listing photos (Vendor Verification) |
 | 0048 | `0048_stripe_webhook_events.sql` | Vendor Verification billing: idempotency ledger for the Stripe webhook |
+| 0050 | `0050_planning_contexts.sql` | Guided journey: the owner-only account copy of the journey (`wr:journey`), for cross-device sync. **Not yet applied** (written 2026-11-06); the app runs unchanged without it |
 
 ## Groups worth knowing as a set
 

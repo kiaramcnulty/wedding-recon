@@ -18,6 +18,7 @@ import {
 } from "@/components/map/vendor-preview-card";
 import { CATEGORIES, VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 import { formatVendorLocality } from "@/lib/vendor-locality";
+import { useWeddingPlace } from "@/lib/search/wedding-place";
 import { cn } from "@/lib/utils";
 import { type Vendor } from "@/lib/types";
 
@@ -49,7 +50,16 @@ const actionLinkClass = cn(
   "gap-1 no-underline!",
 );
 
-export function HubAccordion({ vendors }: HubAccordionProps) {
+export function HubAccordion({ vendors: allVendors }: HubAccordionProps) {
+  // The booked venue has its own card above (WeddingPlaceCard), so it is left
+  // out of the Venue section rather than shown twice.
+  const place = useWeddingPlace();
+  const bookedId = place?.kind === "venue" ? place.location.vendorId : undefined;
+  const vendors = React.useMemo(
+    () => (bookedId ? allVendors.filter((v) => v.id !== bookedId) : allVendors),
+    [allVendors, bookedId],
+  );
+
   // Group vendors by type, preserving VENDOR_TYPES order.
   const grouped = VENDOR_TYPES.reduce<Record<VendorType, VendorWithRecon[]>>(
     (acc, type) => {

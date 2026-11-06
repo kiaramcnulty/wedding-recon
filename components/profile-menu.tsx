@@ -9,6 +9,8 @@ import { captureClient } from "@/lib/analytics/posthog";
 import { LANDING_HREF } from "@/lib/landing/nav";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/app/(auth)/actions";
+import { clearJourneyOnSignOut } from "@/lib/search/journey-sync";
+import { clearPendingSave } from "@/lib/saved-vendors";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -205,7 +207,16 @@ export function ProfileMenu({ className }: { className?: string }) {
                     </p>
                   </div>
                 </div>
-                <form action={signOut}>
+                {/* Forget this couple's journey and any pending heart in this
+                    browser first (the account keeps its copy), so the next
+                    person on a shared device does not see them. */}
+                <form
+                  action={signOut}
+                  onSubmit={() => {
+                    clearJourneyOnSignOut();
+                    clearPendingSave();
+                  }}
+                >
                   <Button
                     type="submit"
                     variant="outline"

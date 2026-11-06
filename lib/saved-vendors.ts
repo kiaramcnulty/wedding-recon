@@ -47,6 +47,15 @@ export function rememberPendingSave(vendorId: string, vendorType: VendorType) {
   }
 }
 
+/** Drop a remembered tap (sign-out: it belongs to whoever was signed in). */
+export function clearPendingSave() {
+  try {
+    localStorage.removeItem(PENDING_KEY);
+  } catch {
+    // nothing stored to clear
+  }
+}
+
 function takePendingSave(): PendingSave | null {
   try {
     const raw = localStorage.getItem(PENDING_KEY);
