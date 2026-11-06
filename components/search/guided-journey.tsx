@@ -24,7 +24,7 @@ import {
   type JourneyState,
   type JourneyStep,
 } from "@/lib/search/journey-state";
-import { COLORADO_PLACES, type PlaceOption } from "@/lib/search/places";
+import { COLORADO_PLACES, foldPlaceName } from "@/lib/search/places";
 import { cn } from "@/lib/utils";
 import { GuidedResults, type ResultsView } from "./guided-results";
 
@@ -88,7 +88,12 @@ export function GuidedJourney() {
       // From the welcome popup: the venue question is already answered.
       if ((venueParam === "yes" || venueParam === "no") && !stored) {
         const hasVenue = venueParam === "yes";
-        const next = { ...emptyJourney(), hasVenue, step: (hasVenue ? "venue" : "city") as JourneyStep };
+        const next = {
+          ...emptyJourney(),
+          hasVenue,
+          selectedVendorType: hasVenue ? null : ("venue" as const),
+          step: (hasVenue ? "venue" : "city") as JourneyStep,
+        };
         saveJourney(next);
         setState(next);
         return;
@@ -221,13 +226,16 @@ export function GuidedJourney() {
               icon={CalendarHeart}
               title="Yes, we’ve booked one"
               hint="We’ll look for nearby vendors"
-              onClick={() => go("venue", { hasVenue: true })}
+              onClick={() => go("venue", { hasVenue: true, selectedVendorType: null })}
             />
             <ChoiceCard
               icon={Search}
               title="Not yet"
               hint="We’ll help you find the one"
-              onClick={() => go("city", { hasVenue: false })}
+              // The answer here sets the vendor type: a type left over from an
+              // earlier pass (Back to this screen after picking Photos) would
+              // otherwise send a venue hunt to the Photos questions.
+              onClick={() => go("city", { hasVenue: false, selectedVendorType: "venue" })}
             />
           </div>
           <Link
@@ -563,14 +571,31 @@ function CityStep({
   // Once a town is picked the list folds away to that one row, so Continue
   // comes into view; a long list left open looked like the tap did nothing.
   const [browsing, setBrowsing] = React.useState(!picked);
-  const f = filter.trim().toLowerCase();
-  const matches = COLORADO_PLACES.filter((p) => !f || p.label.toLowerCase().includes(f));
+  const [lookup, setLookup] = React.useState<TownLookup | null>(null);
+  const query = filter.trim();
+  const f = foldPlaceName(filter);
+  const matches = COLORADO_PLACES.filter((p) => !f || foldPlaceName(p.label).includes(f));
   const regions = [...new Set(matches.map((p) => p.region))];
+  // A lookup belongs to the text it was run for; typing on discards it.
+  const shownLookup = lookup && lookup.query === query ? lookup : null;
+  const canLookUp = query.length >= 2;
 
-  const pick = (p: PlaceOption) => {
+  const pick = (p: { label: string; lat: number; lng: number }) => {
     onPick({ kind: "city", label: `${p.label}, CO`, lat: p.lat, lng: p.lng });
     setFilter("");
+    setLookup(null);
     setBrowsing(false);
+  };
+
+  const runLookup = async () => {
+    if (!canLookUp || shownLookup) return;
+    setLookup({ query, status: "loading", results: [] });
+    try {
+      const results = await lookUpColoradoTown(query);
+      setLookup({ query, status: "done", results });
+    } catch {
+      setLookup({ query, status: "error", results: [] });
+    }
   };
 
   const venueLink = (
@@ -598,6 +623,12 @@ function CityStep({
             setFilter(e.target.value);
             setBrowsing(true);
           }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            if (matches.length === 1) pick(matches[0]);
+            else if (matches.length === 0) void runLookup();
+          }}
         />
       </div>
       {picked && !browsing ? (
@@ -615,18 +646,6 @@ function CityStep({
         </div>
       ) : (
         <div className="mt-3 max-h-72 overflow-y-auto overscroll-contain rounded-lg border">
-          {regions.length === 0 && (
-            <div className="px-3 py-3 text-sm text-muted-foreground">
-              <p>No town by that name. We only cover Colorado for now.</p>
-              <button
-                type="button"
-                className="mt-2 font-medium text-foreground underline underline-offset-4"
-                onClick={() => onVenueInstead(filter.trim())}
-              >
-                Is &ldquo;{filter.trim()}&rdquo; a venue? Search venues
-              </button>
-            </div>
-          )}
           {regions.map((region) => (
             <div key={region}>
               <p className="sticky top-0 bg-muted px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -656,6 +675,17 @@ function CityStep({
               </ul>
             </div>
           ))}
+          {canLookUp && (
+            <TownLookupBlock
+              query={query}
+              lookup={shownLookup}
+              listEmpty={regions.length === 0}
+              pickedLabel={picked?.label}
+              onLookUp={() => void runLookup()}
+              onPick={pick}
+              onVenueInstead={() => onVenueInstead(query)}
+            />
+          )}
         </div>
       )}
       {venueLink}
@@ -664,6 +694,114 @@ function CityStep({
         Continue
       </PrimaryButton>
     </>
+  );
+}
+
+type TownResult = { label: string; detail: string | null; lat: number; lng: number };
+type TownLookup = { query: string; status: "loading" | "done" | "error"; results: TownResult[] };
+
+/**
+ * One geocoder call for a Colorado town that is not on the fixed list. It runs
+ * on a tap or Enter only: Nominatim (behind `/api/geocode`) does not permit
+ * as-you-type autocomplete.
+ */
+async function lookUpColoradoTown(query: string): Promise<TownResult[]> {
+  const res = await fetch(`/api/geocode?q=${encodeURIComponent(`${query}, Colorado`)}`);
+  if (!res.ok) throw new Error(`geocode ${res.status}`);
+  const rows = (await res.json()) as {
+    name: string;
+    lat: number;
+    lng: number;
+    city: string | null;
+    region: string | null;
+  }[];
+  const seen = new Set<string>();
+  const out: TownResult[] = [];
+  for (const r of rows) {
+    if (r.region !== "Colorado" || !Number.isFinite(r.lat) || !Number.isFinite(r.lng)) continue;
+    const label = r.city ?? r.name.split(",")[0].trim();
+    // `/api/geocode` falls back to the county when a hit has no town (a peak
+    // or mine called Gold Hill): that is not a place to pick, so drop it.
+    if (!label || label.endsWith(" County") || seen.has(label)) continue;
+    seen.add(label);
+    // display_name runs "Marble, Gunnison County, Colorado, United States":
+    // keep the county so two towns of one name can be told apart.
+    const county = r.name.split(",").map((s) => s.trim()).find((s) => s.endsWith(" County"));
+    out.push({ label, detail: county ?? null, lat: r.lat, lng: r.lng });
+  }
+  return out;
+}
+
+function TownLookupBlock({
+  query,
+  lookup,
+  listEmpty,
+  pickedLabel,
+  onLookUp,
+  onPick,
+  onVenueInstead,
+}: {
+  query: string;
+  lookup: TownLookup | null;
+  listEmpty: boolean;
+  pickedLabel?: string;
+  onLookUp: () => void;
+  onPick: (r: TownResult) => void;
+  onVenueInstead: () => void;
+}) {
+  const link = "font-medium text-foreground underline underline-offset-4";
+  return (
+    <div className={cn("px-3 py-3 text-sm text-muted-foreground", !listEmpty && "border-t")}>
+      {!lookup && (
+        <button type="button" className={link} onClick={onLookUp}>
+          {listEmpty ? "Look up" : "Not listed? Look up"} &ldquo;{query}&rdquo; in Colorado
+        </button>
+      )}
+      {lookup?.status === "loading" && (
+        <p className="flex items-center gap-2" role="status">
+          <Loader2 className="size-4 animate-spin" /> Looking up &ldquo;{query}&rdquo;…
+        </p>
+      )}
+      {lookup?.status === "error" && (
+        <p>
+          The lookup didn&apos;t work.{" "}
+          <button type="button" className={link} onClick={onLookUp}>
+            Try again
+          </button>
+        </p>
+      )}
+      {lookup?.status === "done" && lookup.results.length === 0 && (
+        <p>No Colorado town called &ldquo;{query}&rdquo;.</p>
+      )}
+      {lookup?.status === "done" && lookup.results.length > 0 && (
+        <ul className="-mx-3 -mt-3">
+          {lookup.results.map((r) => {
+            const selected = pickedLabel === `${r.label}, CO`;
+            return (
+              <li key={`${r.label}|${r.detail}`}>
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onPick(r)}
+                  className={cn(
+                    "flex w-full items-baseline justify-between gap-3 px-3 py-2.5 text-left text-sm text-foreground hover:bg-muted",
+                    selected && "bg-foreground font-medium text-background hover:bg-foreground",
+                  )}
+                >
+                  <span>{r.label}</span>
+                  {r.detail && <span className="text-xs text-muted-foreground">{r.detail}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {listEmpty && (
+        <button type="button" className={cn(link, "mt-3 block")} onClick={onVenueInstead}>
+          Is &ldquo;{query}&rdquo; a venue? Search venues
+        </button>
+      )}
+    </div>
   );
 }
 
