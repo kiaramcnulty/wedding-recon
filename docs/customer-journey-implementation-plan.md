@@ -321,7 +321,7 @@ Done when a first visitor with or without a venue can reach real category-correc
 
 ## Milestone 5 Add the radius UI and map interactions
 
-**Status: built 2026-11-07** on branch `journey/explore-filters`, together with the Advanced sheets (Milestone 4 steps 6 and 10 for Explore). Kiara chose radius search, a chip per filter and one shared set of answers. As built: `docs/notes/explore-map.md`, "Explore is a one-type radius search". Not built: approximate pins are still the existing dashed treatment (step 8 needs nothing new); the ring is not refit on a manual distance change, only on a new anchor.
+**Status: built 2026-11-07** on branch `journey/explore-filters`, together with the Advanced sheets (Milestone 4 steps 6 and 10 for Explore). Kiara chose radius search, a chip per filter and one shared set of answers. As built: `docs/notes/explore-map.md`, "Explore is a one-type radius search". Not built: approximate pins are still the existing dashed treatment (step 8 needs nothing new); the ring is not refit on a manual distance change, only on a new anchor. **Changed the same day (Kiara): Explore does not use the automatic ladder.** It starts at a fixed 25 miles and offers "Widen to 50 mi" when full matches are few, so steps 4 and 5 (the expansion notice, the reset to automatic) apply to the journey only.
 
 1. Draw a geodesic GeoJSON polygon approximating the chosen mile radius; use a subdued fill and thin stroke. A MapLibre `circle-radius` value is in pixels, not geographic miles. A screen-sized circle is not a correct implementation.
 2. Put the radius control in the compact map filter panel. Show the chosen distance in text. Keep the center/location field distinct from vendor type. Single-select type changes the inline fields and pin color.

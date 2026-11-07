@@ -59,8 +59,8 @@ export function FilterChips({
   type,
   prefs,
   guestCount,
-  radius,
   radiusMiles,
+  defaultMiles,
   maxMiles,
   onType,
   onPrefs,
@@ -71,9 +71,10 @@ export function FilterChips({
   type: GuidedType;
   prefs: GuidedPrefs;
   guestCount?: number;
-  radius: RadiusSetting;
-  /** The radius the search is using now (the automatic step, or the manual pick). */
+  /** The radius the search is using now. */
   radiusMiles: number;
+  /** Explore's starting distance, what the distance sheet resets to. */
+  defaultMiles: number;
   maxMiles: number;
   onType: (t: GuidedType) => void;
   onPrefs: (p: GuidedPrefs) => void;
@@ -136,7 +137,7 @@ export function FilterChips({
             {label ?? defOf(type, key)?.label ?? key}
           </Chip>
         ))}
-        <Chip active={radius.mode === "manual"} accent={c} onClick={() => setSheet({ kind: "radius" })}>
+        <Chip active={radiusMiles !== defaultMiles} accent={c} onClick={() => setSheet({ kind: "radius" })}>
           {radiusMiles} mi
         </Chip>
         {more && (
@@ -229,8 +230,8 @@ export function FilterChips({
 
       <RadiusSheet
         open={sheet?.kind === "radius"}
-        radius={radius}
         radiusMiles={radiusMiles}
+        defaultMiles={defaultMiles}
         maxMiles={maxMiles}
         accent={c.colorHex}
         onRadius={onRadius}
@@ -456,20 +457,20 @@ function PickSheet({
 /**
  * Distance. Applies live, so the ring on the map behind the sheet moves with
  * the slider (matching is local, on the vendors already loaded: no request per
- * drag). Any manual pick turns the automatic widening off until "Automatic".
+ * drag). Explore starts at a fixed distance; "Reset" goes back to it.
  */
 function RadiusSheet({
   open,
-  radius,
   radiusMiles,
+  defaultMiles,
   maxMiles,
   accent,
   onRadius,
   onClose,
 }: {
   open: boolean;
-  radius: RadiusSetting;
   radiusMiles: number;
+  defaultMiles: number;
   maxMiles: number;
   accent: string;
   onRadius: (r: RadiusSetting) => void;
@@ -489,7 +490,6 @@ function RadiusSheet({
     >
       <p className="text-sm">
         Within <span className="font-semibold">{radiusMiles} miles</span>
-        {radius.mode === "auto" && <span className="text-muted-foreground"> · automatic</span>}
       </p>
       <input
         type="range"
@@ -507,18 +507,14 @@ function RadiusSheet({
         <span>5 mi</span>
         <span>{maxMiles} mi</span>
       </div>
-      {radius.mode === "manual" ? (
+      {radiusMiles !== defaultMiles && (
         <button
           type="button"
           className="mt-4 text-sm text-muted-foreground underline underline-offset-4"
-          onClick={() => onRadius({ mode: "auto" })}
+          onClick={() => onRadius({ mode: "manual", miles: defaultMiles })}
         >
-          Back to automatic
+          Reset to {defaultMiles} miles
         </button>
-      ) : (
-        <p className="mt-4 text-xs text-muted-foreground">
-          Automatic starts at 25 miles and widens when there are few matches.
-        </p>
       )}
     </BottomSheet>
   );

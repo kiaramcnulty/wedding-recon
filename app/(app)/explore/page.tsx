@@ -37,8 +37,10 @@ import {
 } from "@/lib/map/map-view";
 import { zoomToFitRing } from "@/lib/map/ring";
 import {
+  MIN_CONFIRMED,
   guidedSelection,
   maxRadius,
+  radiusLadder,
   milesBetween,
   runGuidedSearch,
   type GuidedPrefs,
@@ -61,9 +63,9 @@ import { cn } from "@/lib/utils";
  * - The anchor is where the journey says the wedding is, a town picked in the
  *   search bar, the couple's location, or a spot picked with "Search this
  *   area". Panning or zooming never moves it (Milestone 5, step 6).
- * - The radius walks the type's automatic ladder unless the couple picks a
- *   distance; a manual distance holds until "Back to automatic" or a new
- *   anchor.
+ * - The radius is a fixed 25 miles unless the couple picks another (Kiara,
+ *   2026-11-07). It never widens on its own; with fewer than MIN_CONFIRMED
+ *   full matches it offers "Widen to 50 mi". A new anchor resets it to 25.
  * - The filters are the journey's answers for the type (`byType[type]`), so a
  *   budget set here is the journey's budget too (Kiara, 2026-11-07). Guest
  *   count is shared the same way; with none, prices convert at 100 guests.
@@ -154,13 +156,21 @@ function write(storage: Storage, key: string, value: unknown) {
   }
 }
 
+/**
+ * Explore's distance: a fixed 25 miles unless the couple picks another
+ * (Kiara, 2026-11-07). It never widens on its own the way the journey's
+ * automatic ladder does; when matches are few it OFFERS the next step.
+ */
+const EXPLORE_DEFAULT_MILES = 25;
+const DEFAULT_RADIUS: RadiusSetting = { mode: "manual", miles: EXPLORE_DEFAULT_MILES };
+
 /** A stored distance, kept inside the type's slider (5 to the top of its ladder). */
 function parseRadius(raw: unknown, type: GuidedType): RadiusSetting {
   const r = raw as { mode?: string; miles?: unknown } | null;
   if (r?.mode === "manual" && typeof r.miles === "number" && Number.isFinite(r.miles)) {
     return { mode: "manual", miles: Math.min(Math.max(5, Math.round(r.miles / 5) * 5), maxRadius(type)) };
   }
-  return { mode: "auto" };
+  return DEFAULT_RADIUS;
 }
 
 /**
@@ -213,7 +223,7 @@ export default function ExplorePage() {
   // first client render matches the server's.
   const [type, setType] = useState<GuidedType | null>(null);
   const [anchor, setAnchor] = useState<ExploreAnchor | null>(null);
-  const [radius, setRadius] = useState<RadiusSetting>({ mode: "auto" });
+  const [radius, setRadius] = useState<RadiusSetting>(DEFAULT_RADIUS);
   // Where the camera is now, for "Search this area".
   const [cameraCenter, setCameraCenter] = useState<{ lat: number; lng: number } | null>(null);
   // Frame the ring once the search for a new anchor lands, at the radius it
@@ -296,7 +306,7 @@ export default function ExplorePage() {
     (next: ExploreAnchor, frame = true) => {
       setAnchor(next);
       writeExploreAnchor(next);
-      changeRadius({ mode: "auto" });
+      changeRadius(DEFAULT_RADIUS);
       if (frame) frameNextResult.current = true;
       setPin(null);
       setCluster(null);
@@ -590,8 +600,11 @@ export default function ExplorePage() {
           result.partialCount ? ` · ${result.partialCount} partial` : ""
         }`
     : null;
-  const expandedNote =
-    result && result.expanded ? `Expanded to ${result.radiusMiles} miles for more matches.` : null;
+  // Few full matches: offer the next distance step rather than taking it.
+  const widenTo =
+    result && type && result.confirmedCount < MIN_CONFIRMED
+      ? radiusLadder(type).find((r) => r > result.radiusMiles)
+      : undefined;
   const travelNote =
     result && result.radiusMiles > 50 ? "Vendors past 50 miles may charge travel fees." : null;
   const incomplete = candidates.status === "ready" && !candidates.complete;
@@ -759,8 +772,8 @@ export default function ExplorePage() {
               type={type}
               prefs={prefs}
               guestCount={guestCount}
-              radius={radius}
-              radiusMiles={result?.radiusMiles ?? (radius.mode === "manual" ? radius.miles : 25)}
+              radiusMiles={result?.radiusMiles ?? (radius.mode === "manual" ? radius.miles : EXPLORE_DEFAULT_MILES)}
+              defaultMiles={EXPLORE_DEFAULT_MILES}
               maxMiles={maxRadius(type)}
               onType={changeType}
               onPrefs={changePrefs}
@@ -793,9 +806,18 @@ export default function ExplorePage() {
                   <Loader2 className="size-3.5 animate-spin" aria-hidden /> Finding vendors…
                 </span>
               )}
-              {(expandedNote || travelNote) && (
+              {widenTo && (
+                <button
+                  type="button"
+                  onClick={() => changeRadius({ mode: "manual", miles: widenTo })}
+                  className="pointer-events-auto rounded-full border bg-background/95 px-2.5 py-1 text-[13px] font-medium shadow-sm backdrop-blur hover:border-foreground"
+                >
+                  Widen to {widenTo} mi
+                </button>
+              )}
+              {travelNote && (
                 <span className="max-w-full rounded-lg bg-background/90 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
-                  {[expandedNote, travelNote].filter(Boolean).join(" ")}
+                  {travelNote}
                 </span>
               )}
             </div>
