@@ -61,7 +61,7 @@ const today = () => new Date().toLocaleDateString("en-CA");
 // TESTING ONLY (Kiara, 2026-11-05): lifts the once-a-day limit on both popups
 // so they show on every fresh page load. Set back to false BEFORE this branch
 // merges to main.
-const SKIP_DAILY_LIMIT_FOR_TESTING = true;
+const SKIP_DAILY_LIMIT_FOR_TESTING = false;
 
 type Mode = "welcome" | "welcomeBack" | null;
 

@@ -1,4 +1,4 @@
--- 0050_planning_contexts.sql
+-- 0051_planning_contexts.sql
 -- Guided journey: the planning context of a couple, kept on their account.
 --
 -- The journey (venue or town, wedding month and year, preferences per vendor

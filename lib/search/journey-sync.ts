@@ -13,7 +13,7 @@ import {
 
 /**
  * Keeps a signed-in couple's journey (`wr:journey`) on their account, in the
- * owner-only table `planning_contexts` (migration 0050), so it follows them to
+ * owner-only table `planning_contexts` (migration 0051), so it follows them to
  * other devices. Anonymous visitors are untouched: their journey stays in this
  * browser, exactly as before.
  *
@@ -31,7 +31,7 @@ import {
  * it is dropped and replaced by this account's own copy. Sign-out clears the
  * browser copy (see `clearJourneyOnSignOut`).
  *
- * Until 0050 is applied the table does not exist: the first read fails, sync
+ * Until 0051 is applied the table does not exist: the first read fails, sync
  * switches itself off for the page, and everything runs device-local as before.
  */
 

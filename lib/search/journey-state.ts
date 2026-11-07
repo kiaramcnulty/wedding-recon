@@ -9,7 +9,7 @@ import {
  * The guided journey's saved state: what the couple has answered, and where in
  * the flow they are. Kept in this browser (localStorage) for everyone; for a
  * signed-in couple `lib/search/journey-sync.ts` also keeps a copy on the
- * account (table `planning_contexts`, migration 0050) and brings it to their
+ * account (table `planning_contexts`, migration 0051) and brings it to their
  * other devices. Anonymous progress stays on this device only.
  *
  * Separate from the map's per-tab sessionStorage keys (`wr:mapView`,
