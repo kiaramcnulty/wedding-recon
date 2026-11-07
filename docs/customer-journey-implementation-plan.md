@@ -321,6 +321,8 @@ Done when a first visitor with or without a venue can reach real category-correc
 
 ## Milestone 5 Add the radius UI and map interactions
 
+**Status: built 2026-11-07** on branch `journey/explore-filters`, together with the Advanced sheets (Milestone 4 steps 6 and 10 for Explore). Kiara chose radius search, a chip per filter and one shared set of answers. As built: `docs/notes/explore-map.md`, "Explore is a one-type radius search". Not built: approximate pins are still the existing dashed treatment (step 8 needs nothing new); the ring is not refit on a manual distance change, only on a new anchor.
+
 1. Draw a geodesic GeoJSON polygon approximating the chosen mile radius; use a subdued fill and thin stroke. A MapLibre `circle-radius` value is in pixels, not geographic miles. A screen-sized circle is not a correct implementation.
 2. Put the radius control in the compact map filter panel. Show the chosen distance in text. Keep the center/location field distinct from vendor type. Single-select type changes the inline fields and pin color.
 3. Preview the ring while dragging; update matching locally when cached candidates permit. Commit valid slider state on release/keyboard change and debounce network work. Do not make a Google Places request or a database round trip for every pointer movement.
@@ -510,7 +512,7 @@ Undecided unless marked decided; each has a recommendation.
      - hair & makeup: the bride price; DJs, live music, dress: their existing `basis` (an hourly DJ or a package-priced gown is partial).
      Saved answers moved from one `styles` list to `picks` / `flags` keyed by filter; a journey saved in the old shape is read into the type's first chip group (`parsePrefs`, checked in `scripts/test-journey-sync.mjs`).
 
-   Not in the slice: Advanced sheets, the manual radius and Search this area on the map, the conflict-choice screen, and any entry point that sends visitors to `/start`. Pure checks: `scripts/test-guided-search.mjs`.
+   Not in the slice: the conflict-choice screen, and any entry point that sends visitors to `/start`. (Advanced sheets, the manual radius and Search this area came next, on Explore: see Milestone 5.) Pure checks: `scripts/test-guided-search.mjs`.
 4. **Who sees the welcome screen: decided 31 October.**
    - Screen 01 (welcome) shows on **arrival anywhere, including deep links** (a `/vendor/[id]` link, a typed `/explore` URL, Reddit and Google arrivals), as an overlay with an **X to dismiss**, for anyone with no journey on the device, **at most once a day** (revised 6 November, Kiara: closing it used to hide it for good, and a returning visitor never saw it again). Starting the journey stops it; the page underneath is what remains after the X.
    - Screen 11 (returning visitor) shows only on bare `/explore`, at most once a day, for someone who has finished a search.

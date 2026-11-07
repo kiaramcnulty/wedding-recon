@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { CATEGORIES } from "@/lib/constants/categories";
 import { GUIDED_TYPES } from "@/lib/search/guided";
-import { JOURNEY_HREF, loadJourney } from "@/lib/search/journey-state";
+import { JOURNEY_HREF, journeyStarted, loadJourney } from "@/lib/search/journey-state";
 import { cn } from "@/lib/utils";
 
 /**
@@ -80,7 +80,7 @@ export function WelcomePopup() {
     const journey = loadJourney();
     let next: Mode = null;
     const due = (key: string) => SKIP_DAILY_LIMIT_FOR_TESTING || read(key) !== today();
-    if (!journey) {
+    if (!journeyStarted(journey)) {
       if (due(WELCOME_KEY)) {
         next = "welcome";
         write(WELCOME_KEY, today());

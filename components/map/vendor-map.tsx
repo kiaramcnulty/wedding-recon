@@ -1431,6 +1431,21 @@ export function VendorMap({
                 if (leafRows.length === 0) return;
                 const c = map.getCenter();
 
+                // A caller-ranked result set (the guided journey, Explore):
+                // its order and verdicts already ARE the feed's, judged with
+                // rules the raw matcher here does not know (the florist floor,
+                // the couple's guest count), so re-scoring would disagree.
+                const ranked = resultsRef.current;
+                if (ranked) {
+                  const order = new Map([...ranked.keys()].map((id, i) => [id, i]));
+                  const entries = leafRows
+                    .filter((e) => ranked.has(e.id))
+                    .map((e) => ({ id: e.id, rank: ranked.get(e.id)! }))
+                    .sort((x, y) => order.get(x.id)! - order.get(y.id)!);
+                  onOpen({ entries, vendorType: t, center: [c.lng, c.lat], zoom: map.getZoom() });
+                  return;
+                }
+
                 // Order the leaves the way the results feed orders its rows.
                 // getClusterLeaves returns supercluster TREE order, which is
                 // spatial-index insertion order and arbitrary to a reader, so

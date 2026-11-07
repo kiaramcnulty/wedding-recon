@@ -21,6 +21,7 @@ import {
   clearJourney,
   onJourneyChange,
   emptyJourney,
+  journeyStarted,
   loadJourney,
   saveJourney,
   type JourneyLocation,
@@ -90,11 +91,13 @@ export function GuidedJourney() {
         setState(next);
         return;
       }
-      // From the welcome popup: the venue question is already answered.
-      if ((venueParam === "yes" || venueParam === "no") && !stored) {
+      // From the welcome popup: the venue question is already answered. A
+      // stored journey that was never started (Explore keeps its filters in
+      // one) still takes the answer, and keeps those filters and guest count.
+      if ((venueParam === "yes" || venueParam === "no") && !journeyStarted(stored)) {
         const hasVenue = venueParam === "yes";
         const next = {
-          ...emptyJourney(),
+          ...(stored ?? emptyJourney()),
           hasVenue,
           selectedVendorType: hasVenue ? null : ("venue" as const),
           step: (hasVenue ? "venue" : "city") as JourneyStep,
@@ -126,7 +129,10 @@ export function GuidedJourney() {
         setResumeOffer(stored);
         setState(stored);
       } else {
-        setState(emptyJourney());
+        // Nothing to resume. Keep a stored journey that was never started:
+        // its answers are Explore's filters, and the first save here would
+        // otherwise overwrite them with an empty journey.
+        setState(stored ?? emptyJourney());
       }
     }, 0);
     return () => clearTimeout(t);
@@ -984,14 +990,14 @@ function PrefsStep({
       onSubmit={(e) => {
         e.preventDefault();
         if (budgetInvalid) return;
-        onSubmit(
-          {
-            ...(budgetValue && { budget: budgetValue }),
-            ...(Object.keys(picks).length && { picks }),
-            ...(Object.keys(flags).length && { flags }),
-          },
-          state.guestCount,
-        );
+        // Start from what is saved, so answers this screen does not show
+        // (Explore's Advanced limits and day of week) survive a submit.
+        const next: GuidedPrefs = { ...saved, picks, flags };
+        if (budgetValue) next.budget = budgetValue;
+        else delete next.budget;
+        if (!Object.keys(picks).length) delete next.picks;
+        if (!Object.keys(flags).length) delete next.flags;
+        onSubmit(next, state.guestCount);
       }}
     >
       <p className="text-sm font-medium" style={{ color: c.textHex }}>

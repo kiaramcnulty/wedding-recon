@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import {
   clearLocalJourney,
+  journeyStarted,
   loadJourney,
   onJourneyChange,
   parseJourney,
@@ -113,12 +114,29 @@ async function reconcile() {
     // in flight is compared too, not overwritten.
     const local = loadJourney();
     const remote = row ? parseJourney(row.payload) : null;
-    const { dropLocal, action } = syncDecision(local, remote, owner, uid);
+    const { dropLocal, action } = syncDecision(
+      local && { updatedAt: local.updatedAt, started: journeyStarted(local) },
+      remote && { updatedAt: remote.updatedAt, started: journeyStarted(remote) },
+      owner,
+      uid,
+    );
     // Someone else's journey left on a shared device: never upload it.
     if (dropLocal) clearLocalJourney();
     if (action === "pull" && remote) {
       queued = null;
       saveJourney(remote, { remote: true });
+      // Explore filters set here before signing in, for types the account has
+      // no answers for yet: keep them (a local save, so it goes up).
+      if (local && !dropLocal && !journeyStarted(local)) {
+        const extra = Object.entries(local.byType).filter(([t]) => !(t in remote.byType));
+        if (extra.length || (local.guestCount && !remote.guestCount)) {
+          saveJourney({
+            ...remote,
+            byType: { ...remote.byType, ...Object.fromEntries(extra) },
+            guestCount: remote.guestCount ?? local.guestCount,
+          });
+        }
+      }
     } else if (action === "push" && local) {
       queued = local;
       await flush();

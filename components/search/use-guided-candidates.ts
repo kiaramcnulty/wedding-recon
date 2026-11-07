@@ -43,13 +43,18 @@ export function useGuidedCandidates(
   type: GuidedType | null,
   anchor: LatLng | null,
 ): { state: CandidatesState; retry: () => void } {
-  const [state, setState] = React.useState<CandidatesState>({ status: "idle" });
+  // Tagged with the search it answers, so a new type or anchor never sees the
+  // previous search's rows for the moment before its own request starts.
+  const [state, setState] = React.useState<CandidatesState & { key?: string }>({ status: "idle" });
   const [retryTick, setRetryTick] = React.useState(0);
   const lat = anchor?.lat;
   const lng = anchor?.lng;
 
+  const key = type && lat !== undefined && lng !== undefined ? `${type}|${lat}|${lng}` : null;
+
   React.useEffect(() => {
     if (!type || lat === undefined || lng === undefined) return;
+    const forKey = `${type}|${lat}|${lng}`;
     let cancelled = false;
     const box = snapBbox(envelopeFor({ lat, lng }, maxRadius(type)));
     const params = new URLSearchParams({
@@ -76,8 +81,8 @@ export function useGuidedCandidates(
       if (cancelled) return;
       setState(
         rows
-          ? { status: "ready", rows, complete: rows.length < MAX_ROWS }
-          : { status: "error" },
+          ? { status: "ready", rows, complete: rows.length < MAX_ROWS, key: forKey }
+          : { status: "error", key: forKey },
       );
     }, 0);
     return () => {
@@ -88,5 +93,7 @@ export function useGuidedCandidates(
 
   // "Try again" on the error state re-runs the effect with a fresh request.
   const retry = React.useCallback(() => setRetryTick((n) => n + 1), []);
-  return { state, retry };
+  const current: CandidatesState =
+    (state.status === "ready" || state.status === "error") && state.key !== key ? { status: "loading" } : state;
+  return { state: current, retry };
 }
