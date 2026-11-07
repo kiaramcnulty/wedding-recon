@@ -13,7 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CATEGORIES } from "@/lib/constants/categories";
-import { VISIT_COOKIE } from "@/lib/landing/nav";
 import { GUIDED_TYPES } from "@/lib/search/guided";
 import { JOURNEY_HREF, loadJourney } from "@/lib/search/journey-state";
 import { cn } from "@/lib/utils";
@@ -21,26 +20,23 @@ import { cn } from "@/lib/utils";
 /**
  * The guided journey's two entry popups, mounted once in the (app) layout.
  *
- * - **Welcome** (screen 01): on a visitor's FIRST arrival anywhere in the app,
- *   deep links included (a shared vendor page, a typed /explore URL, Reddit
- *   or Google). Dismissible with the X; once dismissed or answered it does not
- *   come back on this device.
+ * - **Welcome** (screen 01): on arrival anywhere in the app, deep links
+ *   included (a shared vendor page, a typed /explore URL, Reddit or Google),
+ *   for anyone with no guided journey on this device, at most once a calendar
+ *   day. Dismissible with the X. Closing it no longer hides it for good
+ *   (Kiara, 2026-11-06): it can come back the next day until they start the
+ *   journey.
  * - **Welcome back** (screen 11): on bare `/explore` for someone who has
  *   finished a guided search, at most once a calendar day.
  *
- * Decided 2026-10-31 (docs/customer-journey-implementation-plan.md, open
- * question 4), including the known risk that an overlay on arrival from search
- * can count against mobile ranking.
+ * Decided 2026-10-31 and revised 2026-11-06
+ * (docs/customer-journey-implementation-plan.md, open question 4), including
+ * the known risk that an overlay on arrival from search can count against
+ * mobile ranking.
  */
 
-const DISMISSED_KEY = "wr:welcomeDismissed";
+const WELCOME_KEY = "wr:welcomeShown";
 const WELCOME_BACK_KEY = "wr:welcomeBackShown";
-
-// Read once, when this module first loads on the page: whether the visitor had
-// been here BEFORE this page load. <MarkVisited> sets the cookie on mount, so
-// reading it any later would make every visitor look like a returning one.
-const SEEN_BEFORE_THIS_LOAD =
-  typeof document !== "undefined" && document.cookie.includes(`${VISIT_COOKIE}=1`);
 
 function read(key: string): string | null {
   try {
@@ -57,11 +53,14 @@ function write(key: string, value: string) {
   }
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+// The visitor's own calendar day (YYYY-MM-DD in their time zone). A UTC date
+// rolled over at 5pm in Colorado, so "once a day" could show twice in one
+// evening.
+const today = () => new Date().toLocaleDateString("en-CA");
 
-// TESTING ONLY (Kiara, 2026-11-05): lifts the once-a-day limit on welcome back
-// so it shows on every fresh /explore load. Set back to false BEFORE this
-// branch merges to main.
+// TESTING ONLY (Kiara, 2026-11-05): lifts the once-a-day limit on both popups
+// so they show on every fresh page load. Set back to false BEFORE this branch
+// merges to main.
 const SKIP_DAILY_LIMIT_FOR_TESTING = true;
 
 type Mode = "welcome" | "welcomeBack" | null;
@@ -80,13 +79,17 @@ export function WelcomePopup() {
     decidedRef.current = true;
     const journey = loadJourney();
     let next: Mode = null;
-    if (!SEEN_BEFORE_THIS_LOAD && !journey && !read(DISMISSED_KEY)) {
-      next = "welcome";
+    const due = (key: string) => SKIP_DAILY_LIMIT_FOR_TESTING || read(key) !== today();
+    if (!journey) {
+      if (due(WELCOME_KEY)) {
+        next = "welcome";
+        write(WELCOME_KEY, today());
+      }
     } else if (
       pathname === "/explore" &&
       !window.location.search &&
       journey?.status === "completed" &&
-      (SKIP_DAILY_LIMIT_FOR_TESTING || read(WELCOME_BACK_KEY) !== today())
+      due(WELCOME_BACK_KEY)
     ) {
       next = "welcomeBack";
       write(WELCOME_BACK_KEY, today());
@@ -99,10 +102,7 @@ export function WelcomePopup() {
     return () => clearTimeout(t);
   }, [pathname]);
 
-  const close = () => {
-    if (mode === "welcome") write(DISMISSED_KEY, "1");
-    setMode(null);
-  };
+  const close = () => setMode(null);
 
   const header = (title: string, description: string, kicker?: string) => (
     <div className="bg-gradient-to-b from-brand-soft via-brand-soft/40 to-popover px-6 pb-1 pt-8 text-center">
