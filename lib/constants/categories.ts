@@ -73,7 +73,7 @@ export const CATEGORIES: Record<VendorType, CategoryMeta> = {
   food: { type: "food", label: "Caterer", icon: UtensilsCrossed, colorHex: "#BA7517", textHex: "#633806", lightHex: "#FAEEDA" },
   // DJs — DJ-led acts. New carve-out from Music, so it gets its own (violet) hue
   // + turntable icon to read distinctly from the Live-music pins beside it.
-  dj: { type: "dj", label: "DJs", icon: Disc3, colorHex: "#8B41C4", textHex: "#5C2A85", lightHex: "#F3E9FB" },
+  dj: { type: "dj", label: "DJ", icon: Disc3, colorHex: "#8B41C4", textHex: "#5C2A85", lightHex: "#F3E9FB" },
   // "Live music" — ALL live performers (bands, string quartets, soloists,
   // pianists, ceremony ensembles), as opposed to DJs. Inherits the old Music
   // palette + note icon: it's the majority successor to Music, so its pins look
@@ -91,7 +91,7 @@ export const CATEGORIES: Record<VendorType, CategoryMeta> = {
   // a block of guest rooms. Navy was picked by perceptual distance — its nearest neighbor
   // (photos blue) sits at ΔE 33, comfortably past the tightest pair already shipping (dj vs
   // band, ΔE 21), so the pins stay separable on a dense map.
-  hotel: { type: "hotel", label: "Hotel blocks", icon: Hotel, colorHex: "#34557A", textHex: "#16304D", lightHex: "#E6EDF5" },
+  hotel: { type: "hotel", label: "Hotel block", icon: Hotel, colorHex: "#34557A", textHex: "#16304D", lightHex: "#E6EDF5" },
   planner: { type: "planner", label: "Planner", icon: ClipboardList, colorHex: "#639922", textHex: "#27500A", lightHex: "#EAF3DE" },
   photos: { type: "photos", label: "Photographer", icon: Camera, colorHex: "#378ADD", textHex: "#0C447C", lightHex: "#E6F1FB" },
   other: { type: "other", label: "Other", icon: MapPin, colorHex: "#888780", textHex: "#444441", lightHex: "#F1EFE8" },

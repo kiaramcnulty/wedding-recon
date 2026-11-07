@@ -457,3 +457,14 @@ export function runGuidedSearch(
 export function suggestionsOf(result: GuidedResult): GuidedRow[] {
   return result.ranked.filter((r) => r.rank === 1).slice(0, SUGGESTION_COUNT);
 }
+
+/**
+ * The best PARTIAL matches, shown under the suggestions (below a "Partial
+ * matches" divider) when there are fewer confirmed matches than suggestion
+ * slots: enough to bring the screen to `SUGGESTION_COUNT` cards. Never mixed
+ * into the suggestions themselves, which are confirmed matches only.
+ */
+export function partialFillOf(result: GuidedResult): GuidedRow[] {
+  const open = SUGGESTION_COUNT - Math.min(result.confirmedCount, SUGGESTION_COUNT);
+  return open > 0 ? result.ranked.filter((r) => r.rank === 0).slice(0, open) : [];
+}

@@ -318,5 +318,19 @@ console.log("explore guest count");
     filtersForType("photos", { guests: 180 }) === filtersForType("photos"), true);
 }
 
+// ---- partial fill under the suggestions ----
+console.log("partial fill");
+{
+  const { partialFillOf } = await import("../lib/search/guided.ts");
+  const res = (full, part) => ({
+    ranked: [...Array(full)].map((_, i) => ({ id: `f${i}`, rank: 1 })).concat([...Array(part)].map((_, i) => ({ id: `p${i}`, rank: 0 }))),
+    confirmedCount: full, partialCount: part,
+  });
+  eq("1 match: two partials fill the screen", partialFillOf(res(1, 86)).map((r) => r.id), ["p0", "p1"]);
+  eq("0 matches: three partials", partialFillOf(res(0, 5)).length, 3);
+  eq("3 matches: no partial section", partialFillOf(res(3, 9)), []);
+  eq("fewer partials than slots: all of them", partialFillOf(res(2, 0)), []);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

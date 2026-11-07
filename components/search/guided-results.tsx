@@ -11,6 +11,7 @@ import { SaveButton } from "@/components/vendor/save-button";
 import {
   VendorPreviewCard,
   useVendorPreviews,
+  type VendorPreview,
 } from "@/components/map/vendor-preview-card";
 import { captureClient } from "@/lib/analytics/posthog";
 import { writeMapView } from "@/lib/map/map-view";
@@ -22,6 +23,7 @@ import {
   guidedSelection,
   hasGuidedQuestions,
   runGuidedSearch,
+  partialFillOf,
   suggestionsOf,
   type GuidedPrefs,
   type GuidedType,
@@ -32,6 +34,8 @@ import { useGuidedCandidates } from "./use-guided-candidates";
 export type ResultsView = "suggestions" | "list" | "map";
 
 const SCROLL_KEY = "wr:journeyScroll";
+/** Same words the full feed uses over its partial tier (vendor-feed.tsx). */
+const PARTIAL_LABEL = "Partial matches in the area";
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 
@@ -112,7 +116,20 @@ export function GuidedResults({
     () => (result ? suggestionsOf(result).map((r) => r.id) : []),
     [result],
   );
-  const previews = useVendorPreviews(suggestionIds);
+  const partialIds = React.useMemo(
+    () => (result ? partialFillOf(result).map((r) => r.id) : []),
+    [result],
+  );
+  // One fetch for both groups, split back apart by id.
+  const allPreviews = useVendorPreviews(React.useMemo(() => [...suggestionIds, ...partialIds], [suggestionIds, partialIds]));
+  const previews = React.useMemo(
+    () => allPreviews && allPreviews.filter((p) => suggestionIds.includes(p.id)),
+    [allPreviews, suggestionIds],
+  );
+  const partialPreviews = React.useMemo(
+    () => allPreviews && allPreviews.filter((p) => partialIds.includes(p.id)),
+    [allPreviews, partialIds],
+  );
   const c = CATEGORIES[type];
 
   const pills = preferencePills(type, prefs, state);
@@ -233,6 +250,42 @@ export function GuidedResults({
   }
 
   const suggestions = suggestionsOf(result);
+  const card = (item: VendorPreview) => (
+    <VendorPreviewCard
+      item={item}
+      vendorType={type}
+      href={`/vendor/${item.id}?from=${encodeURIComponent("/start?restore=suggestions")}`}
+      selection={selection}
+      showCategoryPill={false}
+      cornerAction={
+        <SaveButton
+          vendorId={item.id}
+          vendorType={type}
+          returnTo="/start?restore=suggestions"
+          variant="overlay"
+        />
+      }
+    />
+  );
+  // Fewer confirmed matches than suggestion slots: the best partial matches
+  // fill the screen to three cards, in the feed's own order, under the same
+  // divider the full feed draws over its partial tier, so they never read as
+  // matches.
+  const partialRows =
+    partialIds.length === 0 ? null : (
+      <>
+        <li className="flex items-center gap-3 pt-1">
+          <span className="h-px flex-1 bg-border" aria-hidden />
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {PARTIAL_LABEL}
+          </span>
+          <span className="h-px flex-1 bg-border" aria-hidden />
+        </li>
+        {partialPreviews === null
+          ? partialIds.map((id) => <li key={id} className="h-28 animate-pulse rounded-xl bg-muted" />)
+          : partialPreviews.map((item) => <li key={item.id}>{card(item)}</li>)}
+      </>
+    );
   return (
     <div className="mx-auto w-full max-w-[480px] pb-10">
       {header}
@@ -254,15 +307,6 @@ export function GuidedResults({
             <Button className="mt-4" onClick={onEdit}>
               Adjust filters
             </Button>
-            {result.partialCount > 0 && (
-              <button
-                type="button"
-                className="mt-3 block w-full text-sm text-muted-foreground underline underline-offset-4"
-                onClick={() => onViewChange("list")}
-              >
-                See {result.partialCount} partial {result.partialCount === 1 ? "match" : "matches"}
-              </button>
-            )}
           </div>
         ) : (
           <>
@@ -272,25 +316,8 @@ export function GuidedResults({
                 ? suggestions.map((s) => (
                     <li key={s.id} className="h-28 animate-pulse rounded-xl bg-muted" />
                   ))
-                : previews.map((item) => (
-                    <li key={item.id}>
-                      <VendorPreviewCard
-                        item={item}
-                        vendorType={type}
-                        href={`/vendor/${item.id}?from=${encodeURIComponent("/start?restore=suggestions")}`}
-                        selection={selection}
-                        showCategoryPill={false}
-                        cornerAction={
-                          <SaveButton
-                            vendorId={item.id}
-                            vendorType={type}
-                            returnTo="/start?restore=suggestions"
-                            variant="overlay"
-                          />
-                        }
-                      />
-                    </li>
-                  ))}
+                : previews.map((item) => <li key={item.id}>{card(item)}</li>)}
+              {partialRows}
             </ul>
             <Button
               size="lg"
@@ -300,6 +327,19 @@ export function GuidedResults({
             >
               View all {result.confirmedCount} {result.confirmedCount === 1 ? "match" : "matches"}
               {result.partialCount > 0 && ` + ${result.partialCount} partial`}
+            </Button>
+          </>
+        )}
+        {result.confirmedCount === 0 && partialRows && (
+          <>
+            <ul className="mt-4 flex flex-col gap-3">{partialRows}</ul>
+            <Button
+              size="lg"
+              variant="outline"
+              className="mt-4 h-11 w-full"
+              onClick={() => onViewChange("list")}
+            >
+              View all {result.partialCount} partial
             </Button>
           </>
         )}
