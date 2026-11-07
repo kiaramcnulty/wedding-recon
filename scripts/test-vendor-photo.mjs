@@ -135,6 +135,39 @@ try {
     assert.equal(result.length, 1);
     assert.equal(calls.includes("details"), refresh, `${days}-day reference cache`);
   }
+  // An expired media name is a 400, not a 404: it must trigger ONE re-resolve
+  // and serve the fresh name, not a cached 404 until the 90-day TTL runs out.
+  const fresh = { name: "places/test/photos/fresh", attrib: null, attribUri: null };
+  const expiredRoute = load("app/api/vendor-photo/[vendorId]/route.ts", {
+    "@/lib/supabase/server": server,
+    "@/lib/google-photos": {
+      getVendorGooglePhotos: async () => [photo, photo],
+      refreshVendorGooglePhotos: async () => { calls.push("refresh"); return [fresh, fresh]; },
+      isValidPhotoName: () => true,
+    },
+    "@/lib/rate-limit": { checkRateLimit: async () => { calls.push("limit"); return true; } },
+  });
+  for (const [status, expectRefresh] of [[400, true], [403, true], [404, true], [429, false], [500, false]]) {
+    globalThis.fetch = async (url) => {
+      const isFresh = url.includes("/photos/fresh/");
+      calls.push(isFresh ? "google:fresh" : "google:old");
+      return isFresh
+        ? new Response("image", { headers: { "Content-Type": "image/jpeg" } })
+        : Response.json({ error: { code: status } }, { status });
+    };
+    calls = [];
+    const res = await expiredRoute.GET(
+      { nextUrl: new URL(`https://example.test/api/vendor-photo/${id}?i=0&w=600`), headers: new Headers() },
+      { params: Promise.resolve({ vendorId: id }) },
+    );
+    if (expectRefresh) {
+      assert.equal(res.status, 200, `google ${status} re-resolves and serves the fresh name`);
+      assert.deepEqual(calls, ["limit", "db", "google:old", "refresh", "google:fresh"]);
+    } else {
+      assert.equal(res.status, 404, `google ${status} is transient`);
+      assert.deepEqual(calls, ["limit", "db", "google:old"], `google ${status} must not re-resolve`);
+    }
+  }
   console.log("Vendor photo checks passed: canonical URLs, no-cost rejection/redirects, valid widths, 90-day caches.");
 } finally {
   globalThis.fetch = originalFetch;

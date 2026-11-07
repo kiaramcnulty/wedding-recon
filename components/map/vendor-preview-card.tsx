@@ -42,9 +42,10 @@ export interface VendorPreview {
   locality: string | null;
   reconCount: number;
   /**
-   * Ordered image candidates: recon thumbnail first (free Supabase read), then a
-   * Google photo (a billed fetch). Tried in order (each on error), falling
-   * through to a category placeholder.
+   * Ordered image candidates: a verified vendor's own uploaded photo first,
+   * then the recon thumbnail (both free Supabase reads), then a Google photo
+   * (a billed fetch). Tried in order (each on error), falling through to a
+   * category placeholder.
    */
   photoCandidates: string[];
   /** Text previews of the vendor's recon entries (newest first, text-less entries skipped). */
@@ -187,6 +188,33 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
           overridesById.set(r.vendor_id, r.filter_overrides);
         }
       }
+      // A verified vendor's own first photo leads its card (Kiara, 2026-11-04):
+      // the portal tells them their photos lead their listing, and the card is
+      // where most couples first see it. Only verified ids are asked, so this
+      // is zero calls on most batches. verified_listing_public (0046) because
+      // vendor_listings has no anon select (drafts must never leak); it takes
+      // one id, hence one call per verified vendor. An error simply leaves the
+      // card on its recon / Google candidates.
+      const vendorThumb = new Map<string, string>();
+      await Promise.all(
+        [...verifiedIds].map(async (vid) => {
+          const { data } = await supabase.rpc("verified_listing_public", {
+            p_vendor_id: vid,
+          });
+          const first = (
+            (data as { photos: { thumb_path?: string; storage_path?: string }[] | null }[] | null)?.[0]
+              ?.photos ?? []
+          )[0];
+          const path = first?.thumb_path ?? first?.storage_path;
+          if (path) {
+            vendorThumb.set(
+              vid,
+              supabase.storage.from("vendor-media").getPublicUrl(path).data.publicUrl,
+            );
+          }
+        }),
+      );
+      if (cancelled) return;
 
       const vendorById = new Map<string, VendorLite>();
       for (const v of vendors) vendorById.set(v.id, v);
@@ -236,6 +264,8 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         const v = vendorById.get(id);
         if (!v) return [];
         const candidates: string[] = [];
+        const vt = vendorThumb.get(id);
+        if (vt) candidates.push(vt);
         // Recon photo FIRST (2026-08): it is a free Supabase read, while the
         // Google fallback below is a billed Place Photos fetch ($7/1k, ~1,000
         // free/month). Leading with the couple's own photo also matches the

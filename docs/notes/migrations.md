@@ -79,6 +79,8 @@ or table a migration adds, using the service-role client. Parameter names matter
 | 0046 | `0046_verified_listing_public.sql` | Vendor Verification: the public read of a verified vendor's listing content, for the vendor page |
 | 0047 | `0047_vendor_media_bucket.sql` | Storage for vendor-uploaded listing photos (Vendor Verification) |
 | 0048 | `0048_stripe_webhook_events.sql` | Vendor Verification billing: idempotency ledger for the Stripe webhook |
+| 0049 | `0049_connector_candidates.sql` | Vendor connector API: `connector_vendor_candidates` for the Muse connector. Applied (confirmed callable as anon 2026-11-04) |
+| 0050 | `0050_has_photo_listing_photos.sql` | `vendors_in_bbox.has_photo` counts a verified vendor's own listing photos (via the definer set `verified_listing_photo_ids`). Applied 2026-11-04 (checked as anon: Sanctuary Floral reads `has_photo` true) |
 | 0051 | `0051_planning_contexts.sql` | Guided journey: the owner-only account copy of the journey (`wr:journey`), for cross-device sync. **Not yet applied** (written 2026-11-06); the app runs unchanged without it |
 
 ## Groups worth knowing as a set
@@ -98,7 +100,7 @@ or table a migration adds, using the service-role client. Parameter names matter
   refined five times.** `0025` had to be `drop function` + `create` because the
   return shape changed; the typo tier (`0026`) is a plain `create or replace`.
   See `docs/notes/search.md`.
-- **`0033` -> `0034` -> `0035` -> `0045` -- the map payload.** Each re-creates
+- **`0033` -> `0034` -> `0035` -> `0045` -> `0050` -- the map payload.** Each re-creates
   `vendors_in_bbox`, and each was **backward compatible in both directions**, so
   no coordinated deploy was ever needed: the client detects which shape it got.
   Preserve that property. See `docs/notes/explore-map.md` and
