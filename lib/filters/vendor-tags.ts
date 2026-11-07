@@ -3,7 +3,8 @@ import {
   type FilterDef,
 } from "@/lib/constants/vendor-filters";
 import type { VendorType } from "@/lib/constants/categories";
-import type { FilterSelection, VendorFilters } from "@/lib/filters/match";
+import { offerForSelection, type FilterSelection, type VendorFilters } from "@/lib/filters/match";
+import { OFFER_SCOPES, type PriceOffer } from "@/lib/filters/price-offers";
 
 /**
  * Human-readable "filter tags" for a vendor — the same attributes the Explore
@@ -111,6 +112,46 @@ function formatPrice(filters: Record<string, unknown>): string | null {
   return `${fmtUsd(a)}–${fmtUsd(b)}${suffix}`;
 }
 
+/** Pill prefix per price scope. Short on purpose: it shares a line with the price. */
+const SCOPE_SHORT: Record<string, string> = {
+  day_of: "Day-of",
+  month_of: "Month-of",
+  partial_planning: "Partial planning",
+  full_planning: "Full planning",
+  a_la_carte: "A la carte",
+};
+
+/**
+ * One per-scope offer as pill text, the tier named first: "Day-of from $2.3k".
+ * `named: false` drops the tier for a card where the couple picked exactly
+ * that one tier: its own pill already says so, and the shorter "$1.4k" fits
+ * on a card where "Day-of $1.4k" was folded into "+2 more".
+ */
+function formatOffer(o: PriceOffer, named = true): string | null {
+  const name = named ? `${SCOPE_SHORT[o.scope] ?? o.scope} ` : "";
+  if (o.basis === "percent_of_budget") {
+    const min = num(o.price_min);
+    return `${name}${o.percent}% of budget${min !== undefined ? `, min ${fmtUsd(min)}` : ""}`;
+  }
+  const a = num(o.price_min) ?? num(o.price_max);
+  if (a === undefined) return null;
+  const b = num(o.price_max) ?? a;
+  const suffix = o.basis === "per_hour" ? "/hour" : "";
+  const range = a === b ? fmtUsd(a) : `${fmtUsd(a)}–${fmtUsd(b)}`;
+  if (o.price_kind === "starting_at") return named ? `${name}from ${fmtUsd(a)}${suffix}` : `From ${fmtUsd(a)}${suffix}`;
+  return `${name}${range}${suffix}`;
+}
+
+/** The vendor's stored offers in scope order (day-of before full planning). */
+function sortedOffers(vendorType: string, filters: Record<string, unknown>): PriceOffer[] {
+  const list = filters.price_offers;
+  if (!Array.isArray(list) || list.length === 0) return [];
+  const order: readonly string[] = OFFER_SCOPES[vendorType as keyof typeof OFFER_SCOPES] ?? [];
+  return (list as PriceOffer[])
+    .filter((o) => o && typeof o.scope === "string")
+    .sort((x, y) => order.indexOf(x.scope) - order.indexOf(y.scope));
+}
+
 /** Format a `range` facet into pill text, or null when the vendor is silent. */
 function formatRange(def: FilterDef, filters: Record<string, unknown>): string | null {
   switch (def.key) {
@@ -197,7 +238,43 @@ export function vendorTags(
     }
 
     // range
+    //
+    // A per-tier price (planners) replaces the one flattened range, which
+    // spans every tier and so describes none of them. With tiers picked the
+    // pill quotes the one the couple asked about, named. With none picked,
+    // one pill per tier.
+    if (def.priceScopedBy) {
+      const offers = sortedOffers(vendorType, filters);
+      if (offers.length) {
+        const sel = selection?.[def.key];
+        const hit = offerForSelection(filters, sel);
+        const shown = hit ? [hit] : sel?.kind === "range" && sel.scopes?.length ? [] : offers;
+        const named = !(hit && sel?.kind === "range" && sel.scopes?.length === 1);
+        for (const o of shown) {
+          const text = formatOffer(o, named);
+          if (text) built.push({ key: `${def.key}:${o.scope}`, label: text, matched: !!sel, rare });
+        }
+        if (shown.length) continue;
+      }
+    }
     const label = formatRange(def, filters);
+    // With tiers picked, the flattened range is the answer only when it spans
+    // nothing but picked tiers; otherwise it is some other tier's price and
+    // must not be floated as the one that met the budget.
+    const sel = selection?.[def.key];
+    if (def.priceScopedBy && label && sel?.kind === "range" && sel.scopes?.length) {
+      const tiers = filters[def.priceScopedBy];
+      const accepts = selection?.[def.priceScopedBy];
+      const covered =
+        Array.isArray(tiers) &&
+        tiers.length > 0 &&
+        accepts?.kind === "multi" &&
+        tiers.every((t) => accepts.values.includes(String(t)));
+      if (!covered) {
+        built.push({ key: def.key, label, matched: false, rare });
+        continue;
+      }
+    }
     if (!label) continue;
     built.push({
       key: def.key,

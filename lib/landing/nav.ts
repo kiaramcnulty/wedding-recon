@@ -60,6 +60,12 @@ export const LANDING_HREF = `/?${LANDING_REF_PARAM}=${LANDING_REF_APP}`;
 /** Where the landing page's CTAs send people, and where the gate redirects. */
 export const APP_HREF = "/explore";
 
+/**
+ * The guided search (`app/(app)/start`). The landing page main CTAs start it;
+ * the app welcome popups link into it with `?venue=yes|no` or `?type=`.
+ */
+export const JOURNEY_HREF = "/start";
+
 /** Where the gate sends a business-side browser (VENDOR_COOKIE). */
 export const PORTAL_HREF = "/portal";
 

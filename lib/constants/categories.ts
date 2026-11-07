@@ -70,17 +70,17 @@ export interface CategoryMeta {
  */
 export const CATEGORIES: Record<VendorType, CategoryMeta> = {
   venue: { type: "venue", label: "Venue", icon: Building2, colorHex: "#1D9E75", textHex: "#085041", lightHex: "#E1F5EE" },
-  food: { type: "food", label: "Food", icon: UtensilsCrossed, colorHex: "#BA7517", textHex: "#633806", lightHex: "#FAEEDA" },
+  food: { type: "food", label: "Caterer", icon: UtensilsCrossed, colorHex: "#BA7517", textHex: "#633806", lightHex: "#FAEEDA" },
   // DJs — DJ-led acts. New carve-out from Music, so it gets its own (violet) hue
   // + turntable icon to read distinctly from the Live-music pins beside it.
-  dj: { type: "dj", label: "DJs", icon: Disc3, colorHex: "#8B41C4", textHex: "#5C2A85", lightHex: "#F3E9FB" },
+  dj: { type: "dj", label: "DJ", icon: Disc3, colorHex: "#8B41C4", textHex: "#5C2A85", lightHex: "#F3E9FB" },
   // "Live music" — ALL live performers (bands, string quartets, soloists,
   // pianists, ceremony ensembles), as opposed to DJs. Inherits the old Music
   // palette + note icon: it's the majority successor to Music, so its pins look
   // unchanged for existing users.
   band: { type: "band", label: "Live music", icon: Music, colorHex: "#534AB7", textHex: "#3C3489", lightHex: "#EEEDFE" },
-  flowers: { type: "flowers", label: "Flowers", icon: Flower2, colorHex: "#D4537E", textHex: "#72243E", lightHex: "#FBEAF0" },
-  dress: { type: "dress", label: "Dress", icon: Shirt, colorHex: "#D85A30", textHex: "#712B13", lightHex: "#FAECE7" },
+  flowers: { type: "flowers", label: "Florist", icon: Flower2, colorHex: "#D4537E", textHex: "#72243E", lightHex: "#FBEAF0" },
+  dress: { type: "dress", label: "Bridal shop", icon: Shirt, colorHex: "#D85A30", textHex: "#712B13", lightHex: "#FAECE7" },
   // ONE joint type for wedding-day hair AND makeup (Kiara, 2026-07): most artists do
   // both, and a hair-only or makeup-only artist belongs in the same bucket rather than
   // a second category. Teal is the only unclaimed hue that reads distinctly from the
@@ -91,9 +91,9 @@ export const CATEGORIES: Record<VendorType, CategoryMeta> = {
   // a block of guest rooms. Navy was picked by perceptual distance — its nearest neighbor
   // (photos blue) sits at ΔE 33, comfortably past the tightest pair already shipping (dj vs
   // band, ΔE 21), so the pins stay separable on a dense map.
-  hotel: { type: "hotel", label: "Hotel blocks", icon: Hotel, colorHex: "#34557A", textHex: "#16304D", lightHex: "#E6EDF5" },
+  hotel: { type: "hotel", label: "Hotel block", icon: Hotel, colorHex: "#34557A", textHex: "#16304D", lightHex: "#E6EDF5" },
   planner: { type: "planner", label: "Planner", icon: ClipboardList, colorHex: "#639922", textHex: "#27500A", lightHex: "#EAF3DE" },
-  photos: { type: "photos", label: "Photos", icon: Camera, colorHex: "#378ADD", textHex: "#0C447C", lightHex: "#E6F1FB" },
+  photos: { type: "photos", label: "Photographer", icon: Camera, colorHex: "#378ADD", textHex: "#0C447C", lightHex: "#E6F1FB" },
   other: { type: "other", label: "Other", icon: MapPin, colorHex: "#888780", textHex: "#444441", lightHex: "#F1EFE8" },
   // Legacy — split into dj + band (see LEGACY_VENDOR_TYPES). Retained ONLY so a
   // straggler `music` row still renders; never surfaced in pickers/filters/hub.

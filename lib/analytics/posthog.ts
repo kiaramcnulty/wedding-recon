@@ -99,6 +99,16 @@ type ClientEvents = {
   vendor_cta_clicked: { vendor_id: string; cta_label: string };
   /** Real browser arrival from a Muse connector result; separate from first-touch. */
   muse_arrival: { landing_path: string; campaign: string | null };
+  /** Guided journey (/start): a screen was reached. Coarse on purpose, no location. */
+  journey_step: { step: string; vendor_type: string | null; resumed: boolean };
+  /** Guided journey: a result set was shown. Counts and radius only. */
+  journey_results: {
+    vendor_type: string;
+    confirmed: number;
+    partial: number;
+    radius_miles: number;
+    expanded: boolean;
+  };
 };
 
 export function captureClient<E extends keyof ClientEvents>(

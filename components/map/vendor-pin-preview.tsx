@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { X, Loader2 } from "lucide-react";
+import { SaveButton } from "@/components/vendor/save-button";
 import { type VendorType } from "@/lib/constants/categories";
 import type { FilterSelection } from "@/lib/filters/match";
 import {
@@ -15,6 +16,8 @@ interface VendorPinPreviewProps {
   /** Active attribute filters for this vendor's type, so matched tags sort first. */
   selection?: FilterSelection;
   onClose: () => void;
+  /** Where the vendor page's back button returns. Defaults to Explore with this peek reopened. */
+  returnTo?: string;
 }
 
 /**
@@ -32,6 +35,7 @@ export function VendorPinPreview({
   vendorType,
   selection,
   onClose,
+  returnTo = "/explore?restore=1",
 }: VendorPinPreviewProps) {
   const items = useVendorPreviews([vendorId]);
   const item = items?.[0] ?? null;
@@ -119,13 +123,14 @@ export function VendorPinPreview({
       aria-label="Vendor preview"
       className="relative animate-in slide-in-from-bottom-4 fade-in-0 duration-200"
     >
-      {/* Floats over the card's top-right corner so the card itself stays the
-          same shape as in the list feed. */}
+      {/* Floats over the card's top-LEFT corner so the card itself stays the
+          same shape as in the list feed; the top-right corner is the save
+          heart, as on every other card. */}
       <button
         type="button"
         onClick={onClose}
         aria-label="Close preview"
-        className="absolute -top-2 right-1 z-10 flex size-7 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-md transition-colors hover:text-foreground"
+        className="absolute -left-1 -top-2 z-10 flex size-7 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-md transition-colors hover:text-foreground"
       >
         <X className="size-4" />
       </button>
@@ -139,8 +144,11 @@ export function VendorPinPreview({
           item={item}
           vendorType={vendorType}
           selection={selection}
-          // `from` returns the back button to the map with this peek reopened.
-          href={`/vendor/${item.id}?from=${encodeURIComponent("/explore?restore=1")}`}
+          // `from` returns the back button to the map it was opened from.
+          href={`/vendor/${item.id}?from=${encodeURIComponent(returnTo)}`}
+          cornerAction={
+            <SaveButton vendorId={item.id} vendorType={vendorType} returnTo={returnTo} variant="overlay" />
+          }
           className="shadow-xl"
         />
       )}

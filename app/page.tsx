@@ -24,7 +24,7 @@ import {
   PROBLEM_SOLUTIONS,
   PROBLEMS_SECTION,
 } from "@/lib/landing/content";
-import { APP_HREF } from "@/lib/landing/nav";
+import { JOURNEY_HREF } from "@/lib/landing/nav";
 import { SITE_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -123,7 +123,7 @@ export default function LandingPage() {
 
               <div className="mt-8">
                 <Link
-                  href={APP_HREF}
+                  href={JOURNEY_HREF}
                   className={cn(
                     buttonVariants({ size: "lg" }),
                     "h-12 gap-2 bg-brand px-6 text-base text-white hover:bg-brand/90",
@@ -223,7 +223,7 @@ export default function LandingPage() {
               {CLOSING_CTA.body}
             </p>
             <Link
-              href={APP_HREF}
+              href={JOURNEY_HREF}
               className={cn(
                 buttonVariants({ size: "lg" }),
                 "mt-8 h-12 gap-2 bg-white px-6 text-base text-brand-ink hover:bg-white/90",

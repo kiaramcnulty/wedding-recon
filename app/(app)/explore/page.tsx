@@ -39,6 +39,8 @@ import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 import { ProfileMenu } from "@/components/profile-menu";
 import { LANDING_HREF } from "@/lib/landing/nav";
+import { MAP_VIEW_KEY } from "@/lib/map/map-view";
+import { useJourneySnapshot } from "@/lib/search/wedding-place";
 import { cn } from "@/lib/utils";
 
 interface GeocodeSuggestion {
@@ -218,15 +220,20 @@ export default function ExplorePage() {
   // against what is actually in view.
   const [mapVendors, setMapVendors] = useState<Vendor[]>([]);
 
+  // The guest count the couple gave in the guided journey, if any. Venue
+  // per-person and caterer package prices convert at it; without one they
+  // convert at the assumed 100 (PRICE_ASSUMPTIONS).
+  const guestCount = useJourneySnapshot()?.guestCount;
+
   const filterSelections = useMemo<FilterSelections>(() => {
     const out: FilterSelections = {};
     for (const t of selectedTypes) {
       const st = filterStates[t];
       if (!st || Object.keys(st).length === 0) continue;
-      out[t] = buildSelection(filtersForType(t), st, dateContexts[t] ?? {});
+      out[t] = buildSelection(filtersForType(t, { guests: guestCount }), st, dateContexts[t] ?? {});
     }
     return out;
-  }, [selectedTypes, filterStates, dateContexts]);
+  }, [selectedTypes, filterStates, dateContexts, guestCount]);
 
   const activeFilterCount = countSelections(filterSelections);
   // Vendors on screen that match every filter they were judged against. The
@@ -256,7 +263,7 @@ export default function ExplorePage() {
   const [initialView] = useState<{ lng: number; lat: number; zoom: number } | null>(() => {
     if (typeof window === "undefined") return null;
     try {
-      const raw = sessionStorage.getItem("wr:mapView");
+      const raw = sessionStorage.getItem(MAP_VIEW_KEY);
       if (!raw) return null;
       const d = JSON.parse(raw) as { center?: [number, number]; zoom?: number };
       if (!d.center || typeof d.zoom !== "number") return null;
@@ -317,7 +324,7 @@ export default function ExplorePage() {
   const saveMapView = useCallback(
     (view: { center: [number, number]; zoom: number }) => {
       try {
-        sessionStorage.setItem("wr:mapView", JSON.stringify(view));
+        sessionStorage.setItem(MAP_VIEW_KEY, JSON.stringify(view));
       } catch {
         // sessionStorage unavailable (e.g. private mode) — restore-on-return is
         // lost, nothing else breaks.
@@ -1024,6 +1031,7 @@ export default function ExplorePage() {
           visiblePartial={visible.partial}
           states={filterStates}
           dateContexts={dateContexts}
+          guestCount={guestCount}
           onChangeType={updateFilterState}
           onDateContextChange={updateDateContext}
           onClearAll={clearAllFilters}

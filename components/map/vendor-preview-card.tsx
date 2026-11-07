@@ -136,7 +136,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
     if (idList.length === 0) return;
     (async () => {
       const supabase = createClient();
-      const [vendorsRes, reconRes, claimsRes, verifiedRes] = await Promise.all([
+      const [vendorsRes, reconRes, claimsRes, verifiedRes, overridesRes] = await Promise.all([
         supabase
           .from("vendors")
           // city/region/address_text feed the "City, ST" subtitle — three small
@@ -160,6 +160,13 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         // RPC not yet applied) is treated as "nobody verified" so the card is
         // exactly what it is today — same never-throw stance as searchVendors.
         supabase.rpc("verified_vendor_ids", { p_ids: idList }),
+        // A verified vendor's own published details (migration 0044), merged
+        // over the extracted filters below exactly as the map route and the
+        // vendor page merge them. Without this a card could say "A la carte"
+        // for a florist the matcher, reading the vendor's own "full service
+        // only", had just ranked as a full-service match. Same never-throw
+        // stance: an error leaves the extracted filters as they are.
+        supabase.rpc("verified_listing_overrides", { p_ids: idList }),
       ]);
       if (cancelled) return;
 
@@ -172,6 +179,15 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         ),
       );
 
+      const overridesById = new Map<string, Record<string, unknown>>();
+      for (const r of (overridesRes.data ?? []) as {
+        vendor_id: string;
+        filter_overrides: Record<string, unknown> | null;
+      }[]) {
+        if (r.filter_overrides && Object.keys(r.filter_overrides).length) {
+          overridesById.set(r.vendor_id, r.filter_overrides);
+        }
+      }
       // A verified vendor's own first photo leads its card (Kiara, 2026-11-04):
       // the portal tells them their photos lead their listing, and the card is
       // where most couples first see it. Only verified ids are asked, so this
@@ -271,7 +287,10 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
             reconCount: counts.get(id) ?? 0,
             photoCandidates: candidates,
             slides: slidesByVendor.get(id) ?? [],
-            filters: v.filters ?? null,
+            // Override keys win; extracted keys survive where not set.
+            filters: overridesById.has(id)
+              ? { ...(v.filters ?? {}), ...overridesById.get(id) }
+              : (v.filters ?? null),
             verified: verifiedIds.has(id),
           },
         ];
@@ -325,6 +344,7 @@ export function VendorPreviewCard({
   showCategoryPill = true,
   selection,
   action,
+  cornerAction,
   className,
 }: {
   item: VendorPreview;
@@ -357,6 +377,14 @@ export function VendorPreviewCard({
    * element in a button is invalid and swallows its taps.
    */
   action?: React.ReactNode;
+  /**
+   * Optional small control pinned to the card's top-right corner (the save
+   * heart). Floated rather than given its own column, which would take the
+   * full card height of width from the name and the tag pills; the text column
+   * only gives up a heart's width. A sibling of the Link, positioned against
+   * the card.
+   */
+  cornerAction?: React.ReactNode;
   className?: string;
 }) {
   const router = useRouter();
@@ -383,7 +411,7 @@ export function VendorPreviewCard({
         // and town labels bleed through and made the card unreadable on web
         // (reported 2026-08-12). --muted is oklch(0.97 0 0), a near-white that
         // reads as the same subtle tint the /40 intended, but fully opaque.
-        "overflow-hidden rounded-xl transition-colors",
+        "relative overflow-hidden rounded-xl transition-colors",
         // A verified vendor's card carries the Vendor Verification tint, on
         // every surface this card renders (feed, cluster sheet, pin peek, Hub).
         // Both fills are opaque tokens, for the same reason as above.
@@ -426,7 +454,10 @@ export function VendorPreviewCard({
                 name (not inside it) so `truncate`'s nowrap/overflow never clips
                 the pill; `min-w-0` lets the name shrink past it. `compact` is the
                 short "Verified" pill — the full label lives on the vendor page. */}
-            <span className="flex min-w-0 items-center gap-1.5">
+            {/* Only the name line clears the corner heart: it is the one row
+                long enough to run under it, and padding the whole column would
+                push tag pills off their single line. */}
+            <span className={cn("flex min-w-0 items-center gap-1.5", cornerAction && "pr-8")}>
               <span className="min-w-0 truncate font-heading text-sm font-semibold">
                 {item.name}
               </span>
@@ -450,8 +481,13 @@ export function VendorPreviewCard({
           </div>
         </Link>
         {action && (
-          <div className="flex shrink-0 items-center pr-2 pl-1">{action}</div>
+          // With a corner heart above it, the action drops to the bottom of
+          // its column so the two never overlap.
+          <div className={cn("flex shrink-0 pr-2 pl-1", cornerAction ? "items-end pb-2.5" : "items-center")}>
+            {action}
+          </div>
         )}
+        {cornerAction && <div className="absolute right-2.5 top-2.5">{cornerAction}</div>}
       </div>
       {item.slides.length > 0 && (
         <ReconPreviewCarousel slides={item.slides} onOpen={go} onTint={item.verified} />

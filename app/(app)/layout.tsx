@@ -2,6 +2,8 @@ import { IdentifyUser } from "@/components/analytics/identify-user";
 import { BottomNav } from "@/components/bottom-nav";
 import { MarkVisited } from "@/components/mark-visited";
 import { ResumePublishWatcher } from "@/components/resume-publish-watcher";
+import { WelcomePopup } from "@/components/search/welcome-popup";
+import { JourneySyncMount } from "@/components/search/journey-sync-mount";
 
 /** Mobile-framed shell for the main app screens (explore, vendor, add, hub). */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +16,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Links anonymous browsing to the account in PostHog once signed in. */}
       <IdentifyUser />
       <ResumePublishWatcher />
+      {/* Guided-journey welcome / welcome-back popups. */}
+      <WelcomePopup />
+      {/* Keeps a signed-in couple's journey answers on their account. */}
+      <JourneySyncMount />
       <main className="flex flex-1 flex-col">{children}</main>
       <BottomNav />
     </div>

@@ -14,10 +14,13 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
+import "./ts-alias.mjs";
+
+const {
   filterRank, filterRankFor, filterMatch, filterMatchFor, matchedFraction,
-  hasAnySelection, countSelections,
-} from "../lib/filters/match.ts";
+  hasAnySelection, countSelections, buildSelection, offerForSelection,
+} = await import("../lib/filters/match.ts");
+const { VENDOR_FILTERS } = await import("../lib/constants/vendor-filters.ts");
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const rows = readFileSync(resolve(ROOT, "data/filter-extraction/vendor-filters.jsonl"), "utf8")
@@ -200,6 +203,68 @@ eq("1 of 2 missing ranks below 1 of 3 missing",
   matchedFraction(filterMatch({ setting: ["mountain"] }, {
     setting: three.setting, has_lodging: three.has_lodging,
   })) < matchedFraction(filterMatch({ setting: ["mountain"], has_lodging: true }, three)), true);
+
+// --- planner price per service tier (2026-11-01) ---------------------------
+//
+// A planner's flattened price spans every tier it offers, so it is only a fair
+// comparison for a couple who picked all of those tiers. Per-tier
+// `price_offers` are judged on their own, and tiers are strict: a month-of
+// price says nothing about day-of (Kiara, 2026-11-01).
+
+console.log("\nplanner price per service tier\n");
+
+const plannerDefs = VENDOR_FILTERS.planner;
+const plannerSel = (tiers, max, min) =>
+  buildSelection(plannerDefs, { ...(tiers && { service_tier: tiers }), price: { min, max } });
+const offer = (scope, price_min, extra = {}) => ({
+  scope, price_min, price_kind: "starting_at", basis: "package", quote: "q", source: "s", confidence: "high", ...extra,
+});
+const prank = (f, sel) => filterMatchFor("planner", f, { planner: sel }).rank;
+
+eq("selection carries the picked tiers as price scopes",
+  plannerSel(["day_of"], 2000).price.scopes, ["day_of"]);
+eq("no tier picked -> no scopes, old behaviour",
+  plannerSel(undefined, 2000).price.scopes, undefined);
+
+eq("day-of only, flattened $1,500, day-of picked, budget $2,000 -> match",
+  prank({ service_tier: ["day_of"], price_min: 1500 }, plannerSel(["day_of"], 2000)), 1);
+eq("day-of + full, flattened from $1,500, full picked, budget $2,000 -> partial, not a match",
+  prank({ service_tier: ["day_of", "full_planning"], price_min: 1500, price_kind: "starting_at" }, plannerSel(["full_planning"], 2000)), 0);
+eq("flattened floor $6,500 over a $2,000 budget -> excluded whatever the tier",
+  prank({ service_tier: ["day_of", "full_planning"], price_min: 6500, price_max: 20000 }, plannerSel(["day_of"], 2000)), -1);
+
+const byTier = { service_tier: ["day_of", "full_planning"], price_min: 1500, price_max: 8000,
+  price_offers: [offer("full_planning", 8000), offer("day_of", 1500, { price_kind: "single_figure" })] };
+eq("per-tier offers: full $8,000, day-of $1,500; full picked; budget $2,000 -> excluded",
+  prank(byTier, plannerSel(["full_planning"], 2000)), -1);
+eq("same planner, day-of picked -> match",
+  prank(byTier, plannerSel(["day_of"], 2000)), 1);
+eq("same planner, day-of OR full picked -> match on day-of",
+  prank(byTier, plannerSel(["full_planning", "day_of"], 2000)), 1);
+eq("offers exist but none for the picked tier -> partial",
+  prank({ ...byTier, service_tier: [...byTier.service_tier, "partial_planning"] }, plannerSel(["partial_planning"], 9000)), 0);
+eq("picking day-of does not also pick month-of",
+  plannerSel(["day_of"], 2000).service_tier.values, ["day_of"]);
+eq("a month-of-only planner, day-of picked -> excluded on service level",
+  prank({ service_tier: ["month_of"] }, plannerSel(["day_of"], 2000)), -1);
+
+const monthOnly = { service_tier: ["month_of"], price_offers: [offer("month_of", 2800)] };
+eq("month-of offer $2,800, tagged day-of too; day-of picked -> partial, no fallback to the month-of price",
+  prank({ ...monthOnly, service_tier: ["month_of", "day_of"] }, plannerSel(["day_of"], 3000)), 0);
+eq("the card quotes no offer for an unpriced picked tier",
+  offerForSelection(monthOnly, plannerSel(["day_of"], 3000).price), undefined);
+eq("month-of offer $2,800; month-of picked; budget $3,000 -> match",
+  prank(monthOnly, plannerSel(["month_of"], 3000)), 1);
+eq("only a full-planning offer; partial picked -> partial",
+  prank({ service_tier: ["full_planning", "partial_planning"], price_offers: [offer("full_planning", 3000)] }, plannerSel(["partial_planning"], 5000)), 0);
+eq("hourly offer is silence, not a price",
+  prank({ price_offers: [offer("a_la_carte", 100, { basis: "per_hour" })] }, plannerSel(["a_la_carte"], 50)), 0);
+eq("percent of budget with a $6,500 minimum over a $5,000 budget -> excluded",
+  prank({ price_offers: [offer("full_planning", 6500, { basis: "percent_of_budget", percent: 10 })] }, plannerSel(["full_planning"], 5000)), -1);
+eq("percent of budget with no minimum -> partial",
+  prank({ price_offers: [offer("full_planning", undefined, { basis: "percent_of_budget", percent: 10 })] }, plannerSel(["full_planning"], 5000)), 0);
+eq("starting-at offer is a floor: from $3,200 with budget $2,500-$10,000 -> match",
+  prank({ service_tier: ["month_of"], price_offers: [offer("month_of", 3200)] }, plannerSel(["month_of"], 10000, 2500)), 1);
 
 // --- corpus behaviour ------------------------------------------------------
 console.log("\ncorpus — what real selections return\n");

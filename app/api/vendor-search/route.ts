@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { ALL_VENDOR_TYPES } from "@/lib/constants/categories";
 import { MIN_SEARCH_QUERY_LENGTH, searchVendors } from "@/lib/search/vendors";
 
 export const dynamic = "force-dynamic";
@@ -39,10 +40,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([] as VendorSearchSuggestion[]);
   }
 
+  // Optional `types=venue,hotel`: restricts the search itself, so the six
+  // results are all of the asked-for types (the guided journey venue lookup).
+  const types = req.nextUrl.searchParams
+    .get("types")
+    ?.split(",")
+    .filter((t) => (ALL_VENDOR_TYPES as readonly string[]).includes(t));
+
   const supabase = await createClient();
   const matches = await searchVendors(supabase, q, {
     limit: 6,
     requireCoords: true,
+    ...(types?.length && { types }),
   });
 
   // Which of these are verified vendors. Resolved HERE rather than by a second

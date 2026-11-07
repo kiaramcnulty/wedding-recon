@@ -87,6 +87,14 @@ export interface FilterDef {
   rare?: boolean;
   /** Companion filter id whose selection re-scales this range's histogram. */
   rescaledBy?: string;
+  /**
+   * `range` only. Companion `multi` filter whose picked values are price
+   * SCOPES: the budget is judged against the vendor's `price_offers` for those
+   * scopes, not its one flattened `price_min`/`price_max`. Planners only today
+   * (scope = service tier); see `lib/filters/price-offers.ts` and the scoped
+   * branch of `filterMatch`.
+   */
+  priceScopedBy?: string;
   hint?: string;
 }
 
@@ -128,6 +136,31 @@ export const PRICE_ASSUMPTIONS = {
   hours: 5,
 } as const;
 
+/**
+ * The two price filters whose conversion depends on the guest count, built
+ * from it so the default (100) and a couple's own count can never drift
+ * apart. `filtersForType(t, { guests })` swaps in the couple's number; the
+ * table below is built at the default.
+ *
+ * - venue: a per-person quote is multiplied UP onto the package axis;
+ * - caterer: a package or minimum is divided DOWN onto the per-guest axis.
+ */
+const GUEST_SCALED: Partial<
+  Record<VendorType, (guests: number, theirs: boolean) => Pick<FilterDef, "basisScale" | "basisNote">>
+> = {
+  venue: (guests, theirs) => ({
+    // Only these two bases are convertible: `per_night` is a hotel room rate
+    // that happens to sit on a venue row, and no guest count turns it into a
+    // venue fee.
+    basisScale: { per_person: guests, per_hour: PRICE_ASSUMPTIONS.hours },
+    basisNote: `Venues quoting per person are shown at ${guests} guests${theirs ? " (your count)" : ""}, per hour at ${PRICE_ASSUMPTIONS.hours} hours.`,
+  }),
+  food: (guests, theirs) => ({
+    basisScale: { package: 1 / guests },
+    basisNote: `Caterers quoting a package or minimum are divided across ${guests} guests${theirs ? " (your count)" : ""}.`,
+  }),
+};
+
 const opt = (o: Record<string, string>): FilterOption[] =>
   Object.entries(o).map(([value, label]) => ({ value, label }));
 
@@ -154,7 +187,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       label: "Setting",
       kind: "multi",
       options: opt({
-        mountain: "Mountain",
+        mountain: "Mountain views",
         ranch: "Ranch",
         garden: "Garden",
         barn_rustic: "Barn / rustic",
@@ -177,14 +210,8 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       hi: "price_max",
       unit: "usd",
       basis: "package",
-      // The conversion the sheet's footnote promises the couple. Only these two
-      // bases are convertible: `per_night` is a hotel room rate that happens to
-      // sit on a venue row, and no guest count turns it into a venue fee.
-      basisScale: {
-        per_person: PRICE_ASSUMPTIONS.guests,
-        per_hour: PRICE_ASSUMPTIONS.hours,
-      },
-      basisNote: `Venues quoting per person are shown at ${PRICE_ASSUMPTIONS.guests} guests, per hour at ${PRICE_ASSUMPTIONS.hours} hours.`,
+      // The conversion the sheet's footnote promises the couple (GUEST_SCALED).
+      ...GUEST_SCALED.venue!(PRICE_ASSUMPTIONS.guests, false),
       rescaledBy: "date_context",
     },
     {
@@ -402,6 +429,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       hi: "price_max",
       unit: "usd",
       rescaledBy: "service_tier",
+      priceScopedBy: "service_tier",
     },
     {
       key: "pricing_model",
@@ -490,8 +518,7 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
       // Do NOT add a plausibility floor here instead. A floor hides a bad row
       // rather than fixing it, and it cannot tell a mis-tag from a caterer who
       // is genuinely cheap.
-      basisScale: { package: 1 / PRICE_ASSUMPTIONS.guests },
-      basisNote: `Caterers quoting a package or minimum are divided across ${PRICE_ASSUMPTIONS.guests} guests.`,
+      ...GUEST_SCALED.food!(PRICE_ASSUMPTIONS.guests, false),
     },
     {
       key: "bar_service",
@@ -593,8 +620,26 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
   ],
 };
 
-/** Filters for a type, or [] for types with no extraction (currently `other`). */
-export function filtersForType(t: VendorType | undefined): FilterDef[] {
-  return (t && VENDOR_FILTERS[t]) || [];
+/**
+ * Filters for a type, or [] for types with no extraction (currently `other`).
+ *
+ * `guests` is the couple's own guest count (from the guided journey), used in
+ * place of the assumed `PRICE_ASSUMPTIONS.guests` by the venue and caterer
+ * price conversions. Absent, zero or nonsense, the assumption stands. Pass it
+ * to EVERY reader of the same search (the matcher's `buildSelection` and the
+ * sheet's histogram and note), or the bars and the verdicts disagree again.
+ */
+export function filtersForType(
+  t: VendorType | undefined,
+  opts: { guests?: number } = {},
+): FilterDef[] {
+  const defs = (t && VENDOR_FILTERS[t]) || [];
+  const g = opts.guests;
+  const scaled = t && GUEST_SCALED[t];
+  if (!scaled || !(typeof g === "number" && Number.isInteger(g) && g > 0)) {
+    return defs;
+  }
+  const patch = scaled(g, true);
+  return defs.map((d) => (d.key === "price" ? { ...d, ...patch } : d));
 }
 

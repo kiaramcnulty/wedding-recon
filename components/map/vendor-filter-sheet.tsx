@@ -24,6 +24,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { offerFor } from "@/lib/filters/price-offers";
 import { cn } from "@/lib/utils";
 
 /**
@@ -309,6 +310,7 @@ function TypeSection({
   vendors,
   state,
   dateContext,
+  guestCount,
   onChange,
   onDateContextChange,
 }: {
@@ -316,11 +318,14 @@ function TypeSection({
   vendors: Vendor[];
   state: FilterState;
   dateContext: DateContext;
+  guestCount?: number;
   onChange: (next: FilterState) => void;
   onDateContextChange: (next: DateContext) => void;
 }) {
   const meta = CATEGORIES[vendorType];
-  const defs = filtersForType(vendorType);
+  // The same guest-aware defs the matcher uses (explore/page.tsx), so the
+  // histogram bins a per-person venue at the count it is judged at.
+  const defs = filtersForType(vendorType, { guests: guestCount });
   const hist = HIST[vendorType] ?? {};
   const pool = useMemo(
     () => vendors.filter((v) => v.vendor_type === vendorType),
@@ -346,9 +351,9 @@ function TypeSection({
     const h = hist[def.lo ?? def.key];
     if (!h) return undefined;
 
+    const picked =
+      def.rescaledBy === "date_context" ? undefined : (state[def.rescaledBy!] as string[] | undefined);
     const subset = pool.filter((v) => {
-      if (def.rescaledBy === "date_context") return true;
-      const picked = state[def.rescaledBy!] as string[] | undefined;
       if (!picked?.length) return true;
       const own = v.filters?.[def.rescaledBy!];
       return Array.isArray(own) && own.some((x) => picked.includes(String(x)));
@@ -357,7 +362,7 @@ function TypeSection({
 
     return h.bins.map((b) =>
       subset.filter((v) => {
-        const n = priceForContext(v, def, dateContext);
+        const n = priceForContext(v, def, dateContext, picked);
         return typeof n === "number" && n >= b.lo && n <= b.hi;
       }).length,
     );
@@ -577,6 +582,7 @@ export function VendorFilterSheet({
   visiblePartial,
   states,
   dateContexts,
+  guestCount,
   onChangeType,
   onDateContextChange,
   onClearAll,
@@ -598,6 +604,8 @@ export function VendorFilterSheet({
   visiblePartial: number;
   states: Partial<Record<VendorType, FilterState>>;
   dateContexts: Partial<Record<VendorType, DateContext>>;
+  /** The couple's guest count from the journey, if they gave one. */
+  guestCount?: number;
   onChangeType: (t: VendorType, next: FilterState) => void;
   onDateContextChange: (t: VendorType, next: DateContext) => void;
   onClearAll: () => void;
@@ -890,6 +898,7 @@ export function VendorFilterSheet({
                 vendors={vendors}
                 state={states[focusedType] ?? {}}
                 dateContext={dateContexts[focusedType] ?? {}}
+                guestCount={guestCount}
                 onChange={(next) => onChangeType(focusedType, next)}
                 onDateContextChange={(next) =>
                   onDateContextChange(focusedType, next)
@@ -943,9 +952,20 @@ function priceForContext(
   v: Vendor,
   def: FilterDef,
   dc: DateContext,
+  picked?: string[],
 ): number | undefined {
   const f = v.filters;
   if (!f) return undefined;
+
+  // Per-tier planner prices: bin the picked tier's own price, as the matcher
+  // judges it, rather than a range spanning every tier the planner offers.
+  if (def.priceScopedBy && picked?.length) {
+    const mins = picked
+      .map((s) => offerFor(f, s))
+      .map((o) => (o?.basis === "package" ? (o.price_min ?? o.price_max) : undefined))
+      .filter((n): n is number => typeof n === "number");
+    if (mins.length) return Math.min(...mins);
+  }
 
   let scale = 1;
   const basis = f.price_basis;
