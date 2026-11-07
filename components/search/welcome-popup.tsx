@@ -161,28 +161,30 @@ export function WelcomePopup() {
           <>
             {header("Welcome back!", "Which vendor are you looking for today?")}
             <div className="px-6 pb-6 pt-5">
-              <div className="grid gap-2.5">
+              {/* Every type, in the same compact grid as the journey's type
+                  screen; a booked venue is not something they shop for. */}
+              <div className="grid grid-cols-2 gap-2">
                 {GUIDED_TYPES.filter((t) => !(t === "venue" && hasVenue)).map((t) => {
                   const c = CATEGORIES[t];
+                  const Icon = c.icon;
                   return (
-                    <ChoiceCard
+                    <Link
                       key={t}
                       href={`${JOURNEY_HREF}?type=${t}`}
-                      icon={c.icon}
-                      iconStyle={{ backgroundColor: c.lightHex, color: c.textHex }}
-                      title={c.label}
                       onClick={close}
-                    />
+                      className="flex min-h-11 items-center gap-2 rounded-xl border bg-card px-2.5 py-2 text-sm font-medium transition-colors hover:border-brand/50 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                    >
+                      <span
+                        className="flex size-7 shrink-0 items-center justify-center rounded-full"
+                        style={{ backgroundColor: c.lightHex, color: c.textHex }}
+                      >
+                        <Icon className="size-3.5" strokeWidth={1.75} />
+                      </span>
+                      <span className="leading-tight">{c.label}</span>
+                    </Link>
                   );
                 })}
               </div>
-              <Link
-                href={JOURNEY_HREF}
-                className="mt-4 block text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-                onClick={close}
-              >
-                See all vendor types
-              </Link>
             </div>
           </>
         )}

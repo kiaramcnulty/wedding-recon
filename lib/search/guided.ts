@@ -1,4 +1,4 @@
-import { usesServiceRegion, type VendorType } from "@/lib/constants/categories";
+import { VENDOR_TYPES, usesServiceRegion, type VendorType } from "@/lib/constants/categories";
 import {
   PRICE_ASSUMPTIONS,
   filtersForType,
@@ -25,12 +25,111 @@ import type { ViewportBbox } from "@/lib/map/viewport";
  * banded distance. See docs/customer-journey-implementation-plan.md.
  */
 
-/** The types the first slice of the journey supports. */
-export const GUIDED_TYPES = ["venue", "photos"] as const satisfies readonly VendorType[];
+/**
+ * Every selectable vendor type is in the journey. What differs per type is
+ * only which questions it asks (`GUIDED_CONTROLS`, below); a type with none
+ * goes straight from the type grid to its results.
+ */
+export const GUIDED_TYPES = VENDOR_TYPES;
 export type GuidedType = (typeof GUIDED_TYPES)[number];
 
 export function isGuidedType(t: unknown): t is GuidedType {
   return (GUIDED_TYPES as readonly unknown[]).includes(t);
+}
+
+/**
+ * The questions each type asks, in screen order: an optional budget, the
+ * venue capacity check on the shared guest count, multi-select chip groups and "must have"
+ * checkboxes. Every key is an existing filter in lib/constants/vendor-filters.ts
+ * and every answer is optional: empty means no filter, an unticked box means
+ * "don't care", never "must not have".
+ *
+ * This is the "Default controls per category" table in
+ * docs/customer-journey-implementation-plan.md. Everything else a type can be
+ * filtered on belongs under Advanced, which the journey does not have yet.
+ */
+export interface GuidedControls {
+  budget?: {
+    /** The range filter the budget fills. */
+    key: string;
+    label: string;
+    placeholder: string;
+    /** Pill text for the couple's answer: "Up to $75/guest". */
+    pill: (amount: string) => string;
+  };
+  /**
+   * Judge on the shared guest count (venue capacity). The count itself is
+   * asked once, on the location step, not on this type's screen.
+   */
+  guests?: boolean;
+  /** Multi-select filters, by key. The label defaults to the filter's own. */
+  picks: readonly { key: string; label?: string }[];
+  /** Bool filters shown as one checkbox each, by key. */
+  flags: readonly { key: string; label?: string }[];
+}
+
+const upTo = (a: string) => `Up to ${a}`;
+
+export const GUIDED_CONTROLS: Record<GuidedType, GuidedControls> = {
+  venue: {
+    budget: { key: "price", label: "Venue budget", placeholder: "8,000", pill: upTo },
+    guests: true,
+    picks: [{ key: "setting" }],
+    flags: [],
+  },
+  food: {
+    budget: { key: "price", label: "Budget per guest", placeholder: "75", pill: (a) => `Up to ${a}/guest` },
+    picks: [{ key: "cuisine" }, { key: "service_style" }],
+    flags: [],
+  },
+  dj: {
+    budget: { key: "price", label: "DJ budget", placeholder: "1,500", pill: upTo },
+    picks: [],
+    flags: [{ key: "includes_mc" }],
+  },
+  band: {
+    budget: { key: "price", label: "Music budget", placeholder: "2,500", pill: upTo },
+    picks: [{ key: "genre" }],
+    flags: [],
+  },
+  flowers: {
+    budget: { key: "price", label: "Flower budget", placeholder: "3,000", pill: upTo },
+    picks: [{ key: "style" }, { key: "engagement_model", label: "Full service or à la carte" }],
+    flags: [],
+  },
+  dress: {
+    budget: { key: "price", label: "Dress budget", placeholder: "2,000", pill: upTo },
+    picks: [],
+    flags: [{ key: "in_house_alterations" }],
+  },
+  beauty: {
+    budget: {
+      key: "bride_price",
+      label: "Bride's hair & makeup budget",
+      placeholder: "350",
+      pill: (a) => `Bride up to ${a}`,
+    },
+    picks: [{ key: "work_mode" }],
+    flags: [],
+  },
+  hotel: { picks: [], flags: [] },
+  planner: {
+    budget: { key: "price", label: "Planner budget", placeholder: "3,000", pill: upTo },
+    picks: [{ key: "service_tier" }],
+    flags: [],
+  },
+  photos: {
+    budget: { key: "price", label: "Photography budget", placeholder: "4,000", pill: upTo },
+    picks: [{ key: "style" }],
+    flags: [],
+  },
+  other: { picks: [], flags: [] },
+};
+
+/** Whether a type has a questions screen at all (hotel blocks and Other do not). */
+export function hasGuidedQuestions(t: GuidedType): boolean {
+  const c = GUIDED_CONTROLS[t];
+  return !!c.budget || c.picks.length > 0 || c.flags.length > 0;
 }
 
 /** Confirmed matches needed before the automatic radius stops widening. */
@@ -106,10 +205,12 @@ export function seasonForMonth(month: number): "peak" | "shoulder" | "off" | und
 
 /** What the couple answered on the preferences screen, per type. */
 export interface GuidedPrefs {
-  /** Ceiling in dollars, in the type's own unit (venue/photo package). */
+  /** Ceiling in dollars, in the type's own unit (see `GUIDED_CONTROLS`). */
   budget?: number;
-  /** Venue `setting` or photographer `style` values. */
-  styles?: string[];
+  /** Multi-select answers by filter key: venue `setting`, caterer `cuisine`... */
+  picks?: Record<string, string[]>;
+  /** Ticked "must have" boxes by filter key. Only `true` is ever stored. */
+  flags?: Record<string, true>;
 }
 
 export interface GuidedContext {
@@ -117,21 +218,31 @@ export interface GuidedContext {
   weddingMonth?: number;
 }
 
-const STYLE_KEY: Record<GuidedType, string> = { venue: "setting", photos: "style" };
-
 function positive(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n) && n > 0;
 }
 
 /**
+ * Florist structure: ticking both Full service and A la carte means either,
+ * exactly like ticking neither, so neither restricts the search. Kept as a
+ * multi filter it would only demote the 50 florists who never said which.
+ */
+const EITHER_MEANS_ANY: Record<string, number> = { engagement_model: 2 };
+
+/**
  * The couple's answers as a matcher selection, built through the same
  * `buildSelection` the map's filter sheet uses so the two can never read a
- * budget differently. Two things the sheet cannot know are patched on:
+ * budget differently. What the sheet cannot know is patched on:
  *
- *  - the venue per-person conversion uses the couple's REAL guest count, not
+ *  - venue: the per-person conversion uses the couple's REAL guest count, not
  *    the sheet's assumed 100. With no guest count the per-person basis is
  *    dropped from the scale, so those venues read as unknown (partial) rather
  *    than being judged at an invented headcount;
+ *  - caterers: the mirror image. A package or minimum is divided across the
+ *    real guest count when the couple gave one (on the location step), and is
+ *    otherwise unknown, since the caterer screen does not ask (requirement 6);
+ *  - florists: the budget is judged against a comparable floor, not the raw
+ *    price (see `floralFloor`);
  *  - a wedding month picks the season tier.
  *
  * A budget is a ceiling: a vendor matches when its starting price is at or
@@ -142,12 +253,23 @@ export function guidedSelection(
   prefs: GuidedPrefs,
   ctx: GuidedContext = {},
 ): FilterSelection {
+  const controls = GUIDED_CONTROLS[type];
   const state: Record<string, unknown> = {};
-  if (positive(prefs.budget)) state.price = { max: prefs.budget };
-  if (prefs.styles?.length) state[STYLE_KEY[type]] = prefs.styles;
-  if (type === "venue" && positive(ctx.guestCount)) {
+  if (controls.budget && positive(prefs.budget)) state[controls.budget.key] = { max: prefs.budget };
+  for (const { key } of controls.picks) {
+    const v = prefs.picks?.[key];
+    if (!v?.length) continue;
+    if (EITHER_MEANS_ANY[key] && new Set(v).size >= EITHER_MEANS_ANY[key]) continue;
+    state[key] = v;
+  }
+  for (const { key } of controls.flags) {
+    if (prefs.flags?.[key] === true) state[key] = true;
+  }
+  if (controls.guests && positive(ctx.guestCount)) {
     state.capacity_max = { min: Math.round(ctx.guestCount) };
   }
+  // Planner tiers scope the budget (`priceScopedBy`), so they must reach
+  // buildSelection alongside it, which they do: they are a pick above.
   const season = ctx.weddingMonth ? seasonForMonth(ctx.weddingMonth) : undefined;
   const sel = buildSelection(filtersForType(type), state, season ? { season } : {});
 
@@ -157,7 +279,73 @@ export function guidedSelection(
     if (positive(ctx.guestCount)) scale.per_person = Math.round(ctx.guestCount);
     sel.price = { ...price, scale };
   }
+  if (type === "food" && price) {
+    const scale: Record<string, number> = {};
+    if (positive(ctx.guestCount)) scale.package = 1 / Math.round(ctx.guestCount);
+    sel.price = { ...price, scale };
+  }
+  if (type === "flowers" && price?.max != null) {
+    // A point check on a derived floor; `comparableFilters` writes the field.
+    sel.price = { kind: "range", mode: "point", lo: FLORAL_FLOOR, max: price.max };
+  }
   return sel;
+}
+
+/**
+ * The transient field the florist budget is judged on. Never stored: it is
+ * written onto a copy of the vendor's filters for the comparison only.
+ */
+export const FLORAL_FLOOR = "guided_floral_floor";
+
+function amount(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
+/**
+ * The lowest total a florist's wedding flowers can cost, when the data can say
+ * it, judged against the couple's total flower budget. Requirement 9 and the
+ * Milestone 2 "first release" rule in the implementation plan:
+ *
+ *  - the floor is the larger of the starting price and the minimum spend (a
+ *    $500 starting price under a $3,000 minimum costs $3,000);
+ *  - a price counts only when its scope is plain, i.e. the florist works ONE
+ *    way (full service only, or a la carte only). A florist doing both lists
+ *    one flattened price that is very often a single bouquet ($27.50, $175),
+ *    which says nothing about a whole wedding. That price can still rule the
+ *    florist OUT when even it is over budget, but never in;
+ *  - a per-person or per-item price is not a total, and a $0 minimum does not
+ *    prove anything is free: both are silence.
+ *
+ * Returns the floor to compare, or undefined for silence (partial).
+ */
+export function floralFloor(filters: VendorFilters, budget: number): number | undefined {
+  if (!filters) return undefined;
+  const basis = filters.price_basis;
+  const price = basis == null || basis === "package" ? amount(filters.price_min) ?? amount(filters.price_max) : undefined;
+  const minimum = amount(filters.minimum_spend);
+  const floors = [price, minimum].filter((x): x is number => x !== undefined);
+  if (!floors.length) return undefined;
+  const floor = Math.max(...floors);
+  const models = Array.isArray(filters.engagement_model) ? new Set(filters.engagement_model.map(String)) : new Set();
+  if (models.size === 1) return floor;
+  return floor > budget ? floor : undefined;
+}
+
+/**
+ * The vendor's filters as the guided selection compares them: the stored
+ * attributes, plus any transient comparison field the selection reads.
+ */
+export function comparableFilters(
+  type: string,
+  filters: VendorFilters,
+  selection: FilterSelection,
+): VendorFilters {
+  const price = selection.price;
+  if (type !== "flowers" || price?.kind !== "range" || price.lo !== FLORAL_FLOOR || price.max == null) {
+    return filters;
+  }
+  const floor = floralFloor(filters, price.max);
+  return { ...(filters ?? {}), [FLORAL_FLOOR]: floor };
 }
 
 /** One row from `/api/map/vendors?attrs=1`. */
@@ -210,7 +398,7 @@ export function runGuidedSearch(
   for (const c of candidates) {
     if (c.vendor_type !== type) continue;
     if (!Number.isFinite(c.lat) || !Number.isFinite(c.lng)) continue;
-    const detail = filterMatchFor(type, c.filters, { [type]: selection });
+    const detail = filterMatchFor(type, comparableFilters(type, c.filters, selection), { [type]: selection });
     if (detail.rank === -1) continue;
     const miles = milesBetween(anchor, c);
     const rank = detail.rank;

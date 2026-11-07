@@ -8,13 +8,15 @@ import { Input } from "@/components/ui/input";
 import { BrandMark } from "@/components/brand-mark";
 import { ChoiceCard } from "@/components/search/choice-card";
 import { captureClient } from "@/lib/analytics/posthog";
-import {
-  CATEGORIES,
-  VENDOR_TYPES,
-  type VendorType,
-} from "@/lib/constants/categories";
+import { CATEGORIES, VENDOR_TYPES } from "@/lib/constants/categories";
 import { filtersForType } from "@/lib/constants/vendor-filters";
-import { isGuidedType, type GuidedPrefs, type GuidedType } from "@/lib/search/guided";
+import {
+  GUIDED_CONTROLS,
+  hasGuidedQuestions,
+  isGuidedType,
+  type GuidedPrefs,
+  type GuidedType,
+} from "@/lib/search/guided";
 import {
   clearJourney,
   onJourneyChange,
@@ -31,36 +33,24 @@ import { GuidedResults, type ResultsView } from "./guided-results";
 
 /**
  * The guided first-visit journey (`/start`): venue or town, vendor type, a few
- * preferences, then three suggestions backed by the full feed. First slice:
- * Venue and Photos only. Every other type is shown, so the grid reads as the
- * finished product, but marked "Coming soon".
+ * preferences, then three suggestions backed by the full feed. Every vendor
+ * type is covered and asks its own questions (GUIDED_CONTROLS in
+ * lib/search/guided.ts); hotel blocks and Other ask none and go straight from
+ * the type grid to results.
  *
  * All answers live in one `JourneyState`, saved to this device on every change
  * (lib/search/journey-state.ts), which is what makes resume, back and a vendor
  * round trip lossless.
  */
 
-const STYLE_FIELD: Record<GuidedType, { key: string; label: string }> = {
-  venue: { key: "setting", label: "Setting" },
-  photos: { key: "style", label: "Style" },
-};
-
-// A total; per-person and hourly venue quotes are converted using the guest
-// count and a 5-hour event (see guidedSelection).
-const BUDGET_LABEL: Record<GuidedType, string> = {
-  venue: "Venue budget",
-  photos: "Photography budget",
-};
-
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 
-/** Labels for the setting/style chips, from the shared filter definitions. */
-function styleOptions(t: GuidedType) {
-  const def = filtersForType(t).find((d) => d.key === STYLE_FIELD[t].key);
-  return def?.options ?? [];
+/** A filter's label and options, from the shared filter definitions. */
+function filterDef(t: GuidedType, key: string) {
+  return filtersForType(t).find((d) => d.key === key);
 }
 
 function parseMoney(raw: string): number | undefined {
@@ -116,7 +106,7 @@ export function GuidedJourney() {
       // From the welcome-back popup: straight to that type's preferences.
       if (isGuidedType(typeParam) && stored?.location) {
         resumedRef.current = true;
-        const next = { ...stored, selectedVendorType: typeParam, step: "prefs" as JourneyStep };
+        const next = { ...stored, ...pickType(stored, typeParam) };
         saveJourney(next);
         setState(next);
         return;
@@ -295,6 +285,7 @@ export function GuidedJourney() {
             initialQuery={venueQuery}
             onPick={(location) => update({ location, venueLocation: location })}
             onDate={(weddingMonth, weddingYear) => update({ weddingMonth, weddingYear })}
+            onGuests={(guestCount) => update({ guestCount })}
             onCityInstead={() => go("city")}
             onContinue={(location) => go(afterLocation(state), { location })}
           />
@@ -308,6 +299,7 @@ export function GuidedJourney() {
             state={state}
             onPick={(location) => update({ location, cityLocation: location })}
             onDate={(weddingMonth, weddingYear) => update({ weddingMonth, weddingYear })}
+            onGuests={(guestCount) => update({ guestCount })}
             onVenueInstead={(query) => {
               setVenueQuery(query);
               go("venue", { hasVenue: true });
@@ -328,7 +320,10 @@ export function GuidedJourney() {
         <Shell onBack={state.status === "completed" ? undefined : () => go(back)}>
           <CategoryStep
             state={state}
-            onPick={(t) => go("prefs", { selectedVendorType: t })}
+            onPick={(t) => {
+              const { step: to, ...patch } = pickType(state, t);
+              go(to, patch);
+            }}
             onEditLocation={() => go(state.hasVenue ? "venue" : "city")}
           />
         </Shell>
@@ -382,9 +377,22 @@ export function GuidedJourney() {
  */
 function afterLocation(s: JourneyState): JourneyStep {
   const t = s.selectedVendorType;
-  if (t && s.byType[t]) return "results";
+  if (t && (s.byType[t] || !hasGuidedQuestions(t))) return "results";
   if (t || s.hasVenue === false) return "prefs";
   return "category";
+}
+
+/**
+ * Choosing a vendor type: on to its questions, or, for a type that asks none
+ * (hotel blocks, Other), straight to its results.
+ */
+function pickType(
+  s: JourneyState,
+  t: GuidedType,
+): Pick<JourneyState, "selectedVendorType" | "step" | "byType"> {
+  return hasGuidedQuestions(t)
+    ? { selectedVendorType: t, step: "prefs", byType: s.byType }
+    : { selectedVendorType: t, step: "results", byType: { ...s.byType, [t]: s.byType[t] ?? {} } };
 }
 
 /** Where the back arrow goes from each step. */
@@ -478,6 +486,46 @@ function WhenField({
   );
 }
 
+/**
+ * The shared guest count, asked once beside the date so every type can use
+ * it: venues judge capacity on it, caterers divide a package price by it.
+ * Asked here rather than on the venue screen because a couple with a booked
+ * venue never sees that screen, and they are the main caterer shoppers.
+ */
+function GuestsField({
+  value,
+  onChange,
+}: {
+  value?: number;
+  onChange: (guests: number | undefined) => void;
+}) {
+  const [raw, setRaw] = React.useState(value ? String(value) : "");
+  const n = raw.trim() ? Number(raw) : undefined;
+  const invalid = n !== undefined && !(Number.isInteger(n) && n > 0 && n < 5000);
+  return (
+    <div className="mt-6 flex flex-col">
+      <label className="font-medium" htmlFor="journey-guests">
+        How many guests? <span className="font-normal text-muted-foreground">(optional)</span>
+      </label>
+      <Input
+        id="journey-guests"
+        inputMode="numeric"
+        placeholder="e.g. 120"
+        className="mt-3 h-10 text-base"
+        value={raw}
+        aria-invalid={invalid}
+        onChange={(e) => {
+          const next = e.target.value.replace(/[^\d]/g, "");
+          setRaw(next);
+          const v = next ? Number(next) : undefined;
+          if (v === undefined || (Number.isInteger(v) && v > 0 && v < 5000)) onChange(v);
+        }}
+      />
+      {invalid && <p className="mt-1 text-sm text-destructive">Enter a whole number of guests.</p>}
+    </div>
+  );
+}
+
 interface VenueMatch {
   vendorId: string;
   vendorType: string;
@@ -492,6 +540,7 @@ function VenueStep({
   initialQuery,
   onPick,
   onDate,
+  onGuests,
   onCityInstead,
   onContinue,
 }: {
@@ -499,6 +548,7 @@ function VenueStep({
   initialQuery?: string;
   onPick: (l: JourneyLocation) => void;
   onDate: (m?: number, y?: number) => void;
+  onGuests: (guests: number | undefined) => void;
   onCityInstead: () => void;
   onContinue: (l: JourneyLocation) => void;
 }) {
@@ -585,6 +635,7 @@ function VenueStep({
         Can&apos;t find it? Choose the town instead
       </button>
       <WhenField month={state.weddingMonth} year={state.weddingYear} onChange={onDate} />
+      <GuestsField value={state.guestCount} onChange={onGuests} />
       <PrimaryButton disabled={!picked} onClick={() => picked && onContinue(picked)}>
         Continue
       </PrimaryButton>
@@ -596,12 +647,14 @@ function CityStep({
   state,
   onPick,
   onDate,
+  onGuests,
   onVenueInstead,
   onContinue,
 }: {
   state: JourneyState;
   onPick: (l: JourneyLocation) => void;
   onDate: (m?: number, y?: number) => void;
+  onGuests: (guests: number | undefined) => void;
   onVenueInstead: (query?: string) => void;
   onContinue: (l: JourneyLocation) => void;
 }) {
@@ -730,6 +783,7 @@ function CityStep({
       )}
       {venueLink}
       <WhenField month={state.weddingMonth} year={state.weddingYear} onChange={onDate} />
+      <GuestsField value={state.guestCount} onChange={onGuests} />
       <PrimaryButton disabled={!picked} onClick={() => picked && onContinue(picked)}>
         Continue
       </PrimaryButton>
@@ -869,25 +923,16 @@ function CategoryStep({
         </p>
       )}
       <div className="mt-6 grid grid-cols-2 gap-3">
-        {/* A couple who has booked a venue is not shopping for one. The types
-            the journey covers come first, so they never sit under a page of
-            "Coming soon" tiles. */}
-        {VENDOR_TYPES.filter((t) => !(t === "venue" && state.hasVenue))
-          .sort((x, y) => Number(isGuidedType(y)) - Number(isGuidedType(x)))
-          .map((t: VendorType) => {
+        {/* A couple who has booked a venue is not shopping for one. */}
+        {VENDOR_TYPES.filter((t) => !(t === "venue" && state.hasVenue)).map((t) => {
           const c = CATEGORIES[t];
           const Icon = c.icon;
-          const enabled = isGuidedType(t);
           return (
             <button
               key={t}
               type="button"
-              disabled={!enabled}
-              onClick={() => enabled && onPick(t)}
-              className={cn(
-                "flex min-h-20 flex-col items-start justify-between gap-2 rounded-xl border p-3 text-left transition",
-                enabled ? "hover:border-foreground active:scale-[0.98]" : "cursor-not-allowed opacity-50",
-              )}
+              onClick={() => onPick(t)}
+              className="flex min-h-20 flex-col items-start justify-between gap-2 rounded-xl border p-3 text-left transition hover:border-foreground active:scale-[0.98]"
             >
               <span
                 className="flex size-8 items-center justify-center rounded-full"
@@ -895,10 +940,7 @@ function CategoryStep({
               >
                 <Icon className="size-4" />
               </span>
-              <span className="text-sm font-medium leading-tight">
-                {c.label}
-                {!enabled && <span className="block text-xs font-normal text-muted-foreground">Coming soon</span>}
-              </span>
+              <span className="text-sm font-medium leading-tight">{c.label}</span>
             </button>
           );
         })}
@@ -917,29 +959,38 @@ function PrefsStep({
   onSubmit: (prefs: GuidedPrefs, guestCount: number | undefined) => void;
 }) {
   const saved = state.byType[type] ?? {};
+  const controls = GUIDED_CONTROLS[type];
   const [budget, setBudget] = React.useState(saved.budget ? String(saved.budget) : "");
-  const [guests, setGuests] = React.useState(state.guestCount ? String(state.guestCount) : "");
-  const [styles, setStyles] = React.useState<string[]>(saved.styles ?? []);
+  const [picks, setPicks] = React.useState<Record<string, string[]>>(saved.picks ?? {});
+  const [flags, setFlags] = React.useState<Record<string, true>>(saved.flags ?? {});
   const c = CATEGORIES[type];
 
   const budgetValue = parseMoney(budget);
   const budgetInvalid = budget.trim() !== "" && budgetValue === undefined;
-  const guestValue = guests.trim() ? Number(guests) : undefined;
-  const guestsInvalid =
-    guestValue !== undefined && !(Number.isInteger(guestValue) && guestValue > 0 && guestValue < 5000);
 
-  const toggle = (v: string) =>
-    setStyles((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
+  const toggle = (key: string, v: string) =>
+    setPicks((p) => {
+      const cur = p[key] ?? [];
+      const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
+      const out = { ...p };
+      if (next.length) out[key] = next;
+      else delete out[key];
+      return out;
+    });
 
   return (
     <form
       className="flex flex-col"
       onSubmit={(e) => {
         e.preventDefault();
-        if (budgetInvalid || guestsInvalid) return;
+        if (budgetInvalid) return;
         onSubmit(
-          { ...(budgetValue && { budget: budgetValue }), ...(styles.length && { styles }) },
-          type === "venue" ? guestValue : state.guestCount,
+          {
+            ...(budgetValue && { budget: budgetValue }),
+            ...(Object.keys(picks).length && { picks }),
+            ...(Object.keys(flags).length && { flags }),
+          },
+          state.guestCount,
         );
       }}
     >
@@ -951,68 +1002,81 @@ function PrefsStep({
         <span className="text-base font-normal text-muted-foreground">(optional)</span>
       </h1>
 
-      <label className="mt-6 font-medium" htmlFor="journey-budget">
-        {BUDGET_LABEL[type]}
-      </label>
-      <div className="relative mt-2">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-        <Input
-          id="journey-budget"
-          inputMode="numeric"
-          placeholder="e.g. 8,000"
-          className="h-11 pl-7 text-base"
-          value={budget}
-          aria-invalid={budgetInvalid}
-          onChange={(e) => setBudget(e.target.value)}
-        />
-      </div>
-      {budgetInvalid && <p className="mt-1 text-sm text-destructive">Enter a dollar amount.</p>}
-
-      {type === "venue" && (
+      {controls.budget && (
         <>
-          <label className="mt-6 font-medium" htmlFor="journey-guests">
-            Guest count
+          <label className="mt-6 font-medium" htmlFor="journey-budget">
+            {controls.budget.label}
           </label>
-          <Input
-            id="journey-guests"
-            inputMode="numeric"
-            placeholder="e.g. 120"
-            className="mt-2 h-11 text-base"
-            value={guests}
-            aria-invalid={guestsInvalid}
-            onChange={(e) => setGuests(e.target.value.replace(/[^\d]/g, ""))}
-          />
-          {guestsInvalid && <p className="mt-1 text-sm text-destructive">Enter a whole number of guests.</p>}
+          <div className="relative mt-2">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+            <Input
+              id="journey-budget"
+              inputMode="numeric"
+              placeholder={`e.g. ${controls.budget.placeholder}`}
+              className="h-11 pl-7 text-base"
+              value={budget}
+              aria-invalid={budgetInvalid}
+              onChange={(e) => setBudget(e.target.value)}
+            />
+          </div>
+          {budgetInvalid && <p className="mt-1 text-sm text-destructive">Enter a dollar amount.</p>}
         </>
       )}
 
-      <fieldset className="mt-6">
-        <legend className="font-medium">
-          {STYLE_FIELD[type].label} <span className="font-normal text-muted-foreground">(pick any)</span>
-        </legend>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {styleOptions(type).map((o) => {
-            const on = styles.includes(o.value);
-            return (
-              <button
-                key={o.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggle(o.value)}
-                className={cn(
-                  "min-h-9 rounded-full border px-3 py-1.5 text-sm transition",
-                  on ? "border-transparent font-medium" : "hover:border-foreground",
-                )}
-                style={on ? { backgroundColor: c.lightHex, color: c.textHex } : undefined}
-              >
-                {o.label}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+      {controls.picks.map(({ key, label }) => {
+        const def = filterDef(type, key);
+        if (!def?.options) return null;
+        const chosen = picks[key] ?? [];
+        return (
+          <fieldset key={key} className="mt-6">
+            <legend className="font-medium">
+              {label ?? def.label} <span className="font-normal text-muted-foreground">(pick any)</span>
+            </legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {def.options.map((o) => {
+                const on = chosen.includes(o.value);
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggle(key, o.value)}
+                    className={cn(
+                      "min-h-9 rounded-full border px-3 py-1.5 text-sm transition",
+                      on ? "border-transparent font-medium" : "hover:border-foreground",
+                    )}
+                    style={on ? { backgroundColor: c.lightHex, color: c.textHex } : undefined}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        );
+      })}
 
-      <PrimaryButton type="submit" disabled={budgetInvalid || guestsInvalid}>
+      {controls.flags.map(({ key, label }) => (
+        <label key={key} className="mt-6 flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3">
+          <input
+            type="checkbox"
+            className="size-5 shrink-0"
+            style={{ accentColor: c.colorHex }}
+            checked={flags[key] === true}
+            onChange={(e) =>
+              setFlags((f) => {
+                const out = { ...f };
+                if (e.target.checked) out[key] = true;
+                else delete out[key];
+                return out;
+              })
+            }
+          />
+          <span className="font-medium">{label ?? filterDef(type, key)?.label ?? key}</span>
+        </label>
+      ))}
+
+      <PrimaryButton type="submit" disabled={budgetInvalid}>
         Show my matches
       </PrimaryButton>
     </form>

@@ -310,6 +310,7 @@ function TypeSection({
   vendors,
   state,
   dateContext,
+  guestCount,
   onChange,
   onDateContextChange,
 }: {
@@ -317,11 +318,14 @@ function TypeSection({
   vendors: Vendor[];
   state: FilterState;
   dateContext: DateContext;
+  guestCount?: number;
   onChange: (next: FilterState) => void;
   onDateContextChange: (next: DateContext) => void;
 }) {
   const meta = CATEGORIES[vendorType];
-  const defs = filtersForType(vendorType);
+  // The same guest-aware defs the matcher uses (explore/page.tsx), so the
+  // histogram bins a per-person venue at the count it is judged at.
+  const defs = filtersForType(vendorType, { guests: guestCount });
   const hist = HIST[vendorType] ?? {};
   const pool = useMemo(
     () => vendors.filter((v) => v.vendor_type === vendorType),
@@ -578,6 +582,7 @@ export function VendorFilterSheet({
   visiblePartial,
   states,
   dateContexts,
+  guestCount,
   onChangeType,
   onDateContextChange,
   onClearAll,
@@ -599,6 +604,8 @@ export function VendorFilterSheet({
   visiblePartial: number;
   states: Partial<Record<VendorType, FilterState>>;
   dateContexts: Partial<Record<VendorType, DateContext>>;
+  /** The couple's guest count from the journey, if they gave one. */
+  guestCount?: number;
   onChangeType: (t: VendorType, next: FilterState) => void;
   onDateContextChange: (t: VendorType, next: DateContext) => void;
   onClearAll: () => void;
@@ -891,6 +898,7 @@ export function VendorFilterSheet({
                 vendors={vendors}
                 state={states[focusedType] ?? {}}
                 dateContext={dateContexts[focusedType] ?? {}}
+                guestCount={guestCount}
                 onChange={(next) => onChangeType(focusedType, next)}
                 onDateContextChange={(next) =>
                   onDateContextChange(focusedType, next)

@@ -135,7 +135,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
     if (idList.length === 0) return;
     (async () => {
       const supabase = createClient();
-      const [vendorsRes, reconRes, claimsRes, verifiedRes] = await Promise.all([
+      const [vendorsRes, reconRes, claimsRes, verifiedRes, overridesRes] = await Promise.all([
         supabase
           .from("vendors")
           // city/region/address_text feed the "City, ST" subtitle — three small
@@ -159,6 +159,13 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         // RPC not yet applied) is treated as "nobody verified" so the card is
         // exactly what it is today — same never-throw stance as searchVendors.
         supabase.rpc("verified_vendor_ids", { p_ids: idList }),
+        // A verified vendor's own published details (migration 0044), merged
+        // over the extracted filters below exactly as the map route and the
+        // vendor page merge them. Without this a card could say "A la carte"
+        // for a florist the matcher, reading the vendor's own "full service
+        // only", had just ranked as a full-service match. Same never-throw
+        // stance: an error leaves the extracted filters as they are.
+        supabase.rpc("verified_listing_overrides", { p_ids: idList }),
       ]);
       if (cancelled) return;
 
@@ -170,6 +177,16 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
           (r) => r.vendor_id,
         ),
       );
+
+      const overridesById = new Map<string, Record<string, unknown>>();
+      for (const r of (overridesRes.data ?? []) as {
+        vendor_id: string;
+        filter_overrides: Record<string, unknown> | null;
+      }[]) {
+        if (r.filter_overrides && Object.keys(r.filter_overrides).length) {
+          overridesById.set(r.vendor_id, r.filter_overrides);
+        }
+      }
 
       const vendorById = new Map<string, VendorLite>();
       for (const v of vendors) vendorById.set(v.id, v);
@@ -240,7 +257,10 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
             reconCount: counts.get(id) ?? 0,
             photoCandidates: candidates,
             slides: slidesByVendor.get(id) ?? [],
-            filters: v.filters ?? null,
+            // Override keys win; extracted keys survive where not set.
+            filters: overridesById.has(id)
+              ? { ...(v.filters ?? {}), ...overridesById.get(id) }
+              : (v.filters ?? null),
             verified: verifiedIds.has(id),
           },
         ];

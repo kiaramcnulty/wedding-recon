@@ -1,4 +1,9 @@
-import { isGuidedType, type GuidedPrefs, type GuidedType } from "@/lib/search/guided";
+import {
+  GUIDED_CONTROLS,
+  isGuidedType,
+  type GuidedPrefs,
+  type GuidedType,
+} from "@/lib/search/guided";
 
 /**
  * The guided journey's saved state: what the couple has answered, and where in
@@ -75,15 +80,32 @@ function finitePositive(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
 }
 
-function parsePrefs(raw: unknown): GuidedPrefs {
+function strings(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/**
+ * One type's answers, keeping only keys that type still asks about. A journey
+ * saved before the per-type controls kept the one chip group in `styles`
+ * (venue setting, photo style); it is read into that type's first pick.
+ */
+function parsePrefs(type: GuidedType, raw: unknown): GuidedPrefs {
   if (!raw || typeof raw !== "object") return {};
   const r = raw as Record<string, unknown>;
-  const styles = Array.isArray(r.styles)
-    ? r.styles.filter((s): s is string => typeof s === "string")
-    : undefined;
+  const controls = GUIDED_CONTROLS[type];
+  const rawPicks = (r.picks && typeof r.picks === "object" ? r.picks : {}) as Record<string, unknown>;
+  const rawFlags = (r.flags && typeof r.flags === "object" ? r.flags : {}) as Record<string, unknown>;
+  const picks: Record<string, string[]> = {};
+  controls.picks.forEach(({ key }, i) => {
+    const v = strings(rawPicks[key] ?? (i === 0 ? r.styles : undefined));
+    if (v.length) picks[key] = v;
+  });
+  const flags: Record<string, true> = {};
+  for (const { key } of controls.flags) if (rawFlags[key] === true) flags[key] = true;
   return {
-    ...(finitePositive(r.budget) && { budget: r.budget as number }),
-    ...(styles?.length && { styles }),
+    ...(controls.budget && finitePositive(r.budget) && { budget: r.budget as number }),
+    ...(Object.keys(picks).length && { picks }),
+    ...(Object.keys(flags).length && { flags }),
   };
 }
 
@@ -126,7 +148,7 @@ export function parseJourney(raw: unknown): JourneyState | null {
   const byType: Partial<Record<GuidedType, GuidedPrefs>> = {};
   if (r.byType && typeof r.byType === "object") {
     for (const [t, p] of Object.entries(r.byType as Record<string, unknown>)) {
-      if (isGuidedType(t)) byType[t] = parsePrefs(p);
+      if (isGuidedType(t)) byType[t] = parsePrefs(t, p);
     }
   }
 

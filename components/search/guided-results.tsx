@@ -15,12 +15,15 @@ import {
 import { captureClient } from "@/lib/analytics/posthog";
 import { writeMapView } from "@/lib/map/map-view";
 import { zoomToFitRing } from "@/lib/map/ring";
-import { CATEGORIES } from "@/lib/constants/categories";
+import { CATEGORIES, CATEGORY_PLURAL } from "@/lib/constants/categories";
 import { filtersForType } from "@/lib/constants/vendor-filters";
 import {
+  GUIDED_CONTROLS,
   guidedSelection,
+  hasGuidedQuestions,
   runGuidedSearch,
   suggestionsOf,
+  type GuidedPrefs,
   type GuidedType,
 } from "@/lib/search/guided";
 import type { JourneyState } from "@/lib/search/journey-state";
@@ -29,7 +32,6 @@ import { useGuidedCandidates } from "./use-guided-candidates";
 export type ResultsView = "suggestions" | "list" | "map";
 
 const SCROLL_KEY = "wr:journeyScroll";
-const STYLE_KEY: Record<GuidedType, string> = { venue: "setting", photos: "style" };
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 
@@ -114,6 +116,7 @@ export function GuidedResults({
   const c = CATEGORIES[type];
 
   const pills = preferencePills(type, prefs, state);
+  const asks = hasGuidedQuestions(type);
   const incomplete = candidates.status === "ready" && !candidates.complete;
 
   const header = (
@@ -149,11 +152,13 @@ export function GuidedResults({
           ))}
         </ul>
       )}
-      <div className="mt-3 flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={onEdit}>
-          <SlidersHorizontal className="size-3.5" /> Edit search
-        </Button>
-      </div>
+      {asks && (
+        <div className="mt-3 flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onEdit}>
+            <SlidersHorizontal className="size-3.5" /> Edit search
+          </Button>
+        </div>
+      )}
     </div>
   );
 
@@ -178,7 +183,7 @@ export function GuidedResults({
         {header}
         <div className="flex h-60 flex-col items-center justify-center gap-2 text-muted-foreground" role="status">
           <Loader2 className="size-6 animate-spin" />
-          <span className="text-sm font-medium">Finding {c.label.toLowerCase()} near {location.label}…</span>
+          <span className="text-sm font-medium">Finding {CATEGORY_PLURAL[type]} near {location.label}…</span>
         </div>
       </div>
     );
@@ -218,7 +223,7 @@ export function GuidedResults({
             footnote={
               incomplete
                 ? "There may be more vendors than shown here."
-                : "Partial matches are missing a price, guest count or style we could check."
+                : "Partial matches are missing details we could check."
             }
           />
           )}
@@ -232,7 +237,17 @@ export function GuidedResults({
     <div className="mx-auto w-full max-w-[480px] pb-10">
       {header}
       <div className="px-5 pt-5">
-        {result.confirmedCount === 0 ? (
+        {result.confirmedCount === 0 && !asks ? (
+          <div className="rounded-xl border px-4 py-6 text-center">
+            <h1 className="text-lg font-semibold">No {CATEGORY_PLURAL[type]} nearby yet</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Nothing within {result.radiusMiles} miles of {location.label}.
+            </p>
+            <Button className="mt-4" onClick={onChangeType}>
+              Try another vendor type
+            </Button>
+          </div>
+        ) : result.confirmedCount === 0 ? (
           <div className="rounded-xl border px-4 py-6 text-center">
             <h1 className="text-lg font-semibold">No exact matches yet</h1>
             <p className="mt-1 text-sm text-muted-foreground">Try a higher budget or fewer preferences.</p>
@@ -369,13 +384,22 @@ function ResultsMap({
 }
 
 /** The couple's answers as short pills over the results. */
-function preferencePills(type: GuidedType, prefs: { budget?: number; styles?: string[] }, state: JourneyState): string[] {
+function preferencePills(type: GuidedType, prefs: GuidedPrefs, state: JourneyState): string[] {
+  const controls = GUIDED_CONTROLS[type];
+  const defs = filtersForType(type);
   const out: string[] = [];
-  if (prefs.budget) out.push(`Up to ${money(prefs.budget)}`);
-  if (type === "venue" && state.guestCount) out.push(`${state.guestCount} guests`);
-  const def = filtersForType(type).find((d) => d.key === STYLE_KEY[type]);
-  for (const v of prefs.styles ?? []) {
-    out.push(def?.options?.find((o) => o.value === v)?.label ?? v);
+  if (controls.budget && prefs.budget) out.push(controls.budget.pill(money(prefs.budget)));
+  // The guest count is asked on the location step; caterers use it too, to
+  // divide a package price per guest.
+  if ((controls.guests || type === "food") && state.guestCount) out.push(`${state.guestCount} guests`);
+  for (const { key } of controls.picks) {
+    const def = defs.find((d) => d.key === key);
+    for (const v of prefs.picks?.[key] ?? []) {
+      out.push(def?.options?.find((o) => o.value === v)?.label ?? v);
+    }
+  }
+  for (const { key, label } of controls.flags) {
+    if (prefs.flags?.[key]) out.push(label ?? defs.find((d) => d.key === key)?.label ?? key);
   }
   return out;
 }

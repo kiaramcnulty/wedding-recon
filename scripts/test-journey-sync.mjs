@@ -53,7 +53,10 @@ const journey = {
   weddingMonth: 6,
   weddingYear: 2027,
   selectedVendorType: "photos",
-  byType: { photos: { budget: 4000, styles: ["documentary"] } },
+  byType: {
+    photos: { budget: 4000, picks: { style: ["documentary"] } },
+    dj: { budget: 1500, flags: { includes_mc: true } },
+  },
   step: "results",
   status: "completed",
   updatedAt: 1793990000000,
@@ -66,6 +69,7 @@ eq("venue, date, preferences and progress survive the trip", {
   month: back?.weddingMonth,
   year: back?.weddingYear,
   photos: back?.byType?.photos,
+  dj: back?.byType?.dj,
   step: back?.step,
   status: back?.status,
   updatedAt: back?.updatedAt,
@@ -74,11 +78,18 @@ eq("venue, date, preferences and progress survive the trip", {
   vendorId: "v1",
   month: 6,
   year: 2027,
-  photos: { budget: 4000, styles: ["documentary"] },
+  photos: { budget: 4000, picks: { style: ["documentary"] } },
+  dj: { budget: 1500, flags: { includes_mc: true } },
   step: "results",
   status: "completed",
   updatedAt: 1793990000000,
 });
+eq("a journey saved before per-type questions keeps its chips",
+  parseJourney({ ...journey, byType: { venue: { budget: 9000, styles: ["garden"] } } })?.byType?.venue,
+  { budget: 9000, picks: { setting: ["garden"] } });
+eq("answers to questions a type no longer asks are dropped",
+  parseJourney({ ...journey, byType: { hotel: { budget: 200, picks: { parking: ["free"] } } } })?.byType?.hotel,
+  {});
 eq("a corrupt account copy is rejected, not applied", parseJourney({ version: 2 }), null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
