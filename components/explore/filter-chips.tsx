@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BottomSheet } from "@/components/explore/bottom-sheet";
@@ -20,8 +20,10 @@ import { cn } from "@/lib/utils";
 
 /**
  * Explore's filters for ONE vendor type, as a row of chips over the map:
- * type, each of the type's default controls (the same `GUIDED_CONTROLS` the
- * journey asks), distance, and More (Advanced). A chip opens a focused sheet
+ * each of the type's default controls (the same `GUIDED_CONTROLS` the journey
+ * asks) and More (Advanced). The type itself is the pill in the search bar
+ * ("[Venue] near [Denver]", see `TypeSheet`); distance is the slider at the
+ * bottom of the frame (`DistanceSlider`). A chip opens a focused sheet
  * that keeps a draft until Apply, so closing it discards the change; the
  * Apply button shows how many matches the draft would give before it is
  * applied. A "must have" checkbox control is a chip that toggles in place.
@@ -33,11 +35,9 @@ import { cn } from "@/lib/utils";
 export type MatchCount = { confirmed: number; partial: number } | null;
 
 type Sheet =
-  | { kind: "type" }
   | { kind: "budget" }
   | { kind: "guests" }
   | { kind: "pick"; key: string }
-  | { kind: "radius" }
   | { kind: "more" };
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -59,27 +59,15 @@ export function FilterChips({
   type,
   prefs,
   guestCount,
-  radiusMiles,
-  defaultMiles,
-  maxMiles,
-  onType,
   onPrefs,
   onGuests,
-  onRadius,
   countFor,
 }: {
   type: GuidedType;
   prefs: GuidedPrefs;
   guestCount?: number;
-  /** The radius the search is using now. */
-  radiusMiles: number;
-  /** Explore's starting distance, what the distance sheet resets to. */
-  defaultMiles: number;
-  maxMiles: number;
-  onType: (t: GuidedType) => void;
   onPrefs: (p: GuidedPrefs) => void;
   onGuests: (n: number | undefined) => void;
-  onRadius: (r: RadiusSetting) => void;
   /** Matches a draft would give, for the sheets' Apply buttons. */
   countFor: (p: GuidedPrefs, guests: number | undefined) => MatchCount;
 }) {
@@ -101,11 +89,6 @@ export function FilterChips({
   return (
     <>
       <div className="flex flex-wrap items-center gap-1.5">
-        <Chip active onClick={() => setSheet({ kind: "type" })} style={{ backgroundColor: c.lightHex, color: c.textHex }}>
-          <c.icon className="size-3.5" aria-hidden />
-          {c.label}
-          <ChevronDown className="size-3.5" aria-hidden />
-        </Chip>
         {controls.budget && (
           <Chip active={!!prefs.budget} accent={c} onClick={() => setSheet({ kind: "budget" })}>
             {prefs.budget ? controls.budget.pill(money(prefs.budget)) : "Budget"}
@@ -137,9 +120,6 @@ export function FilterChips({
             {label ?? defOf(type, key)?.label ?? key}
           </Chip>
         ))}
-        <Chip active={radiusMiles !== defaultMiles} accent={c} onClick={() => setSheet({ kind: "radius" })}>
-          {radiusMiles} mi
-        </Chip>
         {more && (
           <Chip active={moreCount > 0} accent={c} onClick={() => setSheet({ kind: "more" })}>
             <SlidersHorizontal className="size-3.5" aria-hidden />
@@ -148,37 +128,6 @@ export function FilterChips({
         )}
       </div>
 
-      <BottomSheet open={sheet?.kind === "type"} onClose={close} title="Vendor type">
-        <div className="grid grid-cols-2 gap-2">
-          {VENDOR_TYPES.map((t) => {
-            const m = CATEGORIES[t];
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  onType(t);
-                  close();
-                }}
-                aria-pressed={t === type}
-                className={cn(
-                  "flex min-h-11 items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-sm font-medium transition-colors",
-                  t === type ? "border-transparent" : "hover:border-foreground",
-                )}
-                style={t === type ? { backgroundColor: m.lightHex, color: m.textHex } : undefined}
-              >
-                <span
-                  className="flex size-7 shrink-0 items-center justify-center rounded-full"
-                  style={{ backgroundColor: m.lightHex, color: m.textHex }}
-                >
-                  <m.icon className="size-3.5" aria-hidden />
-                </span>
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
-      </BottomSheet>
 
       {sheet?.kind === "budget" && controls.budget && (
         <AmountSheet
@@ -228,15 +177,6 @@ export function FilterChips({
         />
       )}
 
-      <RadiusSheet
-        open={sheet?.kind === "radius"}
-        radiusMiles={radiusMiles}
-        defaultMiles={defaultMiles}
-        maxMiles={maxMiles}
-        accent={c.colorHex}
-        onRadius={onRadius}
-        onClose={close}
-      />
 
       {sheet?.kind === "more" && (
         <MoreSheet
@@ -455,42 +395,24 @@ function PickSheet({
 }
 
 /**
- * Distance. Applies live, so the ring on the map behind the sheet moves with
- * the slider (matching is local, on the vendors already loaded: no request per
- * drag). Explore starts at a fixed distance; "Reset" goes back to it.
+ * Distance, inline over the map in 5-mile steps. Applies live, so the ring
+ * moves with the thumb (matching is local, on the vendors already loaded: no
+ * request per drag). The track takes the row; its gaps are not map.
  */
-function RadiusSheet({
-  open,
+export function DistanceSlider({
   radiusMiles,
-  defaultMiles,
   maxMiles,
   accent,
   onRadius,
-  onClose,
 }: {
-  open: boolean;
   radiusMiles: number;
-  defaultMiles: number;
   maxMiles: number;
   accent: string;
   onRadius: (r: RadiusSetting) => void;
-  onClose: () => void;
 }) {
   return (
-    <BottomSheet
-      open={open}
-      onClose={onClose}
-      title="Distance"
-      dim={false}
-      footer={
-        <Button className="h-11 w-full text-base" onClick={onClose}>
-          Done
-        </Button>
-      }
-    >
-      <p className="text-sm">
-        Within <span className="font-semibold">{radiusMiles} miles</span>
-      </p>
+    <label className="pointer-events-auto flex h-11 min-w-0 flex-1 items-center gap-3 rounded-full border bg-background/95 px-4 shadow-md backdrop-blur-sm">
+      <span className="w-14 shrink-0 text-[13px] font-medium tabular-nums">{radiusMiles} mi</span>
       <input
         type="range"
         min={5}
@@ -500,22 +422,56 @@ function RadiusSheet({
         aria-label="Search distance in miles"
         aria-valuetext={`${radiusMiles} miles`}
         onChange={(e) => onRadius({ mode: "manual", miles: Number(e.target.value) })}
-        className="mt-4 w-full"
+        className="min-w-0 flex-1"
         style={{ accentColor: accent }}
       />
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>5 mi</span>
-        <span>{maxMiles} mi</span>
+    </label>
+  );
+}
+
+/** The vendor type grid, opened from the type pill in Explore's search bar. */
+export function TypeSheet({
+  open,
+  type,
+  onType,
+  onClose,
+}: {
+  open: boolean;
+  type: GuidedType;
+  onType: (t: GuidedType) => void;
+  onClose: () => void;
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Vendor type">
+      <div className="grid grid-cols-2 gap-2">
+        {VENDOR_TYPES.map((t) => {
+          const m = CATEGORIES[t];
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => {
+                onType(t);
+                onClose();
+              }}
+              aria-pressed={t === type}
+              className={cn(
+                "flex min-h-11 items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-sm font-medium transition-colors",
+                t === type ? "border-transparent" : "hover:border-foreground",
+              )}
+              style={t === type ? { backgroundColor: m.lightHex, color: m.textHex } : undefined}
+            >
+              <span
+                className="flex size-7 shrink-0 items-center justify-center rounded-full"
+                style={{ backgroundColor: m.lightHex, color: m.textHex }}
+              >
+                <m.icon className="size-3.5" aria-hidden />
+              </span>
+              {m.label}
+            </button>
+          );
+        })}
       </div>
-      {radiusMiles !== defaultMiles && (
-        <button
-          type="button"
-          className="mt-4 text-sm text-muted-foreground underline underline-offset-4"
-          onClick={() => onRadius({ mode: "manual", miles: defaultMiles })}
-        >
-          Reset to {defaultMiles} miles
-        </button>
-      )}
     </BottomSheet>
   );
 }

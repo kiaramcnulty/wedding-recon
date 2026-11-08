@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Search, Loader2, MapPin, Navigation, RotateCw } from "lucide-react";
+import { ChevronDown, Search, Loader2, MapPin, Navigation, RotateCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,11 @@ import { ClusterListSheet } from "@/components/map/cluster-list-sheet";
 import { VendorFeed, ViewToggle } from "@/components/map/vendor-feed";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import { VerifiedBadge } from "@/components/vendor/verified-badge";
-import { FilterChips, type MatchCount } from "@/components/explore/filter-chips";
+import { DistanceSlider, FilterChips, TypeSheet, type MatchCount } from "@/components/explore/filter-chips";
 import { useGuidedCandidates } from "@/components/search/use-guided-candidates";
 import {
   ALL_VENDOR_TYPES,
   CATEGORIES,
-  CATEGORY_PLURAL,
   VENDOR_TYPES,
   type VendorType,
 } from "@/lib/constants/categories";
@@ -192,14 +191,17 @@ function ringView(anchor: { lat: number; lng: number }, miles: number) {
   return { lng: anchor.lng, lat: anchor.lat, zoom: zoomToFitRing(anchor.lat, miles, w, h) };
 }
 
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function ExplorePage() {
   const [cityQuery, setCityQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
   const [vendorResults, setVendorResults] = useState<VendorSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
+  // Which search the bar is in: none (the "[Venue] near [Denver]" sentence),
+  // the place (towns and venues: it moves the search), or a specific vendor
+  // by name (any type: it opens that vendor's card).
+  const [searchMode, setSearchMode] = useState<"place" | "vendor" | null>(null);
+  const [typeSheetOpen, setTypeSheetOpen] = useState(false);
   const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom?: number } | null>(null);
   const [searching, setSearching] = useState(false);
   const [userPosition, setUserPosition] = useState<{ lng: number; lat: number } | null>(null);
@@ -470,11 +472,13 @@ export default function ExplorePage() {
     return () => clearTimeout(t);
   }, []);
 
-  // Debounced autocomplete. Areas (geocode) and vendors (our directory, every
-  // type) are fetched in parallel and shown as two groups.
+  // Debounced autocomplete. The place search asks for towns (geocode) and
+  // venues (our directory); the vendor search asks our directory only, every
+  // type.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const q = cityQuery.trim();
+    const mode = searchMode;
     debounceRef.current = setTimeout(async () => {
       if (suppressFetchRef.current) {
         suppressFetchRef.current = false;
@@ -486,14 +490,18 @@ export default function ExplorePage() {
         setShowSuggestions(false);
         return;
       }
-      const [areas, vendors] = await Promise.all([
-        fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
-          .then((r) => (r.ok ? (r.json() as Promise<GeocodeSuggestion[]>) : []))
-          .catch(() => [] as GeocodeSuggestion[]),
+      if (!mode) return;
+      const [areas, found] = await Promise.all([
+        mode === "place"
+          ? fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+              .then((r) => (r.ok ? (r.json() as Promise<GeocodeSuggestion[]>) : []))
+              .catch(() => [] as GeocodeSuggestion[])
+          : Promise.resolve([] as GeocodeSuggestion[]),
         fetch(`/api/vendor-search?q=${encodeURIComponent(q)}`)
           .then((r) => (r.ok ? (r.json() as Promise<VendorSuggestion[]>) : []))
           .catch(() => [] as VendorSuggestion[]),
       ]);
+      const vendors = mode === "place" ? found.filter((v) => v.vendorType === "venue") : found;
       setSuggestions(areas);
       setVendorResults(vendors);
       setShowSuggestions(areas.length > 0 || vendors.length > 0);
@@ -501,7 +509,7 @@ export default function ExplorePage() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [cityQuery]);
+  }, [cityQuery, searchMode]);
 
   function clearSearchBox() {
     suppressFetchRef.current = true;
@@ -509,6 +517,22 @@ export default function ExplorePage() {
     setSuggestions([]);
     setVendorResults([]);
     setShowSuggestions(false);
+    setSearchMode(null);
+  }
+
+  function openSearch(mode: "place" | "vendor") {
+    setCityQuery("");
+    setSuggestions([]);
+    setVendorResults([]);
+    setShowSuggestions(false);
+    setSearchMode(mode);
+  }
+
+  // A venue in the place search: the search moves to it ("Florists near
+  // Briarhurst Manor").
+  function selectVenueAsPlace(v: VendorSuggestion) {
+    clearSearchBox();
+    moveAnchor({ lat: v.lat, lng: v.lng, label: v.name });
   }
 
   // An area: it becomes the place the search is around.
@@ -529,12 +553,16 @@ export default function ExplorePage() {
     e.preventDefault();
     const q = cityQuery.trim();
     if (!q) return;
+    if (searchMode === "vendor") {
+      if (vendorResults.length > 0) selectVendor(vendorResults[0]);
+      return;
+    }
     if (suggestions.length > 0) {
       selectSuggestion(suggestions[0]);
       return;
     }
     if (vendorResults.length > 0) {
-      selectVendor(vendorResults[0]);
+      selectVenueAsPlace(vendorResults[0]);
       return;
     }
     setSearching(true);
@@ -585,13 +613,17 @@ export default function ExplorePage() {
     );
   }
 
-  // "Hair & makeup artists near Denver" does not fit a phone's search bar.
-  const plural = type ? (type === "beauty" ? CATEGORIES.beauty.label : capitalize(CATEGORY_PLURAL[type])) : "Vendors";
-  const placeholder = anchor
-    ? anchor.label
-      ? `${plural} near ${anchor.label}`
-      : `${plural} in this area`
-    : "Search city or vendor…";
+  const placeLabel = anchor?.label ?? "this area";
+  const radiusMiles = result?.radiusMiles ?? (radius.mode === "manual" ? radius.miles : EXPLORE_DEFAULT_MILES);
+  // Distance, at the bottom of the frame on both views.
+  const slider = type && (
+    <DistanceSlider
+      radiusMiles={radiusMiles}
+      maxMiles={maxRadius(type)}
+      accent={CATEGORIES[type].colorHex}
+      onRadius={changeRadius}
+    />
+  );
 
   const countText = result
     ? result.confirmedCount === 0 && result.partialCount === 0
@@ -659,38 +691,75 @@ export default function ExplorePage() {
               becomes the box's minimum width and pushes the profile icon off a
               390px screen. */}
           <div className="pointer-events-auto min-w-0 flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
-            <form onSubmit={handleSearch} className="flex items-center gap-2 px-3 py-2">
-              <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-              <Input
-                type="search"
-                // The search in effect reads as the resting text ("Venues near
-                // Vail"); typing searches towns and vendor names of every type.
-                placeholder={searchFocused ? "Search a town or vendor name…" : placeholder}
-                value={cityQuery}
-                onChange={(e) => setCityQuery(e.target.value)}
-                onFocus={() => {
-                  setSearchFocused(true);
-                  if (suggestions.length > 0 || vendorResults.length > 0) setShowSuggestions(true);
-                }}
-                onBlur={() => {
-                  setSearchFocused(false);
-                  setTimeout(() => setShowSuggestions(false), 150);
-                }}
-                className={cn(
-                  "h-7 border-0 bg-transparent px-0 text-sm shadow-none",
-                  "focus-visible:ring-0 focus-visible:border-0",
-                  !searchFocused && "placeholder:font-medium placeholder:text-foreground",
+            {searchMode === null ? (
+              // The search in effect, as a sentence of two pills: the type
+              // (opens the type grid) near the place (opens the place search).
+              <div className="flex min-w-0 items-center gap-1.5 px-1.5 py-1.5">
+                {type && (
+                  <button
+                    type="button"
+                    onClick={() => setTypeSheetOpen(true)}
+                    className="flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-medium"
+                    style={{ backgroundColor: CATEGORIES[type].lightHex, color: CATEGORIES[type].textHex }}
+                    aria-label={`Vendor type: ${CATEGORIES[type].label}. Change`}
+                  >
+                    {(() => {
+                      const Icon = CATEGORIES[type].icon;
+                      return <Icon className="size-3.5" aria-hidden />;
+                    })()}
+                    {CATEGORIES[type].label}
+                    <ChevronDown className="size-3.5" aria-hidden />
+                  </button>
                 )}
-                aria-label="Search a town or vendor name"
-                aria-autocomplete="list"
-                autoComplete="off"
-              />
-              {cityQuery.length > 0 && (
-                <Button type="submit" size="xs" variant="default" aria-label="Search" disabled={searching}>
-                  {searching ? <Loader2 size={12} className="animate-spin" /> : "Go"}
-                </Button>
-              )}
-            </form>
+                <span className="shrink-0 text-sm text-muted-foreground">near</span>
+                <button
+                  type="button"
+                  onClick={() => openSearch("place")}
+                  className="flex h-8 min-w-0 items-center gap-1 rounded-full border px-2.5 text-sm font-medium hover:border-foreground"
+                  aria-label={`Place: ${placeLabel}. Search a town or venue`}
+                >
+                  <MapPin className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="truncate">{placeLabel}</span>
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSearch} className="flex items-center gap-2 px-3 py-2">
+                <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+                <Input
+                  // text, not search: the browser's own clear button would sit
+                  // beside the cancel button.
+                  type="text"
+                  enterKeyHint="search"
+                  autoFocus
+                  placeholder={searchMode === "place" ? "Search a town or venue…" : "Search a vendor by name…"}
+                  value={cityQuery}
+                  onChange={(e) => setCityQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && clearSearchBox()}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onFocus={() => (suggestions.length > 0 || vendorResults.length > 0) && setShowSuggestions(true)}
+                  className={cn(
+                    "h-7 border-0 bg-transparent px-0 text-sm shadow-none",
+                    "focus-visible:ring-0 focus-visible:border-0",
+                  )}
+                  aria-label={searchMode === "place" ? "Search a town or venue" : "Search a vendor by name"}
+                  aria-autocomplete="list"
+                  autoComplete="off"
+                />
+                {cityQuery.length > 0 && (
+                  <Button type="submit" size="xs" variant="default" aria-label="Search" disabled={searching}>
+                    {searching ? <Loader2 size={12} className="animate-spin" /> : "Go"}
+                  </Button>
+                )}
+                <button
+                  type="button"
+                  onClick={clearSearchBox}
+                  aria-label="Cancel search"
+                  className="-mr-1 flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              </form>
+            )}
 
             {showSuggestions && (vendorResults.length > 0 || suggestions.length > 0) && (
               <div className="border-t border-border py-1">
@@ -698,7 +767,7 @@ export default function ExplorePage() {
                   <>
                     {suggestions.length > 0 && (
                       <div className="px-3 pt-1 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Vendors
+                        {searchMode === "place" ? "Venues" : "Vendors"}
                       </div>
                     )}
                     <ul role="listbox" aria-label="Vendors">
@@ -710,7 +779,7 @@ export default function ExplorePage() {
                             key={`v:${v.vendorId}`}
                             role="option"
                             aria-selected={false}
-                            onMouseDown={() => selectVendor(v)}
+                            onMouseDown={() => (searchMode === "place" ? selectVenueAsPlace(v) : selectVendor(v))}
                             className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"
                           >
                             <span
@@ -740,7 +809,7 @@ export default function ExplorePage() {
                   <>
                     {vendorResults.length > 0 && (
                       <div className="px-3 pt-1.5 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Areas
+                        Towns
                       </div>
                     )}
                     <ul role="listbox" aria-label="Areas">
@@ -764,6 +833,21 @@ export default function ExplorePage() {
           </div>
           <ProfileMenu className="pointer-events-auto shrink-0" />
         </div>
+        {/* The other way in: a vendor the couple already has in mind, any type. */}
+        {searchMode === null && (
+          <div className="pointer-events-none relative z-10 mx-auto w-full max-w-[520px] pl-14 pr-3">
+            <button
+              type="button"
+              onClick={() => openSearch("vendor")}
+              className="pointer-events-auto mt-1 rounded-full bg-background/80 px-2 py-0.5 text-xs text-muted-foreground underline underline-offset-4 backdrop-blur-sm hover:text-foreground"
+            >
+              Search for a specific vendor
+            </button>
+          </div>
+        )}
+        {type && (
+          <TypeSheet open={typeSheetOpen} type={type} onType={changeType} onClose={() => setTypeSheetOpen(false)} />
+        )}
 
         {/* The type's filters, distance, More, and the Map / List toggle. */}
         {type && (
@@ -772,13 +856,8 @@ export default function ExplorePage() {
               type={type}
               prefs={prefs}
               guestCount={guestCount}
-              radiusMiles={result?.radiusMiles ?? (radius.mode === "manual" ? radius.miles : EXPLORE_DEFAULT_MILES)}
-              defaultMiles={EXPLORE_DEFAULT_MILES}
-              maxMiles={maxRadius(type)}
-              onType={changeType}
               onPrefs={changePrefs}
               onGuests={writeGuestCount}
-              onRadius={changeRadius}
               countFor={countFor}
             />
             {/* The count and any notice: on the map, so each sits on its own
@@ -853,6 +932,7 @@ export default function ExplorePage() {
               emptyText="Nothing within this distance yet. Try a wider distance or fewer filters."
               footnote={incomplete ? "There may be more vendors than shown here." : undefined}
             />
+            {slider && <div className="flex shrink-0 border-t bg-background px-3 py-2">{slider}</div>}
           </div>
         )}
 
@@ -868,13 +948,14 @@ export default function ExplorePage() {
               />
             </div>
           ) : (
-            <div className="flex items-end justify-end px-3 pb-9 pt-3">
+            <div className="mx-auto flex w-full max-w-[520px] items-end gap-2 px-3 pb-9 pt-3">
+              {slider}
               <button
                 type="button"
                 onClick={handleLocate}
                 disabled={locating}
                 aria-label="Search around my location"
-                className="pointer-events-auto flex size-11 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
+                className="pointer-events-auto flex size-11 shrink-0 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm transition-colors hover:text-foreground"
               >
                 {locating ? <Loader2 size={20} className="animate-spin" aria-hidden /> : <Navigation size={20} aria-hidden />}
               </button>
