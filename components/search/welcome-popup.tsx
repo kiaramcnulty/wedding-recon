@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarHeart, Search } from "lucide-react";
+import { CalendarHeart, LogIn, Search } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { ChoiceCard } from "@/components/search/choice-card";
 import {
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CATEGORIES } from "@/lib/constants/categories";
+import { createClient } from "@/lib/supabase/client";
 import { GUIDED_TYPES } from "@/lib/search/guided";
 import { JOURNEY_HREF, journeyStarted, loadJourney } from "@/lib/search/journey-state";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,11 @@ import { cn } from "@/lib/utils";
  *   journey.
  * - **Welcome back** (screen 11): on bare `/explore` for someone who has
  *   finished a guided search, at most once a calendar day.
+ *
+ * Both carry a "Log in or sign up" link for a visitor with no session (Kiara,
+ * 2026-11-08), landing back on the page the popup opened over. It renders
+ * only once the session check says signed out, so a signed-in visitor never
+ * sees it flash.
  *
  * Decided 2026-10-31 and revised 2026-11-06
  * (docs/customer-journey-implementation-plan.md, open question 4), including
@@ -71,6 +77,9 @@ export function WelcomePopup() {
   // A couple who has booked a venue is not offered Venue on welcome back.
   const [hasVenue, setHasVenue] = React.useState(false);
   const decidedRef = React.useRef(false);
+  // null until checked: the sign-in link waits for a definite "signed out".
+  const [signedIn, setSignedIn] = React.useState<boolean | null>(null);
+  const [returnTo, setReturnTo] = React.useState("/explore");
 
   React.useEffect(() => {
     // Decided once per page load; client-side navigation never re-opens it.
@@ -95,14 +104,38 @@ export function WelcomePopup() {
       write(WELCOME_BACK_KEY, today());
     }
     if (!next) return;
+    let cancelled = false;
+    // getClaims() verifies the JWT locally, so this costs no Auth round trip.
+    createClient()
+      .auth.getClaims()
+      .then(({ data }) => !cancelled && setSignedIn(Boolean(data?.claims)))
+      .catch(() => !cancelled && setSignedIn(false));
     const t = setTimeout(() => {
       setHasVenue(journey?.hasVenue === true);
+      setReturnTo(window.location.pathname + window.location.search);
       setMode(next);
     }, 0);
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [pathname]);
 
   const close = () => setMode(null);
+
+  // For a visitor with no session: sign in, then land back here.
+  const signInLink = signedIn === false && (
+    <div className="border-t px-6 py-4 text-center text-sm">
+      <Link
+        href={`/login?from=${encodeURIComponent(returnTo)}`}
+        onClick={close}
+        className="inline-flex items-center gap-1 font-medium text-brand-ink underline-offset-4 hover:underline"
+      >
+        <LogIn className="size-3.5" aria-hidden />
+        Log in or sign up
+      </Link>
+    </div>
+  );
 
   const header = (title: string, description: string, kicker?: string) => (
     <div className="bg-gradient-to-b from-brand-soft via-brand-soft/40 to-popover px-6 pb-1 pt-8 text-center">
@@ -155,6 +188,7 @@ export function WelcomePopup() {
                 I&apos;m just browsing
               </button>
             </div>
+            {signInLink}
           </>
         )}
         {mode === "welcomeBack" && (
@@ -186,6 +220,7 @@ export function WelcomePopup() {
                 })}
               </div>
             </div>
+            {signInLink}
           </>
         )}
       </DialogContent>

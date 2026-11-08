@@ -614,6 +614,39 @@ export default function ExplorePage() {
   }
 
   const placeLabel = anchor?.label ?? "this area";
+  // One input for both searches; the place one sits inside the place pill.
+  const searchField = (
+    <Input
+      // text, not search: the browser's own clear button would sit beside the
+      // cancel button.
+      type="text"
+      enterKeyHint="search"
+      autoFocus
+      placeholder={searchMode === "place" ? "Town or venue…" : "Search a vendor by name…"}
+      value={cityQuery}
+      onChange={(e) => setCityQuery(e.target.value)}
+      onKeyDown={(e) => e.key === "Escape" && clearSearchBox()}
+      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+      onFocus={() => (suggestions.length > 0 || vendorResults.length > 0) && setShowSuggestions(true)}
+      className={cn(
+        "h-7 min-w-0 border-0 bg-transparent px-0 text-sm shadow-none",
+        "focus-visible:ring-0 focus-visible:border-0",
+      )}
+      aria-label={searchMode === "place" ? "Search a town or venue" : "Search a vendor by name"}
+      aria-autocomplete="list"
+      autoComplete="off"
+    />
+  );
+  const cancelButton = (
+    <button
+      type="button"
+      onClick={clearSearchBox}
+      aria-label="Cancel search"
+      className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+    >
+      <X className="size-4" aria-hidden />
+    </button>
+  );
   const radiusMiles = result?.radiusMiles ?? (radius.mode === "manual" ? radius.miles : EXPLORE_DEFAULT_MILES);
   // Distance, at the bottom of the frame on both views.
   const slider = type && (
@@ -680,84 +713,78 @@ export default function ExplorePage() {
 
         {/* Brand mark, search bar, account control. */}
         <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[520px] items-start gap-2 px-3 pt-3">
-          <Link
-            href={LANDING_HREF}
-            aria-label="About Wedding Recon"
-            className="pointer-events-auto flex size-9 shrink-0 items-center justify-center rounded-full border bg-background/95 shadow-md backdrop-blur-sm transition-opacity hover:opacity-80"
-          >
-            <BrandMark className="size-5" />
-          </Link>
+          {/* An open search takes the whole row: beside a long type ("Hair &
+              makeup") the place input would otherwise have no room. */}
+          {searchMode === null && (
+            <Link
+              href={LANDING_HREF}
+              aria-label="About Wedding Recon"
+              className="pointer-events-auto flex size-9 shrink-0 items-center justify-center rounded-full border bg-background/95 shadow-md backdrop-blur-sm transition-opacity hover:opacity-80"
+            >
+              <BrandMark className="size-5" />
+            </Link>
+          )}
           {/* min-w-0 is load-bearing: without it the longest suggestion row
               becomes the box's minimum width and pushes the profile icon off a
               390px screen. */}
           <div className="pointer-events-auto min-w-0 flex-1 rounded-xl bg-background/95 shadow-md backdrop-blur-sm">
-            {searchMode === null ? (
-              // The search in effect, as a sentence of two pills: the type
-              // (opens the type grid) near the place (opens the place search).
-              <div className="flex min-w-0 items-center gap-1.5 px-1.5 py-1.5">
-                {type && (
-                  <button
-                    type="button"
-                    onClick={() => setTypeSheetOpen(true)}
-                    className="flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-medium"
-                    style={{ backgroundColor: CATEGORIES[type].lightHex, color: CATEGORIES[type].textHex }}
-                    aria-label={`Vendor type: ${CATEGORIES[type].label}. Change`}
-                  >
-                    {(() => {
-                      const Icon = CATEGORIES[type].icon;
-                      return <Icon className="size-3.5" aria-hidden />;
-                    })()}
-                    {CATEGORIES[type].label}
-                    <ChevronDown className="size-3.5" aria-hidden />
-                  </button>
-                )}
-                <span className="shrink-0 text-sm text-muted-foreground">near</span>
-                <button
-                  type="button"
-                  onClick={() => openSearch("place")}
-                  className="flex h-8 min-w-0 items-center gap-1 rounded-full border px-2.5 text-sm font-medium hover:border-foreground"
-                  aria-label={`Place: ${placeLabel}. Search a town or venue`}
-                >
-                  <MapPin className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="truncate">{placeLabel}</span>
-                </button>
-              </div>
-            ) : (
+            {searchMode === "vendor" ? (
               <form onSubmit={handleSearch} className="flex items-center gap-2 px-3 py-2">
                 <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-                <Input
-                  // text, not search: the browser's own clear button would sit
-                  // beside the cancel button.
-                  type="text"
-                  enterKeyHint="search"
-                  autoFocus
-                  placeholder={searchMode === "place" ? "Search a town or venue…" : "Search a vendor by name…"}
-                  value={cityQuery}
-                  onChange={(e) => setCityQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Escape" && clearSearchBox()}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                  onFocus={() => (suggestions.length > 0 || vendorResults.length > 0) && setShowSuggestions(true)}
-                  className={cn(
-                    "h-7 border-0 bg-transparent px-0 text-sm shadow-none",
-                    "focus-visible:ring-0 focus-visible:border-0",
-                  )}
-                  aria-label={searchMode === "place" ? "Search a town or venue" : "Search a vendor by name"}
-                  aria-autocomplete="list"
-                  autoComplete="off"
-                />
+                {searchField}
                 {cityQuery.length > 0 && (
                   <Button type="submit" size="xs" variant="default" aria-label="Search" disabled={searching}>
                     {searching ? <Loader2 size={12} className="animate-spin" /> : "Go"}
                   </Button>
                 )}
-                <button
-                  type="button"
-                  onClick={clearSearchBox}
-                  aria-label="Cancel search"
-                  className="-mr-1 flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
-                >
-                  <X className="size-4" aria-hidden />
-                </button>
+                {cancelButton}
+              </form>
+            ) : (
+              // The search in effect, as a sentence of two pills: the type
+              // (opens the type grid) near the place (opens the place search).
+              // Searching a place turns only the place pill into the input, so
+              // the type stays put and the bar still reads "Venue near ...".
+              <form onSubmit={handleSearch} className="flex min-w-0 items-center gap-1.5 px-1.5 py-1.5">
+                {type && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (searchMode) clearSearchBox();
+                      setTypeSheetOpen(true);
+                    }}
+                    // Shrinks before the place pill does, so a long type
+                    // ("Hair & makeup") never cuts the town down to "B...".
+                    className="flex h-8 min-w-0 items-center gap-1 rounded-full px-2.5 text-sm font-medium"
+                    style={{ backgroundColor: CATEGORIES[type].lightHex, color: CATEGORIES[type].textHex }}
+                    aria-label={`Vendor type: ${CATEGORIES[type].label}. Change`}
+                  >
+                    {(() => {
+                      const Icon = CATEGORIES[type].icon;
+                      return <Icon className="size-3.5 shrink-0" aria-hidden />;
+                    })()}
+                    <span className="truncate">{CATEGORIES[type].label}</span>
+                    <ChevronDown className="size-3.5 shrink-0" aria-hidden />
+                  </button>
+                )}
+                <span className="shrink-0 text-sm text-muted-foreground">near</span>
+                {searchMode === "place" ? (
+                  <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-full border border-foreground pl-2.5 pr-0.5">
+                    <MapPin className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    {searchField}
+                    {searching && <Loader2 size={12} className="shrink-0 animate-spin text-muted-foreground" />}
+                    {cancelButton}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openSearch("place")}
+                    className="flex h-8 min-w-0 max-w-[55%] shrink-0 items-center gap-1 rounded-full border px-2.5 text-sm font-medium hover:border-foreground"
+                    aria-label={`Place: ${placeLabel}. Search a town or venue`}
+                  >
+                    <MapPin className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="truncate">{placeLabel}</span>
+                  </button>
+                )}
               </form>
             )}
 
@@ -831,7 +858,7 @@ export default function ExplorePage() {
               </div>
             )}
           </div>
-          <ProfileMenu className="pointer-events-auto shrink-0" />
+          {searchMode === null && <ProfileMenu className="pointer-events-auto shrink-0" />}
         </div>
         {/* The other way in: a vendor the couple already has in mind, any type. */}
         {searchMode === null && (
