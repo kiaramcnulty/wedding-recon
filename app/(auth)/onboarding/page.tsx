@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { setUsername } from "@/app/(auth)/actions";
+import { markWelcomeNewAccount } from "@/lib/search/welcome-resume";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,12 @@ export default function OnboardingPage() {
   const [agreed, setAgreed] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Only a new account reaches onboarding: if it signed up from the welcome
+  // popup, the popup reopens on its welcome screen afterwards.
+  useEffect(() => {
+    markWelcomeNewAccount();
+  }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

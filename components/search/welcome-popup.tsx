@@ -16,6 +16,7 @@ import { CATEGORIES } from "@/lib/constants/categories";
 import { createClient } from "@/lib/supabase/client";
 import { GUIDED_TYPES } from "@/lib/search/guided";
 import { JOURNEY_HREF, journeyStarted, loadJourney } from "@/lib/search/journey-state";
+import { hasWelcomeResume, markWelcomeResume, takeWelcomeResume } from "@/lib/search/welcome-resume";
 import { cn } from "@/lib/utils";
 
 /**
@@ -33,7 +34,9 @@ import { cn } from "@/lib/utils";
  * Both carry a "Log in or sign up" link for a visitor with no session (Kiara,
  * 2026-11-08), landing back on the page the popup opened over. It renders
  * only once the session check says signed out, so a signed-in visitor never
- * sees it flash.
+ * sees it flash. Sign-in from it reopens the popup where it lands: the welcome
+ * screen for a new account, welcome back for a returning one
+ * (lib/search/welcome-resume.ts).
  *
  * Decided 2026-10-31 and revised 2026-11-06
  * (docs/customer-journey-implementation-plan.md, open question 4), including
@@ -87,34 +90,59 @@ export function WelcomePopup() {
     if (pathname.startsWith(JOURNEY_HREF)) return;
     decidedRef.current = true;
     const journey = loadJourney();
-    let next: Mode = null;
-    const due = (key: string) => SKIP_DAILY_LIMIT_FOR_TESTING || read(key) !== today();
-    if (!journeyStarted(journey)) {
-      if (due(WELCOME_KEY)) {
-        next = "welcome";
-        write(WELCOME_KEY, today());
-      }
-    } else if (
-      pathname === "/explore" &&
-      !window.location.search &&
-      journey?.status === "completed" &&
-      due(WELCOME_BACK_KEY)
-    ) {
-      next = "welcomeBack";
-      write(WELCOME_BACK_KEY, today());
-    }
-    if (!next) return;
     let cancelled = false;
-    // getClaims() verifies the JWT locally, so this costs no Auth round trip.
-    createClient()
-      .auth.getClaims()
-      .then(({ data }) => !cancelled && setSignedIn(Boolean(data?.claims)))
-      .catch(() => !cancelled && setSignedIn(false));
-    const t = setTimeout(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+
+    // isSignedIn is left out when the session check is still running.
+    const open = (next: Mode, isSignedIn?: boolean) => {
+      if (cancelled || !next) return;
+      if (isSignedIn !== undefined) setSignedIn(isSignedIn);
       setHasVenue(journey?.hasVenue === true);
       setReturnTo(window.location.pathname + window.location.search);
       setMode(next);
-    }, 0);
+    };
+
+    // The arrival rules: who sees which screen, at most once a day.
+    const decide = (): Mode => {
+      const due = (key: string) => SKIP_DAILY_LIMIT_FOR_TESTING || read(key) !== today();
+      if (!journeyStarted(journey)) {
+        if (!due(WELCOME_KEY)) return null;
+        write(WELCOME_KEY, today());
+        return "welcome";
+      }
+      if (
+        pathname === "/explore" &&
+        !window.location.search &&
+        journey?.status === "completed" &&
+        due(WELCOME_BACK_KEY)
+      ) {
+        write(WELCOME_BACK_KEY, today());
+        return "welcomeBack";
+      }
+      return null;
+    };
+
+    // getClaims() verifies the JWT locally, so this costs no Auth round trip.
+    const session = createClient()
+      .auth.getClaims()
+      .then(({ data }) => Boolean(data?.claims))
+      .catch(() => false);
+
+    if (hasWelcomeResume()) {
+      // Back from the popup's sign-in link: a new account picks up the welcome
+      // screen, a returning one gets welcome back, whatever the daily limits.
+      // Still signed out (they backed out of sign-in): the usual rules.
+      session.then((isSignedIn) => {
+        if (cancelled) return;
+        if (isSignedIn) open(takeWelcomeResume(), true);
+        else open(decide(), false);
+      });
+    } else {
+      const next = decide();
+      if (!next) return;
+      session.then((isSignedIn) => !cancelled && setSignedIn(isSignedIn));
+      t = setTimeout(() => open(next), 0);
+    }
     return () => {
       cancelled = true;
       clearTimeout(t);
@@ -128,7 +156,10 @@ export function WelcomePopup() {
     <div className="border-t px-6 py-4 text-center text-sm">
       <Link
         href={`/login?from=${encodeURIComponent(returnTo)}`}
-        onClick={close}
+        onClick={() => {
+          markWelcomeResume();
+          close();
+        }}
         className="inline-flex items-center gap-1 font-medium text-brand-ink underline-offset-4 hover:underline"
       >
         <LogIn className="size-3.5" aria-hidden />
