@@ -36,10 +36,8 @@ import {
 } from "@/lib/map/map-view";
 import { zoomToFitRing } from "@/lib/map/ring";
 import {
-  MIN_CONFIRMED,
   guidedSelection,
   maxRadius,
-  radiusLadder,
   milesBetween,
   runGuidedSearch,
   type GuidedPrefs,
@@ -63,8 +61,9 @@ import { cn } from "@/lib/utils";
  *   search bar, the couple's location, or a spot picked with "Search this
  *   area". Panning or zooming never moves it (Milestone 5, step 6).
  * - The radius is a fixed 25 miles unless the couple picks another (Kiara,
- *   2026-11-07). It never widens on its own; with fewer than MIN_CONFIRMED
- *   full matches it offers "Widen to 50 mi". A new anchor resets it to 25.
+ *   2026-11-07). It never widens on its own, and there is no widen button
+ *   (Kiara, 2026-11-08): the distance slider is the one way to change it. A
+ *   new anchor resets it to 25.
  * - The filters are the journey's answers for the type (`byType[type]`), so a
  *   budget set here is the journey's budget too (Kiara, 2026-11-07). Guest
  *   count is shared the same way; with none, prices convert at 100 guests.
@@ -665,11 +664,6 @@ export default function ExplorePage() {
           result.partialCount ? ` · ${result.partialCount} partial` : ""
         }`
     : null;
-  // Few full matches: offer the next distance step rather than taking it.
-  const widenTo =
-    result && type && result.confirmedCount < MIN_CONFIRMED
-      ? radiusLadder(type).find((r) => r > result.radiusMiles)
-      : undefined;
   const travelNote =
     result && result.radiusMiles > 50 ? "Vendors past 50 miles may charge travel fees." : null;
   const incomplete = candidates.status === "ready" && !candidates.complete;
@@ -887,10 +881,10 @@ export default function ExplorePage() {
               onGuests={writeGuestCount}
               countFor={countFor}
             />
-            {/* The count and any notice: on the map, so each sits on its own
-                surface to stay legible over any basemap colour. */}
-            <div className="mt-2 flex items-start gap-2">
-            <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+            {/* Map / List, then the count and any notice under it, each on
+                its own surface to stay legible over any basemap colour. */}
+            <div className="mt-2 flex flex-col items-end gap-1">
+              <ViewToggle view={view} onChange={updateView} className="pointer-events-auto shrink-0" />
               {candidates.status === "error" ? (
                 <button
                   type="button"
@@ -912,22 +906,11 @@ export default function ExplorePage() {
                   <Loader2 className="size-3.5 animate-spin" aria-hidden /> Finding vendors…
                 </span>
               )}
-              {widenTo && (
-                <button
-                  type="button"
-                  onClick={() => changeRadius({ mode: "manual", miles: widenTo })}
-                  className="pointer-events-auto rounded-full border bg-background/95 px-2.5 py-1 text-[13px] font-medium shadow-sm backdrop-blur hover:border-foreground"
-                >
-                  Widen to {widenTo} mi
-                </button>
-              )}
               {travelNote && (
-                <span className="max-w-full rounded-lg bg-background/90 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
+                <span className="max-w-[16rem] rounded-lg bg-background/90 px-2.5 py-1 text-right text-xs text-muted-foreground shadow-sm">
                   {travelNote}
                 </span>
               )}
-            </div>
-            <ViewToggle view={view} onChange={updateView} className="pointer-events-auto shrink-0" />
             </div>
           </div>
         )}
