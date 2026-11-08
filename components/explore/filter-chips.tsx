@@ -477,16 +477,23 @@ export function TypeSheet({
 }
 
 /** Advanced: every other filter the type has, as one draft. */
-function MoreSheet({
+/**
+ * The type's Advanced filters: everything its default controls do not show
+ * (`advancedDefs`). Shared by Explore's More chip and the journey's
+ * preferences step, so the two can never list different filters. Keeps a
+ * draft until Apply; closing discards it. Without `count` (the journey has no
+ * results yet) the button just says Apply.
+ */
+export function MoreSheet({
   type,
   initial,
-  count,
+  count = () => null,
   onApply,
   onClose,
 }: {
   type: GuidedType;
   initial: GuidedPrefs;
-  count: (p: GuidedPrefs) => MatchCount;
+  count?: (p: GuidedPrefs) => MatchCount;
   onApply: (p: GuidedPrefs) => void;
   onClose: () => void;
 }) {
