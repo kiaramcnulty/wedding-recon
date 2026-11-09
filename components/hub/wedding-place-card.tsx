@@ -66,7 +66,7 @@ export function WeddingPlaceCard() {
             href={`/vendor/${vendorId}?from=${HUB_RETURN}`}
           />
         ) : vendorId && previews === null ? (
-          <div className="h-28 animate-pulse rounded-xl bg-background" />
+          <div className="h-[213px] animate-pulse rounded-xl bg-background" />
         ) : (
           // A town, or a venue that is not in our directory: no card to show,
           // just the place.

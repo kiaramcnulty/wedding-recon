@@ -259,12 +259,8 @@ export function VendorFeed({
                 <li
                   // Native content-visibility virtualization: off-screen cards
                   // skip layout/paint, so a few-hundred-item feed stays smooth.
-                  className={cn(
-                    "[content-visibility:auto]",
-                    item.slides.length > 0
-                      ? "[contain-intrinsic-size:auto_196px]"
-                      : "[contain-intrinsic-size:auto_112px]",
-                  )}
+                  // Every card is one height now (photo strip + three lines).
+                  className="[content-visibility:auto] [contain-intrinsic-size:auto_212px]"
                 >
                   <VendorPreviewCard
                     showCategoryPill={showCategoryPill}

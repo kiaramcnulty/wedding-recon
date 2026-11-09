@@ -284,7 +284,7 @@ export function GuidedResults({
           <span className="h-px flex-1 bg-border" aria-hidden />
         </li>
         {partialPreviews === null
-          ? partialIds.map((id) => <li key={id} className="h-28 animate-pulse rounded-xl bg-muted" />)
+          ? partialIds.map((id) => <li key={id} className="h-[213px] animate-pulse rounded-xl bg-muted" />)
           : partialPreviews.map((item) => <li key={item.id}>{card(item)}</li>)}
       </>
     );
@@ -316,7 +316,7 @@ export function GuidedResults({
             <ul className="mt-4 flex flex-col gap-3">
               {previews === null
                 ? suggestions.map((s) => (
-                    <li key={s.id} className="h-28 animate-pulse rounded-xl bg-muted" />
+                    <li key={s.id} className="h-[213px] animate-pulse rounded-xl bg-muted" />
                   ))
                 : previews.map((item) => <li key={item.id}>{card(item)}</li>)}
               {partialRows}

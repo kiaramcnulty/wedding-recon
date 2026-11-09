@@ -136,7 +136,7 @@ export function VendorPinPreview({
       </button>
 
       {item === null ? (
-        <div className="flex h-[112px] items-center justify-center rounded-xl border bg-card shadow-xl">
+        <div className="flex h-[213px] items-center justify-center rounded-xl border bg-card shadow-xl">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
       ) : (
