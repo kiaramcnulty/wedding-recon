@@ -46,7 +46,7 @@ export function BottomSheet({
           className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[85dvh] w-full max-w-[480px] flex-col rounded-t-3xl bg-popover text-popover-foreground shadow-2xl outline-none duration-200 data-open:animate-in data-open:slide-in-from-bottom-8 data-closed:animate-out data-closed:slide-out-to-bottom-8"
         >
           <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
-            <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
+            <DialogPrimitive.Title className="font-display text-[1.4rem] font-semibold leading-tight">{title}</DialogPrimitive.Title>
             <DialogPrimitive.Close
               aria-label="Close"
               className="-mr-2 flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"

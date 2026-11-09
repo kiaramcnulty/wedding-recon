@@ -348,7 +348,7 @@ export default async function VendorPage({
           {/* Name + category label, with the Vendor Verification badge under
               the name when this is a paying verified vendor. */}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <h1 className="font-heading text-lg font-semibold leading-tight truncate">
+            <h1 className="font-display text-[1.45rem] font-semibold leading-[1.1] line-clamp-2 break-words">
               {vendor.name}
             </h1>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">

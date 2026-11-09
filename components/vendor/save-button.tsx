@@ -16,6 +16,7 @@ import {
   useJustSaved,
 } from "@/lib/saved-vendors";
 import { Button } from "@/components/ui/button";
+import { HeartBurst } from "@/components/vendor/heart-burst";
 import { cn } from "@/lib/utils";
 
 interface SaveButtonProps {
@@ -107,14 +108,17 @@ export function SaveButton({ vendorId, vendorType, returnTo, variant = "default"
       >
         <span
           className={cn(
-            "flex size-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm ring-1 ring-black/5 transition-transform group-active:scale-90 group-focus-visible:ring-2 group-focus-visible:ring-brand",
-            saved && "text-brand",
+            // A saved heart is rose, the one warm accent on the card (bridal
+            // polish, 2026-11-08); it blooms when the save lands.
+            "relative flex size-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm ring-1 ring-black/5 transition-transform group-active:scale-90 group-focus-visible:ring-2 group-focus-visible:ring-brand",
+            saved && "text-rose",
           )}
         >
           <Heart
             className={cn("size-4", saved && "fill-current", popping && "animate-heart-pop")}
             strokeWidth={2}
           />
+          {popping && <HeartBurst />}
         </span>
       </button>
     );
@@ -127,9 +131,10 @@ export function SaveButton({ vendorId, vendorType, returnTo, variant = "default"
       onClick={handleSave}
       disabled={loading}
       aria-label={label}
-      className={cn(saved && "text-primary border-primary/40 bg-primary/5")}
+      className={cn("relative overflow-visible", saved && "border-rose/40 bg-rose/5 text-rose")}
     >
       <Heart className={cn("size-4", saved && "fill-current", popping && "animate-heart-pop")} />
+      {popping && <HeartBurst />}
     </Button>
   );
 }

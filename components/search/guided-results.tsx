@@ -294,7 +294,7 @@ export function GuidedResults({
       <div className="px-5 pt-5">
         {result.confirmedCount === 0 && !asks ? (
           <div className="rounded-xl border px-4 py-6 text-center">
-            <h1 className="text-lg font-semibold">No {CATEGORY_PLURAL[type]} nearby yet</h1>
+            <h1 className="font-display text-2xl font-semibold">No {CATEGORY_PLURAL[type]} nearby yet</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Nothing within {result.radiusMiles} miles of {location.label}.
             </p>
@@ -304,7 +304,7 @@ export function GuidedResults({
           </div>
         ) : result.confirmedCount === 0 ? (
           <div className="rounded-xl border px-4 py-6 text-center">
-            <h1 className="text-lg font-semibold">No exact matches yet</h1>
+            <h1 className="font-display text-2xl font-semibold">No exact matches yet</h1>
             <p className="mt-1 text-sm text-muted-foreground">Try a higher budget or fewer preferences.</p>
             <Button className="mt-4" onClick={onEdit}>
               Adjust filters
@@ -312,7 +312,7 @@ export function GuidedResults({
           </div>
         ) : (
           <>
-            <h1 className="text-xl font-semibold tracking-tight">Here are the top options we found</h1>
+            <h1 className="font-display text-[1.75rem] font-semibold leading-tight">Here are the top options we found</h1>
             <ul className="mt-4 flex flex-col gap-3">
               {previews === null
                 ? suggestions.map((s) => (
