@@ -453,8 +453,10 @@ export function VendorPreviewCard({
  * not fire click after a scroll gesture, so a tap opens the vendor page and a
  * swipe never does. Tiles peek the next photo as the swipe affordance.
  *
- * Only the first two photos load up front; the rest mount as the strip is
- * swiped toward them. A feed of 20 cards would otherwise ask for up to 200
+ * Every photo shows whole, at its own aspect ratio and the strip height: never
+ * cropped or stretched (Kiara, 2026-11-08), so a short strip can leave
+ * whitespace. Only the photos in view (plus the next) load up front; the rest
+ * mount as the strip is swiped toward them. A feed of 20 cards would otherwise ask for up to 200
  * images, and the Google ones are billed.
  */
 function PhotoStrip({
@@ -469,9 +471,23 @@ function PhotoStrip({
   onOpen: () => void;
 }) {
   const [failed, setFailed] = React.useState<ReadonlySet<string>>(() => new Set());
+  const [loaded, setLoaded] = React.useState<ReadonlySet<string>>(() => new Set());
   const [reach, setReach] = React.useState(2);
+  const stripRef = React.useRef<HTMLDivElement>(null);
   const shown = photos.filter((p) => !failed.has(p));
   const category = CATEGORIES[vendorType];
+
+  // Mount every photo whose tile has come into view, plus the next one. Tiles
+  // are as wide as their photo, so this is measured, not counted: run on
+  // scroll, and after each load (three portraits can fit where one landscape
+  // did).
+  const extendReach = () => {
+    const el = stripRef.current;
+    if (!el) return;
+    const edge = el.scrollLeft + el.clientWidth;
+    const inView = [...el.children].filter((c) => (c as HTMLElement).offsetLeft < edge).length;
+    if (inView + 1 > reach) setReach(inView + 1);
+  };
 
   if (shown.length === 0) {
     const Icon = category.icon;
@@ -488,25 +504,31 @@ function PhotoStrip({
       </button>
     );
   }
-  const single = shown.length === 1;
   return (
     <div
+      ref={stripRef}
       onClick={onOpen}
-      onScroll={(e) => {
-        const el = e.currentTarget;
-        // Tiles are a fixed width, so how far the strip has scrolled says how
-        // many have come into view; load one past that.
-        const tile = el.firstElementChild?.getBoundingClientRect().width || el.clientWidth;
-        const seen = Math.ceil((el.scrollLeft + el.clientWidth) / tile) + 1;
-        if (seen > reach) setReach(seen);
-      }}
-      className="flex h-32 cursor-pointer snap-x snap-mandatory gap-0.5 overflow-x-auto"
+      onScroll={extendReach}
+      // One photo sits centred; several run left to right. Either way the
+      // leftover width stays card-coloured rather than being filled by
+      // cropping (Kiara, 2026-11-08: show the whole photo).
+      className={cn(
+        "flex h-32 cursor-pointer snap-x snap-mandatory gap-0.5 overflow-x-auto",
+        shown.length === 1 && "justify-center",
+      )}
       style={{ scrollbarWidth: "none" }}
     >
       {shown.map((src, i) => (
         <div
           key={src}
-          className={cn("h-full shrink-0 snap-start bg-muted", single ? "w-full" : "w-[62%]")}
+          // As wide as the photo at the strip height, so nothing is cropped or
+          // stretched. Capped at the strip width: a panorama wider than that
+          // is shown whole, letterboxed, instead of cut. Until it loads, a
+          // grey tile holds its place.
+          className={cn(
+            "flex h-full max-w-full shrink-0 snap-start items-center",
+            !loaded.has(src) && "w-40 bg-muted",
+          )}
         >
           {i < reach && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -516,8 +538,12 @@ function PhotoStrip({
               loading="lazy"
               decoding="async"
               draggable={false}
+              onLoad={() => {
+                setLoaded((l) => new Set(l).add(src));
+                requestAnimationFrame(extendReach);
+              }}
               onError={() => setFailed((f) => new Set(f).add(src))}
-              className="size-full object-cover"
+              className={cn("h-full w-auto max-w-full object-contain", !loaded.has(src) && "opacity-0")}
             />
           )}
         </div>
