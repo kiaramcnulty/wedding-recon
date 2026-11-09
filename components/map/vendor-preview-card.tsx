@@ -24,16 +24,20 @@ import { cn } from "@/lib/utils";
  * Two props flex it per surface without forking it: `showCategoryPill` (off in
  * the Hub, where cards already sit inside a category accordion) and `action`
  * (a trailing control — the Hub's edit/add button; the map passes none).
+ * Shape since 2026-11-08: a photo strip on top, then name and town, tags and
+ * the recon count, with no recon-entry text.
  */
 
-/** Abbreviated text-only preview of one recon entry (photos intentionally omitted). */
-export interface ReconSlide {
-  priceText: string | null;
-  priceDetails: string | null;
-  notes: string | null;
-  /** Authored by the current viewer — sorted first and tagged. */
-  isMine: boolean;
-}
+/**
+ * Google photos per vendor the card may show: mirrors `MAX_PHOTOS` in
+ * lib/google-photos.ts (a server module the client cannot import). Each is a
+ * billed Place Photos fetch the first time, then edge-cached, and they are the
+ * same `i`/`w` keys the vendor page strip requests, so a card and the page
+ * share one fetch per photo.
+ */
+const GOOGLE_PHOTO_CAP = 2;
+/** Photos in one card's strip, all sources together. */
+const CARD_PHOTO_CAP = 10;
 
 export interface VendorPreview {
   id: string;
@@ -42,14 +46,12 @@ export interface VendorPreview {
   locality: string | null;
   reconCount: number;
   /**
-   * Ordered image candidates: a verified vendor's own uploaded photo first,
-   * then the recon thumbnail (both free Supabase reads), then a Google photo
-   * (a billed fetch). Tried in order (each on error), falling through to a
-   * category placeholder.
+   * Every photo for the card's strip, in order: a verified vendor's own
+   * uploads first, then recon photos (both free Supabase reads, in recon sort
+   * order), then Google's (billed, see GOOGLE_PHOTO_CAP). A photo that fails
+   * to load drops out; with none left the card shows a category placeholder.
    */
-  photoCandidates: string[];
-  /** Text previews of the vendor's recon entries (newest first, text-less entries skipped). */
-  slides: ReconSlide[];
+  photos: string[];
   /** The vendor's raw filter attributes, for the tag pills. */
   filters: VendorFilters;
   /**
@@ -75,9 +77,9 @@ interface VendorLite {
 interface ReconRow {
   vendor_id: string;
   author_id: string;
+  // The price fields are read by sortReconEntries (priced entries first).
   price_text: string | null;
   price_details: string | null;
-  notes: string | null;
   // Read by sortReconEntries — the collected date is the recency it orders on,
   // with created_at as the tiebreak and the fallback for pre-migration rows.
   recon_collected_month: number | null;
@@ -148,7 +150,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         supabase
           .from("recon_entries")
           .select(
-            "vendor_id, author_id, price_text, price_details, notes, recon_collected_month, recon_collected_year, created_at, media:recon_media(thumb_path, storage_path)",
+            "vendor_id, author_id, price_text, price_details, recon_collected_month, recon_collected_year, created_at, media:recon_media(thumb_path, storage_path)",
           )
           .eq("status", "active")
           .in("vendor_id", idList)
@@ -195,23 +197,20 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
       // vendor_listings has no anon select (drafts must never leak); it takes
       // one id, hence one call per verified vendor. An error simply leaves the
       // card on its recon / Google candidates.
-      const vendorThumb = new Map<string, string>();
+      const vendorPhotos = new Map<string, string[]>();
       await Promise.all(
         [...verifiedIds].map(async (vid) => {
           const { data } = await supabase.rpc("verified_listing_public", {
             p_vendor_id: vid,
           });
-          const first = (
+          const photos =
             (data as { photos: { thumb_path?: string; storage_path?: string }[] | null }[] | null)?.[0]
-              ?.photos ?? []
-          )[0];
-          const path = first?.thumb_path ?? first?.storage_path;
-          if (path) {
-            vendorThumb.set(
-              vid,
-              supabase.storage.from("vendor-media").getPublicUrl(path).data.publicUrl,
-            );
-          }
+              ?.photos ?? [];
+          const urls = photos.flatMap((ph) => {
+            const path = ph.thumb_path ?? ph.storage_path;
+            return path ? [supabase.storage.from("vendor-media").getPublicUrl(path).data.publicUrl] : [];
+          });
+          if (urls.length) vendorPhotos.set(vid, urls);
         }),
       );
       if (cancelled) return;
@@ -226,36 +225,17 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
       // only ordering that matters here.
       const ordered = sortReconEntries(recons, viewerId);
 
-      // Tally active recon counts, capture the leading entry's thumbnail per
-      // vendor, and collect text previews. Entries with no text get no slide.
+      // Tally active recon counts and collect every recon photo per vendor.
       const counts = new Map<string, number>();
-      const reconThumb = new Map<string, string>();
-      const slidesByVendor = new Map<string, ReconSlide[]>();
+      const reconPhotos = new Map<string, string[]>();
       for (const row of ordered) {
         counts.set(row.vendor_id, (counts.get(row.vendor_id) ?? 0) + 1);
-        if (!reconThumb.has(row.vendor_id)) {
-          const first = row.media?.[0];
-          if (first) {
-            const path = first.thumb_path ?? first.storage_path;
-            reconThumb.set(
-              row.vendor_id,
-              supabase.storage.from("recon-media").getPublicUrl(path).data
-                .publicUrl,
-            );
-          }
-        }
-        const priceText = row.price_text?.trim() || null;
-        const priceDetails = row.price_details?.trim() || null;
-        const notes = row.notes?.trim() || null;
-        if (priceText || priceDetails || notes) {
-          const list = slidesByVendor.get(row.vendor_id) ?? [];
-          list.push({
-            priceText,
-            priceDetails,
-            notes,
-            isMine: !!viewerId && row.author_id === viewerId,
-          });
-          slidesByVendor.set(row.vendor_id, list);
+        for (const m of row.media ?? []) {
+          const path = m.thumb_path ?? m.storage_path;
+          if (!path) continue;
+          const list = reconPhotos.get(row.vendor_id) ?? [];
+          list.push(supabase.storage.from("recon-media").getPublicUrl(path).data.publicUrl);
+          reconPhotos.set(row.vendor_id, list);
         }
       }
 
@@ -263,30 +243,26 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
       const built: VendorPreview[] = idList.flatMap((id) => {
         const v = vendorById.get(id);
         if (!v) return [];
-        const candidates: string[] = [];
-        const vt = vendorThumb.get(id);
-        if (vt) candidates.push(vt);
-        // Recon photo FIRST (2026-08): it is a free Supabase read, while the
-        // Google fallback below is a billed Place Photos fetch ($7/1k, ~1,000
-        // free/month). Leading with the couple's own photo also matches the
-        // vendor page's strip, which puts recon photos first.
-        const rt = reconThumb.get(id);
-        if (rt) candidates.push(rt);
-        const hasGoogle =
-          (v.google_photos?.length ?? 0) > 0 || !!v.google_place_id;
-        // w=600 matches the vendor-page strip, so a card and the strip share ONE
-        // billed fetch + CDN entry for i=0 instead of billing 300 and 600
-        // separately. The extra bytes to a small card slot are cheap; the Google
-        // fetch is the thing that costs money.
-        if (hasGoogle) candidates.push(`/api/vendor-photo/${id}?i=0&w=600`);
+        // The vendor's own photos, then recon photos (2026-08: free Supabase
+        // reads, and the vendor page strip also leads with recon), then Google.
+        const photos = [...(vendorPhotos.get(id) ?? []), ...(reconPhotos.get(id) ?? [])];
+        // Google: as many as the row has cached (up to the cap), or just the
+        // first when it has a place but no cached list yet, exactly the one
+        // photo cards asked for before. w=600 is the vendor page strip width,
+        // so the two share one billed fetch and CDN entry per photo.
+        const googleCount = v.google_photos?.length
+          ? Math.min(v.google_photos.length, GOOGLE_PHOTO_CAP)
+          : v.google_place_id
+            ? 1
+            : 0;
+        for (let i = 0; i < googleCount; i++) photos.push(`/api/vendor-photo/${id}?i=${i}&w=600`);
         return [
           {
             id,
             name: v.name,
             locality: formatVendorLocality(v),
             reconCount: counts.get(id) ?? 0,
-            photoCandidates: candidates,
-            slides: slidesByVendor.get(id) ?? [],
+            photos: photos.slice(0, CARD_PHOTO_CAP),
             // Override keys win; extracted keys survive where not set.
             filters: overridesById.has(id)
               ? { ...(v.filters ?? {}), ...overridesById.get(id) }
@@ -332,9 +308,10 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
 }
 
 /**
- * One vendor preview: photo + category pill + name + recon count, with a
- * swipeable strip of recon-entry previews beneath it when there are any.
- * Tapping anywhere calls `onOpen` (the vendor page).
+ * One vendor preview (Kiara, 2026-11-08): a swipeable strip of every photo
+ * across the top, then name and town, the tag pills, and the recon count. No
+ * recon-entry text: the photos take the room it used, at the same card height.
+ * Tapping anywhere opens the vendor page; a swipe never does.
  */
 export function VendorPreviewCard({
   item,
@@ -395,15 +372,15 @@ export function VendorPreviewCard({
     [vendorType, item.filters, selection],
   );
 
-  /** Same destination as the Link, for the carousel below it. */
+  /** Same destination as the Link, for the photo strip above it. */
   const go = () => {
     onNavigate?.();
     router.push(href);
   };
 
   return (
-    // The scrollable carousel can't live inside the main control, so the card is
-    // a div: link row on top, swipeable previews below.
+    // The scrollable strip can't live inside the main control, so the card is
+    // a div: swipeable photos on top, the link below.
     <div
       className={cn(
         // hover must stay OPAQUE: the single-pin peek card floats directly over
@@ -421,6 +398,21 @@ export function VendorPreviewCard({
         className,
       )}
     >
+      <div className="relative">
+        <PhotoStrip photos={item.photos} vendorType={vendorType} alt={item.name} onOpen={go} />
+        {/* Bottom-left: the pin card's close button sits on the top-left
+            corner, and the save heart on the top-right. */}
+        {showCategoryPill && (
+          <span
+            className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium shadow-sm"
+            style={{ backgroundColor: category.lightHex, color: category.textHex }}
+          >
+            <CategoryIcon className="size-3 shrink-0" />
+            {category.label}
+          </span>
+        )}
+        {cornerAction && <div className="absolute right-2 top-2">{cornerAction}</div>}
+      </div>
       <div className="flex items-stretch">
         <Link
           href={href}
@@ -429,126 +421,104 @@ export function VendorPreviewCard({
           // inside AccordionContent, which underlines every descendant anchor
           // with `[&_a]:underline` — a selector that out-specifies a plain
           // utility. Same gotcha as the Hub's "Add" action link.
-          className="flex min-w-0 flex-1 items-stretch gap-3 p-2 text-left no-underline!"
+          className="flex min-w-0 flex-1 flex-col gap-1 px-3 pb-2.5 pt-2 text-left no-underline!"
         >
-          <VendorPreviewPhoto
-            candidates={item.photoCandidates}
-            vendorType={vendorType}
-            alt={item.name}
-            className="size-24 shrink-0 rounded-lg"
-          />
-          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
-            {showCategoryPill && (
-              <span
-                className="inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[11px] font-medium"
-                style={{
-                  backgroundColor: category.lightHex,
-                  color: category.textHex,
-                }}
-              >
-                <CategoryIcon className="size-3 shrink-0" />
-                {category.label}
-              </span>
-            )}
-            {/* Name + verified badge. The badge is a sibling of the truncating
-                name (not inside it) so `truncate`'s nowrap/overflow never clips
-                the pill; `min-w-0` lets the name shrink past it. `compact` is the
-                short "Verified" pill — the full label lives on the vendor page. */}
-            {/* Only the name line clears the corner heart: it is the one row
-                long enough to run under it, and padding the whole column would
-                push tag pills off their single line. */}
-            <span className={cn("flex min-w-0 items-center gap-1.5", cornerAction && "pr-8")}>
-              <span className="min-w-0 truncate font-heading text-sm font-semibold">
-                {item.name}
-              </span>
-              {item.verified && <VerifiedBadge compact />}
-            </span>
-            {/* "City, ST" of the address behind the pin — shown for every
-                vendor type, including the service-region ones whose pin marks
-                a base rather than where the work happens. */}
+          {/* Name, verified badge and town on one line. The badge and town are
+              siblings of the truncating name so only the name gives way; the
+              town is "City, ST" of the address behind the pin, for every type. */}
+          <span className="flex min-w-0 items-baseline gap-1.5">
+            <span className="min-w-0 truncate font-heading text-sm font-semibold">{item.name}</span>
+            {item.verified && <VerifiedBadge compact className="self-center" />}
             {item.locality && (
-              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="size-3 shrink-0" />
-                <span className="truncate">{item.locality}</span>
+              <span className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">
+                <MapPin className="size-3 shrink-0 self-center" aria-hidden />
+                {item.locality}
               </span>
             )}
-            <span className="text-xs text-muted-foreground">
-              {reconLabel(item.reconCount)}
-            </span>
-            {/* One clipped line of filter tags, inside the tap box. Hidden
-                entirely when the vendor has no known facets. */}
-            {tags.length > 0 && <VendorTagPreview tags={tags} className="mt-0.5" />}
-          </div>
+          </span>
+          {/* One clipped line of filter tags; none when the vendor has no known
+              facets. */}
+          {tags.length > 0 && <VendorTagPreview tags={tags} />}
+          <span className="text-xs text-muted-foreground">{reconLabel(item.reconCount)}</span>
         </Link>
-        {action && (
-          // With a corner heart above it, the action drops to the bottom of
-          // its column so the two never overlap.
-          <div className={cn("flex shrink-0 pr-2 pl-1", cornerAction ? "items-end pb-2.5" : "items-center")}>
-            {action}
-          </div>
-        )}
-        {cornerAction && <div className="absolute right-2.5 top-2.5">{cornerAction}</div>}
+        {action && <div className="flex shrink-0 items-center pl-1 pr-2">{action}</div>}
       </div>
-      {item.slides.length > 0 && (
-        <ReconPreviewCarousel slides={item.slides} onOpen={go} onTint={item.verified} />
-      )}
     </div>
   );
 }
 
 /**
- * Horizontal, swipeable strip of abbreviated recon-entry previews — text only,
- * photos deliberately omitted at this altitude. Native scroll-snap does the
- * swiping (the host sheet's swipe-down handler yields via its axis lock); a tap
- * anywhere opens the vendor page — browsers don't fire click after a scroll
- * gesture, so swipes never navigate. Slides peek the next entry as the
- * swipe affordance.
+ * The card's photos as one horizontal, snapping strip. Native scroll does the
+ * swiping (a host sheet's swipe-down yields via its axis lock), and browsers do
+ * not fire click after a scroll gesture, so a tap opens the vendor page and a
+ * swipe never does. Tiles peek the next photo as the swipe affordance.
+ *
+ * Only the first two photos load up front; the rest mount as the strip is
+ * swiped toward them. A feed of 20 cards would otherwise ask for up to 200
+ * images, and the Google ones are billed.
  */
-function ReconPreviewCarousel({
-  slides,
+function PhotoStrip({
+  photos,
+  vendorType,
+  alt,
   onOpen,
-  onTint = false,
 }: {
-  slides: ReconSlide[];
+  photos: string[];
+  vendorType: VendorType;
+  alt: string;
   onOpen: () => void;
-  /** On a verified (tinted) card the muted slide fill disappears into the
-   * tint, so the slides go solid instead. */
-  onTint?: boolean;
 }) {
+  const [failed, setFailed] = React.useState<ReadonlySet<string>>(() => new Set());
+  const [reach, setReach] = React.useState(2);
+  const shown = photos.filter((p) => !failed.has(p));
+  const category = CATEGORIES[vendorType];
+
+  if (shown.length === 0) {
+    const Icon = category.icon;
+    return (
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={onOpen}
+        aria-hidden
+        className="flex h-32 w-full items-center justify-center"
+        style={{ backgroundColor: category.lightHex, color: category.textHex }}
+      >
+        <Icon className="size-8 opacity-60" />
+      </button>
+    );
+  }
+  const single = shown.length === 1;
   return (
     <div
       onClick={onOpen}
-      className="flex cursor-pointer snap-x snap-mandatory gap-2 overflow-x-auto scroll-pl-2 px-2 pb-2"
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        // Tiles are a fixed width, so how far the strip has scrolled says how
+        // many have come into view; load one past that.
+        const tile = el.firstElementChild?.getBoundingClientRect().width || el.clientWidth;
+        const seen = Math.ceil((el.scrollLeft + el.clientWidth) / tile) + 1;
+        if (seen > reach) setReach(seen);
+      }}
+      className="flex h-32 cursor-pointer snap-x snap-mandatory gap-0.5 overflow-x-auto"
       style={{ scrollbarWidth: "none" }}
     >
-      {slides.map((slide, i) => (
+      {shown.map((src, i) => (
         <div
-          key={i}
-          className={cn(
-            "flex shrink-0 snap-start flex-col gap-0.5 rounded-lg px-3 py-2",
-            onTint ? "bg-background" : "bg-muted/50",
-            slides.length === 1 ? "w-full" : "w-[85%]",
-          )}
+          key={src}
+          className={cn("h-full shrink-0 snap-start bg-muted", single ? "w-full" : "w-[62%]")}
         >
-          {slide.isMine && (
-            // Same palette as the "My recon" badge on the vendor page card.
-            <span
-              className="mb-0.5 self-start rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-              style={{ backgroundColor: "#E1F5EE", color: "#085041" }}
-            >
-              My recon
-            </span>
-          )}
-          {slide.priceText && (
-            <p className="truncate text-sm font-semibold">{slide.priceText}</p>
-          )}
-          {slide.priceDetails && (
-            <p className="truncate text-xs text-muted-foreground">
-              {slide.priceDetails}
-            </p>
-          )}
-          {slide.notes && (
-            <p className="line-clamp-2 text-xs leading-relaxed">{slide.notes}</p>
+          {i < reach && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={src}
+              alt={i === 0 ? alt : ""}
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              onError={() => setFailed((f) => new Set(f).add(src))}
+              className="size-full object-cover"
+            />
           )}
         </div>
       ))}
@@ -560,48 +530,4 @@ export function reconLabel(n: number): string {
   if (n === 0) return "No recon yet";
   if (n === 1) return "1 recon entry";
   return `${n} recon entries`;
-}
-
-/**
- * Card photo with an ordered fallback chain (Google → recon → placeholder).
- * `loading="lazy"` keeps off-screen images off the network until scrolled near.
- */
-function VendorPreviewPhoto({
-  candidates,
-  vendorType,
-  alt,
-  className,
-}: {
-  candidates: string[];
-  vendorType: VendorType;
-  alt: string;
-  className?: string;
-}) {
-  const [idx, setIdx] = React.useState(0);
-  const category = CATEGORIES[vendorType];
-  const src = candidates[idx];
-
-  if (!src) {
-    const Icon = category.icon;
-    return (
-      <div
-        className={cn("flex items-center justify-center", className)}
-        style={{ backgroundColor: category.lightHex, color: category.textHex }}
-        aria-hidden
-      >
-        <Icon className="size-7 opacity-70" />
-      </div>
-    );
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      loading="lazy"
-      decoding="async"
-      onError={() => setIdx((i) => i + 1)}
-      className={cn("bg-muted object-cover", className)}
-    />
-  );
 }
