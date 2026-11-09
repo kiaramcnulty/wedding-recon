@@ -357,15 +357,22 @@ export default function ExplorePage() {
     return () => clearTimeout(t);
   }, [result, anchorPoint]);
 
-  const results = useMemo(
-    () => (result ? new Map(result.ranked.map((r) => [r.id, r.rank])) : new Map<string, 0 | 1>()),
-    [result],
-  );
+  const results = useMemo(() => {
+    const m = result ? new Map(result.ranked.map((r) => [r.id, r.rank])) : new Map<string, 0 | 1>();
+    // An open card for a vendor outside the results (picked in the name
+    // search: another type, or past the ring) still gets its pin, so the card
+    // points somewhere on the map. The count and the list are unchanged.
+    if (pin && !m.has(pin.id)) m.set(pin.id, 1);
+    return m;
+  }, [result, pin]);
   const ring = useMemo(
     () => (anchorPoint && result ? { ...anchorPoint, miles: result.radiusMiles } : null),
     [anchorPoint, result],
   );
-  const selectedTypes = useMemo(() => (type ? [type] : []), [type]);
+  const selectedTypes = useMemo(
+    () => (type ? (pin && pin.vendorType !== type ? [type, pin.vendorType] : [type]) : []),
+    [type, pin],
+  );
   const feedEntries = useMemo(
     () => (result && type ? result.ranked.map((r) => ({ id: r.id, vendorType: type, rank: r.rank })) : []),
     [result, type],
@@ -478,6 +485,9 @@ export default function ExplorePage() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const q = cityQuery.trim();
     const mode = searchMode;
+    // Set by the cleanup: a reply for an older query, or one that lands after
+    // the search was cancelled, must not reopen the dropdown.
+    let stale = false;
     debounceRef.current = setTimeout(async () => {
       if (suppressFetchRef.current) {
         suppressFetchRef.current = false;
@@ -500,12 +510,14 @@ export default function ExplorePage() {
           .then((r) => (r.ok ? (r.json() as Promise<VendorSuggestion[]>) : []))
           .catch(() => [] as VendorSuggestion[]),
       ]);
+      if (stale) return;
       const vendors = mode === "place" ? found.filter((v) => v.vendorType === "venue") : found;
       setSuggestions(areas);
       setVendorResults(vendors);
       setShowSuggestions(areas.length > 0 || vendors.length > 0);
     }, 300);
     return () => {
+      stale = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [cityQuery, searchMode]);
@@ -544,6 +556,9 @@ export default function ExplorePage() {
   // tap opens. The search itself does not move.
   function selectVendor(v: VendorSuggestion) {
     clearSearchBox();
+    // The card lives on the map: from the list, picking a vendor would
+    // otherwise open it out of sight.
+    updateView("map");
     setFlyTo({ lng: v.lng, lat: v.lat, zoom: 15 });
     openPin({ id: v.vendorId, vendorType: toVendorType(v.vendorType) });
   }
@@ -553,7 +568,22 @@ export default function ExplorePage() {
     const q = cityQuery.trim();
     if (!q) return;
     if (searchMode === "vendor") {
-      if (vendorResults.length > 0) selectVendor(vendorResults[0]);
+      if (vendorResults.length > 0) {
+        selectVendor(vendorResults[0]);
+        return;
+      }
+      // Enter before the suggestions arrived: ask now and take the top one.
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/vendor-search?q=${encodeURIComponent(q)}`);
+        const found: VendorSuggestion[] = res.ok ? await res.json() : [];
+        if (found.length > 0) selectVendor(found[0]);
+        else toast.error(`No vendor called “${q}”.`);
+      } catch {
+        // silently ignore
+      } finally {
+        setSearching(false);
+      }
       return;
     }
     if (suggestions.length > 0) {
@@ -612,7 +642,9 @@ export default function ExplorePage() {
     );
   }
 
-  const placeLabel = anchor?.label ?? "this area";
+  // The journey labels towns "Golden, CO"; every place here is in Colorado,
+  // and the pill is short, so it reads "near Golden" like a town picked here.
+  const placeLabel = anchor?.label?.replace(/, CO$/, "") ?? "this area";
   // One input for both searches; the place one sits inside the place pill.
   const searchField = (
     <Input
@@ -738,7 +770,7 @@ export default function ExplorePage() {
               // (opens the type grid) near the place (opens the place search).
               // Searching a place turns only the place pill into the input, so
               // the type stays put and the bar still reads "Venue near ...".
-              <form onSubmit={handleSearch} className="flex min-w-0 items-center gap-1.5 px-1.5 py-1.5">
+              <form onSubmit={handleSearch} className="flex min-w-0 items-center gap-1 px-1.5 py-1.5">
                 {type && (
                   <button
                     type="button"
@@ -748,19 +780,17 @@ export default function ExplorePage() {
                     }}
                     // Shrinks before the place pill does, so a long type
                     // ("Hair & makeup") never cuts the town down to "B...".
-                    className="flex h-8 min-w-0 items-center gap-1 rounded-full px-2.5 text-sm font-medium"
+                    // No category icon: the colour already says which type, and
+                    // the icon's room is what lets "Photographer" fit at 375px.
+                    className="flex h-8 min-w-0 items-center gap-0.5 overflow-hidden rounded-full pl-2.5 pr-2 text-sm font-medium"
                     style={{ backgroundColor: CATEGORIES[type].lightHex, color: CATEGORIES[type].textHex }}
                     aria-label={`Vendor type: ${CATEGORIES[type].label}. Change`}
                   >
-                    {(() => {
-                      const Icon = CATEGORIES[type].icon;
-                      return <Icon className="size-3.5 shrink-0" aria-hidden />;
-                    })()}
                     <span className="truncate">{CATEGORIES[type].label}</span>
                     <ChevronDown className="size-3.5 shrink-0" aria-hidden />
                   </button>
                 )}
-                <span className="shrink-0 text-sm text-muted-foreground">near</span>
+                <span className="shrink-0 px-0.5 text-sm text-muted-foreground max-[359px]:hidden">near</span>
                 {searchMode === "place" ? (
                   <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-full border border-foreground pl-2.5 pr-0.5">
                     <MapPin className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -772,7 +802,7 @@ export default function ExplorePage() {
                   <button
                     type="button"
                     onClick={() => openSearch("place")}
-                    className="flex h-8 min-w-0 max-w-[55%] shrink-0 items-center gap-1 rounded-full border px-2.5 text-sm font-medium hover:border-foreground"
+                    className="flex h-8 min-w-0 max-w-[50%] shrink-0 items-center gap-1 rounded-full border px-2 text-sm font-medium hover:border-foreground"
                     aria-label={`Place: ${placeLabel}. Search a town or venue`}
                   >
                     <MapPin className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -782,7 +812,7 @@ export default function ExplorePage() {
               </form>
             )}
 
-            {showSuggestions && (vendorResults.length > 0 || suggestions.length > 0) && (
+            {searchMode !== null && showSuggestions && (vendorResults.length > 0 || suggestions.length > 0) && (
               <div className="border-t border-border py-1">
                 {vendorResults.length > 0 && (
                   <>

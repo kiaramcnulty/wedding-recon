@@ -118,6 +118,14 @@ export function GuidedJourney() {
         setState(next);
         return;
       }
+      // The same link with no location on this device yet (welcome back after
+      // signing in on a new device): keep the pick and ask where first.
+      if (isGuidedType(typeParam)) {
+        const next = { ...(stored ?? emptyJourney()), selectedVendorType: typeParam, step: "city" as JourneyStep };
+        saveJourney(next);
+        setState(next);
+        return;
+      }
       if (restore && stored?.step === "results") {
         // Back from a vendor page: straight to where the couple was.
         setView(restore === "list" || restore === "map" ? restore : "suggestions");

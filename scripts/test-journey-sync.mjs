@@ -47,6 +47,10 @@ eq("an anonymous journey (no owner yet) is adopted",
 console.log("Explore filters before signing in");
 eq("a never-started copy (Explore filters only) never replaces a real journey",
   syncDecision({ updatedAt: 999, started: false }, { updatedAt: 1, started: true }, null, ME), { dropLocal: false, action: "pull" });
+eq("a newer never-started account copy never wipes a real journey here",
+  syncDecision({ updatedAt: 1, started: true }, { updatedAt: 999, started: false }, ME, ME), { dropLocal: false, action: "push" });
+eq("...unless that browser copy belongs to another account",
+  syncDecision({ updatedAt: 1, started: true }, { updatedAt: 999, started: false }, "someone-else", ME), { dropLocal: true, action: "pull" });
 eq("a never-started copy still goes up when the account has nothing",
   syncDecision({ updatedAt: 999, started: false }, null, null, ME), { dropLocal: false, action: "push" });
 eq("two never-started copies: the newer wins as usual",

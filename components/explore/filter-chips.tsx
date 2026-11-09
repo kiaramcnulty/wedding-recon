@@ -310,7 +310,9 @@ function AmountSheet({
               const next = whole ? e.target.value.replace(/[^\d]/g, "") : e.target.value;
               setRaw(next);
               const v = whole ? (next.trim() ? Number(next) : undefined) : parseAmount(next);
-              if (next.trim() === "" || v !== undefined) setLastValid(v);
+              // Only a value Apply would accept moves the count.
+              const ok = v === undefined || !whole || (Number.isInteger(v) && v > 0 && v < 5000);
+              if (next.trim() === "" || (v !== undefined && ok)) setLastValid(v);
             }}
           />
         </div>

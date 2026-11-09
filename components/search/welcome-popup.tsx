@@ -135,7 +135,12 @@ export function WelcomePopup() {
       session.then((isSignedIn) => {
         if (cancelled) return;
         if (isSignedIn) open(takeWelcomeResume(), true);
-        else open(decide(), false);
+        else {
+          // Back in the app still signed out: that sign-in was abandoned, so
+          // the mark must not pop a screen after some later, unrelated one.
+          takeWelcomeResume();
+          open(decide(), false);
+        }
       });
     } else {
       const next = decide();
@@ -239,8 +244,10 @@ export function WelcomePopup() {
                       onClick={close}
                       className="flex min-h-11 items-center gap-2 rounded-xl border bg-card px-2.5 py-2 text-sm font-medium transition-colors hover:border-brand/50 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                     >
+                      {/* Hidden on the narrowest phones: "Photographer" needs
+                          the room at 320px. */}
                       <span
-                        className="flex size-7 shrink-0 items-center justify-center rounded-full"
+                        className="flex size-7 shrink-0 items-center justify-center rounded-full max-[359px]:hidden"
                         style={{ backgroundColor: c.lightHex, color: c.textHex }}
                       >
                         <Icon className="size-3.5" strokeWidth={1.75} />

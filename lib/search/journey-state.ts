@@ -267,6 +267,9 @@ export function syncDecision(
   // newer by the clock the moment a filter is touched, but it must not replace
   // a real journey on the account (the caller folds its filters in).
   if (remote?.started && mine && mine.started === false) return { dropLocal, action: "pull" };
+  // And the other way round: a never-started account copy (Explore filters
+  // touched on another device) must not wipe a real journey in this browser.
+  if (mine?.started && remote && remote.started === false) return { dropLocal, action: "push" };
   if (remote && (!mine || remote.updatedAt > mine.updatedAt)) return { dropLocal, action: "pull" };
   if (mine && (!remote || mine.updatedAt > remote.updatedAt)) return { dropLocal, action: "push" };
   return { dropLocal, action: "none" };
