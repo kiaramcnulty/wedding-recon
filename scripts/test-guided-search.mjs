@@ -332,5 +332,45 @@ console.log("partial fill");
   eq("fewer partials than slots: all of them", partialFillOf(res(2, 0)), []);
 }
 
+// ---- Advanced filters and Explore's use of the shared adapter ----
+console.log("advanced filters");
+{
+  const { advancedDefs, advancedCount, asksDay } = await import("../lib/search/guided.ts");
+  const keys = (t) => advancedDefs(t).map((d) => d.key);
+  eq("venue Advanced: everything but budget, guests and setting",
+    keys("venue"), ["ceremony_location", "catering_policy", "has_lodging", "has_getting_ready_suite"]);
+  eq("florist Advanced leaves out the minimum (folded into the budget)",
+    keys("flowers").includes("minimum_spend"), false);
+  eq("hair & makeup Advanced has the bridesmaid price", keys("beauty").includes("party_price"), true);
+  eq("hotel blocks: everything is Advanced", keys("hotel"), ["block_type", "parking", "breakfast_included", "has_shuttle", "pet_friendly"]);
+  eq("Other has nothing to filter", keys("other"), []);
+  eq("only venues ask the day of the week", ["venue", "photos", "food"].map(asksDay), [true, false, false]);
+  eq("More count: one per answered Advanced filter",
+    advancedCount("venue", { budget: 9000, picks: { setting: ["garden"], ceremony_location: ["outdoor"] }, flags: { has_lodging: true }, day: "friday" }), 3);
+
+  const party = vendor("beauty", DENVER, { party_price_min: 180, bride_price_min: 300 });
+  eq("bridesmaid limit excludes a $180 bridesmaid price at $150",
+    verdict("beauty", party, guidedSelection("beauty", { limits: { party_price: 150 } })), -1);
+  eq("bridesmaid limit fits at $180",
+    verdict("beauty", party, guidedSelection("beauty", { limits: { party_price: 180 } })), 1);
+  eq("delivery weeks is a ceiling",
+    verdict("photos", vendor("photos", DENVER, { turnaround_weeks: 10 }), guidedSelection("photos", { limits: { turnaround_weeks: 8 } })), -1);
+  eq("an Advanced chip group filters like a default one",
+    verdict("venue", vendor("venue", DENVER, { ceremony_location: ["indoor"] }), guidedSelection("venue", { picks: { ceremony_location: ["outdoor"] } })), -1);
+
+  const byDay = vendor("venue", DENVER, {
+    price_basis: "package", price_tiers: [{ day_type: "saturday", min: 9000 }, { day_type: "friday", min: 5000 }],
+  });
+  eq("Friday prices judged on the Friday rate", verdict("venue", byDay, guidedSelection("venue", { budget: 6000, day: "friday" })), 1);
+  eq("Saturday prices judged on the Saturday rate", verdict("venue", byDay, guidedSelection("venue", { budget: 6000, day: "saturday" })), -1);
+  eq("an unknown day is ignored", Object.keys(guidedSelection("venue", { day: "funday" })), []);
+
+  const pp = vendor("venue", DENVER, { price_min: 150, price_basis: "per_person", price_kind: "starting_at" });
+  eq("journey: no guest count, per-person venue is partial", verdict("venue", pp, guidedSelection("venue", { budget: 15000 })), 0);
+  eq("Explore: no guest count assumes 100", verdict("venue", pp, guidedSelection("venue", { budget: 15000 }, { assumeGuests: true })), 1);
+  eq("Explore: the couple's count wins over 100",
+    verdict("venue", pp, guidedSelection("venue", { budget: 15000 }, { assumeGuests: true, guestCount: 180 })), -1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

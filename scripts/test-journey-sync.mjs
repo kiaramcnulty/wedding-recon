@@ -44,6 +44,18 @@ eq("another account's journey is dropped and this account's copy pulled",
 eq("an anonymous journey (no owner yet) is adopted",
   syncDecision(at(5), at(1), null, ME), { dropLocal: false, action: "push" });
 
+console.log("Explore filters before signing in");
+eq("a never-started copy (Explore filters only) never replaces a real journey",
+  syncDecision({ updatedAt: 999, started: false }, { updatedAt: 1, started: true }, null, ME), { dropLocal: false, action: "pull" });
+eq("a newer never-started account copy never wipes a real journey here",
+  syncDecision({ updatedAt: 1, started: true }, { updatedAt: 999, started: false }, ME, ME), { dropLocal: false, action: "push" });
+eq("...unless that browser copy belongs to another account",
+  syncDecision({ updatedAt: 1, started: true }, { updatedAt: 999, started: false }, "someone-else", ME), { dropLocal: true, action: "pull" });
+eq("a never-started copy still goes up when the account has nothing",
+  syncDecision({ updatedAt: 999, started: false }, null, null, ME), { dropLocal: false, action: "push" });
+eq("two never-started copies: the newer wins as usual",
+  syncDecision({ updatedAt: 999, started: false }, { updatedAt: 1, started: false }, ME, ME), { dropLocal: false, action: "push" });
+
 console.log("account copy round trip");
 const journey = {
   version: 1,
@@ -87,9 +99,12 @@ eq("venue, date, preferences and progress survive the trip", {
 eq("a journey saved before per-type questions keeps its chips",
   parseJourney({ ...journey, byType: { venue: { budget: 9000, styles: ["garden"] } } })?.byType?.venue,
   { budget: 9000, picks: { setting: ["garden"] } });
-eq("answers to questions a type no longer asks are dropped",
-  parseJourney({ ...journey, byType: { hotel: { budget: 200, picks: { parking: ["free"] } } } })?.byType?.hotel,
-  {});
+eq("answers that are not a filter of the type are dropped",
+  parseJourney({ ...journey, byType: { hotel: { budget: 200, picks: { cuisine: ["bbq"], parking: ["valet", "nonsense"] } } } })?.byType?.hotel,
+  { picks: { parking: ["valet"] } });
+eq("Advanced answers survive the trip",
+  parseJourney({ ...journey, byType: { beauty: { budget: 300, flags: { airbrush: true }, limits: { party_price: 150 } }, venue: { day: "friday" } } })?.byType,
+  { beauty: { budget: 300, flags: { airbrush: true }, limits: { party_price: 150 } }, venue: { day: "friday" } });
 eq("a corrupt account copy is rejected, not applied", parseJourney({ version: 2 }), null);
 
 console.log(`\n${pass} passed, ${fail} failed`);

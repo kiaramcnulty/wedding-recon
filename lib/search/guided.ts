@@ -1,7 +1,9 @@
 import { VENDOR_TYPES, usesServiceRegion, type VendorType } from "@/lib/constants/categories";
 import {
+  DAY_TYPES,
   PRICE_ASSUMPTIONS,
   filtersForType,
+  type FilterDef,
 } from "@/lib/constants/vendor-filters";
 import {
   buildSelection,
@@ -207,15 +209,68 @@ export function seasonForMonth(month: number): "peak" | "shoulder" | "off" | und
 export interface GuidedPrefs {
   /** Ceiling in dollars, in the type's own unit (see `GUIDED_CONTROLS`). */
   budget?: number;
-  /** Multi-select answers by filter key: venue `setting`, caterer `cuisine`... */
+  /**
+   * Multi-select answers by filter key: venue `setting`, caterer `cuisine`...
+   * Any multi filter of the type, the default controls and Advanced alike.
+   */
   picks?: Record<string, string[]>;
   /** Ticked "must have" boxes by filter key. Only `true` is ever stored. */
   flags?: Record<string, true>;
+  /**
+   * Advanced "up to" limits on the type's other range filters, by key: the
+   * per-bridesmaid price, a photographer's delivery weeks. A ceiling only,
+   * like the budget.
+   */
+  limits?: Record<string, number>;
+  /** Venue price day of week (Advanced), on the `DAY_TYPES` vocabulary. */
+  day?: string;
 }
 
 export interface GuidedContext {
   guestCount?: number;
   weddingMonth?: number;
+  /**
+   * With no guest count, convert venue per-person and caterer package prices
+   * at the assumed 100 (`PRICE_ASSUMPTIONS.guests`) instead of reading them as
+   * unknown. Explore does (Kiara, 2026-11-06); the journey does not, since it
+   * asks for the real number.
+   */
+  assumeGuests?: boolean;
+}
+
+/**
+ * The filters a type offers under Advanced: everything it can be filtered on
+ * that is not one of its default controls. Two are left out because a default
+ * control already covers them: venue capacity (the shared guest count) and
+ * florist minimum spend (folded into the flower budget).
+ */
+export function advancedDefs(type: GuidedType): FilterDef[] {
+  const c = GUIDED_CONTROLS[type];
+  const shown = new Set<string>([
+    ...(c.budget ? [c.budget.key] : []),
+    ...c.picks.map((p) => p.key),
+    ...c.flags.map((f) => f.key),
+    "capacity_max",
+    ...(type === "flowers" ? ["minimum_spend"] : []),
+  ]);
+  return filtersForType(type).filter((d) => !shown.has(d.key));
+}
+
+/** Whether a venue price can be judged by day of week (Advanced). */
+export function asksDay(type: GuidedType): boolean {
+  return filtersForType(type).some((d) => d.rescaledBy === "date_context");
+}
+
+/** How many Advanced answers are set, for the "More · n" chip. */
+export function advancedCount(type: GuidedType, prefs: GuidedPrefs): number {
+  let n = 0;
+  for (const d of advancedDefs(type)) {
+    if (d.kind === "multi" && prefs.picks?.[d.key]?.length) n++;
+    else if (d.kind === "bool" && prefs.flags?.[d.key]) n++;
+    else if (d.kind === "range" && positive(prefs.limits?.[d.key])) n++;
+  }
+  if (asksDay(type) && prefs.day) n++;
+  return n;
 }
 
 function positive(n: unknown): n is number {
@@ -254,16 +309,24 @@ export function guidedSelection(
   ctx: GuidedContext = {},
 ): FilterSelection {
   const controls = GUIDED_CONTROLS[type];
+  const defs = filtersForType(type);
+  const budgetKey = controls.budget?.key;
   const state: Record<string, unknown> = {};
-  if (controls.budget && positive(prefs.budget)) state[controls.budget.key] = { max: prefs.budget };
-  for (const { key } of controls.picks) {
-    const v = prefs.picks?.[key];
-    if (!v?.length) continue;
-    if (EITHER_MEANS_ANY[key] && new Set(v).size >= EITHER_MEANS_ANY[key]) continue;
-    state[key] = v;
-  }
-  for (const { key } of controls.flags) {
-    if (prefs.flags?.[key] === true) state[key] = true;
+  if (budgetKey && positive(prefs.budget)) state[budgetKey] = { max: prefs.budget };
+  // Every multi / bool / range filter of the type, default and Advanced: one
+  // adapter for the journey's questions and Explore's chips and sheets.
+  for (const d of defs) {
+    if (d.kind === "multi") {
+      const v = prefs.picks?.[d.key];
+      if (!v?.length) continue;
+      if (EITHER_MEANS_ANY[d.key] && new Set(v).size >= EITHER_MEANS_ANY[d.key]) continue;
+      state[d.key] = v;
+    } else if (d.kind === "bool") {
+      if (prefs.flags?.[d.key] === true) state[d.key] = true;
+    } else if (d.key !== budgetKey && d.key !== "capacity_max") {
+      const max = prefs.limits?.[d.key];
+      if (positive(max)) state[d.key] = { max };
+    }
   }
   if (controls.guests && positive(ctx.guestCount)) {
     state.capacity_max = { min: Math.round(ctx.guestCount) };
@@ -271,17 +334,23 @@ export function guidedSelection(
   // Planner tiers scope the budget (`priceScopedBy`), so they must reach
   // buildSelection alongside it, which they do: they are a pick above.
   const season = ctx.weddingMonth ? seasonForMonth(ctx.weddingMonth) : undefined;
-  const sel = buildSelection(filtersForType(type), state, season ? { season } : {});
+  const day = prefs.day && DAY_TYPES.some((d) => d.value === prefs.day) ? prefs.day : undefined;
+  const sel = buildSelection(defs, state, { ...(season && { season }), ...(day && { day }) });
 
+  const guests = positive(ctx.guestCount)
+    ? Math.round(ctx.guestCount)
+    : ctx.assumeGuests
+      ? PRICE_ASSUMPTIONS.guests
+      : undefined;
   const price = sel.price as Extract<FilterSpec, { kind: "range" }> | undefined;
   if (type === "venue" && price) {
     const scale: Record<string, number> = { per_hour: PRICE_ASSUMPTIONS.hours };
-    if (positive(ctx.guestCount)) scale.per_person = Math.round(ctx.guestCount);
+    if (guests) scale.per_person = guests;
     sel.price = { ...price, scale };
   }
   if (type === "food" && price) {
     const scale: Record<string, number> = {};
-    if (positive(ctx.guestCount)) scale.package = 1 / Math.round(ctx.guestCount);
+    if (guests) scale.package = 1 / guests;
     sel.price = { ...price, scale };
   }
   if (type === "flowers" && price?.max != null) {

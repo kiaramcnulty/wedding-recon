@@ -2,16 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CalendarHeart, ChevronLeft, Loader2, MapPin, Search } from "lucide-react";
+import { CalendarHeart, ChevronLeft, ChevronRight, Loader2, MapPin, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandMark } from "@/components/brand-mark";
 import { ChoiceCard } from "@/components/search/choice-card";
+import { MoreSheet } from "@/components/explore/filter-chips";
 import { captureClient } from "@/lib/analytics/posthog";
 import { CATEGORIES, VENDOR_TYPES } from "@/lib/constants/categories";
 import { filtersForType } from "@/lib/constants/vendor-filters";
 import {
   GUIDED_CONTROLS,
+  advancedCount,
+  advancedDefs,
+  asksDay,
   hasGuidedQuestions,
   isGuidedType,
   type GuidedPrefs,
@@ -21,6 +25,7 @@ import {
   clearJourney,
   onJourneyChange,
   emptyJourney,
+  journeyStarted,
   loadJourney,
   saveJourney,
   type JourneyLocation,
@@ -90,11 +95,13 @@ export function GuidedJourney() {
         setState(next);
         return;
       }
-      // From the welcome popup: the venue question is already answered.
-      if ((venueParam === "yes" || venueParam === "no") && !stored) {
+      // From the welcome popup: the venue question is already answered. A
+      // stored journey that was never started (Explore keeps its filters in
+      // one) still takes the answer, and keeps those filters and guest count.
+      if ((venueParam === "yes" || venueParam === "no") && !journeyStarted(stored)) {
         const hasVenue = venueParam === "yes";
         const next = {
-          ...emptyJourney(),
+          ...(stored ?? emptyJourney()),
           hasVenue,
           selectedVendorType: hasVenue ? null : ("venue" as const),
           step: (hasVenue ? "venue" : "city") as JourneyStep,
@@ -107,6 +114,14 @@ export function GuidedJourney() {
       if (isGuidedType(typeParam) && stored?.location) {
         resumedRef.current = true;
         const next = { ...stored, ...pickType(stored, typeParam) };
+        saveJourney(next);
+        setState(next);
+        return;
+      }
+      // The same link with no location on this device yet (welcome back after
+      // signing in on a new device): keep the pick and ask where first.
+      if (isGuidedType(typeParam)) {
+        const next = { ...(stored ?? emptyJourney()), selectedVendorType: typeParam, step: "city" as JourneyStep };
         saveJourney(next);
         setState(next);
         return;
@@ -126,7 +141,10 @@ export function GuidedJourney() {
         setResumeOffer(stored);
         setState(stored);
       } else {
-        setState(emptyJourney());
+        // Nothing to resume. Keep a stored journey that was never started:
+        // its answers are Explore's filters, and the first save here would
+        // otherwise overwrite them with an empty journey.
+        setState(stored ?? emptyJourney());
       }
     }, 0);
     return () => clearTimeout(t);
@@ -963,10 +981,18 @@ function PrefsStep({
   const [budget, setBudget] = React.useState(saved.budget ? String(saved.budget) : "");
   const [picks, setPicks] = React.useState<Record<string, string[]>>(saved.picks ?? {});
   const [flags, setFlags] = React.useState<Record<string, true>>(saved.flags ?? {});
+  // Advanced: its picks and flags live in the two maps above; these are the
+  // rest. The same answers Explore's More sheet edits.
+  const [limits, setLimits] = React.useState<Record<string, number>>(saved.limits ?? {});
+  const [day, setDay] = React.useState<string | undefined>(saved.day);
+  const [moreOpen, setMoreOpen] = React.useState(false);
   const c = CATEGORIES[type];
 
   const budgetValue = parseMoney(budget);
   const budgetInvalid = budget.trim() !== "" && budgetValue === undefined;
+  const current: GuidedPrefs = { ...saved, picks, flags, limits, day };
+  const hasAdvanced = advancedDefs(type).length > 0 || asksDay(type);
+  const moreCount = advancedCount(type, current);
 
   const toggle = (key: string, v: string) =>
     setPicks((p) => {
@@ -984,14 +1010,16 @@ function PrefsStep({
       onSubmit={(e) => {
         e.preventDefault();
         if (budgetInvalid) return;
-        onSubmit(
-          {
-            ...(budgetValue && { budget: budgetValue }),
-            ...(Object.keys(picks).length && { picks }),
-            ...(Object.keys(flags).length && { flags }),
-          },
-          state.guestCount,
-        );
+        // Start from what is saved, so any answer this screen does not show
+        // survives a submit.
+        const next: GuidedPrefs = { ...current };
+        if (budgetValue) next.budget = budgetValue;
+        else delete next.budget;
+        if (!Object.keys(picks).length) delete next.picks;
+        if (!Object.keys(flags).length) delete next.flags;
+        if (!Object.keys(limits).length) delete next.limits;
+        if (!day) delete next.day;
+        onSubmit(next, state.guestCount);
       }}
     >
       <p className="text-sm font-medium" style={{ color: c.textHex }}>
@@ -1075,6 +1103,40 @@ function PrefsStep({
           <span className="font-medium">{label ?? filterDef(type, key)?.label ?? key}</span>
         </label>
       ))}
+
+      {hasAdvanced && (
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          className="mt-6 flex min-h-11 items-center gap-2 rounded-xl border px-3 text-left font-medium hover:border-foreground"
+        >
+          <SlidersHorizontal className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="flex-1">More filters</span>
+          {moreCount > 0 && (
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-medium"
+              style={{ backgroundColor: c.lightHex, color: c.textHex }}
+            >
+              {moreCount}
+            </span>
+          )}
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+      )}
+      {moreOpen && (
+        <MoreSheet
+          type={type}
+          initial={current}
+          onApply={(p) => {
+            setPicks(p.picks ?? {});
+            setFlags(p.flags ?? {});
+            setLimits(p.limits ?? {});
+            setDay(p.day);
+            setMoreOpen(false);
+          }}
+          onClose={() => setMoreOpen(false)}
+        />
+      )}
 
       <PrimaryButton type="submit" disabled={budgetInvalid}>
         Show my matches

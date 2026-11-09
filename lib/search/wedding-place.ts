@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import type { GuidedPrefs, GuidedType } from "@/lib/search/guided";
 import {
   JOURNEY_STORAGE_KEY,
+  emptyJourney,
   loadJourney,
   onJourneyChange,
   saveJourney,
@@ -112,4 +114,20 @@ export function useWeddingPlace(): WeddingPlace | null {
 /** Write the journey; subscribers hear about it through `onJourneyChange`. */
 export function writeJourney(s: JourneyState) {
   saveJourney(s);
+}
+
+/**
+ * Explore's filters ARE the journey's answers for that type (Kiara,
+ * 2026-11-07: one shared set). Saving one here creates a journey when there is
+ * none yet, at the welcome step, so it never reads as a journey in progress.
+ */
+export function writeTypePrefs(type: GuidedType, prefs: GuidedPrefs) {
+  const cur = loadJourney() ?? emptyJourney();
+  saveJourney({ ...cur, byType: { ...cur.byType, [type]: prefs } });
+}
+
+/** The shared guest count, from Explore's guests chip. */
+export function writeGuestCount(guestCount: number | undefined) {
+  const cur = loadJourney() ?? emptyJourney();
+  saveJourney({ ...cur, guestCount });
 }

@@ -62,6 +62,7 @@ export function VendorFeed({
   scrollRef: externalScrollRef,
   returnTo = "/explore?restore=1",
   emptyText = "No vendors here. Try moving the map or loosening a filter.",
+  showCategoryPill = true,
 }: {
   /** Vendors to list, in display order. Each carries its OWN type, so a feed can mix them. */
   entries: VendorListEntry[];
@@ -93,6 +94,8 @@ export function VendorFeed({
   returnTo?: string;
   /** Shown when the source reported and nothing is in it. */
   emptyText?: string;
+  /** Off for a one-type feed, where every card would carry the same pill. */
+  showCategoryPill?: boolean;
 }) {
   const ownScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef ?? ownScrollRef;
@@ -264,6 +267,7 @@ export function VendorFeed({
                   )}
                 >
                   <VendorPreviewCard
+                    showCategoryPill={showCategoryPill}
                     item={item}
                     vendorType={typeById.get(item.id) ?? "other"}
                     href={vendorHref(item.id)}

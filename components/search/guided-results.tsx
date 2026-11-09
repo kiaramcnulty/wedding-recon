@@ -14,12 +14,13 @@ import {
   type VendorPreview,
 } from "@/components/map/vendor-preview-card";
 import { captureClient } from "@/lib/analytics/posthog";
-import { writeMapView } from "@/lib/map/map-view";
+import { writeExploreAnchor, writeMapView } from "@/lib/map/map-view";
 import { zoomToFitRing } from "@/lib/map/ring";
 import { CATEGORIES, CATEGORY_PLURAL } from "@/lib/constants/categories";
 import { filtersForType } from "@/lib/constants/vendor-filters";
 import {
   GUIDED_CONTROLS,
+  advancedCount,
   guidedSelection,
   hasGuidedQuestions,
   runGuidedSearch,
@@ -233,6 +234,7 @@ export function GuidedResults({
           <VendorFeed
             entries={result.ranked.map((r) => ({ id: r.id, vendorType: type, rank: r.rank }))}
             scrollKey={SCROLL_KEY}
+            showCategoryPill={false}
             selections={{ [type]: selection }}
             returnTo="/start?restore=list"
             emptyText="Nothing nearby yet. Try fewer preferences."
@@ -353,7 +355,10 @@ export function GuidedResults({
         <Link
           href={`/explore?types=${type}`}
           // Open the map on this search, not on Explore's Denver default.
-          onClick={() => writeMapView({ center: [location.lng, location.lat], zoom: MAP_ZOOM })}
+          onClick={() => {
+            writeMapView({ center: [location.lng, location.lat], zoom: MAP_ZOOM });
+            writeExploreAnchor({ lat: location.lat, lng: location.lng, label: location.label });
+          }}
           className="text-muted-foreground underline underline-offset-4"
         >
           Browse the map instead
@@ -441,5 +446,8 @@ function preferencePills(type: GuidedType, prefs: GuidedPrefs, state: JourneySta
   for (const { key, label } of controls.flags) {
     if (prefs.flags?.[key]) out.push(label ?? defs.find((d) => d.key === key)?.label ?? key);
   }
+  // Advanced filters set on Explore narrow these results too; say so.
+  const more = advancedCount(type, prefs);
+  if (more) out.push(`+${more} more ${more === 1 ? "filter" : "filters"}`);
   return out;
 }

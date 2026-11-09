@@ -1,3 +1,4 @@
+import { DAY_TYPES, filtersForType } from "@/lib/constants/vendor-filters";
 import {
   GUIDED_CONTROLS,
   isGuidedType,
@@ -85,27 +86,44 @@ function strings(v: unknown): string[] {
 }
 
 /**
- * One type's answers, keeping only keys that type still asks about. A journey
- * saved before the per-type controls kept the one chip group in `styles`
- * (venue setting, photo style); it is read into that type's first pick.
+ * One type's answers, keeping only keys that are still a filter of that type,
+ * of the right kind (default controls and Advanced alike). A journey saved
+ * before the per-type controls kept the one chip group in `styles` (venue
+ * setting, photo style); it is read into that type's first pick.
  */
 function parsePrefs(type: GuidedType, raw: unknown): GuidedPrefs {
   if (!raw || typeof raw !== "object") return {};
   const r = raw as Record<string, unknown>;
   const controls = GUIDED_CONTROLS[type];
-  const rawPicks = (r.picks && typeof r.picks === "object" ? r.picks : {}) as Record<string, unknown>;
-  const rawFlags = (r.flags && typeof r.flags === "object" ? r.flags : {}) as Record<string, unknown>;
+  const obj = (v: unknown) => (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const rawPicks = obj(r.picks);
+  const rawFlags = obj(r.flags);
+  const rawLimits = obj(r.limits);
+  const firstPick = controls.picks[0]?.key;
   const picks: Record<string, string[]> = {};
-  controls.picks.forEach(({ key }, i) => {
-    const v = strings(rawPicks[key] ?? (i === 0 ? r.styles : undefined));
-    if (v.length) picks[key] = v;
-  });
   const flags: Record<string, true> = {};
-  for (const { key } of controls.flags) if (rawFlags[key] === true) flags[key] = true;
+  const limits: Record<string, number> = {};
+  for (const d of filtersForType(type)) {
+    if (d.kind === "multi") {
+      const known = new Set((d.options ?? []).map((o) => o.value));
+      const v = strings(rawPicks[d.key] ?? (d.key === firstPick ? r.styles : undefined)).filter((x) =>
+        known.has(x),
+      );
+      if (v.length) picks[d.key] = v;
+    } else if (d.kind === "bool") {
+      if (rawFlags[d.key] === true) flags[d.key] = true;
+    } else if (d.key !== controls.budget?.key) {
+      const n = finitePositive(rawLimits[d.key]);
+      if (n !== undefined) limits[d.key] = n;
+    }
+  }
+  const day = typeof r.day === "string" && DAY_TYPES.some((d) => d.value === r.day) ? r.day : undefined;
   return {
     ...(controls.budget && finitePositive(r.budget) && { budget: r.budget as number }),
     ...(Object.keys(picks).length && { picks }),
     ...(Object.keys(flags).length && { flags }),
+    ...(Object.keys(limits).length && { limits }),
+    ...(day && { day }),
   };
 }
 
@@ -172,6 +190,15 @@ export function parseJourney(raw: unknown): JourneyState | null {
   };
 }
 
+/**
+ * Whether the couple has actually begun the guided journey (answered the venue
+ * question or picked a place). A stored journey can exist without that: Explore
+ * keeps its filters in it as the shared per-type answers.
+ */
+export function journeyStarted(s: JourneyState | null): boolean {
+  return !!s && (s.hasVenue !== null || !!s.location);
+}
+
 export function loadJourney(): JourneyState | null {
   try {
     const raw = localStorage.getItem(JOURNEY_STORAGE_KEY);
@@ -229,13 +256,20 @@ export function saveJourney(state: JourneyState, opts: { remote?: boolean } = {}
  *   missing. A tie keeps both as they are.
  */
 export function syncDecision(
-  local: { updatedAt: number } | null,
-  remote: { updatedAt: number } | null,
+  local: { updatedAt: number; started?: boolean } | null,
+  remote: { updatedAt: number; started?: boolean } | null,
   owner: string | null,
   accountId: string,
 ): { dropLocal: boolean; action: "pull" | "push" | "none" } {
   const dropLocal = !!local && !!owner && owner !== accountId;
   const mine = dropLocal ? null : local;
+  // A browser copy that was never started holds only Explore filters. It is
+  // newer by the clock the moment a filter is touched, but it must not replace
+  // a real journey on the account (the caller folds its filters in).
+  if (remote?.started && mine && mine.started === false) return { dropLocal, action: "pull" };
+  // And the other way round: a never-started account copy (Explore filters
+  // touched on another device) must not wipe a real journey in this browser.
+  if (mine?.started && remote && remote.started === false) return { dropLocal, action: "push" };
   if (remote && (!mine || remote.updatedAt > mine.updatedAt)) return { dropLocal, action: "pull" };
   if (mine && (!remote || mine.updatedAt > remote.updatedAt)) return { dropLocal, action: "push" };
   return { dropLocal, action: "none" };
