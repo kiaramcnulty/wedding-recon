@@ -22,7 +22,7 @@ export function ChoiceCard({
   onClick: () => void;
 }) {
   const className =
-    "group flex w-full items-center gap-3 rounded-2xl border bg-card p-3 text-left transition-colors hover:border-brand/50 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50";
+    "card-lift group flex w-full items-center gap-3 rounded-2xl border border-black/[0.06] bg-card p-3 text-left hover:border-brand/50 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50";
   const body = (
     <>
       <span

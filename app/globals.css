@@ -9,6 +9,11 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+  --font-display: var(--font-cormorant), ui-serif, Georgia, serif;
+  --color-ivory: var(--ivory);
+  --color-blush: var(--blush);
+  --color-rose: var(--rose);
+  --color-champagne: var(--champagne);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -91,6 +96,13 @@
   --brand: #1d9e75;
   --brand-ink: #085041;
   --brand-soft: #e1f5ee;
+  /* The bridal accents (2026-11-08): a warm ivory page, a blush wash that
+     pairs with the sage, a rose for the saved heart, and a champagne hairline.
+     Accents only: the brand stays green and the buttons stay neutral. */
+  --ivory: #fcfaf6;
+  --blush: #f8ebe6;
+  --rose: #c95d74;
+  --champagne: #e6d8bf;
   /* Vendor Verification blue: the badge fill, and the tint / wash / line a
      verified vendor gets on its card and page header. Deliberately NOT the brand
      green, and deeper than the photos category blue (#378ADD), so the marks
@@ -163,7 +175,19 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /* Not plain white: a warm ivory with a faint sage wash at the top right
+       and a blush one at the top left, the same softness as the welcome
+       popup's header. Fixed, so it sits still behind scrolling content. Cards
+       and sheets stay white on top of it. */
+    background-color: var(--ivory);
+    background-image:
+      radial-gradient(70rem 32rem at 110% -8%, color-mix(in oklab, var(--brand-soft) 85%, transparent), transparent 62%),
+      radial-gradient(56rem 28rem at -15% -4%, color-mix(in oklab, var(--blush) 90%, transparent), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--blush) 70%, var(--rose) 30%);
   }
   html {
     @apply font-sans;
@@ -223,8 +247,97 @@
   animation: heart-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
 }
 
+/* The save "bloom": tiny hearts drift out from the heart and fade, with a soft
+   ring. Each particle sets --dx/--dy/--r inline (components/vendor/heart-burst.tsx). */
+@keyframes heart-burst {
+  /* Linear overall, eased per step: the drift decelerates out (the segment's
+     own curve), the hearts hold, then fade. One overall ease-out would spend
+     the fade in the first half and the hearts would barely be seen. */
+  0% {
+    transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.15, 0.7, 0.3, 1);
+  }
+  55% {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--r));
+    opacity: 1;
+    animation-timing-function: ease-in;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--dx) * 1.15), calc(-50% + var(--dy) * 1.15)) scale(0.8) rotate(var(--r));
+    opacity: 0;
+  }
+}
+@keyframes heart-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.1);
+    opacity: 0;
+  }
+}
+.animate-heart-burst {
+  animation: heart-burst 0.95s linear both;
+}
+.animate-heart-ring {
+  animation: heart-ring 0.6s ease-out both;
+}
+
+/* Screens and journey steps arrive with a gentle fade. Opacity only, never a
+   transform: a transform left on an ancestor becomes the containing block for
+   every position:fixed descendant (the map overlays, sheets) and moves them. */
+@keyframes screen-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-screen-in {
+  animation: screen-in 0.38s ease-out backwards;
+}
+/* Journey steps: a touch of rise as well, on a box with no fixed children. */
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-step-in {
+  animation: step-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* Cards lift a hair on hover, on devices that hover. */
+.card-lift {
+  box-shadow:
+    0 1px 2px rgb(31 58 47 / 0.04),
+    0 10px 28px -16px rgb(31 58 47 / 0.22);
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.25s ease,
+    background-color 0.15s ease;
+}
+@media (hover: hover) {
+  .card-lift:hover {
+    box-shadow:
+      0 2px 4px rgb(31 58 47 / 0.05),
+      0 16px 36px -18px rgb(31 58 47 / 0.3);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-heart-pop {
+  .animate-heart-pop,
+  .animate-heart-burst,
+  .animate-heart-ring,
+  .animate-screen-in,
+  .animate-step-in {
     animation: none;
   }
 }

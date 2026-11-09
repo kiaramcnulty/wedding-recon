@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandMark } from "@/components/brand-mark";
 import { ChoiceCard } from "@/components/search/choice-card";
+import { Flourish, Sprig } from "@/components/ornaments";
 import { MoreSheet } from "@/components/explore/filter-chips";
 import { captureClient } from "@/lib/analytics/posthog";
 import { CATEGORIES, VENDOR_TYPES } from "@/lib/constants/categories";
@@ -213,10 +214,13 @@ export function GuidedJourney() {
     );
   }
 
+  // Remounts each step's Shell, so every step arrives with the step-in fade.
+  const stepKey = `${state.step}:${state.selectedVendorType ?? ""}`;
+
   if (resumeOffer) {
     return (
-      <Shell>
-        <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+      <Shell key="resume">
+        <h1 className="font-display text-[2rem] font-semibold leading-tight">Welcome back</h1>
         <p className="mt-2 text-muted-foreground">
           Pick up where you left off?
           {resumeOffer.location && ` You were searching near ${resumeOffer.location.label}.`}
@@ -254,16 +258,26 @@ export function GuidedJourney() {
   switch (state.step) {
     case "welcome":
       return (
-        <Shell>
+        <Shell key={stepKey}>
           {/* -mt-16 pulls the wash up under the empty back-button row of Shell. */}
-          <div className="-mx-5 -mt-16 bg-gradient-to-b from-brand-soft via-brand-soft/40 to-background px-5 pb-2 pt-16 text-center">
-            <BrandMark className="mx-auto size-14" />
-            <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-brand-ink">
+          {/* The same sage and blush wash as the welcome popup, fading into the
+              page's ivory rather than to white (a white band read as a seam). */}
+          <div
+            className="relative -mx-5 -mt-16 overflow-hidden px-5 pb-2 pt-16 text-center"
+            style={{
+              backgroundImage:
+                "radial-gradient(120% 90% at 100% 0%, var(--brand-soft), transparent 62%), radial-gradient(100% 80% at 0% 0%, var(--blush), transparent 60%)",
+            }}
+          >
+            <Sprig className="absolute -left-2 top-1 w-32 -scale-y-100 text-brand-ink/30" />
+            <BrandMark className="relative mx-auto size-14" />
+            <p className="relative mt-4 text-[11px] font-medium uppercase tracking-[0.22em] text-brand-ink">
               Welcome to Wedding Recon
             </p>
-            <h1 className="mt-1.5 text-2xl font-semibold leading-tight tracking-tight text-balance">
+            <h1 className="relative mt-1.5 font-display text-[2.1rem] font-semibold leading-[1.1] text-balance">
               Let&rsquo;s find vendors you&rsquo;ll love
             </h1>
+            <Flourish className="relative mx-auto mt-2.5 w-28 text-rose/70" />
             <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground text-balance">
               Real prices and intel from couples and vendor websites.
             </p>
@@ -297,7 +311,7 @@ export function GuidedJourney() {
 
     case "venue":
       return (
-        <Shell onBack={() => go(back)}>
+        <Shell key={stepKey} onBack={() => go(back)}>
           <VenueStep
             state={state}
             initialQuery={venueQuery}
@@ -312,7 +326,7 @@ export function GuidedJourney() {
 
     case "city":
       return (
-        <Shell onBack={() => go(back)}>
+        <Shell key={stepKey} onBack={() => go(back)}>
           <CityStep
             state={state}
             onPick={(location) => update({ location, cityLocation: location })}
@@ -335,7 +349,7 @@ export function GuidedJourney() {
 
     case "category":
       return (
-        <Shell onBack={state.status === "completed" ? undefined : () => go(back)}>
+        <Shell key={stepKey} onBack={state.status === "completed" ? undefined : () => go(back)}>
           <CategoryStep
             state={state}
             onPick={(t) => {
@@ -352,7 +366,7 @@ export function GuidedJourney() {
         return null;
       }
       return (
-        <Shell onBack={() => go(back)}>
+        <Shell key={stepKey} onBack={() => go(back)}>
           <PrefsStep
             key={state.selectedVendorType}
             state={state}
@@ -370,6 +384,7 @@ export function GuidedJourney() {
     case "results":
       if (!state.selectedVendorType || !state.location) return null;
       return (
+        <div key={stepKey} className="animate-screen-in flex flex-1 flex-col">
         <GuidedResults
           state={state}
           view={view}
@@ -384,6 +399,7 @@ export function GuidedJourney() {
             if (state.status !== "completed") update({ status: "completed" });
           }}
         />
+        </div>
       );
   }
 }
@@ -436,15 +452,19 @@ function Shell({
   onBack?: () => void;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-[480px] flex-1 flex-col px-5 pb-10 pt-4">
-      <div className="mb-4 h-8">
+    // overflow-x-clip: the corner sprig sits a little past the edge and must
+    // not give the page a sideways scroll (clip, not hidden, so no scroll box).
+    <div className="animate-step-in relative mx-auto flex w-full max-w-[480px] flex-1 flex-col overflow-x-clip px-5 pb-10 pt-4">
+      {/* A fine-line sprig in the top corner, like the welcome popup. */}
+      <Sprig className="pointer-events-none absolute -right-2 -top-1 w-28 rotate-180 text-brand-ink/20" />
+      <div className="relative mb-4 h-8">
         {onBack && (
           <Button variant="ghost" size="sm" className="-ml-2 h-8" onClick={onBack}>
             <ChevronLeft className="size-4" /> Back
           </Button>
         )}
       </div>
-      <div className="flex flex-1 flex-col">{children}</div>
+      <div className="relative flex flex-1 flex-col">{children}</div>
     </div>
   );
 }
@@ -602,7 +622,7 @@ function VenueStep({
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">Where is your venue?</h1>
+      <h1 className="font-display text-[2rem] font-semibold leading-tight">Where is your venue?</h1>
       <p className="mt-2 text-muted-foreground">We&apos;ll look for nearby vendors.</p>
       <div className="relative mt-6">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -721,7 +741,7 @@ function CityStep({
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">Where do you want to get married?</h1>
+      <h1 className="font-display text-[2rem] font-semibold leading-tight">Where do you want to get married?</h1>
       <p className="mt-2 text-muted-foreground">Pick the town you&apos;re thinking about. You can change it later.</p>
       <div className="relative mt-6">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -929,7 +949,7 @@ function CategoryStep({
   const returning = state.status === "completed";
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">
+      <h1 className="font-display text-[2rem] font-semibold leading-tight">
         {returning ? "Welcome back! Which vendor are you looking for today?" : "Which vendor are you looking for?"}
       </h1>
       {state.location && (
@@ -1025,9 +1045,9 @@ function PrefsStep({
       <p className="text-sm font-medium" style={{ color: c.textHex }}>
         {c.label}
       </p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+      <h1 className="mt-1 font-display text-[2rem] font-semibold leading-tight">
         Tell us what you&apos;re looking for{" "}
-        <span className="text-base font-normal text-muted-foreground">(optional)</span>
+        <span className="font-sans text-base font-normal text-muted-foreground">(optional)</span>
       </h1>
 
       {controls.budget && (

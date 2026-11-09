@@ -394,7 +394,10 @@ export function VendorPreviewCard({
         // Both fills are opaque tokens, for the same reason as above.
         item.verified
           ? "border-[1.5px] border-verified-line bg-verified-soft hover:bg-verified-wash"
-          : "border bg-card hover:bg-muted",
+          : "border border-black/[0.06] bg-card hover:bg-muted",
+        // A soft, sage-tinted shadow that deepens on hover: the cards sit on
+        // the ivory wash like paper rather than in boxes.
+        "card-lift",
         className,
       )}
     >

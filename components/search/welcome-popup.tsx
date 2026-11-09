@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { CalendarHeart, LogIn, Search } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { ChoiceCard } from "@/components/search/choice-card";
+import { Flourish, Sprig } from "@/components/ornaments";
 import {
   Dialog,
   DialogContent,
@@ -174,14 +175,31 @@ export function WelcomePopup() {
   );
 
   const header = (title: string, description: string, kicker?: string) => (
-    <div className="bg-gradient-to-b from-brand-soft via-brand-soft/40 to-popover px-6 pb-1 pt-8 text-center">
-      <BrandMark className="mx-auto size-14" />
+    // Sage from the top right, blush from the top left, fading to white: the
+    // wash the whole app now sits on, at full strength here. Fine-line sprigs
+    // frame it like an invitation.
+    <div
+      className="relative overflow-hidden px-6 pb-1 pt-8 text-center"
+      style={{
+        backgroundImage:
+          "radial-gradient(120% 90% at 100% 0%, var(--brand-soft), transparent 62%), radial-gradient(100% 80% at 0% 0%, var(--blush), transparent 60%), linear-gradient(to bottom, transparent 55%, var(--popover))",
+      }}
+    >
+      <Sprig className="absolute -left-2 -top-1 w-32 -scale-y-100 text-brand-ink/30" />
+      <Sprig className="absolute -right-2 -top-1 w-32 rotate-180 text-brand-ink/30" />
+      <BrandMark className="relative mx-auto size-14" />
       {kicker && (
-        <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-brand-ink">{kicker}</p>
+        <p className="relative mt-4 text-[11px] font-medium uppercase tracking-[0.22em] text-brand-ink">{kicker}</p>
       )}
-      <DialogTitle className={cn("text-2xl font-semibold leading-tight tracking-tight text-balance", kicker ? "mt-1.5" : "mt-4")}>
+      <DialogTitle
+        className={cn(
+          "relative font-display text-[2rem] font-semibold leading-[1.1] text-balance",
+          kicker ? "mt-1.5" : "mt-4",
+        )}
+      >
         {title}
       </DialogTitle>
+      <Flourish className="relative mx-auto mt-2.5 w-28 text-rose/70" />
       <DialogDescription className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-balance">
         {description}
       </DialogDescription>
