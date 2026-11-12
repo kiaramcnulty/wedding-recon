@@ -965,6 +965,7 @@ export default function ExplorePage() {
             <VendorFeed
               entries={feedEntries}
               scrollKey="wr:screenScroll"
+              surface="explore_list"
               showCategoryPill={false}
               selections={selections}
               pending={!result && candidates.status !== "error"}
@@ -985,6 +986,7 @@ export default function ExplorePage() {
                 vendorType={pin.vendorType}
                 selection={pin.vendorType === type ? selection : undefined}
                 onClose={closePin}
+                surface="explore_peek"
               />
             </div>
           ) : (

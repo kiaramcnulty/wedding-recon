@@ -52,6 +52,38 @@ Anonymous browsing is stitched to the account **client-side** (`identifyClient` 
 server side just uses `userId` as the distinct id. Person profiles are
 `identified_only`.
 
+## Listing exposure events (added 2026-11-11)
+
+Three client events so "do verified listings get more attention?" can be measured
+per exposure, not just per vendor-page view. All carry `vendor_id`, `vendor_type`,
+`surface` and `verified`. Event types and dedupe live in `lib/analytics/posthog.ts`.
+
+- `vendor_impression` -- a feed card at least half on screen (one
+  IntersectionObserver per `VendorFeed`), with its 0-based `position`.
+  Surfaces: `explore_list`, `explore_cluster`, `start_list`. **Deduped once per
+  listing per surface per page load**, via a module-level Set, so a vendor-page
+  round trip does not re-count the same cards. A full reload starts over.
+- `vendor_peek_opened` -- a map pin tapped and its peek card shown (`explore_peek`,
+  `start_peek`). Fired after the preview resolves, so it can carry `verified`.
+  This is the map's impression: pins themselves are not counted.
+- `vendor_card_clicked` -- a feed or peek card tapped through to the vendor page
+  (`position` is null from a peek). Needed because the pageview that follows
+  carries the same `from` for list and map.
+
+`surface` is a required prop on `VendorFeed` and `VendorPinPreview`, so a new
+feed cannot ship uncounted. Hub cards are not tracked (the couple's own saves,
+not exposure).
+
+**Why it exists:** the 2026-11-11 verified-vs-unverified read had only vendor-page
+views to go on. Five verified listings, about eight views, one venue carrying
+all of it -- no lift was measurable, and the sort-first perk acts on exposure,
+which was not recorded at all.
+
+**Testing it locally without polluting production:** the `dev-no-analytics`
+entry in `.claude/launch.json` (gitignored, per checkout) runs dev on 3001 with
+a fake `NEXT_PUBLIC_POSTHOG_KEY`, so sends get a 401. Set
+`localStorage.ph_debug = "true"` and the console logs every `send`.
+
 ## First-touch attribution is the authoritative funnel input (migration `0039`)
 
 `lib/analytics/attribution.ts` plus the writer in `instrumentation-client.ts`
