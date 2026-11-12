@@ -18,6 +18,7 @@ import {
   writeJourney,
 } from "@/lib/search/wedding-place";
 import { cn } from "@/lib/utils";
+import { vendorPath } from "@/lib/vendors/slug";
 
 const HUB_RETURN = encodeURIComponent("/hub");
 
@@ -63,7 +64,7 @@ export function WeddingPlaceCard() {
             item={item}
             vendorType="venue"
             showCategoryPill={false}
-            href={`/vendor/${vendorId}?from=${HUB_RETURN}`}
+            href={`${vendorPath(item)}?from=${HUB_RETURN}`}
           />
         ) : vendorId && previews === null ? (
           <div className="h-[213px] animate-pulse rounded-xl bg-background" />

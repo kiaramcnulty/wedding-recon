@@ -9,6 +9,7 @@ import {
   VendorPreviewCard,
   useVendorPreviews,
 } from "@/components/map/vendor-preview-card";
+import { vendorPath } from "@/lib/vendors/slug";
 import {
   captureClient,
   type PeekSurface,
@@ -167,7 +168,7 @@ export function VendorPinPreview({
           vendorType={vendorType}
           selection={selection}
           // `from` returns the back button to the map it was opened from.
-          href={`/vendor/${item.id}?from=${encodeURIComponent(returnTo)}`}
+          href={vendorPath(item, returnTo)}
           onNavigate={() =>
             captureClient("vendor_card_clicked", {
               vendor_id: item.id,

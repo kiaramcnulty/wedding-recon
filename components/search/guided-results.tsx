@@ -31,6 +31,7 @@ import {
 } from "@/lib/search/guided";
 import type { JourneyState } from "@/lib/search/journey-state";
 import { useGuidedCandidates } from "./use-guided-candidates";
+import { vendorPath } from "@/lib/vendors/slug";
 
 export type ResultsView = "suggestions" | "list" | "map";
 
@@ -257,7 +258,7 @@ export function GuidedResults({
     <VendorPreviewCard
       item={item}
       vendorType={type}
-      href={`/vendor/${item.id}?from=${encodeURIComponent("/start?restore=suggestions")}`}
+      href={vendorPath(item, "/start?restore=suggestions")}
       selection={selection}
       showCategoryPill={false}
       cornerAction={

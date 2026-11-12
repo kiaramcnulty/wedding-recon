@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isAdminUser } from "@/lib/auth/admin";
 import { usesServiceRegion } from "@/lib/constants/categories";
 import type { ReconType, VendorType } from "@/lib/constants/categories";
+import { vendorPath } from "@/lib/vendors/slug";
 
 export interface UpdateReconInput {
   reconId: string;
@@ -50,7 +51,7 @@ export async function updateRecon(input: UpdateReconInput) {
   const { data: entry, error: fetchError } = await supabase
     .from("recon_entries")
     .select(
-      "id, author_id, vendor_id, status, vendor:vendors(vendor_type), author:profiles(is_bot)",
+      "id, author_id, vendor_id, status, vendor:vendors(vendor_type, slug), author:profiles(is_bot)",
     )
     .eq("id", input.reconId)
     .single();
@@ -77,11 +78,12 @@ export async function updateRecon(input: UpdateReconInput) {
 
   // Supabase types the embedded row as an object or single-item array.
   const vendorRel = entry.vendor as
-    | { vendor_type: VendorType }
-    | { vendor_type: VendorType }[]
+    | { vendor_type: VendorType; slug: string | null }
+    | { vendor_type: VendorType; slug: string | null }[]
     | null;
-  const vendorType = (Array.isArray(vendorRel) ? vendorRel[0] : vendorRel)
-    ?.vendor_type;
+  const vendorRow = Array.isArray(vendorRel) ? vendorRel[0] : vendorRel;
+  const vendorType = vendorRow?.vendor_type;
+  const vendorHref = vendorPath({ id: entry.vendor_id, slug: vendorRow?.slug });
 
   const { error: updateError } = await supabase
     .from("recon_entries")
@@ -107,14 +109,14 @@ export async function updateRecon(input: UpdateReconInput) {
   // Both pages are dynamic (cookie-based client), so there is no full-route
   // cache to bust — this clears Next's client-side Router Cache so a back-nav
   // after saving does not show the pre-edit copy.
-  revalidatePath(`/vendor/${entry.vendor_id}`);
+  revalidatePath(vendorHref);
   revalidatePath("/hub");
 
   // Internal paths only — a caller-supplied target is an open-redirect vector.
   const target =
     input.returnTo?.startsWith("/") && !input.returnTo.startsWith("//")
       ? input.returnTo
-      : `/vendor/${entry.vendor_id}`;
+      : vendorHref;
 
   // `replace`, not push: a saved form should not be reachable by pressing back.
   redirect(target, RedirectType.replace);

@@ -21,6 +21,7 @@ import { formatVendorLocality } from "@/lib/vendor-locality";
 import { useWeddingPlace } from "@/lib/search/wedding-place";
 import { cn } from "@/lib/utils";
 import { type Vendor } from "@/lib/types";
+import { vendorPath } from "@/lib/vendors/slug";
 
 interface VendorWithRecon extends Vendor {
   /** True when this viewer has their own (non-removed) recon on the vendor. */
@@ -144,7 +145,7 @@ export function HubAccordion({ vendors: allVendors }: HubAccordionProps) {
                           // Redundant here: the card already sits inside this
                           // category's accordion section.
                           showCategoryPill={false}
-                          href={`/vendor/${vendor.id}?from=${HUB_RETURN}`}
+                          href={`${vendorPath(vendor)}?from=${HUB_RETURN}`}
                           // Unhearting here leaves the card in place until the
                           // next visit, so a mis-tap can be undone on the spot.
                           cornerAction={

@@ -53,7 +53,7 @@ export default async function EditReconPage({
   const { data: entry, error } = await supabase
     .from("recon_entries")
     .select(
-      "*, vendor:vendors(id, name, vendor_type), media:recon_media(id, thumb_path, storage_path), author:profiles(is_bot)",
+      "*, vendor:vendors(id, slug, name, vendor_type), media:recon_media(id, thumb_path, storage_path), author:profiles(is_bot)",
     )
     .eq("id", id)
     .single();
@@ -78,8 +78,8 @@ export default async function EditReconPage({
 
   // Supabase types an embedded row as object-or-single-item-array.
   const vendorRel = entry.vendor as
-    | { id: string; name: string; vendor_type: VendorType }
-    | { id: string; name: string; vendor_type: VendorType }[]
+    | { id: string; slug: string | null; name: string; vendor_type: VendorType }
+    | { id: string; slug: string | null; name: string; vendor_type: VendorType }[]
     | null;
   const vendor = Array.isArray(vendorRel) ? vendorRel[0] : vendorRel;
   if (!vendor) notFound();
@@ -107,6 +107,7 @@ export default async function EditReconPage({
     <EditReconForm
       reconId={entry.id}
       vendorId={vendor.id}
+      vendorSlug={vendor.slug ?? null}
       vendorName={vendor.name}
       vendorType={vendor.vendor_type}
       backHref={backHref}

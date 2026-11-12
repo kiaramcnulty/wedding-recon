@@ -19,10 +19,12 @@ import { BrandFooter } from "@/components/brand-lockup";
 import { ProfileMenu } from "@/components/profile-menu";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { updateRecon } from "./actions";
+import { vendorPath } from "@/lib/vendors/slug";
 
 interface EditReconFormProps {
   reconId: string;
   vendorId: string;
+  vendorSlug: string | null;
   vendorName: string;
   vendorType: VendorType;
   backHref: string | null;
@@ -35,6 +37,7 @@ interface EditReconFormProps {
 export function EditReconForm({
   reconId,
   vendorId,
+  vendorSlug,
   vendorName,
   vendorType,
   backHref,
@@ -81,7 +84,7 @@ export function EditReconForm({
 
   // Falling back to the vendor page keeps the back button useful on a direct
   // link (a shared or bookmarked edit URL arrives with no `from`).
-  const backTo = backHref ?? `/vendor/${vendorId}`;
+  const backTo = backHref ?? vendorPath({ id: vendorId, slug: vendorSlug });
 
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
