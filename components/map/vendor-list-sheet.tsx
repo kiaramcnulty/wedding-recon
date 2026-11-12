@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { VendorFeed, type VendorListEntry } from "@/components/map/vendor-feed";
 import type { FilterSelections } from "@/lib/filters/match";
+import type { ListingSurface } from "@/lib/analytics/posthog";
 
 export type { VendorListEntry };
 
@@ -20,6 +21,8 @@ interface VendorListSheetProps {
   /** Active attribute filters per type, forwarded to the feed's cards. */
   selections?: FilterSelections;
   onClose: () => void;
+  /** Analytics surface for the feed inside (see `VendorFeed`). */
+  surface: ListingSurface;
 }
 
 /**
@@ -42,6 +45,7 @@ export function VendorListSheet({
   footnote,
   selections,
   onClose,
+  surface,
 }: VendorListSheetProps) {
   const sheetRef = React.useRef<HTMLDivElement>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -176,6 +180,7 @@ export function VendorListSheet({
           footnote={footnote}
           selections={selections}
           scrollRef={scrollRef}
+          surface={surface}
           className="flex-1"
         />
       </div>

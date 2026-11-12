@@ -9,6 +9,10 @@ import {
   VendorPreviewCard,
   useVendorPreviews,
 } from "@/components/map/vendor-preview-card";
+import {
+  captureClient,
+  type PeekSurface,
+} from "@/lib/analytics/posthog";
 
 interface VendorPinPreviewProps {
   vendorId: string;
@@ -18,6 +22,8 @@ interface VendorPinPreviewProps {
   onClose: () => void;
   /** Where the vendor page's back button returns. Defaults to Explore with this peek reopened. */
   returnTo?: string;
+  /** Which map this peek is over, for the `vendor_peek_opened` event. */
+  surface: PeekSurface;
 }
 
 /**
@@ -36,10 +42,26 @@ export function VendorPinPreview({
   selection,
   onClose,
   returnTo = "/explore?restore=1",
+  surface,
 }: VendorPinPreviewProps) {
   const items = useVendorPreviews([vendorId]);
   const item = items?.[0] ?? null;
   const cardRef = React.useRef<HTMLDivElement>(null);
+
+  // One `vendor_peek_opened` per peek shown, fired once the preview resolves
+  // so it can carry `verified`. Keyed on the vendor, so tapping a second pin
+  // (which swaps the card in place) counts again, and a re-render does not.
+  const peekedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!item || peekedRef.current === item.id) return;
+    peekedRef.current = item.id;
+    captureClient("vendor_peek_opened", {
+      vendor_id: item.id,
+      vendor_type: vendorType,
+      surface,
+      verified: item.verified,
+    });
+  }, [item, vendorType, surface]);
 
   // Escape closes, matching the cluster sheet.
   React.useEffect(() => {
@@ -146,6 +168,15 @@ export function VendorPinPreview({
           selection={selection}
           // `from` returns the back button to the map it was opened from.
           href={`/vendor/${item.id}?from=${encodeURIComponent(returnTo)}`}
+          onNavigate={() =>
+            captureClient("vendor_card_clicked", {
+              vendor_id: item.id,
+              vendor_type: vendorType,
+              surface,
+              position: null,
+              verified: item.verified,
+            })
+          }
           cornerAction={
             <SaveButton vendorId={item.id} vendorType={vendorType} returnTo={returnTo} variant="overlay" />
           }

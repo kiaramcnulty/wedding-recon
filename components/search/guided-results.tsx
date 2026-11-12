@@ -234,6 +234,7 @@ export function GuidedResults({
           <VendorFeed
             entries={result.ranked.map((r) => ({ id: r.id, vendorType: type, rank: r.rank }))}
             scrollKey={SCROLL_KEY}
+            surface="start_list"
             showCategoryPill={false}
             selections={{ [type]: selection }}
             returnTo="/start?restore=list"
@@ -421,6 +422,7 @@ function ResultsMap({
             selection={selection}
             onClose={closePin}
             returnTo="/start?restore=map"
+            surface="start_peek"
           />
         </div>
       )}
