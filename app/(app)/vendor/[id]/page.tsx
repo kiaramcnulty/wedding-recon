@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import {
   MapPin,
@@ -37,6 +37,7 @@ import { BackButton } from "@/components/vendor/back-button";
 import { ExternalLink } from "@/components/external-link";
 import { BrandFooter } from "@/components/brand-lockup";
 import { cn } from "@/lib/utils";
+import { isVendorUuid, vendorPath } from "@/lib/vendors/slug";
 
 /** One row of a verified vendor's published listing (RPC verified_listing_public). */
 interface VerifiedListingRow {
@@ -87,9 +88,16 @@ interface VendorPageProps {
  * over-fetches slightly: one wider query beats two narrow ones when the cost is
  * a network round trip, not bytes.
  */
-const getVendor = cache(async (id: string) => {
+const getVendor = cache(async (ref: string) => {
   const supabase = await createClient();
-  return supabase.from("vendors").select("*").eq("id", id).single();
+  // The segment is a slug (`/vendor/dj-blnce`) or, for a link shared before
+  // slugs existed, the uuid. The page redirects the uuid form to the slug, so
+  // the id lookup only ever serves that redirect. See lib/vendors/slug.ts.
+  return supabase
+    .from("vendors")
+    .select("*")
+    .eq(isVendorUuid(ref) ? "id" : "slug", ref.toLowerCase())
+    .maybeSingle();
 });
 
 // Per-vendor social metadata: a shared /vendor/[id] link (SMS, X, etc.) should
@@ -99,8 +107,8 @@ const getVendor = cache(async (id: string) => {
 export async function generateMetadata({
   params,
 }: VendorPageProps): Promise<Metadata> {
-  const { id } = await params;
-  const { data: vendor } = await getVendor(id);
+  const { id: ref } = await params;
+  const { data: vendor } = await getVendor(ref);
 
   if (!vendor) {
     return { title: "Vendor not found" };
@@ -117,13 +125,16 @@ export async function generateMetadata({
       title: `${vendor.name} · Wedding Recon`,
       description,
       type: "article",
-      url: `/vendor/${id}`,
+      url: vendorPath(vendor),
     },
     twitter: {
       card: "summary_large_image",
       title: `${vendor.name} · Wedding Recon`,
       description,
     },
+    // One canonical URL per vendor however it was reached (slug, a `from`
+    // return path, a tracking param), so search engines index one page.
+    alternates: { canonical: vendorPath(vendor) },
   };
 }
 
@@ -131,25 +142,18 @@ export default async function VendorPage({
   params,
   searchParams,
 }: VendorPageProps) {
-  const { id } = await params;
+  const { id: ref } = await params;
 
   // Where to send the back button: when navigated from another page (e.g. the
   // Planning Hub) a `from` return path is passed. Restrict to internal paths.
   // If absent, BackButton steps back through history, or goes to Explore on a
   // cold arrival (shared link, search result) with nothing to step back to.
-  const { from } = await searchParams;
+  const query = await searchParams;
+  const { from } = query;
   const backHref =
     typeof from === "string" && from.startsWith("/") && !from.startsWith("//")
       ? from
       : null;
-  // This page's own URL *including* its return path. Handed to the Add and
-  // Edit recon forms so they return to a vendor page that still knows where
-  // it came from; dropping the `from` here is what used to strand people
-  // bouncing between a form and this page.
-  const selfHref = backHref
-    ? `/vendor/${id}?from=${encodeURIComponent(backHref)}`
-    : `/vendor/${id}`;
-
   const supabase = await createClient();
 
   // Stage 1 — independent fetches in parallel: the vendor row, the viewer's
@@ -157,22 +161,65 @@ export default async function VendorPage({
   // JWT locally (no Auth-server round trip when the project uses asymmetric
   // signing keys; falls back to a network check otherwise — never slower than
   // the getUser() it replaces, and it runs in parallel here regardless).
+  //
+  // The recon query keys on the vendor through an inner join on the slug, not
+  // on vendor_id, so it does not have to wait for the vendor row to learn the
+  // id. A legacy uuid segment skips it: that request only redirects.
+  const legacyId = isVendorUuid(ref);
   const [vendorRes, claimsRes, entriesRes] = await Promise.all([
     // Deduped with generateMetadata's fetch via React cache() — see getVendor.
-    getVendor(id),
+    getVendor(ref),
     supabase.auth.getClaims(),
-    supabase
-      .from("recon_entries")
-      .select("*, author:profiles(username, is_bot), media:recon_media(*)")
-      .eq("vendor_id", id)
-      .eq("status", "active")
-      .order("created_at", { ascending: false }),
+    legacyId
+      ? null
+      : supabase
+          .from("recon_entries")
+          .select(
+            "*, author:profiles(username, is_bot), media:recon_media(*), vendor:vendors!inner(slug)",
+          )
+          .eq("vendor.slug", ref.toLowerCase())
+          .eq("status", "active")
+          .order("created_at", { ascending: false }),
   ]);
 
   const vendor = vendorRes.data;
   if (vendorRes.error || !vendor) {
     notFound();
   }
+  const id = vendor.id as string;
+
+  // An old /vendor/<uuid> link (or a slug typed in capitals): send it to the
+  // canonical slug URL, keeping its query string (`from`, UTM tags). 308, so
+  // search engines move the old entry onto the new URL.
+  if (vendor.slug && ref !== vendor.slug) {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      for (const v of Array.isArray(value) ? value : [value]) {
+        if (v !== undefined) qs.append(key, v);
+      }
+    }
+    const tail = qs.toString();
+    permanentRedirect(`${vendorPath(vendor)}${tail ? `?${tail}` : ""}`);
+  }
+
+  // This page's own URL *including* its return path. Handed to the Add and
+  // Edit recon forms so they return to a vendor page that still knows where
+  // it came from; dropping the `from` here is what used to strand people
+  // bouncing between a form and this page.
+  const selfHref = vendorPath(vendor, backHref);
+
+  // Only reached with a uuid segment when the row has no slug, i.e. before
+  // migration 0052 is applied: fetch the entries by id as the page always did.
+  const entriesData = entriesRes
+    ? entriesRes.data
+    : (
+        await supabase
+          .from("recon_entries")
+          .select("*, author:profiles(username, is_bot), media:recon_media(*)")
+          .eq("vendor_id", id)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+      ).data;
 
   const userId = claimsRes.data?.claims.sub ?? null;
 
@@ -247,7 +294,7 @@ export default async function VendorPage({
       ...new Set(googlePhotos.map((p) => p.attrib).filter((a): a is string => !!a)),
     ].join(", ") || null;
 
-  const rawList = (entriesRes.data ?? []) as ReconEntryWithDetails[];
+  const rawList = (entriesData ?? []) as ReconEntryWithDetails[];
 
   // Your own entry first, then entries that state a price, then most recently
   // collected. Shared with the preview card's carousel so the entry a card
@@ -364,6 +411,7 @@ export default async function VendorPage({
             <SaveButton vendorId={vendor.id} vendorType={vendor.vendor_type} />
             <ShareButton
               vendorId={vendor.id}
+              slug={vendor.slug ?? null}
               vendorType={vendor.vendor_type}
               name={vendor.name}
             />

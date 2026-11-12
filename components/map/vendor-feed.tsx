@@ -7,9 +7,11 @@ import type { FilterSelections } from "@/lib/filters/match";
 import {
   VendorPreviewCard,
   useVendorPreviews,
+  type VendorPreview,
 } from "@/components/map/vendor-preview-card";
 import { SaveButton } from "@/components/vendor/save-button";
 import { cn } from "@/lib/utils";
+import { vendorPath } from "@/lib/vendors/slug";
 
 /**
  * Rows added per page. Sized to comfortably overfill a phone screen (cards are
@@ -205,8 +207,7 @@ export function VendorFeed({
   }, [items, scrollKey, scrollRef]);
 
   // `from` returns the back button here: /explore?restore=1 restores the view.
-  const vendorHref = (id: string) =>
-    `/vendor/${id}?from=${encodeURIComponent(returnTo)}`;
+  const vendorHref = (item: VendorPreview) => vendorPath(item, returnTo);
 
   /** Remember where we are so returning here lands in the same spot. */
   function rememberScroll() {
@@ -266,7 +267,7 @@ export function VendorFeed({
                     showCategoryPill={showCategoryPill}
                     item={item}
                     vendorType={typeById.get(item.id) ?? "other"}
-                    href={vendorHref(item.id)}
+                    href={vendorHref(item)}
                     onNavigate={rememberScroll}
                     selection={selections?.[typeById.get(item.id) ?? "other"]}
                     cornerAction={

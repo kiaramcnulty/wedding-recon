@@ -82,6 +82,7 @@ or table a migration adds, using the service-role client. Parameter names matter
 | 0049 | `0049_connector_candidates.sql` | Vendor connector API: `connector_vendor_candidates` for the Muse connector. Applied (confirmed callable as anon 2026-11-04) |
 | 0050 | `0050_has_photo_listing_photos.sql` | `vendors_in_bbox.has_photo` counts a verified vendor's own listing photos (via the definer set `verified_listing_photo_ids`). Applied 2026-11-04 (checked as anon: Sanctuary Floral reads `has_photo` true) |
 | 0051 | `0051_planning_contexts.sql` | Guided journey: the owner-only account copy of the journey (`wr:journey`), for cross-device sync. **Not yet applied** (written 2026-11-06); the app runs unchanged without it |
+| 0052 | `0052_vendor_slugs.sql` | `vendors.slug` (unique, not null, URL-shaped check) + before-insert trigger + oldest-first backfill: name, then name-city, then `-2`. Insert-only, so a rename keeps its URL. **Not yet applied** (written 2026-11-11). **Apply BEFORE deploying the slug app change**: the preview cards select `slug` by name and PostgREST rejects an unknown column. Tested in `scripts/test-vendor-slugs.mjs` (pglite) |
 
 ## Groups worth knowing as a set
 

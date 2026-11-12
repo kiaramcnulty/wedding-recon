@@ -41,6 +41,8 @@ const CARD_PHOTO_CAP = 10;
 
 export interface VendorPreview {
   id: string;
+  /** The vendor page URL segment (migration 0052). Link through `vendorPath()`. */
+  slug: string | null;
   name: string;
   /** "City, ST" subtitle under the name; null when the row has no usable place. */
   locality: string | null;
@@ -66,6 +68,7 @@ export interface VendorPreview {
 /** Minimal row shapes for the on-tap detail fetch (client queries are untyped). */
 interface VendorLite {
   id: string;
+  slug: string | null;
   name: string;
   google_photos: unknown[] | null;
   google_place_id: string | null;
@@ -144,7 +147,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
           // city/region/address_text feed the "City, ST" subtitle — three small
           // text columns on rows already being fetched, so no extra round trip.
           .select(
-            "id, name, google_photos, google_place_id, city, region, address_text, filters",
+            "id, slug, name, google_photos, google_place_id, city, region, address_text, filters",
           )
           .in("id", idList),
         supabase
@@ -259,6 +262,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         return [
           {
             id,
+            slug: v.slug ?? null,
             name: v.name,
             locality: formatVendorLocality(v),
             reconCount: counts.get(id) ?? 0,

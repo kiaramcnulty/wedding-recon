@@ -16,6 +16,8 @@ export interface Profile {
 
 export interface Vendor {
   id: string;
+  /** URL segment for the vendor page, generated once from the name (migration 0052). Build links with `vendorPath()` in lib/vendors/slug.ts. */
+  slug: string;
   name: string;
   vendor_type: VendorType;
   google_place_id: string | null;

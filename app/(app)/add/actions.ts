@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeRegion } from "@/lib/normalize-region";
 import { MANUAL_LOCATION_ERROR } from "@/lib/vendor/manual-entry";
 import type { VendorType, ReconType } from "@/lib/constants/categories";
+import { vendorPath as toVendorPath } from "@/lib/vendors/slug";
 
 export interface CreateReconInput {
   // Vendor resolution — exactly one of these scenarios applies:
@@ -231,7 +232,15 @@ export async function createRecon(input: CreateReconInput) {
     input.returnTo?.startsWith("/") && !input.returnTo.startsWith("//")
       ? input.returnTo
       : null;
-  const vendorPath = `/vendor/${vendorId}`;
+  // The slug is set by the database on insert (migration 0052), so look it up
+  // rather than guess it. A miss falls back to the id, which the vendor page
+  // redirects: one extra hop, never a dead end.
+  const { data: slugRow } = await supabase
+    .from("vendors")
+    .select("slug")
+    .eq("id", vendorId)
+    .maybeSingle();
+  const vendorPath = toVendorPath({ id: vendorId, slug: slugRow?.slug });
   const target = !returnTo
     ? vendorPath
     : returnTo === vendorPath || returnTo.startsWith(`${vendorPath}?`)

@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
 
 import { SITE_URL } from "@/lib/site";
+import { vendorPath } from "@/lib/vendors/slug";
 
 /**
  * Regenerated daily. Vendor rows change as launch/enrich runs land, and a
@@ -47,7 +48,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     const { data, error } = await supabase
       .from("vendors")
-      .select("id, created_at")
+      .select("id, slug, created_at")
       .order("created_at", { ascending: false })
       .limit(VENDOR_LIMIT);
 
@@ -56,7 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [
       ...staticRoutes,
       ...data.map((vendor) => ({
-        url: `${SITE_URL}/vendor/${vendor.id}`,
+        url: `${SITE_URL}${vendorPath(vendor)}`,
         lastModified: vendor.created_at ? new Date(vendor.created_at) : undefined,
         changeFrequency: "weekly" as const,
         priority: 0.6,

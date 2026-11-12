@@ -9,6 +9,7 @@ import {
   VendorPreviewCard,
   useVendorPreviews,
 } from "@/components/map/vendor-preview-card";
+import { vendorPath } from "@/lib/vendors/slug";
 
 interface VendorPinPreviewProps {
   vendorId: string;
@@ -145,7 +146,7 @@ export function VendorPinPreview({
           vendorType={vendorType}
           selection={selection}
           // `from` returns the back button to the map it was opened from.
-          href={`/vendor/${item.id}?from=${encodeURIComponent(returnTo)}`}
+          href={vendorPath(item, returnTo)}
           cornerAction={
             <SaveButton vendorId={item.id} vendorType={vendorType} returnTo={returnTo} variant="overlay" />
           }

@@ -6,16 +6,19 @@ import { captureClient } from "@/lib/analytics/posthog";
 import { Button } from "@/components/ui/button";
 import type { VendorType } from "@/lib/constants/categories";
 import { CATEGORIES } from "@/lib/constants/categories";
+import { vendorPath } from "@/lib/vendors/slug";
 
 interface ShareButtonProps {
   vendorId: string;
+  /** The vendor page slug, so a shared link reads /vendor/dj-blnce rather than a uuid. */
+  slug: string | null;
   vendorType: VendorType;
   name: string;
 }
 
-export function ShareButton({ vendorId, vendorType, name }: ShareButtonProps) {
+export function ShareButton({ vendorId, slug, vendorType, name }: ShareButtonProps) {
   const categoryLabel = CATEGORIES[vendorType]?.label ?? vendorType;
-  const url = `${process.env.NEXT_PUBLIC_SITE_URL}/vendor/${vendorId}`;
+  const url = `${process.env.NEXT_PUBLIC_SITE_URL}${vendorPath({ id: vendorId, slug })}`;
   const shareText = `Check out ${name} — a ${categoryLabel} vendor on Wedding Recon!`;
 
   async function handleShare() {

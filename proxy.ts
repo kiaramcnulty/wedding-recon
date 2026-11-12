@@ -1,8 +1,14 @@
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { applyFirstVisitGate } from "@/lib/landing/first-visit";
+import { legacyVendorRedirect } from "@/lib/vendors/legacy-redirect";
 
 export async function proxy(request: NextRequest) {
+  // Old /vendor/<uuid> links: a real 308 to the slug URL, before any session
+  // work, since the redirect carries no page and needs no session.
+  const legacy = await legacyVendorRedirect(request);
+  if (legacy) return legacy;
+
   const { response, claims } = await updateSession(request);
   // Decides between the landing page and the product at `/`, and records that a
   // visitor has reached the product. Reuses the claims updateSession already

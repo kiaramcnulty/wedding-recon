@@ -216,6 +216,8 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
 
   revalidatePath("/portal");
   revalidatePath(`/portal/listing/${input.vendorId}`);
-  revalidatePath(`/vendor/${input.vendorId}`);
+  // The public page lives at /vendor/<slug>, which this action does not have in
+  // hand; revalidating the route covers the slug and any legacy uuid URL alike.
+  revalidatePath("/vendor/[id]", "page");
   return { ok: true, published };
 }
