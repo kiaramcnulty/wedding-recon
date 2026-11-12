@@ -58,6 +58,8 @@ The same key is used by the browser and by `posthog-node` server-side — there 
 
 No events for map pans, filter taps, or peek cards in v1 — pageviews on `/explore` and `/vendor/[id]` cover browsing depth.
 
+**Added 2026-11-11 (listing exposure):** `vendor_impression`, `vendor_peek_opened` and `vendor_card_clicked`. See `docs/notes/analytics.md` ("Listing exposure events") for why: without them, the main verified perk (sorting first) was invisible to measurement.
+
 ### Privacy posture
 No PII in properties (no emails/names). `identified_only` keeps anonymous browsers anonymous until sign-in. Referrer stored as host only. No cookie banner for v1 (US-only, first-party). **Flag for `/terms`:** we now persist a coarse marketing source (`utm_*` + referrer host) against the account — worth a one-line mention.
 

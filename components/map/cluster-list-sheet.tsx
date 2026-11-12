@@ -54,6 +54,7 @@ export function ClusterListSheet({
       entries={rows}
       heading={heading}
       scrollKey="wr:clusterScroll"
+      surface="explore_cluster"
       selections={selections}
       onClose={onClose}
     />

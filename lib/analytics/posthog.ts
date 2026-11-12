@@ -80,8 +80,31 @@ export function resetClient(): void {
   }
 }
 
+/** The feeds a listing card can be shown in. */
+export type ListingSurface = "explore_list" | "explore_cluster" | "start_list";
+/** The maps whose pins open a peek card. */
+export type PeekSurface = "explore_peek" | "start_peek";
+
 /**
- * The three client-side engagement events and their property shapes. Conversions
+ * Listings already reported as seen on a surface. Module-level so it survives
+ * client navigation: going to a vendor page and back re-mounts the feed, and
+ * counting the same cards again on every round trip would make heavy browsers
+ * look like more exposure. A full reload starts it over.
+ */
+const seenListings = new Set<string>();
+
+/** `vendor_impression`, deduped to once per listing per surface per page load. */
+export function captureImpression(
+  properties: ClientEvents["vendor_impression"],
+): void {
+  const key = `${properties.surface}:${properties.vendor_id}`;
+  if (seenListings.has(key)) return;
+  seenListings.add(key);
+  captureClient("vendor_impression", properties);
+}
+
+/**
+ * The client-side engagement events and their property shapes. Conversions
  * are intentionally absent — they live server-side.
  */
 type ClientEvents = {
@@ -97,6 +120,39 @@ type ClientEvents = {
   vendor_portal_cta_clicked: { placement: "hero" | "closing" | "signin" };
   /** A couple clicked a verified vendor's CTA button on the vendor page. */
   vendor_cta_clicked: { vendor_id: string; cta_label: string };
+  /**
+   * A listing card was actually SEEN in a feed (at least half on screen), at
+   * most once per listing per surface per page load. The denominator for
+   * "does verification earn more attention": a verified vendor sorts first
+   * (`lib/map/rank.ts`), and before this event that only showed up as page
+   * views, which are downstream of it. `position` is 0-based in the feed.
+   */
+  vendor_impression: {
+    vendor_id: string;
+    vendor_type: string;
+    surface: ListingSurface;
+    position: number;
+    verified: boolean;
+  };
+  /** A map pin was tapped and its peek card shown (the map impression). */
+  vendor_peek_opened: {
+    vendor_id: string;
+    vendor_type: string;
+    surface: PeekSurface;
+    verified: boolean;
+  };
+  /**
+   * A feed or peek card was tapped through to the vendor page. The pageview
+   * that follows cannot tell list from map (both carry the same `from`), so
+   * this is what pairs with the two events above into a click-through rate.
+   */
+  vendor_card_clicked: {
+    vendor_id: string;
+    vendor_type: string;
+    surface: ListingSurface | PeekSurface;
+    position: number | null;
+    verified: boolean;
+  };
   /** Real browser arrival from a Muse connector result; separate from first-touch. */
   muse_arrival: { landing_path: string; campaign: string | null };
   /** Guided journey (/start): a screen was reached. Coarse on purpose, no location. */

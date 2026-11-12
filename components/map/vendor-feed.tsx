@@ -10,6 +10,11 @@ import {
   type VendorPreview,
 } from "@/components/map/vendor-preview-card";
 import { SaveButton } from "@/components/vendor/save-button";
+import {
+  captureClient,
+  captureImpression,
+  type ListingSurface,
+} from "@/lib/analytics/posthog";
 import { cn } from "@/lib/utils";
 import { vendorPath } from "@/lib/vendors/slug";
 
@@ -56,6 +61,7 @@ const PARTIAL_DIVIDER_LABEL = "Partial matches in the area";
  */
 export function VendorFeed({
   entries,
+  surface,
   scrollKey,
   footnote,
   selections,
@@ -68,6 +74,11 @@ export function VendorFeed({
 }: {
   /** Vendors to list, in display order. Each carries its OWN type, so a feed can mix them. */
   entries: VendorListEntry[];
+  /**
+   * Which feed this is, for the `vendor_impression` / `vendor_card_clicked`
+   * analytics events. Required so a new feed cannot ship uncounted.
+   */
+  surface: ListingSurface;
   /** sessionStorage key the scroll position is parked under across a vendor round trip. */
   scrollKey: string;
   /** Rendered under the last card — e.g. a note that the feed was capped. */
@@ -187,6 +198,39 @@ export function VendorFeed({
     return () => io.disconnect();
   }, [hasMore, entries.length, scrollRef, items]);
 
+  // Impressions: a card counts as seen once at least half of it is on screen
+  // in the scroll container. One observer for the whole feed, re-attached as
+  // pages load in; captureImpression dedupes, so re-observing is harmless.
+  // Position and verified ride on the element so the callback needs no lookup.
+  const listRef = React.useRef<HTMLUListElement>(null);
+  React.useEffect(() => {
+    const list = listRef.current;
+    if (!list || !items?.length) return;
+    const io = new IntersectionObserver(
+      (obs) => {
+        for (const o of obs) {
+          if (!o.isIntersecting) continue;
+          const el = o.target as HTMLElement;
+          const id = el.dataset.vendorId;
+          if (!id) continue;
+          captureImpression({
+            vendor_id: id,
+            vendor_type: el.dataset.vendorType ?? "other",
+            surface,
+            position: Number(el.dataset.position),
+            verified: el.dataset.verified === "true",
+          });
+          io.unobserve(el);
+        }
+      },
+      { root: scrollRef.current, threshold: 0.5 },
+    );
+    for (const el of list.querySelectorAll<HTMLElement>("[data-vendor-id]")) {
+      io.observe(el);
+    }
+    return () => io.disconnect();
+  }, [items, surface, scrollRef]);
+
   // Restore scroll after returning from a vendor page. Set before paint (layout
   // effect) so the list doesn't flash at the top first.
   React.useLayoutEffect(() => {
@@ -242,8 +286,8 @@ export function VendorFeed({
         </p>
       ) : (
         <>
-          <ul className="flex flex-col gap-3">
-            {items.map((item) => (
+          <ul ref={listRef} className="flex flex-col gap-3">
+            {items.map((item, position) => (
               <React.Fragment key={item.id}>
                 {item.id === firstPartialId && (
                   // A real list item, not a decorated gap: a screen reader
@@ -262,13 +306,26 @@ export function VendorFeed({
                   // skip layout/paint, so a few-hundred-item feed stays smooth.
                   // Every card is one height now (photo strip + three lines).
                   className="[content-visibility:auto] [contain-intrinsic-size:auto_212px]"
+                  data-vendor-id={item.id}
+                  data-vendor-type={typeById.get(item.id) ?? "other"}
+                  data-position={position}
+                  data-verified={item.verified}
                 >
                   <VendorPreviewCard
                     showCategoryPill={showCategoryPill}
                     item={item}
                     vendorType={typeById.get(item.id) ?? "other"}
                     href={vendorHref(item)}
-                    onNavigate={rememberScroll}
+                    onNavigate={() => {
+                      captureClient("vendor_card_clicked", {
+                        vendor_id: item.id,
+                        vendor_type: typeById.get(item.id) ?? "other",
+                        surface,
+                        position,
+                        verified: item.verified,
+                      });
+                      rememberScroll();
+                    }}
                     selection={selections?.[typeById.get(item.id) ?? "other"]}
                     cornerAction={
                       <SaveButton
