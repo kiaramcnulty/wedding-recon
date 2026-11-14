@@ -57,9 +57,30 @@ local build):
 So per visit, most of the CPU was **request amplification**, not pages people
 read: no-op proxy runs, the map fan-out missing its 60-second cache, and
 prefetches for cards nobody stopped on. (This is from per-request cost times
-per-visit request counts. The real per-route split is in the Vercel dashboard,
-and was not available when this was written; crawler renders of vendor pages
-are the one large line this cannot see.)
+per-visit request counts; the dashboard split below came later.)
+
+**The real split, Oct 15 - Nov 14 (before PR #80)**, from the team Usage tab:
+about **3h39m of the 4h** Hobby allowance.
+
+| By type | CPU | Share |
+|---|---|---|
+| Middleware (the proxy) | 2h10m | 59.4% |
+| Functions | 1h29m | 40.6% |
+
+| By region | Share |
+|---|---|
+| iad1 (Washington, D.C.) | 51.6% |
+| sfo1 (San Francisco) | 17.4% |
+| sin1 (Singapore) | 13.1% |
+| fra1 (Frankfurt) | 8.9% |
+| syd1 (Sydney) | 8.2% |
+| every other region | under 1% each |
+
+Hobby runs functions only in iad1, so **nearly all the non-iad1 CPU was the
+proxy** running near the visitor, much of it crawler traffic from abroad --
+the no-op runs item 1 removed. The **~40% that is functions, all in iad1**, is
+vendor page renders, the map API and prefetches: the share items 2, 5 and 6
+go after.
 
 ## What changed
 
@@ -151,7 +172,10 @@ are the one large line this cannot see.)
   deliberately courts answer-engine bots. That is a product call, not a perf
   default; if crawler volume turns out to dominate, block the *training*
   crawlers (GPTBot, ClaudeBot, CCBot, Bytespider, meta-externalagent) and keep
-  the search/answer ones.
+  the search/answer ones. Less pressing now: most crawler CPU was the proxy
+  outside iad1 (the split above), which item 1 removed, and a crawler hit on a
+  vendor page is a CDN hit after item 6. Crawlers still drive ISR writes after
+  each deploy (the ISR section below).
 - **The bottom nav's `/hub` prefetch and the profile menu's `/portal`.** Both
   dynamic, so each is an invocation per page view, but each costs ~2 ms
   anonymous; not worth bending the tap feel of the Hub tab for.
@@ -209,9 +233,9 @@ the 30-day window resets. What that means here:
   curl -sI "https://www.weddingrecon.com/vendor/dj-blnce?from=%2Fexplore" | grep -i x-vercel-cache
   ```
 - Reading the Usage tab's **Regions** view: Hobby runs functions in one
-  region (iad1 here), so CPU billed in sin1 / fra1 / syd1 is most likely the
-  proxy, which runs near the visitor, rather than page renders. Not confirmed;
-  the **Type** tab splits Middleware from Functions and settles it.
+  region (iad1 here), so CPU billed in sin1 / fra1 / syd1 and the other
+  non-iad1 regions is the proxy, which runs near the visitor. The **Type** tab
+  splits Middleware from Functions (the Oct 15 - Nov 14 figures are above).
 - The real breakdown lives in the Vercel dashboard: project -> Observability
   -> Functions (Hobby shows per-function totals; per-path breakdown needs
   Observability Plus), and the team Usage tab for the CPU-hours line.
