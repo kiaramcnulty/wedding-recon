@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { AUTH_COOKIE_NAME } from "./auth-cookie";
+
 /**
  * Refreshes the Supabase auth session on each request and keeps cookies in sync.
  * Call from the root middleware. Does NOT gate routes — public vendor pages and
@@ -17,6 +19,8 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // The name the proxy matcher keys on; see lib/supabase/auth-cookie.ts.
+      cookieOptions: { name: AUTH_COOKIE_NAME },
       cookies: {
         getAll() {
           return request.cookies.getAll();

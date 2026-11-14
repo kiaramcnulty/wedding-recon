@@ -12,6 +12,7 @@ import type { FilterSelection, VendorFilters } from "@/lib/filters/match";
 import { vendorTags } from "@/lib/filters/vendor-tags";
 import { VendorTagPreview } from "@/components/vendor/vendor-tags";
 import { VerifiedBadge } from "@/components/vendor/verified-badge";
+import { useIntentPrefetch } from "@/lib/use-intent-prefetch";
 import { cn } from "@/lib/utils";
 
 /**
@@ -382,10 +383,18 @@ export function VendorPreviewCard({
     router.push(href);
   };
 
+  // The Link prefetches only once this card has held still on screen or been
+  // touched/hovered/focused -- not for every card scrolled past, each of which
+  // was a billed server render. See lib/use-intent-prefetch.ts.
+  const { ref: cardRef, armed, intent } = useIntentPrefetch<HTMLDivElement>();
+
   return (
     // The scrollable strip can't live inside the main control, so the card is
-    // a div: swipeable photos on top, the link below.
+    // a div: swipeable photos on top, the link below. Intent anywhere on the
+    // card arms the prefetch, so a tap on the photos benefits too.
     <div
+      ref={cardRef}
+      {...intent}
       className={cn(
         // hover must stay OPAQUE: the single-pin peek card floats directly over
         // the map, so a translucent hover (bg-muted/40) let the basemap's roads
@@ -423,6 +432,7 @@ export function VendorPreviewCard({
       <div className="flex items-stretch">
         <Link
           href={href}
+          prefetch={armed ? null : false}
           onClick={onNavigate}
           // `no-underline!` is required, not cosmetic: in the Hub this card sits
           // inside AccordionContent, which underlines every descendant anchor

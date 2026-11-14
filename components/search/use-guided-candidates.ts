@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { mapFreshToken } from "@/lib/map/fresh";
 import { snapBbox } from "@/lib/map/viewport";
 import {
   envelopeFor,
@@ -66,6 +67,10 @@ export function useGuidedCandidates(
       max_rows: String(MAX_ROWS),
       attrs: "1",
     });
+    // Same as the map: after this browser's own write, skip the shared CDN
+    // copy (lib/map/fresh.ts).
+    const fresh = mapFreshToken();
+    if (fresh) params.set("fresh", fresh);
     const url = `/api/map/vendors?${params.toString()}`;
     // Deferred a tick so the loading state is not set synchronously in the
     // effect body (react-hooks/set-state-in-effect).

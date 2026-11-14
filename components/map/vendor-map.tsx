@@ -18,6 +18,7 @@ import {
 } from "@/lib/map/pin-images";
 import { isApproximateLocation } from "@/lib/map/vendor-location";
 import { bboxForView, padBbox, snapBbox, type ViewportBbox } from "@/lib/map/viewport";
+import { mapFreshToken } from "@/lib/map/fresh";
 import { mapWithConcurrency, withRpcRetry } from "@/lib/map/rpc-fanout";
 import { compareRanked, type RankedVendor } from "@/lib/map/rank";
 import { ringFeature } from "@/lib/map/ring";
@@ -97,6 +98,10 @@ async function fetchVendorsInBbox(
     type,
     max_rows: String(maxRows),
   });
+  // After this browser's own write, skip the shared hour-long CDN copy so the
+  // author sees it (lib/map/fresh.ts). Everyone else keeps the shared copy.
+  const fresh = mapFreshToken();
+  if (fresh) params.set("fresh", fresh);
   try {
     const res = await fetch(`/api/map/vendors?${params.toString()}`, {
       credentials: "omit",

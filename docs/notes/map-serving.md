@@ -28,9 +28,11 @@ gone for everybody.
 **1. An edge-cached route: `app/api/map/vendors/route.ts`.** The browser calls
 this instead of the RPC. It returns the raw `vendors_in_bbox` rows, so the map is
 unchanged downstream. The point is purely the cache: `CDN-Cache-Control:
-public, s-maxage=60, stale-while-revalidate=300` collapses a spike of identical
-viewports into roughly **one DB hit per minute**. `Cache-Control` holds nothing in
-the browser -- vendor data changes, and the shared cache is where the win is.
+public, s-maxage=3600, stale-while-revalidate=3600` collapses a spike of
+identical viewports into roughly **one DB hit per hour** (it was `s-maxage=60`
+until 2026-11-14; raised for the function-CPU budget, see "Tuning" below).
+`Cache-Control` holds nothing in the browser -- vendor data changes, and the
+shared cache is where the win is.
 
 Two things keep it cacheable and **must stay true**:
 - it is EXCLUDED from the auth middleware (the `proxy.ts` matcher), so no
@@ -72,7 +74,17 @@ than after two backoffs. `scripts/test-rpc-fanout.mjs` covers the classifier.
 
 - `RPC_CONCURRENCY` is the knob: **lower is gentler on the DB, higher fills the
   map in fewer waves.**
-- Raising `s-maxage` buys more protection and more staleness. 60s was chosen
+- **`s-maxage` is now an hour (2026-11-14), for CPU, not the DB.** Every miss
+  is a billed function invocation (~9 ms CPU, ~5 ms of it fixed), a map load is
+  ~13 of them, and the default Explore view is one Colorado-wide snapped box
+  that nearly every visitor shares -- yet at 60 s, any two visitors more than
+  a minute apart each paid for all ~13. The CDN cache is also keyed per deployment, so each deploy
+  starts it cold. The staleness this adds is bounded for the person who
+  caused it: a recon save/edit or a portal listing save sets the one-hour
+  `wr_map_fresh` cookie, and that browser's map requests add `&fresh=<token>`,
+  a separate CDN key (`lib/map/fresh.ts`). Everyone else may see a new vendor,
+  verification or recon count up to an hour late. `docs/notes/function-cpu.md`.
+- (History) Raising `s-maxage` buys more protection and more staleness. 60s was chosen
   because a newly seeded vendor appearing within a minute is fine.
 - The **prefetch-at-mount** behavior is unaffected and still applies: the query
   fires before MapLibre is downloaded, using a bbox computed from center/zoom/
