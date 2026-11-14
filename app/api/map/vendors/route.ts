@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ALL_VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
+import { MAP_CACHE_TAG } from "@/lib/map/purge";
 
 /**
  * GET /api/map/vendors?min_lng&min_lat&max_lng&max_lat&type&max_rows[&attrs=1]
@@ -152,6 +153,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // deployment starts the cache over regardless. On error above we send
       // no-store instead, so failures never stick in the cache.
       "CDN-Cache-Control": "public, s-maxage=3600, stale-while-revalidate=3600",
+      // Lets a verification change drop every cached copy at once instead of
+      // waiting out the hour (lib/map/purge.ts). Success responses only.
+      "Vercel-Cache-Tag": MAP_CACHE_TAG,
     },
   });
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { purgeMapCache } from "@/lib/map/purge";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminUser } from "@/lib/auth/admin";
@@ -35,8 +36,10 @@ export async function revokeClaim(claimId: string): Promise<RevokeResult> {
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/portal/admin");
-  // A revoked claim ends verification, so the cached vendor page must drop
-  // its badge and listing now, not within the hour.
+  // An approved claim is one leg of being verified, so a revoke can take a
+  // badge off the map, which is CDN-cached for an hour (lib/map/purge.ts),
+  // and off the vendor page, which is a cached render too (ISR).
+  await purgeMapCache(`claim ${claimId} revoked`);
   if (revoked?.vendor_id) {
     await revalidateVendorPage({ id: revoked.vendor_id as string });
   }

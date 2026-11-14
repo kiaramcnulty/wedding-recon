@@ -30,7 +30,7 @@ treat absolute numbers as a floor and the ratios as the finding.
 
 | Request | CPU / request |
 |---|---|
-| Vendor page, full SSR | ~37 ms (now cached, item 4: ~1.35 ms locally on a HIT, 0 on Vercel's CDN) |
+| Vendor page, full SSR | ~37 ms (now cached, item 6: ~1.35 ms locally on a HIT, 0 on Vercel's CDN) |
 | Vendor page, client navigation (RSC) | ~21 ms |
 | **Vendor page prefetch** (loading boundary) | **~11.5 ms** -- runs `generateMetadata`, a DB read |
 | Vendor page prefetch, route tree | ~1.5 ms |
@@ -88,16 +88,30 @@ are the one large line this cannot see.)
    to a shared grid and the default view is one Colorado-wide box, so almost
    every Explore visitor asks for the same 13 URLs; at 60 s, any two visitors
    more than a minute apart each paid for all 13. Cost: a new vendor, verification, or recon count
-   can take up to an hour to reach the map (the vendor page is expired by every app write, item 4).
+   can take up to an hour to reach the map (the vendor page is expired by every app write, item 6).
    - **The author is exempt**: a recon save, a recon edit and a portal listing
      save set a one-hour `wr_map_fresh` cookie (`lib/map/fresh-server.ts`),
      and while it lives that browser's map and guided-search requests add
      `&fresh=<token>` -- a separate CDN key, so they get current rows while
      everyone else shares the cached ones. The route ignores the parameter.
-   - Not covered: a newly *verified* vendor (the Stripe webhook is
-     server-to-server, so there is no browser to mark) sees the badge on the
-     map within the hour, on the vendor page at once.
-3. **Vendor cards prefetch on dwell or intent, not on scroll**
+   - Verification has no browser to mark (the Stripe webhook is
+     server-to-server), so instead every map response carries
+     `Vercel-Cache-Tag: map-vendors`, and the writes that can change who is
+     verified drop that tag (`purgeMapCache()` in `lib/map/purge.ts`,
+     `dangerouslyDeleteByTag` from `@vercel/functions`): `mirrorSubscription()`
+     when a vendor's status crosses `active` either way, a portal listing
+     save, and an admin claim revoke. The next request for each map URL is
+     rebuilt, so the badge shows on the vendor's next load. Kept off routine
+     writes on purpose: each purge refills the map cache for everyone. Outside
+     a Vercel function it does nothing, so local runs cannot exercise it.
+4. **Commits that change nothing deployed do not deploy** (`vercel.json`
+   `ignoreCommand` -> `scripts/vercel-ignore-build.sh`). Every deploy starts
+   the CDN cache over, and this repo merges a lot of notes, pipeline scripts,
+   migrations and skill files. The build is skipped only when EVERY file
+   changed since the branch's last successful deployment is outside the app
+   (the list is in the script); anything uncertain builds.
+   `scripts/test-vercel-ignore-build.mjs` runs it against throwaway repos.
+5. **Vendor cards prefetch on dwell or intent, not on scroll**
    (`lib/use-intent-prefetch.ts`, used by `VendorPreviewCard`, so the Explore
    feed, cluster sheet, pin peek, guided results and the Hub all move
    together). The Link's `prefetch` stays `false` until the card has been at
@@ -106,7 +120,7 @@ are the one large line this cannot see.)
    honors immediately for an on-screen link. The tap-feel contract in
    CLAUDE.md (a card's main control is a `<Link>` so `loading.tsx` is
    prefetched) still holds for every card someone stops on.
-4. **The vendor page is cached (ISR), 2026-11-14.** `revalidate = 3600` and an
+6. **The vendor page is cached (ISR), 2026-11-14.** `revalidate = 3600` and an
    empty `generateStaticParams`, so each vendor renders once and is then a CDN
    hit for every visitor and crawler until a write expires it. The render no
    longer reads cookies or the query string; the per-viewer parts (the "Edit
@@ -118,12 +132,12 @@ are the one large line this cannot see.)
      5 database reads, the next requests 0; a HIT cost ~1.35 ms of server CPU
      (on Vercel, a CDN hit costs none) against ~14 ms for a bare-vendor render
      on the same machine (~37 ms for a real one, above).
-   - Side effect worth knowing: vendor-card prefetches (item 3) now hit the
+   - Side effect worth knowing: vendor-card prefetches (item 5) now hit the
      CDN too, so the dwell rule mostly saves CDN requests rather than CPU.
 
 ## Deliberately NOT done (yet), and why
 
-- ~~**Vendor page ISR.**~~ Done 2026-11-14, item 4 above. Left out of that
+- ~~**Vendor page ISR.**~~ Done 2026-11-14, item 6 above. Left out of that
   change on purpose: writes that do not go through the app (seed and enrich
   uploads, the reconcile writers, `filter-recon-daily`, dashboard edits) do
   not expire the page; they show within the hour.
@@ -142,7 +156,7 @@ are the one large line this cannot see.)
   dynamic, so each is an invocation per page view, but each costs ~2 ms
   anonymous; not worth bending the tap feel of the Hub tab for.
 
-## ISR has its own Hobby allowance (watch it after item 4)
+## ISR has its own Hobby allowance (watch it after item 6)
 
 Caching the vendor page trades function CPU for ISR usage, which Hobby also
 caps: **200k ISR writes and 1M ISR reads a month, in 8 KB units** (Vercel
@@ -162,8 +176,9 @@ the 30-day window resets. What that means here:
   10k-18k units, and the allowance covers on the order of 10-20 of those a
   month. Frequent production deploys plus aggressive crawlers are the way this
   could run out. Check the **ISR Writes** line on the team Usage tab a few
-  days after this ships; if it climbs toward the cap, batch production deploys
-  before anything else.
+  days after this ships; if it climbs toward the cap, cut production deploys
+  before anything else (item 4 already skips the ones that change nothing
+  deployed).
 
 ## Checking it in production
 
@@ -185,7 +200,7 @@ the 30-day window resets. What that means here:
   exclusions) until it is understood.
 - A map response should come back `x-vercel-cache: HIT` on a second request
   to the same URL within the hour.
-- So should a vendor page, query string or not (item 4). A MISS on every
+- So should a vendor page, query string or not (item 6). A MISS on every
   request means the render started reading the request again (see
   `docs/notes/vendor-page.md`):
 

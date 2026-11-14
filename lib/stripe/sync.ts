@@ -1,6 +1,7 @@
 import "server-only";
 import type Stripe from "stripe";
 
+import { purgeMapCache } from "@/lib/map/purge";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { revalidateVendorPage } from "@/lib/vendors/revalidate";
 import { periodEnd } from "./webhook-events";
@@ -19,10 +20,11 @@ import { periodEnd } from "./webhook-events";
  *
  * Service role because vendor_subscriptions is deny-all RLS (0044).
  *
- * Expires the vendor page's cached render on every call: the status decides
- * the Verified badge and whether the listing shows (verified_vendor_ids), and
- * this is the one place both the webhook and the reconcile path go through.
- * Only callable from a Route Handler or Server Action (revalidatePath).
+ * When the active status flips it also drops the map cache and expires the
+ * vendor page's cached render: the status decides the Verified badge and
+ * whether the listing shows (verified_vendor_ids), and this is the one place
+ * both the webhook and the reconcile path go through. Only callable from a
+ * Route Handler or Server Action (revalidatePath).
  *
  * @returns whether perks are now live for this vendor (status === "active").
  */
@@ -33,6 +35,13 @@ export async function mirrorSubscription(
   const svc = createServiceRoleClient();
   const customerId =
     typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+
+  // The status before this write, to tell whether verification is changing.
+  const { data: before } = await svc
+    .from("vendor_subscriptions")
+    .select("status")
+    .eq("vendor_id", vendorId)
+    .maybeSingle();
 
   await svc.from("vendor_subscriptions").upsert(
     {
@@ -56,7 +65,18 @@ export async function mirrorSubscription(
       .eq("vendor_id", vendorId);
   }
 
-  await revalidateVendorPage({ id: vendorId });
+  // Becoming verified (or losing it) changes the badge and the sort order on
+  // the map, which is CDN-cached for an hour and has no browser here to mark.
+  // Drop the map cache so the vendor sees it on their next load. Only on a
+  // CHANGE: Stripe sends several events per checkout and one per renewal, and
+  // each purge refills the map cache for everyone (lib/map/purge.ts). The
+  // vendor page is a cached render too (ISR): expire it on the same change,
+  // since the badge and the published listing are all that status decides
+  // there.
+  if ((before?.status === "active") !== (sub.status === "active")) {
+    await purgeMapCache(`vendor ${vendorId} subscription ${sub.status}`);
+    await revalidateVendorPage({ id: vendorId });
+  }
 
   return sub.status === "active";
 }

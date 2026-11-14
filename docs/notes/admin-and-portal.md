@@ -81,7 +81,12 @@ any of it, because it records what each slice deliberately left out.
   `vendor_subscriptions`**, shared by the webhook and by the billing action's
   reconcile path. Both have to produce identical state -- the reconcile path
   exists for when the webhook did not run, so a divergent shape would make the
-  repair worse than the gap.
+  repair worse than the gap. It is also where a verification change reaches
+  the MAP: when the status crosses `active` either way it drops the map's CDN
+  cache (`purgeMapCache()`, `lib/map/purge.ts`), because the map is cached for
+  an hour and a webhook has no browser to mark. A listing save and a claim
+  revoke do the same, since published-ness and the approved claim are the
+  other two legs of `verified_vendor_ids()`.
 - **Checkout consults Stripe, not just our mirror.** `vendor_subscriptions` is
   written only by the webhook, so a missed delivery leaves it empty and the
   mirror alone reports "never paid" about someone who has paid -- and the
