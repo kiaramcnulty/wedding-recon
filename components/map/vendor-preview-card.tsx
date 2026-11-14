@@ -80,7 +80,6 @@ interface VendorLite {
 }
 interface ReconRow {
   vendor_id: string;
-  author_id: string;
   // The price fields are read by sortReconEntries (priced entries first).
   price_text: string | null;
   price_details: string | null;
@@ -95,14 +94,14 @@ interface ReconRow {
 /**
  * Fetch preview data for a set of vendor ids. Returns null while in flight, then
  * the built previews in the *given id order* (ids whose vendor row is gone are
- * dropped). Three client queries, no RPC/migration: the vendor rows, their
- * active recon entries with media (tallied for the count + a fallback
- * thumbnail), and the viewer's identity so their own recon sorts first.
+ * dropped). Two client queries plus the verification RPCs: the vendor rows
+ * and their active recon entries with media (tallied for the count + a
+ * fallback thumbnail).
  *
- * The identity check is `getClaims()` — a local JWT verify, no round trip on a
- * project with asymmetric signing keys. Explore is public, so a signed-out
- * viewer is normal: `viewerId` is simply null and the "mine first" key and the
- * tag are both no-ops (the price and recency keys still apply).
+ * It no longer reads the viewer's identity. It did, to sort the viewer's own
+ * recon first; that key left `sortReconEntries` when the vendor page became a
+ * cached render that cannot know the viewer (lib/recon-sort.ts), and the card
+ * follows the page so it leads with the same entry.
  */
 /** Ceiling on the per-session preview cache before it is dropped wholesale. */
 const PREVIEW_CACHE_MAX = 600;
@@ -142,7 +141,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
     if (idList.length === 0) return;
     (async () => {
       const supabase = createClient();
-      const [vendorsRes, reconRes, claimsRes, verifiedRes, overridesRes] = await Promise.all([
+      const [vendorsRes, reconRes, verifiedRes, overridesRes] = await Promise.all([
         supabase
           .from("vendors")
           // city/region/address_text feed the "City, ST" subtitle — three small
@@ -154,12 +153,11 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
         supabase
           .from("recon_entries")
           .select(
-            "vendor_id, author_id, price_text, price_details, recon_collected_month, recon_collected_year, created_at, media:recon_media(thumb_path, storage_path)",
+            "vendor_id, price_text, price_details, recon_collected_month, recon_collected_year, created_at, media:recon_media(thumb_path, storage_path)",
           )
           .eq("status", "active")
           .in("vendor_id", idList)
           .order("created_at", { ascending: false }),
-        supabase.auth.getClaims(),
         // Which of these ids are verified vendors. A SECURITY DEFINER set
         // function (migration 0044), because the perks rule reads the deny-all
         // subscriptions table a plain select cannot touch. An error here (the
@@ -178,7 +176,6 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
 
       const vendors = (vendorsRes.data ?? []) as unknown as VendorLite[];
       const recons = (reconRes.data ?? []) as unknown as ReconRow[];
-      const viewerId = claimsRes.data?.claims.sub ?? null;
       const verifiedIds = new Set<string>(
         ((verifiedRes.data ?? []) as { vendor_id: string }[]).map(
           (r) => r.vendor_id,
@@ -227,7 +224,7 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
       // it is the same order the vendor page uses. Bucketing by vendor_id below
       // preserves the relative order inside each vendor's rows, which is the
       // only ordering that matters here.
-      const ordered = sortReconEntries(recons, viewerId);
+      const ordered = sortReconEntries(recons);
 
       // Tally active recon counts and collect every recon photo per vendor.
       const counts = new Map<string, number>();

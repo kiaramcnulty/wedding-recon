@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateVendorPage } from "@/lib/vendors/revalidate";
 import { markMapFresh } from "@/lib/map/fresh-server";
 import { purgeMapCache } from "@/lib/map/purge";
 
@@ -218,9 +219,10 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
 
   revalidatePath("/portal");
   revalidatePath(`/portal/listing/${input.vendorId}`);
-  // The public page lives at /vendor/<slug>, which this action does not have in
-  // hand; revalidating the route covers the slug and any legacy uuid URL alike.
-  revalidatePath("/vendor/[id]", "page");
+  // The public page is a cached render (ISR); expire just this vendor's (the
+  // helper looks the slug up). Not the whole "/vendor/[id]" route: that would
+  // expire every vendor page on every listing save.
+  await revalidateVendorPage({ id: input.vendorId });
   // Filter overrides, and whether the listing is published (one leg of being
   // verified), show on the map, which is CDN-cached for an hour. Drop that
   // cache so every visitor sees the change (lib/map/purge.ts; listing saves

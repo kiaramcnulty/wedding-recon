@@ -8,6 +8,7 @@ import { normalizeRegion } from "@/lib/normalize-region";
 import { MANUAL_LOCATION_ERROR } from "@/lib/vendor/manual-entry";
 import type { VendorType, ReconType } from "@/lib/constants/categories";
 import { vendorPath as toVendorPath } from "@/lib/vendors/slug";
+import { revalidateVendorPage } from "@/lib/vendors/revalidate";
 
 export interface CreateReconInput {
   // Vendor resolution — exactly one of these scenarios applies:
@@ -246,6 +247,11 @@ export async function createRecon(input: CreateReconInput) {
     .eq("id", vendorId)
     .maybeSingle();
   const vendorPath = toVendorPath({ id: vendorId, slug: slugRow?.slug });
+  // The vendor page is a cached render (ISR); expire it so the redirect below
+  // lands on a page that already shows this entry (and so does everyone
+  // else's next visit). Also clears a cached "not found" for a vendor this
+  // save just created.
+  await revalidateVendorPage({ id: vendorId, slug: slugRow?.slug });
   const target = !returnTo
     ? vendorPath
     : returnTo === vendorPath || returnTo.startsWith(`${vendorPath}?`)

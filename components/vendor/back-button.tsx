@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 import { hasInAppHistory } from "@/components/in-app-history";
+import { safeReturnPath } from "@/lib/vendors/slug";
 
 /**
  * Vendor page back button. With a `from` it pushes that path (Explore needs
@@ -12,13 +13,21 @@ import { hasInAppHistory } from "@/components/in-app-history";
  * step back to. A cold arrival (shared link, Google, sitemap) has none, and
  * `router.back()` there was a dead button; it now `replace`s with Explore, so
  * the system back gesture still leaves to wherever the visitor came from.
+ *
+ * The `from` is read from the address bar at TAP time, not passed in: the
+ * vendor page is cached (ISR) and its server render never sees the query
+ * string. Reading it on tap needs no hook, so the button renders identically
+ * on the server and needs no Suspense boundary.
  */
-export function BackButton({ from }: { from?: string | null }) {
+export function BackButton() {
   const router = useRouter();
   return (
     <button
       type="button"
       onClick={() => {
+        const from = safeReturnPath(
+          new URLSearchParams(window.location.search).get("from"),
+        );
         if (from) router.push(from);
         else if (hasInAppHistory()) router.back();
         else router.replace("/explore");

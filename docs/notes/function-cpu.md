@@ -30,7 +30,7 @@ treat absolute numbers as a floor and the ratios as the finding.
 
 | Request | CPU / request |
 |---|---|
-| Vendor page, full SSR | ~37 ms |
+| Vendor page, full SSR | ~37 ms (now cached, item 6: ~1.35 ms locally on a HIT, 0 on Vercel's CDN) |
 | Vendor page, client navigation (RSC) | ~21 ms |
 | **Vendor page prefetch** (loading boundary) | **~11.5 ms** -- runs `generateMetadata`, a DB read |
 | Vendor page prefetch, route tree | ~1.5 ms |
@@ -57,9 +57,30 @@ local build):
 So per visit, most of the CPU was **request amplification**, not pages people
 read: no-op proxy runs, the map fan-out missing its 60-second cache, and
 prefetches for cards nobody stopped on. (This is from per-request cost times
-per-visit request counts. The real per-route split is in the Vercel dashboard,
-and was not available when this was written; crawler renders of vendor pages
-are the one large line this cannot see.)
+per-visit request counts; the dashboard split below came later.)
+
+**The real split, Oct 15 - Nov 14 (before PR #80)**, from the team Usage tab:
+about **3h39m of the 4h** Hobby allowance.
+
+| By type | CPU | Share |
+|---|---|---|
+| Middleware (the proxy) | 2h10m | 59.4% |
+| Functions | 1h29m | 40.6% |
+
+| By region | Share |
+|---|---|
+| iad1 (Washington, D.C.) | 51.6% |
+| sfo1 (San Francisco) | 17.4% |
+| sin1 (Singapore) | 13.1% |
+| fra1 (Frankfurt) | 8.9% |
+| syd1 (Sydney) | 8.2% |
+| every other region | under 1% each |
+
+Hobby runs functions only in iad1, so **nearly all the non-iad1 CPU was the
+proxy** running near the visitor, much of it crawler traffic from abroad --
+the no-op runs item 1 removed. The **~40% that is functions, all in iad1**, is
+vendor page renders, the map API and prefetches: the share items 2, 5 and 6
+go after.
 
 ## What changed
 
@@ -88,7 +109,7 @@ are the one large line this cannot see.)
    to a shared grid and the default view is one Colorado-wide box, so almost
    every Explore visitor asks for the same 13 URLs; at 60 s, any two visitors
    more than a minute apart each paid for all 13. Cost: a new vendor, verification, or recon count
-   can take up to an hour to reach the map (the vendor page is always live).
+   can take up to an hour to reach the map (the vendor page is expired by every app write, item 6).
    - **The author is exempt**: a recon save, a recon edit and a portal listing
      save set a one-hour `wr_map_fresh` cookie (`lib/map/fresh-server.ts`),
      and while it lives that browser's map and guided-search requests add
@@ -120,17 +141,27 @@ are the one large line this cannot see.)
    honors immediately for an on-screen link. The tap-feel contract in
    CLAUDE.md (a card's main control is a `<Link>` so `loading.tsx` is
    prefetched) still holds for every card someone stops on.
+6. **The vendor page is cached (ISR), 2026-11-14.** `revalidate = 3600` and an
+   empty `generateStaticParams`, so each vendor renders once and is then a CDN
+   hit for every visitor and crawler until a write expires it. The render no
+   longer reads cookies or the query string; the per-viewer parts (the "Edit
+   my recon" slot, the My recon / Admin pills, the `from` back link) moved to
+   the browser. Every app write that changes the page calls
+   `revalidateVendorPage()`. Full account, Kiara's ruling on the signed-in
+   order, and what was verified: `docs/notes/vendor-page.md`.
+   - Measured on a local production build against a fake backend: a MISS did
+     5 database reads, the next requests 0; a HIT cost ~1.35 ms of server CPU
+     (on Vercel, a CDN hit costs none) against ~14 ms for a bare-vendor render
+     on the same machine (~37 ms for a real one, above).
+   - Side effect worth knowing: vendor-card prefetches (item 5) now hit the
+     CDN too, so the dwell rule mostly saves CDN requests rather than CPU.
 
 ## Deliberately NOT done (yet), and why
 
-- **Vendor page ISR.** The vendor page is the single most expensive request
-  (~37 ms) and every crawler hit is a full render. Caching it means moving the
-  viewer-specific parts (own entry first in `sortReconEntries`, "you already
-  have recon", admin edit controls, the `from` back link) to the client so the
-  server render reads no cookies, plus `revalidatePath` on every write. Worth
-  doing -- `docs/seo-aeo-plan.md` item 9 wants it for crawl speed too -- but it
-  is a refactor of the most important page, not a matcher change, so it was
-  left for its own change with real per-route data to size it.
+- ~~**Vendor page ISR.**~~ Done 2026-11-14, item 6 above. Left out of that
+  change on purpose: writes that do not go through the app (seed and enrich
+  uploads, the reconcile writers, `filter-recon-daily`, dashboard edits) do
+  not expire the page; they show within the hour.
 - **Collapsing the map's per-type fan-out into one request.** ~5 ms of each
   ~9 ms miss is fixed per-request overhead, so 13 requests -> 1 would roughly
   halve a miss. But the per-type split, concurrency cap and retry are the
@@ -141,10 +172,37 @@ are the one large line this cannot see.)
   deliberately courts answer-engine bots. That is a product call, not a perf
   default; if crawler volume turns out to dominate, block the *training*
   crawlers (GPTBot, ClaudeBot, CCBot, Bytespider, meta-externalagent) and keep
-  the search/answer ones.
+  the search/answer ones. Less pressing now: most crawler CPU was the proxy
+  outside iad1 (the split above), which item 1 removed, and a crawler hit on a
+  vendor page is a CDN hit after item 6. Crawlers still drive ISR writes after
+  each deploy (the ISR section below).
 - **The bottom nav's `/hub` prefetch and the profile menu's `/portal`.** Both
   dynamic, so each is an invocation per page view, but each costs ~2 ms
   anonymous; not worth bending the tap feel of the Hub tab for.
+
+## ISR has its own Hobby allowance (watch it after item 6)
+
+Caching the vendor page trades function CPU for ISR usage, which Hobby also
+caps: **200k ISR writes and 1M ISR reads a month, in 8 KB units** (Vercel
+pricing page, checked 2026-11-14), and a capped Hobby feature stays off until
+the 30-day window resets. What that means here:
+
+- **CDN hits are free.** ISR reads are only CDN misses that fall through to
+  the durable ISR cache (a region whose edge has not seen the page yet).
+- **A regeneration that produces the same output writes nothing**, time-based
+  or on-demand, and the vendor render is deterministic. So the hourly TTL is
+  close to free; writes come from content that changed and, mainly, from the
+  **first render of each page after every production deploy** (the cache is
+  per deployment).
+- **Size per write:** a vendor with one entry is ~26 KB gzipped across HTML,
+  RSC and the prefetch segments (~3-4 units); a fuller page perhaps twice that.
+  So one full re-crawl of ~2,300 vendors after a deploy is very roughly
+  10k-18k units, and the allowance covers on the order of 10-20 of those a
+  month. Frequent production deploys plus aggressive crawlers are the way this
+  could run out. Check the **ISR Writes** line on the team Usage tab a few
+  days after this ships; if it climbs toward the cap, cut production deploys
+  before anything else (item 4 already skips the ones that change nothing
+  deployed).
 
 ## Checking it in production
 
@@ -166,6 +224,18 @@ are the one large line this cannot see.)
   exclusions) until it is understood.
 - A map response should come back `x-vercel-cache: HIT` on a second request
   to the same URL within the hour.
+- So should a vendor page, query string or not (item 6). A MISS on every
+  request means the render started reading the request again (see
+  `docs/notes/vendor-page.md`):
+
+  ```bash
+  curl -sI "https://www.weddingrecon.com/vendor/dj-blnce" | grep -i x-vercel-cache
+  curl -sI "https://www.weddingrecon.com/vendor/dj-blnce?from=%2Fexplore" | grep -i x-vercel-cache
+  ```
+- Reading the Usage tab's **Regions** view: Hobby runs functions in one
+  region (iad1 here), so CPU billed in sin1 / fra1 / syd1 and the other
+  non-iad1 regions is the proxy, which runs near the visitor. The **Type** tab
+  splits Middleware from Functions (the Oct 15 - Nov 14 figures are above).
 - The real breakdown lives in the Vercel dashboard: project -> Observability
   -> Functions (Hobby shows per-function totals; per-path breakdown needs
   Observability Plus), and the team Usage tab for the CPU-hours line.

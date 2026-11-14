@@ -5,6 +5,7 @@ import { purgeMapCache } from "@/lib/map/purge";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminUser } from "@/lib/auth/admin";
+import { revalidateVendorPage } from "@/lib/vendors/revalidate";
 
 export type RevokeResult = { ok: true } | { ok: false; error: string };
 
@@ -25,16 +26,22 @@ export async function revokeClaim(claimId: string): Promise<RevokeResult> {
   }
 
   const svc = createServiceRoleClient();
-  const { error } = await svc
+  const { data: revoked, error } = await svc
     .from("vendor_claims")
     .update({ status: "revoked", revoked_at: new Date().toISOString() })
-    .eq("id", claimId);
+    .eq("id", claimId)
+    .select("vendor_id")
+    .maybeSingle();
 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/portal/admin");
   // An approved claim is one leg of being verified, so a revoke can take a
-  // badge off the map, which is CDN-cached for an hour (lib/map/purge.ts).
+  // badge off the map, which is CDN-cached for an hour (lib/map/purge.ts),
+  // and off the vendor page, which is a cached render too (ISR).
   await purgeMapCache(`claim ${claimId} revoked`);
+  if (revoked?.vendor_id) {
+    await revalidateVendorPage({ id: revoked.vendor_id as string });
+  }
   return { ok: true };
 }
