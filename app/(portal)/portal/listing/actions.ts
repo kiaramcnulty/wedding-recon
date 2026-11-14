@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { markMapFresh } from "@/lib/map/fresh-server";
+import { purgeMapCache } from "@/lib/map/purge";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { filtersForType } from "@/lib/constants/vendor-filters";
@@ -220,8 +221,12 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
   // The public page lives at /vendor/<slug>, which this action does not have in
   // hand; revalidating the route covers the slug and any legacy uuid URL alike.
   revalidatePath("/vendor/[id]", "page");
-  // Filter overrides and the listing show on the map, which is CDN-cached for
-  // an hour; let this vendor see their own change there now (lib/map/fresh.ts).
+  // Filter overrides, and whether the listing is published (one leg of being
+  // verified), show on the map, which is CDN-cached for an hour. Drop that
+  // cache so every visitor sees the change (lib/map/purge.ts; listing saves
+  // are rare), and mark this vendor's browser too, which also covers local
+  // runs where the purge is a no-op (lib/map/fresh.ts).
+  await purgeMapCache(`listing saved for vendor ${input.vendorId}`);
   await markMapFresh();
   return { ok: true, published };
 }

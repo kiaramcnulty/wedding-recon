@@ -50,6 +50,7 @@ Copy `.env.example` → `.env.local` and fill in. See `SETUP.md` for how to obta
 
 - `npm run dev` -- dev server (needs `.env.local`).
 - `npm run build` -- production build (**must pass before commit**).
+- **A commit that changes nothing deployed does not deploy**: `vercel.json`'s `ignoreCommand` (`scripts/vercel-ignore-build.sh`) skips the Vercel build when every file changed since the last successful deployment is a top-level `*.md`, or under `docs/`, `scripts/`, `supabase/`, `data/`, `recon/`, `mockups/`, `outreach/`, `analytics/`, the skill trees or `.github/`. Each deploy restarts the CDN cache, which costs function CPU (`docs/notes/function-cpu.md`). If a merge "didn't deploy", that is why; anything outside the list deploys as normal.
 - `npm run lint` -- eslint. Must be clean; one known-benign warning remains (`watch()` in `app/(app)/add/page.tsx`, react-hook-form + React Compiler).
 - `npm test` -- the 10 node check scripts in `scripts/test-*.mjs` (~270 assertions), preceded by a staleness check on the Codex mirrors. Run after touching filter matching, list ordering, the RPC fan-out, bbox snapping, the verification SQL, or the bot-recon gates -- these are the only executable checks on those rules.
 - `npm run sync-codex` -- regenerate the Codex mirrors from `.claude/`. See the Skills section.

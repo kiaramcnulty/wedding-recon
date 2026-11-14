@@ -94,10 +94,24 @@ are the one large line this cannot see.)
      and while it lives that browser's map and guided-search requests add
      `&fresh=<token>` -- a separate CDN key, so they get current rows while
      everyone else shares the cached ones. The route ignores the parameter.
-   - Not covered: a newly *verified* vendor (the Stripe webhook is
-     server-to-server, so there is no browser to mark) sees the badge on the
-     map within the hour, on the vendor page at once.
-3. **Vendor cards prefetch on dwell or intent, not on scroll**
+   - Verification has no browser to mark (the Stripe webhook is
+     server-to-server), so instead every map response carries
+     `Vercel-Cache-Tag: map-vendors`, and the writes that can change who is
+     verified drop that tag (`purgeMapCache()` in `lib/map/purge.ts`,
+     `dangerouslyDeleteByTag` from `@vercel/functions`): `mirrorSubscription()`
+     when a vendor's status crosses `active` either way, a portal listing
+     save, and an admin claim revoke. The next request for each map URL is
+     rebuilt, so the badge shows on the vendor's next load. Kept off routine
+     writes on purpose: each purge refills the map cache for everyone. Outside
+     a Vercel function it does nothing, so local runs cannot exercise it.
+4. **Commits that change nothing deployed do not deploy** (`vercel.json`
+   `ignoreCommand` -> `scripts/vercel-ignore-build.sh`). Every deploy starts
+   the CDN cache over, and this repo merges a lot of notes, pipeline scripts,
+   migrations and skill files. The build is skipped only when EVERY file
+   changed since the branch's last successful deployment is outside the app
+   (the list is in the script); anything uncertain builds.
+   `scripts/test-vercel-ignore-build.mjs` runs it against throwaway repos.
+5. **Vendor cards prefetch on dwell or intent, not on scroll**
    (`lib/use-intent-prefetch.ts`, used by `VendorPreviewCard`, so the Explore
    feed, cluster sheet, pin peek, guided results and the Hub all move
    together). The Link's `prefetch` stays `false` until the card has been at

@@ -1,6 +1,7 @@
 import "server-only";
 import type Stripe from "stripe";
 
+import { purgeMapCache } from "@/lib/map/purge";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { periodEnd } from "./webhook-events";
 
@@ -28,6 +29,13 @@ export async function mirrorSubscription(
   const customerId =
     typeof sub.customer === "string" ? sub.customer : sub.customer.id;
 
+  // The status before this write, to tell whether verification is changing.
+  const { data: before } = await svc
+    .from("vendor_subscriptions")
+    .select("status")
+    .eq("vendor_id", vendorId)
+    .maybeSingle();
+
   await svc.from("vendor_subscriptions").upsert(
     {
       vendor_id: vendorId,
@@ -48,6 +56,15 @@ export async function mirrorSubscription(
       .from("vendor_listings")
       .update({ published: true })
       .eq("vendor_id", vendorId);
+  }
+
+  // Becoming verified (or losing it) changes the badge and the sort order on
+  // the map, which is CDN-cached for an hour and has no browser here to mark.
+  // Drop the map cache so the vendor sees it on their next load. Only on a
+  // CHANGE: Stripe sends several events per checkout and one per renewal, and
+  // each purge refills the map cache for everyone (lib/map/purge.ts).
+  if ((before?.status === "active") !== (sub.status === "active")) {
+    await purgeMapCache(`vendor ${vendorId} subscription ${sub.status}`);
   }
 
   return sub.status === "active";

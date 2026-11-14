@@ -17,6 +17,15 @@ export const revalidate = 86400;
  */
 const VENDOR_LIMIT = 20000;
 
+/**
+ * Rows asked for per request. PostgREST caps a single response at the
+ * project's max-rows setting (1000 on Supabase), and a `.limit()` above it is
+ * silently clamped -- which is how this sitemap listed exactly 1,000 of ~2,300
+ * vendors until 2026-11-14. So it pages, and advances by the rows actually
+ * returned, so a lower server cap still pages correctly instead of stopping.
+ */
+const PAGE_SIZE = 1000;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     {
@@ -46,17 +55,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const supabase = createClient(url, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { data, error } = await supabase
-      .from("vendors")
-      .select("id, slug, created_at")
-      .order("created_at", { ascending: false })
-      .limit(VENDOR_LIMIT);
 
-    if (error || !data) return staticRoutes;
+    type Row = { id: string; slug: string | null; created_at: string | null };
+    const rows: Row[] = [];
+    while (rows.length < VENDOR_LIMIT) {
+      const from = rows.length;
+      const { data, error } = await supabase
+        .from("vendors")
+        .select("id, slug, created_at")
+        .order("created_at", { ascending: false })
+        // Tie-break: a bulk launch upload inserts hundreds of rows with one
+        // created_at, and offset paging over an unstable order can skip or
+        // repeat rows across page boundaries.
+        .order("id", { ascending: true })
+        .range(from, Math.min(from + PAGE_SIZE, VENDOR_LIMIT) - 1);
+      if (error || !data) {
+        // First page failed: same as before, static routes only. A later page
+        // failed: keep what we have -- a partial list beats dropping every
+        // vendor URL until the next daily regeneration.
+        if (rows.length === 0) return staticRoutes;
+        console.error("[sitemap] vendor page failed at offset", from, error?.message);
+        break;
+      }
+      rows.push(...(data as Row[]));
+      if (data.length === 0) break;
+    }
+
+    // Defensive: one URL per vendor even if paging ever overlapped.
+    const seen = new Set<string>();
+    const vendors = rows.filter((v) => !seen.has(v.id) && !!seen.add(v.id));
 
     return [
       ...staticRoutes,
-      ...data.map((vendor) => ({
+      ...vendors.map((vendor) => ({
         url: `${SITE_URL}${vendorPath(vendor)}`,
         lastModified: vendor.created_at ? new Date(vendor.created_at) : undefined,
         changeFrequency: "weekly" as const,
