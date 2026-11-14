@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminUser } from "@/lib/auth/admin";
+import { revalidateVendorPage } from "@/lib/vendors/revalidate";
 
 export type RevokeResult = { ok: true } | { ok: false; error: string };
 
@@ -24,13 +25,20 @@ export async function revokeClaim(claimId: string): Promise<RevokeResult> {
   }
 
   const svc = createServiceRoleClient();
-  const { error } = await svc
+  const { data: revoked, error } = await svc
     .from("vendor_claims")
     .update({ status: "revoked", revoked_at: new Date().toISOString() })
-    .eq("id", claimId);
+    .eq("id", claimId)
+    .select("vendor_id")
+    .maybeSingle();
 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/portal/admin");
+  // A revoked claim ends verification, so the cached vendor page must drop
+  // its badge and listing now, not within the hour.
+  if (revoked?.vendor_id) {
+    await revalidateVendorPage({ id: revoked.vendor_id as string });
+  }
   return { ok: true };
 }

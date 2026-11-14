@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Flag } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { reportReconEntry } from "@/app/(app)/vendor/[id]/actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,24 +34,17 @@ export function ReportButton({ reconEntryId }: ReportButtonProps) {
     setSubmitting(true);
 
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // A Server Action: a report can hide the entry, and only the server can
+      // expire the cached vendor page to show that (see the action).
+      const result = await reportReconEntry(reconEntryId, reason);
 
-      if (!user) {
+      if (!result.ok && result.reason === "signin") {
         setOpen(false);
         router.push("/login");
         return;
       }
 
-      const { error } = await supabase.from("reports").insert({
-        recon_entry_id: reconEntryId,
-        reporter_id: user.id,
-        reason: reason.trim() || null,
-      });
-
-      if (error) {
+      if (!result.ok) {
         toast.error("Could not submit report. Please try again.");
       } else {
         toast("Reported — thank you for helping keep the community accurate.");

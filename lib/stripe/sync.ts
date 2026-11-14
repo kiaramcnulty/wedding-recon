@@ -2,6 +2,7 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { revalidateVendorPage } from "@/lib/vendors/revalidate";
 import { periodEnd } from "./webhook-events";
 
 /**
@@ -17,6 +18,11 @@ import { periodEnd } from "./webhook-events";
  * of whichever event happened to arrive.
  *
  * Service role because vendor_subscriptions is deny-all RLS (0044).
+ *
+ * Expires the vendor page's cached render on every call: the status decides
+ * the Verified badge and whether the listing shows (verified_vendor_ids), and
+ * this is the one place both the webhook and the reconcile path go through.
+ * Only callable from a Route Handler or Server Action (revalidatePath).
  *
  * @returns whether perks are now live for this vendor (status === "active").
  */
@@ -49,6 +55,8 @@ export async function mirrorSubscription(
       .update({ published: true })
       .eq("vendor_id", vendorId);
   }
+
+  await revalidateVendorPage({ id: vendorId });
 
   return sub.status === "active";
 }

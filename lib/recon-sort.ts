@@ -8,10 +8,18 @@
  * the preview card is a Client Component, and a client module cannot be called
  * from the server (the mistake `usesServiceRegion()` made — see CLAUDE.md).
  *
- * Three keys, in order:
- *   1. the viewer's own entry first
- *   2. entries that state a price before entries that do not
- *   3. most recently collected first
+ * Two keys, in order:
+ *   1. entries that state a price before entries that do not
+ *   2. most recently collected first
+ *
+ * The SAME order for every viewer. There used to be a first key, "the
+ * viewer's own entry first"; it went when the vendor page became a cached
+ * (ISR) render shared by everyone (2026-11-14). The server no longer knows who
+ * is looking, so honoring it meant moving an entry after first paint, and
+ * Kiara ruled out that shuffle: the viewer's entry is marked where it falls
+ * (ReconCard), and the "Edit my recon" slot at the top of the list leads to it
+ * (components/vendor/recon-slot.tsx). The preview card dropped it in the same
+ * change, so the card still leads with the entry the page leads with.
  */
 
 /**
@@ -21,7 +29,6 @@
  * `created_at` and the collected-date ordering silently does nothing.
  */
 export interface SortableReconEntry {
-  author_id: string;
   price_text?: string | null;
   price_details?: string | null;
   recon_collected_month?: number | null;
@@ -99,21 +106,11 @@ function createdMs(entry: SortableReconEntry): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-/**
- * Order two entries. `viewerId` is null for signed-out readers, where the first
- * key is simply a no-op (Explore and every vendor page are public).
- */
+/** Order two entries. */
 export function compareReconEntries(
   a: SortableReconEntry,
   b: SortableReconEntry,
-  viewerId: string | null,
 ): number {
-  if (viewerId) {
-    const mine =
-      Number(b.author_id === viewerId) - Number(a.author_id === viewerId);
-    if (mine !== 0) return mine;
-  }
-
   const priced = Number(hasPriceQuote(b)) - Number(hasPriceQuote(a));
   if (priced !== 0) return priced;
 
@@ -128,7 +125,6 @@ export function compareReconEntries(
 /** Sorted copy, newest-priced-first. Never mutates the input. */
 export function sortReconEntries<T extends SortableReconEntry>(
   entries: readonly T[],
-  viewerId: string | null,
 ): T[] {
-  return [...entries].sort((a, b) => compareReconEntries(a, b, viewerId));
+  return [...entries].sort(compareReconEntries);
 }

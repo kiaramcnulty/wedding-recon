@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
+import { revalidateVendorPage } from "@/lib/vendors/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRegion } from "@/lib/normalize-region";
 import { MANUAL_LOCATION_ERROR } from "@/lib/vendor/manual-entry";
@@ -213,5 +214,9 @@ export async function claimVendor(input: ClaimVendorInput): Promise<ClaimResult>
   ]);
 
   revalidatePath("/portal");
+  // An approved claim is one of the three verification conditions (with an
+  // active subscription and a published listing), and this action may have
+  // just created the vendor row. Either way the cached vendor page is stale.
+  await revalidateVendorPage({ id: vendorId });
   return { ok: true, vendorId, alreadyYours: false };
 }

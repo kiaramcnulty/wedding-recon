@@ -8,6 +8,7 @@ import { isAdminUser } from "@/lib/auth/admin";
 import { usesServiceRegion } from "@/lib/constants/categories";
 import type { ReconType, VendorType } from "@/lib/constants/categories";
 import { vendorPath } from "@/lib/vendors/slug";
+import { revalidateVendorPage } from "@/lib/vendors/revalidate";
 
 export interface UpdateReconInput {
   reconId: string;
@@ -107,10 +108,11 @@ export async function updateRecon(input: UpdateReconInput) {
 
   if (updateError) throw new Error(`Recon update error: ${updateError.message}`);
 
-  // Both pages are dynamic (cookie-based client), so there is no full-route
-  // cache to bust — this clears Next's client-side Router Cache so a back-nav
-  // after saving does not show the pre-edit copy.
-  revalidatePath(vendorHref);
+  // The vendor page is a cached render (ISR): expire it, so the edit (an
+  // author's, or an admin's on bot recon) shows at once for everyone, not
+  // after the hour. The Hub is dynamic; revalidating it just clears Next's
+  // client-side Router Cache so a back-nav does not show the pre-edit copy.
+  await revalidateVendorPage({ id: entry.vendor_id, slug: vendorRow?.slug });
   revalidatePath("/hub");
   // A price or photo edit can change the map card; it is CDN-cached for an
   // hour, so let this author see it now (lib/map/fresh.ts).

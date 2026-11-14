@@ -96,7 +96,12 @@ async function fetchGooglePhotoRefs(placeId: string): Promise<GooglePhotoRef[]> 
       `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
       {
         headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "id,photos" },
-        cache: "no-store", // we do our own 90-day cache on the row
+        // No `cache` option, deliberately. We do our own 90-day cache on the
+        // row, and Next's default for a runtime fetch is already uncached. An
+        // explicit `cache: "no-store"` would ALSO mark the render dynamic: this
+        // runs inside the vendor page's ISR render on a photo-cache miss, and
+        // a no-store fetch there flips that render to per-request (or errors
+        // as "static to dynamic at runtime"). See app/(app)/vendor/[id]/page.tsx.
       },
     );
     if (!res.ok) {

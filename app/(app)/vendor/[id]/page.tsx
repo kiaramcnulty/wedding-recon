@@ -1,16 +1,13 @@
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import Link from "next/link";
 import {
   MapPin,
-  PlusCircle,
   ExternalLink as ExternalLinkIcon,
   Globe,
   Waypoints,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { isAdminUser } from "@/lib/auth/admin";
+import { createPublicClient } from "@/lib/supabase/public";
 import { getVendorGooglePhotos } from "@/lib/google-photos";
 import {
   CATEGORIES,
@@ -25,6 +22,7 @@ import { VendorMapPreview } from "@/components/vendor/vendor-map-preview";
 import type { ReconEntryWithDetails } from "@/lib/types";
 import { VendorPhotos } from "@/components/vendor/vendor-photos";
 import { ReconCard } from "@/components/vendor/recon-card";
+import { AddReconLink, ReconSlot } from "@/components/vendor/recon-slot";
 import { VerifiedBadge } from "@/components/vendor/verified-badge";
 import { VerifyBusinessLink } from "@/components/portal/verify-business-link";
 import {
@@ -74,7 +72,33 @@ function InstagramIcon({ className }: { className?: string }) {
 
 interface VendorPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+/*
+ * CACHED (ISR): one render per vendor is shared by every visitor and crawler,
+ * served from Vercel's CDN, and re-rendered at most hourly or when a write
+ * calls `revalidateVendorPage()` (lib/vendors/revalidate.ts). A full render
+ * was ~37 ms of billed function CPU on every view (docs/notes/function-cpu.md).
+ *
+ * That only holds while the render reads NOTHING per-request: no cookies (so
+ * no `createClient()` from lib/supabase/server -- `createPublicClient()`
+ * instead), no `searchParams`, no `headers()`, no `cache: "no-store"` fetch.
+ * Any one of those turns the whole route back into a per-request render, and
+ * nothing errors when it does. The viewer-specific parts live in Client
+ * Components that read the session in the browser (lib/viewer.ts), and the
+ * `from` return path is read there too. `scripts/test-vendor-page-static.mjs`
+ * guards the obvious regressions; `x-nextjs-cache: HIT` on a second request is
+ * the real check.
+ */
+export const revalidate = 3600;
+
+/**
+ * Nothing is prerendered at build time; each vendor renders on its first visit
+ * and is cached from then on. Returning an empty list (rather than omitting
+ * this) is what makes a dynamic segment ISR instead of dynamic.
+ */
+export function generateStaticParams(): { id: string }[] {
+  return [];
 }
 
 /**
@@ -89,7 +113,7 @@ interface VendorPageProps {
  * a network round trip, not bytes.
  */
 const getVendor = cache(async (ref: string) => {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   // The segment is a slug (`/vendor/dj-blnce`) or, for a link shared before
   // slugs existed, the uuid. The page redirects the uuid form to the slug, so
   // the id lookup only ever serves that redirect. See lib/vendors/slug.ts.
@@ -138,38 +162,21 @@ export async function generateMetadata({
   };
 }
 
-export default async function VendorPage({
-  params,
-  searchParams,
-}: VendorPageProps) {
+export default async function VendorPage({ params }: VendorPageProps) {
   const { id: ref } = await params;
+  const supabase = createPublicClient();
 
-  // Where to send the back button: when navigated from another page (e.g. the
-  // Planning Hub) a `from` return path is passed. Restrict to internal paths.
-  // If absent, BackButton steps back through history, or goes to Explore on a
-  // cold arrival (shared link, search result) with nothing to step back to.
-  const query = await searchParams;
-  const { from } = query;
-  const backHref =
-    typeof from === "string" && from.startsWith("/") && !from.startsWith("//")
-      ? from
-      : null;
-  const supabase = await createClient();
-
-  // Stage 1 — independent fetches in parallel: the vendor row, the viewer's
-  // identity, and the vendor's active recon entries. getClaims() verifies the
-  // JWT locally (no Auth-server round trip when the project uses asymmetric
-  // signing keys; falls back to a network check otherwise — never slower than
-  // the getUser() it replaces, and it runs in parallel here regardless).
+  // Stage 1 — independent fetches in parallel: the vendor row and its active
+  // recon entries. (The viewer's identity is not read here: this render is
+  // shared by everyone. See the note above `revalidate`.)
   //
   // The recon query keys on the vendor through an inner join on the slug, not
   // on vendor_id, so it does not have to wait for the vendor row to learn the
   // id. A legacy uuid segment skips it: that request only redirects.
   const legacyId = isVendorUuid(ref);
-  const [vendorRes, claimsRes, entriesRes] = await Promise.all([
+  const [vendorRes, entriesRes] = await Promise.all([
     // Deduped with generateMetadata's fetch via React cache() — see getVendor.
     getVendor(ref),
-    supabase.auth.getClaims(),
     legacyId
       ? null
       : supabase
@@ -189,24 +196,13 @@ export default async function VendorPage({
   const id = vendor.id as string;
 
   // An old /vendor/<uuid> link (or a slug typed in capitals): send it to the
-  // canonical slug URL, keeping its query string (`from`, UTM tags). 308, so
-  // search engines move the old entry onto the new URL.
+  // canonical slug URL. A FALLBACK: proxy.ts already 308s every uuid URL,
+  // query string kept, before this page runs (lib/vendors/legacy-redirect.ts).
+  // This one cannot keep the query string, because a cached render never sees
+  // it; it only fires when that lookup failed, or for a capitalized slug.
   if (vendor.slug && ref !== vendor.slug) {
-    const qs = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) {
-      for (const v of Array.isArray(value) ? value : [value]) {
-        if (v !== undefined) qs.append(key, v);
-      }
-    }
-    const tail = qs.toString();
-    permanentRedirect(`${vendorPath(vendor)}${tail ? `?${tail}` : ""}`);
+    permanentRedirect(vendorPath(vendor));
   }
-
-  // This page's own URL *including* its return path. Handed to the Add and
-  // Edit recon forms so they return to a vendor page that still knows where
-  // it came from; dropping the `from` here is what used to strand people
-  // bouncing between a form and this page.
-  const selfHref = vendorPath(vendor, backHref);
 
   // Only reached with a uuid segment when the row has no slug, i.e. before
   // migration 0052 is applied: fetch the entries by id as the page always did.
@@ -221,8 +217,6 @@ export default async function VendorPage({
           .order("created_at", { ascending: false })
       ).data;
 
-  const userId = claimsRes.data?.claims.sub ?? null;
-
   // A fixed-location vendor (a venue, a hotel, a bridal shop) IS a property at
   // an address, so its pin is the fact and it gets a map preview. A
   // service-region vendor's pin marks a base they travel out from — mapping
@@ -232,22 +226,12 @@ export default async function VendorPage({
   // `FIXED_LOCATION_TYPES` in lib/constants/categories.ts.
   const fixedLocation = !usesServiceRegion(vendor.vendor_type as VendorType);
 
-  // Stage 2 — all need stage-1 results. The "does the viewer already have
-  // recon here" check must stay a separate query (it counts `flagged` entries,
-  // which the active-only list above does not include). getVendorGooglePhotos
-  // only touches the network on a cache miss, so it's usually free.
-  const [existingRes, googlePhotos, coordsRes, viewerIsAdmin, verifiedRes, overridesRes] =
+  // Stage 2 — all need stage-1 results. getVendorGooglePhotos only touches
+  // the network on a cache miss, so it's usually free. (The viewer's own
+  // entries, flagged ones included, and the admin flag are read in the
+  // browser now: lib/viewer.ts.)
+  const [googlePhotos, coordsRes, verifiedRes, overridesRes] =
     await Promise.all([
-      userId
-        ? supabase
-            .from("recon_entries")
-            .select("id")
-            .eq("vendor_id", id)
-            .eq("author_id", userId)
-            .neq("status", "removed")
-            .limit(1)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
       getVendorGooglePhotos(vendor),
       // vendors.location is PostGIS geography, which PostgREST hands back as hex
       // EWKB — the RPC (migration 0029) is what flattens it to lng/lat. Errors
@@ -256,8 +240,6 @@ export default async function VendorPage({
       fixedLocation
         ? supabase.rpc("vendor_location", { p_id: id }).maybeSingle()
         : Promise.resolve({ data: null }),
-      // Site admins get an edit control on bot-authored recon below (0041).
-      isAdminUser(supabase, userId),
       // A verified vendor's published listing (intro / CTA / pricing / links).
       // A SECURITY DEFINER function (migration 0046) that returns a row ONLY for
       // a verified vendor, so it doubles as the badge signal. Errors are
@@ -268,7 +250,6 @@ export default async function VendorPage({
       // over the extracted tags below so the chips match what the map shows.
       supabase.rpc("verified_listing_overrides", { p_ids: [id] }),
     ]);
-  const userHasRecon = !!existingRes.data;
   const coords = coordsRes.data as { lng: number; lat: number } | null;
   const listing = ((verifiedRes.data ?? []) as VerifiedListingRow[])[0] ?? null;
   const isVerified = !!listing;
@@ -296,23 +277,30 @@ export default async function VendorPage({
 
   const rawList = (entriesData ?? []) as ReconEntryWithDetails[];
 
-  // Your own entry first, then entries that state a price, then most recently
-  // collected. Shared with the preview card's carousel so the entry a card
-  // leads with is the entry this page leads with — see lib/recon-sort.ts.
-  const entries = sortReconEntries(rawList, userId);
+  // Entries that state a price first, then most recently collected. The SAME
+  // order for every viewer (the page is cached); the viewer's own entry is
+  // marked where it falls, not moved. Shared with the preview card's carousel
+  // so the entry a card leads with is the entry this page leads with — see
+  // lib/recon-sort.ts.
+  const entries = sortReconEntries(rawList);
 
-  // Media for the carousel: thumbnails inline, full opened in the lightbox so
-  // the carousel itself stays cheap on egress.
-  const photos = entries.flatMap((entry) =>
-    entry.media.map((m) => ({
-      thumb: supabase.storage
-        .from("recon-media")
-        .getPublicUrl(m.thumb_path ?? m.storage_path).data.publicUrl,
-      full: supabase.storage
-        .from("recon-media")
-        .getPublicUrl(m.storage_path).data.publicUrl,
-    })),
+  // Media: thumbnails inline, full opened in the lightbox so the strip itself
+  // stays cheap on egress. Public bucket, so no network call. Resolved once
+  // per entry and shared by the strip and that entry's card.
+  const entryPhotos = new Map(
+    entries.map((entry) => [
+      entry.id,
+      entry.media.map((m) => ({
+        thumb: supabase.storage
+          .from("recon-media")
+          .getPublicUrl(m.thumb_path ?? m.storage_path).data.publicUrl,
+        full: supabase.storage
+          .from("recon-media")
+          .getPublicUrl(m.storage_path).data.publicUrl,
+      })),
+    ]),
   );
+  const photos = entries.flatMap((entry) => entryPhotos.get(entry.id) ?? []);
 
   // A verified vendor's own uploaded photos, badged and slotted between recon
   // and Google in the strip (see VendorPhotos). Public bucket, so the URLs are
@@ -358,6 +346,15 @@ export default async function VendorPage({
   const textHex = category?.textHex ?? "#444441";
   const categoryLabel = category?.label ?? vendor.vendor_type;
 
+  // The fields the client-side recon slot and cards need, and nothing more:
+  // every prop of a Client Component is serialized into the page payload.
+  const slotVendor = {
+    id,
+    slug: (vendor.slug as string | null) ?? null,
+    name: vendor.name as string,
+    vendor_type: vendor.vendor_type as string,
+  };
+
   // Centroid-fallback vendors store "City, ST" as address_text; don't append
   // the city again ("Littleton, CO, Littleton").
   const addressParts = [
@@ -383,7 +380,7 @@ export default async function VendorPage({
         )}
       >
         <div className="flex items-start gap-3">
-          <BackButton from={backHref} />
+          <BackButton />
           {/* Category icon chip */}
           <div
             className="mt-0.5 flex shrink-0 items-center justify-center rounded-lg p-2"
@@ -576,28 +573,33 @@ export default async function VendorPage({
               : `${entries.length} recon entries`}
         </p>
 
-        {/* Add recon CTA — sits at the top of the entries so it's reachable
-            without scrolling past the list; hidden once the viewer has already
-            contributed. Filled with the vendor's category color (the app's only
-            accent) so it pops against the otherwise grayscale UI. */}
-        {!userHasRecon && (
-          <Link
-            href={`/add?vendorId=${vendor.id}&vendorName=${encodeURIComponent(vendor.name)}&vendorType=${vendor.vendor_type}&from=${encodeURIComponent(selfHref)}`}
-            style={{ backgroundColor: colorHex }}
-            className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-          >
-            <PlusCircle className="size-4" />
-            Add recon
-          </Link>
-        )}
+        {/* Add recon — or "Edit my recon" for someone who already has recon
+            here — at the top of the entries so it's reachable without
+            scrolling past the list. Decided in the browser (ReconSlot); the
+            cached HTML is the public button, the same box either way. The
+            Suspense is for `useSearchParams` (the `from` the form returns to). */}
+        <Suspense
+          fallback={
+            <AddReconLink
+              vendor={slotVendor}
+              colorHex={colorHex}
+              selfHref={vendorPath(vendor)}
+            />
+          }
+        >
+          <ReconSlot
+            vendor={slotVendor}
+            colorHex={colorHex}
+            entries={entries.map((e) => ({ id: e.id, author_id: e.author_id }))}
+          />
+        </Suspense>
 
         {entries.map((entry) => (
           <ReconCard
             key={entry.id}
             entry={entry}
-            isMine={!!userId && entry.author_id === userId}
-            viewerIsAdmin={viewerIsAdmin}
-            returnTo={selfHref}
+            photos={entryPhotos.get(entry.id) ?? []}
+            vendor={slotVendor}
           />
         ))}
       </div>

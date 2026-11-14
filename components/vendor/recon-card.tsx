@@ -1,9 +1,14 @@
+"use client";
+
+import { Suspense } from "react";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 
 import { RECON_TYPE_LABELS } from "@/lib/constants/categories";
 import type { ReconEntryWithDetails } from "@/lib/types";
-import { createClient } from "@/lib/supabase/server";
+import { useViewer } from "@/lib/viewer";
+import { useVendorSelfHref } from "@/lib/vendors/use-self-href";
+import type { VendorRef } from "@/lib/vendors/slug";
 import {
   Card,
   CardHeader,
@@ -13,26 +18,29 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ReportButton } from "@/components/vendor/report-button";
-import { PhotoLightbox } from "@/components/vendor/photo-lightbox";
+import {
+  PhotoLightbox,
+  type LightboxPhoto,
+} from "@/components/vendor/photo-lightbox";
 import { BotReconBadge } from "@/components/vendor/bot-recon-badge";
 import { cn } from "@/lib/utils";
 
 interface ReconCardProps {
   entry: ReconEntryWithDetails;
-  /** True when the entry was authored by the current viewer. */
-  isMine?: boolean;
+  /** The entry's photos, public URLs resolved by the (server) page. */
+  photos: LightboxPhoto[];
   /**
-   * True when the current viewer is a site admin. Surfaces an "Admin · Edit"
-   * control on bot-authored entries that aren't the viewer's own — the same
-   * edit route, authorized for admins in the page/action/RLS (migration 0041).
+   * The host vendor page. "Back" from the edit page leads to its URL, carrying
+   * its `from` so the return chain survives the round trip.
    */
-  viewerIsAdmin?: boolean;
-  /**
-   * Where "back" from the edit page should lead — the host vendor page's own
-   * URL, carrying its `from` so the return chain survives the round trip.
-   */
-  returnTo?: string;
+  vendor: VendorRef;
 }
+
+/**
+ * The "yours" tone, shared by the My recon pill and the vendor page's
+ * "Edit my recon" slot so the two read as one thing.
+ */
+export const MINE_TONE = { backgroundColor: "#E1F5EE", color: "#085041" } as const;
 
 /**
  * The "· Edit" pill on an editable entry: the badge that labels the entry is
@@ -45,17 +53,18 @@ interface ReconCardProps {
  */
 function ReconEditLink({
   entry,
-  returnTo,
+  vendor,
   tone,
 }: {
   entry: ReconEntryWithDetails;
-  returnTo?: string;
+  vendor: VendorRef;
   tone: "mine" | "admin";
 }) {
   const isMine = tone === "mine";
+  const returnTo = useVendorSelfHref(vendor);
   return (
     <Link
-      href={`/recon/${entry.id}/edit?from=${encodeURIComponent(returnTo ?? `/vendor/${entry.vendor_id}`)}`}
+      href={`/recon/${entry.id}/edit?from=${encodeURIComponent(returnTo)}`}
       aria-label={isMine ? "Edit your recon" : "Edit this recon (admin)"}
       // The badge stays badge-sized (~20px tall) but its TOUCH area is grown to
       // ~44px with a transparent ::after — at 20px it was routinely missed on a
@@ -65,9 +74,7 @@ function ReconEditLink({
       // Green marks "yours"; the admin pill is a neutral stone so it never reads
       // as a personal entry (that distinction is the whole point of the tone).
       style={
-        isMine
-          ? { backgroundColor: "#E1F5EE", color: "#085041" }
-          : { backgroundColor: "#F1EFE8", color: "#444441" }
+        isMine ? MINE_TONE : { backgroundColor: "#F1EFE8", color: "#444441" }
       }
     >
       {isMine ? "My recon" : "Admin"}
@@ -89,26 +96,25 @@ function getInitials(username: string): string {
     .join("") || username.slice(0, 2).toUpperCase();
 }
 
-export async function ReconCard({
-  entry,
-  isMine = false,
-  viewerIsAdmin = false,
-  returnTo,
-}: ReconCardProps) {
-  const supabase = await createClient();
+/**
+ * One recon entry. A Client Component because the vendor page is cached (ISR)
+ * and the only per-viewer parts of a card (the My recon / Admin edit pills,
+ * the green "yours" frame, the report flag they replace) are decided in the
+ * browser from `useViewer()`. Everything else renders the same for everyone,
+ * so it is in the cached HTML.
+ *
+ * A signed-out or still-unknown viewer gets the public card. After an in-app
+ * tap the viewer is already known on first render; on a cold load the pill
+ * appears at hydration, in place (Kiara, 2026-11-14: accepted, rather than
+ * dropping the pill's label for a same-size icon).
+ */
+export function ReconCard({ entry, photos, vendor }: ReconCardProps) {
+  const viewer = useViewer();
+  const isMine = !!viewer && entry.author_id === viewer.userId;
 
   // An admin can edit bot-authored recon that isn't their own. This never fires
   // for a real person's entry, matching the RLS scope in migration 0041.
-  const canAdminEdit = !isMine && viewerIsAdmin && entry.author.is_bot;
-
-  const photos = entry.media.map((m) => ({
-    thumb: supabase.storage
-      .from("recon-media")
-      .getPublicUrl(m.thumb_path ?? m.storage_path).data.publicUrl,
-    full: supabase.storage
-      .from("recon-media")
-      .getPublicUrl(m.storage_path).data.publicUrl,
-  }));
+  const canAdminEdit = !isMine && !!viewer?.isAdmin && entry.author.is_bot;
 
   const typeLabel = RECON_TYPE_LABELS[entry.recon_type] ?? entry.recon_type;
 
@@ -154,11 +160,16 @@ export async function ReconCard({
           <span className="text-sm font-medium break-words">
             {entry.author.username}
           </span>
-          {isMine && (
-            <ReconEditLink entry={entry} returnTo={returnTo} tone="mine" />
-          )}
-          {canAdminEdit && (
-            <ReconEditLink entry={entry} returnTo={returnTo} tone="admin" />
+          {/* Only ever rendered in the browser (the server has no viewer),
+              so the Suspense that `useSearchParams` asks for never shows. */}
+          {(isMine || canAdminEdit) && (
+            <Suspense fallback={null}>
+              <ReconEditLink
+                entry={entry}
+                vendor={vendor}
+                tone={isMine ? "mine" : "admin"}
+              />
+            </Suspense>
           )}
           <Badge variant="secondary" className="shrink-0">
             {typeLabel}

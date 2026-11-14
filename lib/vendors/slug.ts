@@ -24,6 +24,17 @@ export interface VendorRef {
 }
 
 /**
+ * A `from` return path, if it is safe to navigate to: internal paths only
+ * (`/explore?restore=1`), never a protocol-relative `//host` or an absolute
+ * URL, which would make the back button an open redirect.
+ */
+export function safeReturnPath(from: string | null | undefined): string | null {
+  return typeof from === "string" && from.startsWith("/") && !from.startsWith("//")
+    ? from
+    : null;
+}
+
+/**
  * The vendor page path, optionally with a `from` return path for its back
  * button (internal paths only; the page re-checks it).
  */

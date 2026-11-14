@@ -13,9 +13,13 @@ type ServerClient = Awaited<ReturnType<typeof createClient>>;
  *
  * Deliberately forgiving: a null/blank user id is not an admin, and a query
  * error resolves to `false` rather than throwing — an admin check that errors
- * must never grant access, and must never break a public page (the vendor page
- * calls this for logged-out viewers). `profiles` is public-read, so this works
- * under the caller's own RLS with no privileged client.
+ * must never grant access, and must never break the page calling it.
+ * `profiles` is public-read, so this works under the caller's own RLS with no
+ * privileged client.
+ *
+ * The vendor page no longer calls it: that page is a cached render shared by
+ * every visitor, so its admin pill is decided in the browser instead
+ * (`isAdmin` in lib/viewer.ts, the same `profiles.is_admin` read).
  */
 export async function isAdminUser(
   supabase: ServerClient,

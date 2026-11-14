@@ -2,6 +2,7 @@ import { IdentifyUser } from "@/components/analytics/identify-user";
 import { BottomNav } from "@/components/bottom-nav";
 import { MarkVisited } from "@/components/mark-visited";
 import { ResumePublishWatcher } from "@/components/resume-publish-watcher";
+import { ViewerPreload } from "@/components/viewer-preload";
 import { WelcomePopup } from "@/components/search/welcome-popup";
 import { JourneySyncMount } from "@/components/search/journey-sync-mount";
 
@@ -15,6 +16,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <MarkVisited />
       {/* Links anonymous browsing to the account in PostHog once signed in. */}
       <IdentifyUser />
+      {/* Resolves who is viewing in the browser, so a vendor page (cached,
+          the same for everyone) reached by a tap draws "Edit my recon" and
+          the My recon pill on its first paint. See lib/viewer.ts. */}
+      <ViewerPreload />
       <ResumePublishWatcher />
       {/* Guided-journey welcome / welcome-back popups. */}
       <WelcomePopup />
