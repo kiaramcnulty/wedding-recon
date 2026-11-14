@@ -2,6 +2,7 @@
 
 import { redirect, RedirectType } from "next/navigation";
 import { captureServer } from "@/lib/analytics/posthog-server";
+import { markMapFresh } from "@/lib/map/fresh-server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRegion } from "@/lib/normalize-region";
 import { MANUAL_LOCATION_ERROR } from "@/lib/vendor/manual-entry";
@@ -223,6 +224,10 @@ export async function createRecon(input: CreateReconInput) {
     vendor_type: input.vendorType,
     photo_count: input.media?.length ?? 0,
   });
+
+  // The map is CDN-cached for an hour; let this couple see their new vendor /
+  // recon count there now rather than in an hour (lib/map/fresh.ts).
+  await markMapFresh();
 
   // ── 6. Redirect to vendor page ────────────────────────────────────────────
   // Keep the return context so the vendor page back button still reaches

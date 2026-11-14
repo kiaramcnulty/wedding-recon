@@ -2,6 +2,7 @@
 
 import { redirect, RedirectType } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { markMapFresh } from "@/lib/map/fresh-server";
 import { createClient } from "@/lib/supabase/server";
 import { isAdminUser } from "@/lib/auth/admin";
 import { usesServiceRegion } from "@/lib/constants/categories";
@@ -111,6 +112,9 @@ export async function updateRecon(input: UpdateReconInput) {
   // after saving does not show the pre-edit copy.
   revalidatePath(vendorHref);
   revalidatePath("/hub");
+  // A price or photo edit can change the map card; it is CDN-cached for an
+  // hour, so let this author see it now (lib/map/fresh.ts).
+  await markMapFresh();
 
   // Internal paths only — a caller-supplied target is an open-redirect vector.
   const target =

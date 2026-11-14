@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { markMapFresh } from "@/lib/map/fresh-server";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { filtersForType } from "@/lib/constants/vendor-filters";
@@ -219,5 +220,8 @@ export async function saveListing(input: SaveListingInput): Promise<SaveListingR
   // The public page lives at /vendor/<slug>, which this action does not have in
   // hand; revalidating the route covers the slug and any legacy uuid URL alike.
   revalidatePath("/vendor/[id]", "page");
+  // Filter overrides and the listing show on the map, which is CDN-cached for
+  // an hour; let this vendor see their own change there now (lib/map/fresh.ts).
+  await markMapFresh();
   return { ok: true, published };
 }

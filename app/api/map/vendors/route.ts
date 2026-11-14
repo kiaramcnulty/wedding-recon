@@ -17,7 +17,8 @@ import { ALL_VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
  * rows, the same shape the browser used to get calling the RPC directly, so the
  * map is unchanged downstream.
  *
- * The point is the cache. The map fans a bbox query out to ~12 of these per
+ * The point is the cache (CPU as well as the DB pool: each miss is a billed
+ * function invocation). The map fans a bbox query out to ~12 of these per
  * load, and a Reddit traffic spike on 2026-08-14 had every visitor's dozen calls
  * hit Postgres directly, exhausting the free-tier pool (503 storm). Snapping the
  * bbox to a shared grid client-side (lib/map/viewport.ts) makes near-identical
@@ -135,12 +136,22 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // Browser holds nothing — vendor data changes, and the shared cache is
       // where the win is. Always revalidate against the edge.
       "Cache-Control": "public, max-age=0, must-revalidate",
-      // Vercel edge (and any CDN honoring the standard): one cached copy for
-      // 60s, then serve stale up to 5 more minutes while revalidating. This is
-      // the layer that collapses a spike of identical viewports into ~1 DB
-      // hit/min. On error above we send no-store instead, so failures never
-      // stick in the cache.
-      "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+      // Vercel edge (and any CDN honoring the standard): one cached copy for an
+      // hour, then served stale for up to one more hour while ONE background
+      // request refreshes it -- so no visitor sees rows older than ~2 hours.
+      // (The stale window was a day at first; cut to an hour 2026-11-14, Kiara:
+      // after a quiet stretch the first visitor got day-old rows. The cost is
+      // that a visitor after 2+ quiet hours waits for a fresh miss.) This is the layer that collapses a spike of identical
+      // viewports into one DB hit, and -- the reason it is an hour, not the
+      // original 60s -- the layer that keeps the map off the function CPU
+      // bill: a map load is ~13 of these, and at 60s any two visitors more
+      // than a minute apart each paid for all 13 (docs/notes/function-cpu.md).
+      // The cost is that a
+      // new vendor, a new verification or a new recon count can take up to an
+      // hour to reach the map; the vendor page itself is always live. A new
+      // deployment starts the cache over regardless. On error above we send
+      // no-store instead, so failures never stick in the cache.
+      "CDN-Cache-Control": "public, s-maxage=3600, stale-while-revalidate=3600",
     },
   });
 }
