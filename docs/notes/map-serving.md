@@ -82,7 +82,10 @@ than after two backoffs. `scripts/test-rpc-fanout.mjs` covers the classifier.
   starts it cold. The staleness this adds is bounded for the person who
   caused it: a recon save/edit or a portal listing save sets the one-hour
   `wr_map_fresh` cookie, and that browser's map requests add `&fresh=<token>`,
-  a separate CDN key (`lib/map/fresh.ts`). Everyone else may see a new vendor,
+  a separate CDN key (`lib/map/fresh.ts`). Verification changes, listing saves
+  and claim revokes drop the whole map cache instead (the `map-vendors` cache
+  tag, `lib/map/purge.ts`), since the Stripe webhook has no browser to mark.
+  Otherwise, everyone else may see a new vendor,
   verification or recon count up to an hour late. `docs/notes/function-cpu.md`.
 - (History) Raising `s-maxage` buys more protection and more staleness. 60s was chosen
   because a newly seeded vendor appearing within a minute is fine.

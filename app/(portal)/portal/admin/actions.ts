@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { purgeMapCache } from "@/lib/map/purge";
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminUser } from "@/lib/auth/admin";
@@ -32,5 +33,8 @@ export async function revokeClaim(claimId: string): Promise<RevokeResult> {
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/portal/admin");
+  // An approved claim is one leg of being verified, so a revoke can take a
+  // badge off the map, which is CDN-cached for an hour (lib/map/purge.ts).
+  await purgeMapCache(`claim ${claimId} revoked`);
   return { ok: true };
 }
