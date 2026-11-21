@@ -72,6 +72,10 @@ export function GuidedJourney() {
   const [view, setView] = React.useState<ResultsView>("suggestions");
   // What the couple typed into the town box before switching to venue search.
   const [venueQuery, setVenueQuery] = React.useState<string | undefined>();
+  // Set by "Change type" on the results: the type grid (and the questions
+  // after it) then lead Back to that type's results, which the grid a
+  // returning visitor lands on does not. Cleared on any other step.
+  const [changeTypeFrom, setChangeTypeFrom] = React.useState<GuidedType | null>(null);
   const resumedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -189,6 +193,7 @@ export function GuidedJourney() {
     (step: JourneyStep, patch: Partial<JourneyState> = {}) => {
       update({ ...patch, step });
       if (step !== "results") setView("suggestions");
+      if (step !== "category" && step !== "prefs") setChangeTypeFrom(null);
       window.scrollTo({ top: 0 });
     },
     [update],
@@ -347,11 +352,18 @@ export function GuidedJourney() {
         </Shell>
       );
 
-    case "category":
+    case "category": {
+      const from = changeTypeFrom;
+      const onBack = from
+        ? () => go("results", { selectedVendorType: from })
+        : state.status === "completed"
+          ? undefined
+          : () => go(back);
       return (
-        <Shell key={stepKey} onBack={state.status === "completed" ? undefined : () => go(back)}>
+        <Shell key={stepKey} onBack={onBack}>
           <CategoryStep
             state={state}
+            returning={state.status === "completed" && !from}
             onPick={(t) => {
               const { step: to, ...patch } = pickType(state, t);
               go(to, patch);
@@ -360,6 +372,7 @@ export function GuidedJourney() {
           />
         </Shell>
       );
+    }
 
     case "prefs":
       if (!state.selectedVendorType) {
@@ -394,7 +407,10 @@ export function GuidedJourney() {
           }}
           onEdit={() => go("prefs")}
           onEditLocation={() => go(state.hasVenue ? "venue" : "city")}
-          onChangeType={() => go("category")}
+          onChangeType={() => {
+            setChangeTypeFrom(state.selectedVendorType);
+            go("category");
+          }}
           onShown={() => {
             if (state.status !== "completed") update({ status: "completed" });
           }}
@@ -939,14 +955,16 @@ function TownLookupBlock({
 
 function CategoryStep({
   state,
+  returning,
   onPick,
   onEditLocation,
 }: {
   state: JourneyState;
+  /** A finished search, back for another type: not one mid-way through "Change type". */
+  returning: boolean;
   onPick: (t: GuidedType) => void;
   onEditLocation: () => void;
 }) {
-  const returning = state.status === "completed";
   return (
     <>
       <h1 className="font-display text-[2rem] font-semibold leading-tight">
