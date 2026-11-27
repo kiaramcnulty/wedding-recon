@@ -21,7 +21,8 @@ import { cn } from "@/lib/utils";
 /**
  * Explore's filters for ONE vendor type, as a row of chips over the map:
  * each of the type's default controls (the same `GUIDED_CONTROLS` the journey
- * asks) and More (Advanced). The type itself is the pill in the search bar
+ * asks) and More, which opens every filter the type has in one sheet (the
+ * chips' own first, then Advanced). The type itself is the pill in the search bar
  * ("[Venue] near [Denver]", see `TypeSheet`); distance is the slider at the
  * bottom of the frame (`DistanceSlider`). A chip opens a focused sheet
  * that keeps a draft until Apply, so closing it discards the change; the
@@ -55,6 +56,9 @@ function optionLabel(def: FilterDef | undefined, v: string) {
   return def?.options?.find((o) => o.value === v)?.label ?? v;
 }
 
+/** Venues judge capacity on the shared guest count and caterers price per guest. */
+const asksGuests = (type: GuidedType) => !!GUIDED_CONTROLS[type].guests || type === "food";
+
 export function FilterChips({
   type,
   prefs,
@@ -77,7 +81,7 @@ export function FilterChips({
   const controls = GUIDED_CONTROLS[type];
   const more = advancedDefs(type).length > 0 || asksDay(type);
   const moreCount = advancedCount(type, prefs);
-  const usesGuests = !!controls.guests || type === "food";
+  const usesGuests = asksGuests(type);
 
   const toggleFlag = (key: string) => {
     const flags = { ...(prefs.flags ?? {}) };
@@ -180,11 +184,14 @@ export function FilterChips({
 
       {sheet?.kind === "more" && (
         <MoreSheet
+          all
           type={type}
           initial={prefs}
-          count={(p) => countFor(p, guestCount)}
-          onApply={(p) => {
+          initialGuests={guestCount}
+          count={countFor}
+          onApply={(p, guests) => {
             onPrefs(p);
+            if (guests !== guestCount) onGuests(guests);
             close();
           }}
           onClose={close}
@@ -478,57 +485,131 @@ export function TypeSheet({
   );
 }
 
-/** Advanced: every other filter the type has, as one draft. */
 /**
- * The type's Advanced filters: everything its default controls do not show
- * (`advancedDefs`). Shared by Explore's More chip and the journey's
- * preferences step, so the two can never list different filters. Keeps a
- * draft until Apply; closing discards it. Without `count` (the journey has no
+ * The type's filters as one sheet with one draft, kept until Apply; closing
+ * discards it. Explore's More chip opens it with `all`: every filter the type
+ * has, the chips' own first (budget, guests, the default picks and checkboxes)
+ * and then Advanced (`advancedDefs`), so all of them can be set in one place
+ * (Kiara, 2026-11-28). The journey's preferences step asks the defaults on its
+ * own screen, so it opens Advanced only. Both read `advancedDefs`, so the two
+ * can never list different filters. Without `count` (the journey has no
  * results yet) the button just says Apply.
  */
 export function MoreSheet({
   type,
   initial,
+  all = false,
+  initialGuests,
   count = () => null,
   onApply,
   onClose,
 }: {
   type: GuidedType;
   initial: GuidedPrefs;
-  count?: (p: GuidedPrefs) => MatchCount;
-  onApply: (p: GuidedPrefs) => void;
+  /** Every filter, not just Advanced (Explore). */
+  all?: boolean;
+  /** The shared guest count, edited only with `all`. */
+  initialGuests?: number;
+  count?: (p: GuidedPrefs, guests: number | undefined) => MatchCount;
+  onApply: (p: GuidedPrefs, guests: number | undefined) => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = React.useState<GuidedPrefs>(initial);
-  // Bumped by Clear, to remount the limit fields: they keep their own text.
+  const [guests, setGuests] = React.useState(initialGuests);
+  // Number fields holding text Apply would refuse, by id: Apply waits for a fix.
+  const [invalid, setInvalid] = React.useState<Record<string, boolean>>({});
+  // Bumped by Clear, to remount the number fields: they keep their own text.
   const [cleared, setCleared] = React.useState(0);
+  const controls = GUIDED_CONTROLS[type];
   const defs = advancedDefs(type);
   const accent = CATEGORIES[type];
-  const clearAdvanced = () => {
-    const picks = { ...(draft.picks ?? {}) };
-    const flags = { ...(draft.flags ?? {}) };
-    for (const d of defs) {
-      delete picks[d.key];
-      delete flags[d.key];
+  const blocked = Object.values(invalid).some(Boolean);
+  const validity = (id: string) => (bad: boolean) =>
+    setInvalid((m) => (!!m[id] === bad ? m : { ...m, [id]: bad }));
+
+  // The chips' picks and checkboxes (under the chip's own label), then Advanced.
+  const items: { def: FilterDef; label: string }[] = [
+    ...(all
+      ? [...controls.picks, ...controls.flags].flatMap(({ key, label }) => {
+          const def = defOf(type, key);
+          return def ? [{ def, label: label ?? def.label }] : [];
+        })
+      : []),
+    ...defs.map((def) => ({ def, label: def.label })),
+  ];
+
+  const clear = () => {
+    if (all) {
+      const next: GuidedPrefs = { ...draft, picks: {}, flags: {}, limits: {}, day: undefined };
+      delete next.budget;
+      setDraft(next);
+      setGuests(undefined);
+    } else {
+      const picks = { ...(draft.picks ?? {}) };
+      const flags = { ...(draft.flags ?? {}) };
+      for (const d of defs) {
+        delete picks[d.key];
+        delete flags[d.key];
+      }
+      setDraft({ ...draft, picks, flags, limits: {}, day: undefined });
     }
-    setDraft({ ...draft, picks, flags, limits: {}, day: undefined });
+    setInvalid({});
     setCleared((n) => n + 1);
   };
+
   return (
     <BottomSheet
       open
       onClose={onClose}
-      title={`More ${CATEGORIES[type].label.toLowerCase()} filters`}
-      footer={<SheetFooter count={count(draft)} onClear={clearAdvanced} onApply={() => onApply(draft)} />}
+      title={all ? "All filters" : `More ${CATEGORIES[type].label.toLowerCase()} filters`}
+      footer={
+        <SheetFooter
+          count={count(draft, guests)}
+          onClear={clear}
+          onApply={() => !blocked && onApply(draft, guests)}
+        />
+      }
     >
       <div className="flex flex-col gap-6">
-        {defs.map((d) => {
+        {all && controls.budget && (
+          <NumberField
+            key={`budget:${cleared}`}
+            id="filter-budget"
+            label={controls.budget.label}
+            placeholder={controls.budget.placeholder}
+            prefix="$"
+            value={draft.budget}
+            error="Enter a dollar amount."
+            onValidity={validity("budget")}
+            onChange={(v) => {
+              const next = { ...draft };
+              if (v) next.budget = v;
+              else delete next.budget;
+              setDraft(next);
+            }}
+          />
+        )}
+        {all && asksGuests(type) && (
+          <NumberField
+            key={`guests:${cleared}`}
+            id="filter-guests"
+            label="Guest count"
+            placeholder="120"
+            whole
+            max={4999}
+            value={guests}
+            error="Enter a whole number of guests."
+            onValidity={validity("guests")}
+            onChange={setGuests}
+          />
+        )}
+        {items.map(({ def: d, label }) => {
           const rare = d.rare && <span className="font-normal text-muted-foreground"> · few vendors list this</span>;
           if (d.kind === "multi") {
             return (
               <fieldset key={d.key}>
                 <legend className="mb-2 text-sm font-medium">
-                  {d.label}
+                  {label}
                   {rare}
                 </legend>
                 <OptionChips
@@ -556,17 +637,24 @@ export function MoreSheet({
                   }}
                 />
                 <span className="text-sm font-medium">
-                  {d.label}
+                  {label}
                   {rare}
                 </span>
               </label>
             );
           }
+          const usd = d.unit === "usd";
           return (
-            <LimitField
+            <NumberField
               key={`${d.key}:${cleared}`}
-              def={d}
+              id={`limit-${d.key}`}
+              label={label}
+              hint={usd ? "(up to)" : "(at most)"}
+              prefix={usd ? "$" : undefined}
+              suffix={d.unit === "weeks" ? "weeks" : undefined}
               value={draft.limits?.[d.key]}
+              error={usd ? "Enter a dollar amount." : "Enter a number."}
+              onValidity={validity(d.key)}
               onChange={(v) => {
                 const limits = { ...(draft.limits ?? {}) };
                 if (v) limits[d.key] = v;
@@ -601,39 +689,70 @@ export function MoreSheet({
   );
 }
 
-/** An "up to" limit on one of the type's other ranges. */
-function LimitField({
-  def,
+/**
+ * A number typed as text: the budget, the guest count, an "up to" limit on one
+ * of the type's other ranges. Keeps its own text, and reports a value only
+ * once Apply would accept it, so a half-typed number keeps the last good one.
+ */
+function NumberField({
+  id,
+  label,
+  hint,
+  placeholder,
+  prefix,
+  suffix,
+  whole,
+  max,
   value,
+  error,
   onChange,
+  onValidity,
 }: {
-  def: FilterDef;
+  id: string;
+  label: string;
+  hint?: string;
+  placeholder?: string;
+  prefix?: string;
+  suffix?: string;
+  /** Digits only (the guest count). */
+  whole?: boolean;
+  max?: number;
   value?: number;
+  error: string;
   onChange: (v: number | undefined) => void;
+  onValidity: (invalid: boolean) => void;
 }) {
   const [raw, setRaw] = React.useState(value ? String(value) : "");
-  const usd = def.unit === "usd";
-  const id = `limit-${def.key}`;
+  const check = (s: string) => {
+    const v = whole ? (s.trim() && Number(s) > 0 ? Number(s) : undefined) : parseAmount(s);
+    return { v, bad: s.trim() !== "" && (v === undefined || (max !== undefined && v > max)) };
+  };
+  const invalid = check(raw).bad;
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor={id} className="text-sm font-medium">
-        {def.label} <span className="font-normal text-muted-foreground">{usd ? "(up to)" : "(at most)"}</span>
+        {label} {hint && <span className="font-normal text-muted-foreground">{hint}</span>}
       </label>
       <div className="relative flex items-center">
-        {usd && <span className="pointer-events-none absolute left-3 text-muted-foreground">$</span>}
+        {prefix && <span className="pointer-events-none absolute left-3 text-muted-foreground">{prefix}</span>}
         <Input
           id={id}
           inputMode="numeric"
-          className={cn("h-10 text-base", usd && "pl-7", def.unit === "weeks" && "pr-16")}
+          placeholder={placeholder && `e.g. ${placeholder}`}
+          className={cn("h-10 text-base", prefix && "pl-7", suffix && "pr-16")}
           value={raw}
+          aria-invalid={invalid}
           onChange={(e) => {
-            setRaw(e.target.value);
-            const n = parseAmount(e.target.value);
-            if (e.target.value.trim() === "" || n !== undefined) onChange(n);
+            const next = whole ? e.target.value.replace(/[^\d]/g, "") : e.target.value;
+            setRaw(next);
+            const { v, bad } = check(next);
+            onValidity(bad);
+            if (!bad) onChange(v);
           }}
         />
-        {def.unit === "weeks" && <span className="pointer-events-none absolute right-3 text-muted-foreground">weeks</span>}
+        {suffix && <span className="pointer-events-none absolute right-3 text-muted-foreground">{suffix}</span>}
       </div>
+      {invalid && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
