@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { CalendarHeart, LogIn, Search } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { ChoiceCard } from "@/components/search/choice-card";
+import { StepProgress } from "@/components/search/step-progress";
 import { Flourish, Sprig } from "@/components/ornaments";
 import {
   Dialog,
@@ -16,7 +17,7 @@ import {
 import { CATEGORIES } from "@/lib/constants/categories";
 import { createClient } from "@/lib/supabase/client";
 import { GUIDED_TYPES } from "@/lib/search/guided";
-import { JOURNEY_HREF, journeyStarted, loadJourney } from "@/lib/search/journey-state";
+import { JOURNEY_HREF, journeyProgress, journeyStarted, loadJourney } from "@/lib/search/journey-state";
 import { hasWelcomeResume, markWelcomeResume, takeWelcomeResume } from "@/lib/search/welcome-resume";
 import { cn } from "@/lib/utils";
 
@@ -174,12 +175,20 @@ export function WelcomePopup() {
     </div>
   );
 
+  // The journey's own first screens, so the tracker's count carries on into
+  // /start: welcome is step 1 of the first search, the type grid step 1 of the
+  // next one.
+  const progress =
+    mode === "welcome"
+      ? journeyProgress({ step: "welcome", status: "in_progress", hasVenue: null })
+      : journeyProgress({ step: "category", status: "completed", hasVenue: null });
+
   const header = (title: string, description: string, kicker?: string) => (
     // Sage from the top right, blush from the top left, fading to white: the
     // wash the whole app now sits on, at full strength here. Fine-line sprigs
     // frame it like an invitation.
     <div
-      className="relative overflow-hidden px-6 pb-1 pt-8 text-center"
+      className="relative overflow-hidden px-6 pb-1 pt-4 text-center"
       style={{
         backgroundImage:
           "radial-gradient(120% 90% at 100% 0%, var(--brand-soft), transparent 62%), radial-gradient(100% 80% at 0% 0%, var(--blush), transparent 60%), linear-gradient(to bottom, transparent 55%, var(--popover))",
@@ -187,6 +196,7 @@ export function WelcomePopup() {
     >
       <Sprig className="absolute -left-2 -top-1 w-32 -scale-y-100 text-brand-ink/30" />
       <Sprig className="absolute -right-2 -top-1 w-32 rotate-180 text-brand-ink/30" />
+      {progress && <StepProgress {...progress} className="relative mx-auto mb-4" />}
       <BrandMark className="relative mx-auto size-14" />
       {kicker && (
         <p className="relative mt-4 text-[11px] font-medium uppercase tracking-[0.22em] text-brand-ink">{kicker}</p>

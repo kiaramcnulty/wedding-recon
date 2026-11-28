@@ -314,6 +314,21 @@
   animation: step-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
 }
 
+/* The journey tracker: the current step's segment fills in from the left.
+   Transform on a segment with no fixed children, so the note above is safe. */
+@keyframes progress-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.animate-progress-fill {
+  transform-origin: left;
+  animation: progress-fill 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s backwards;
+}
+
 /* Cards lift a hair on hover, on devices that hover. */
 .card-lift {
   box-shadow:
@@ -337,7 +352,8 @@
   .animate-heart-burst,
   .animate-heart-ring,
   .animate-screen-in,
-  .animate-step-in {
+  .animate-step-in,
+  .animate-progress-fill {
     animation: none;
   }
 }

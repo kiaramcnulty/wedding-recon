@@ -26,6 +26,7 @@ import {
   clearJourney,
   onJourneyChange,
   emptyJourney,
+  journeyProgress,
   journeyStarted,
   loadJourney,
   saveJourney,
@@ -36,6 +37,7 @@ import {
 import { COLORADO_PLACES, foldPlaceName } from "@/lib/search/places";
 import { cn } from "@/lib/utils";
 import { GuidedResults, type ResultsView } from "./guided-results";
+import { StepProgress } from "./step-progress";
 
 /**
  * The guided first-visit journey (`/start`): venue or town, vendor type, a few
@@ -259,11 +261,12 @@ export function GuidedJourney() {
   }
 
   const back = backStep(state);
+  const progress = journeyProgress(state);
 
   switch (state.step) {
     case "welcome":
       return (
-        <Shell key={stepKey}>
+        <Shell key={stepKey} progress={progress}>
           {/* -mt-16 pulls the wash up under the empty back-button row of Shell. */}
           {/* The same sage and blush wash as the welcome popup, fading into the
               page's ivory rather than to white (a white band read as a seam). */}
@@ -316,7 +319,7 @@ export function GuidedJourney() {
 
     case "venue":
       return (
-        <Shell key={stepKey} onBack={() => go(back)}>
+        <Shell key={stepKey} progress={progress} onBack={() => go(back)}>
           <VenueStep
             state={state}
             initialQuery={venueQuery}
@@ -331,7 +334,7 @@ export function GuidedJourney() {
 
     case "city":
       return (
-        <Shell key={stepKey} onBack={() => go(back)}>
+        <Shell key={stepKey} progress={progress} onBack={() => go(back)}>
           <CityStep
             state={state}
             onPick={(location) => update({ location, cityLocation: location })}
@@ -360,7 +363,7 @@ export function GuidedJourney() {
           ? undefined
           : () => go(back);
       return (
-        <Shell key={stepKey} onBack={onBack}>
+        <Shell key={stepKey} progress={progress} onBack={onBack}>
           <CategoryStep
             state={state}
             returning={state.status === "completed" && !from}
@@ -379,7 +382,7 @@ export function GuidedJourney() {
         return null;
       }
       return (
-        <Shell key={stepKey} onBack={() => go(back)}>
+        <Shell key={stepKey} progress={progress} onBack={() => go(back)}>
           <PrefsStep
             key={state.selectedVendorType}
             state={state}
@@ -463,9 +466,11 @@ function backStep(s: JourneyState): JourneyStep {
 function Shell({
   children,
   onBack,
+  progress,
 }: {
   children: React.ReactNode;
   onBack?: () => void;
+  progress?: { step: number; total: number } | null;
 }) {
   return (
     // overflow-x-clip: the corner sprig sits a little past the edge and must
@@ -473,11 +478,17 @@ function Shell({
     <div className="animate-step-in relative mx-auto flex w-full max-w-[480px] flex-1 flex-col overflow-x-clip px-5 pb-10 pt-4">
       {/* A fine-line sprig in the top corner, like the welcome popup. */}
       <Sprig className="pointer-events-none absolute -right-2 -top-1 w-28 rotate-180 text-brand-ink/20" />
-      <div className="relative mb-4 h-8">
+      {/* z-10: the welcome step pulls its wash up under this row. */}
+      <div className="relative z-10 mb-4 h-8">
         {onBack && (
           <Button variant="ghost" size="sm" className="-ml-2 h-8" onClick={onBack}>
             <ChevronLeft className="size-4" /> Back
           </Button>
+        )}
+        {/* Centred on the screen, not after Back, so it holds still from step
+            to step whether or not there is a Back button. */}
+        {progress && (
+          <StepProgress {...progress} className="absolute left-1/2 top-0.5 -translate-x-1/2" />
         )}
       </div>
       <div className="relative flex flex-1 flex-col">{children}</div>
