@@ -9,8 +9,9 @@ import { VendorMap } from "@/components/map/vendor-map";
 import { VendorPinPreview } from "@/components/map/vendor-pin-preview";
 import { SaveButton } from "@/components/vendor/save-button";
 import {
+  PreviewLoadError,
   VendorPreviewCard,
-  useVendorPreviews,
+  useVendorPreviewsState,
   type VendorPreview,
 } from "@/components/map/vendor-preview-card";
 import { captureClient } from "@/lib/analytics/posthog";
@@ -123,7 +124,13 @@ export function GuidedResults({
     [result],
   );
   // One fetch for both groups, split back apart by id.
-  const allPreviews = useVendorPreviews(React.useMemo(() => [...suggestionIds, ...partialIds], [suggestionIds, partialIds]));
+  const {
+    items: allPreviews,
+    failed: previewsFailed,
+    retry: retryPreviews,
+  } = useVendorPreviewsState(
+    React.useMemo(() => [...suggestionIds, ...partialIds], [suggestionIds, partialIds]),
+  );
   const previews = React.useMemo(
     () => allPreviews && allPreviews.filter((p) => suggestionIds.includes(p.id)),
     [allPreviews, suggestionIds],
@@ -286,7 +293,15 @@ export function GuidedResults({
           <span className="h-px flex-1 bg-border" aria-hidden />
         </li>
         {partialPreviews === null
-          ? partialIds.map((id) => <li key={id} className="h-[213px] animate-pulse rounded-xl bg-muted" />)
+          ? previewsFailed
+            ? // One fetch covers both groups, so its error shows once: here
+              // only when there are no suggestion rows above to carry it.
+              suggestionIds.length === 0 && (
+                <li>
+                  <PreviewLoadError onRetry={retryPreviews} />
+                </li>
+              )
+            : partialIds.map((id) => <li key={id} className="h-[213px] animate-pulse rounded-xl bg-muted" />)
           : partialPreviews.map((item) => <li key={item.id}>{card(item)}</li>)}
       </>
     );
@@ -317,9 +332,15 @@ export function GuidedResults({
             <h1 className="font-display text-[1.75rem] font-semibold leading-tight">Here are the top options we found</h1>
             <ul className="mt-4 flex flex-col gap-3">
               {previews === null
-                ? suggestions.map((s) => (
-                    <li key={s.id} className="h-[213px] animate-pulse rounded-xl bg-muted" />
-                  ))
+                ? previewsFailed
+                  ? (
+                      <li>
+                        <PreviewLoadError onRetry={retryPreviews} />
+                      </li>
+                    )
+                  : suggestions.map((s) => (
+                      <li key={s.id} className="h-[213px] animate-pulse rounded-xl bg-muted" />
+                    ))
                 : previews.map((item) => <li key={item.id}>{card(item)}</li>)}
               {partialRows}
             </ul>

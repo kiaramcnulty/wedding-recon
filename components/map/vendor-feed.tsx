@@ -5,8 +5,9 @@ import { Loader2 } from "lucide-react";
 import { type VendorType } from "@/lib/constants/categories";
 import type { FilterSelections } from "@/lib/filters/match";
 import {
+  PreviewLoadError,
   VendorPreviewCard,
-  useVendorPreviews,
+  useVendorPreviewsState,
   type VendorPreview,
 } from "@/components/map/vendor-preview-card";
 import { SaveButton } from "@/components/vendor/save-button";
@@ -153,7 +154,7 @@ export function VendorFeed({
     for (const e of entries) m.set(e.id, e.vendorType);
     return m;
   }, [entries]);
-  const items = useVendorPreviews(ids);
+  const { items, failed, retry } = useVendorPreviewsState(ids);
 
   const rankById = React.useMemo(() => {
     const m = new Map<string, 0 | 1>();
@@ -269,7 +270,9 @@ export function VendorFeed({
       ref={scrollRef}
       className={cn("overflow-y-auto overscroll-contain px-3 py-3", className)}
     >
-      {items === null || (pending && items.length === 0) ? (
+      {items === null && failed ? (
+        <PreviewLoadError onRetry={retry} />
+      ) : items === null || (pending && items.length === 0) ? (
         // Loading: either the preview fetch is in flight (items === null), or
         // the list's source hasn't reported yet and an empty list would be a
         // premature "nothing here". Both read as "still finding vendors".
@@ -342,7 +345,10 @@ export function VendorFeed({
           </ul>
           {/* Sentinel: crossing into view (or within 600px of it) pages in the
               next batch. Kept OUTSIDE the list so it is never a stray <li>. */}
-          {hasMore && (
+          {/* The newest page gave up: offer it again in place of the
+              sentinel, which would otherwise spin with nothing coming. */}
+          {failed && <PreviewLoadError compact onRetry={retry} />}
+          {hasMore && !failed && (
             <div
               ref={sentinelRef}
               className="flex justify-center py-4"

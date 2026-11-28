@@ -91,22 +91,199 @@ interface ReconRow {
   media: { thumb_path: string | null; storage_path: string }[] | null;
 }
 
+/** Ceiling on the per-session preview cache before it is dropped wholesale. */
+const PREVIEW_CACHE_MAX = 600;
+
 /**
- * Fetch preview data for a set of vendor ids. Returns null while in flight, then
- * the built previews in the *given id order* (ids whose vendor row is gone are
- * dropped). Two client queries plus the verification RPCs: the vendor rows
- * and their active recon entries with media (tallied for the count + a
- * fallback thumbnail).
+ * How long one attempt may take before it is abandoned, and the pauses before
+ * the automatic retries. Without a deadline a request that never answers
+ * leaves the skeletons up for good: on 2026-11-17 an anonymous iPhone visitor
+ * came back to the tab after a few minutes away and no card rendered again on
+ * any screen, while the cached vendor pages and the map route (both on our own
+ * domain) kept working and Supabase was serving everyone else. A browser
+ * connection to Supabase that died while the tab was in the background is the
+ * best fit. The retries are spaced out so a dead connection has time to be
+ * replaced before the next try. After the last one the caller shows Try again.
+ */
+const PREVIEW_ATTEMPT_TIMEOUT_MS = 12_000;
+const PREVIEW_RETRY_DELAYS_MS = [1_500, 4_000];
+
+/**
+ * One attempt at the preview data for `idList`, in that order. Throws when the
+ * vendor rows or their recon entries do not come back: a half-built preview
+ * (no photos, "0 recon") would be cached for the session and look like real
+ * data. The verification RPCs keep their never-throw stance; an error there
+ * just leaves the card unverified, as before.
+ */
+async function fetchPreviews(
+  idList: string[],
+  signal: AbortSignal,
+): Promise<VendorPreview[]> {
+  const supabase = createClient();
+  const [vendorsRes, reconRes, verifiedRes, overridesRes] = await Promise.all([
+    supabase
+      .from("vendors")
+      // city/region/address_text feed the "City, ST" subtitle — three small
+      // text columns on rows already being fetched, so no extra round trip.
+      .select(
+        "id, slug, name, google_photos, google_place_id, city, region, address_text, filters",
+      )
+      .in("id", idList)
+      .abortSignal(signal),
+    supabase
+      .from("recon_entries")
+      .select(
+        "vendor_id, price_text, price_details, recon_collected_month, recon_collected_year, created_at, media:recon_media(thumb_path, storage_path)",
+      )
+      .eq("status", "active")
+      .in("vendor_id", idList)
+      .order("created_at", { ascending: false })
+      .abortSignal(signal),
+    // Which of these ids are verified vendors. A SECURITY DEFINER set
+    // function (migration 0044), because the perks rule reads the deny-all
+    // subscriptions table a plain select cannot touch. An error here (the
+    // RPC not yet applied) is treated as "nobody verified" so the card is
+    // exactly what it is today — same never-throw stance as searchVendors.
+    supabase.rpc("verified_vendor_ids", { p_ids: idList }).abortSignal(signal),
+    // A verified vendor's own published details (migration 0044), merged
+    // over the extracted filters below exactly as the map route and the
+    // vendor page merge them. Without this a card could say "A la carte"
+    // for a florist the matcher, reading the vendor's own "full service
+    // only", had just ranked as a full-service match. Same never-throw
+    // stance: an error leaves the extracted filters as they are.
+    supabase.rpc("verified_listing_overrides", { p_ids: idList }).abortSignal(signal),
+  ]);
+  if (vendorsRes.error) throw vendorsRes.error;
+  if (reconRes.error) throw reconRes.error;
+
+  const vendors = (vendorsRes.data ?? []) as unknown as VendorLite[];
+  const recons = (reconRes.data ?? []) as unknown as ReconRow[];
+  const verifiedIds = new Set<string>(
+    ((verifiedRes.data ?? []) as { vendor_id: string }[]).map(
+      (r) => r.vendor_id,
+    ),
+  );
+
+  const overridesById = new Map<string, Record<string, unknown>>();
+  for (const r of (overridesRes.data ?? []) as {
+    vendor_id: string;
+    filter_overrides: Record<string, unknown> | null;
+  }[]) {
+    if (r.filter_overrides && Object.keys(r.filter_overrides).length) {
+      overridesById.set(r.vendor_id, r.filter_overrides);
+    }
+  }
+  // A verified vendor's own first photo leads its card (Kiara, 2026-11-04):
+  // the portal tells them their photos lead their listing, and the card is
+  // where most couples first see it. Only verified ids are asked, so this
+  // is zero calls on most batches. verified_listing_public (0046) because
+  // vendor_listings has no anon select (drafts must never leak); it takes
+  // one id, hence one call per verified vendor. An error simply leaves the
+  // card on its recon / Google candidates.
+  const vendorPhotos = new Map<string, string[]>();
+  await Promise.all(
+    [...verifiedIds].map(async (vid) => {
+      const { data } = await supabase
+        .rpc("verified_listing_public", { p_vendor_id: vid })
+        .abortSignal(signal);
+      const photos =
+        (data as { photos: { thumb_path?: string; storage_path?: string }[] | null }[] | null)?.[0]
+          ?.photos ?? [];
+      const urls = photos.flatMap((ph) => {
+        const path = ph.thumb_path ?? ph.storage_path;
+        return path ? [supabase.storage.from("vendor-media").getPublicUrl(path).data.publicUrl] : [];
+      });
+      if (urls.length) vendorPhotos.set(vid, urls);
+    }),
+  );
+
+  const vendorById = new Map<string, VendorLite>();
+  for (const v of vendors) vendorById.set(v.id, v);
+
+  // Sorted ONCE over the flat result, before anything is grouped, so the
+  // count, the fallback thumbnail and the slides all follow one order — and
+  // it is the same order the vendor page uses. Bucketing by vendor_id below
+  // preserves the relative order inside each vendor's rows, which is the
+  // only ordering that matters here.
+  const ordered = sortReconEntries(recons);
+
+  // Tally active recon counts and collect every recon photo per vendor.
+  const counts = new Map<string, number>();
+  const reconPhotos = new Map<string, string[]>();
+  for (const row of ordered) {
+    counts.set(row.vendor_id, (counts.get(row.vendor_id) ?? 0) + 1);
+    for (const m of row.media ?? []) {
+      const path = m.thumb_path ?? m.storage_path;
+      if (!path) continue;
+      const list = reconPhotos.get(row.vendor_id) ?? [];
+      list.push(supabase.storage.from("recon-media").getPublicUrl(path).data.publicUrl);
+      reconPhotos.set(row.vendor_id, list);
+    }
+  }
+
+  // Preserve the caller's id order; drop ids whose vendor row is gone.
+  return idList.flatMap((id) => {
+    const v = vendorById.get(id);
+    if (!v) return [];
+    // The vendor's own photos, then recon photos (2026-08: free Supabase
+    // reads, and the vendor page strip also leads with recon), then Google.
+    const photos = [...(vendorPhotos.get(id) ?? []), ...(reconPhotos.get(id) ?? [])];
+    // Google: as many as the row has cached (up to the cap), or just the
+    // first when it has a place but no cached list yet, exactly the one
+    // photo cards asked for before. w=600 is the vendor page strip width,
+    // so the two share one billed fetch and CDN entry per photo.
+    const googleCount = v.google_photos?.length
+      ? Math.min(v.google_photos.length, GOOGLE_PHOTO_CAP)
+      : v.google_place_id
+        ? 1
+        : 0;
+    for (let i = 0; i < googleCount; i++) photos.push(`/api/vendor-photo/${id}?i=${i}&w=600`);
+    return [
+      {
+        id,
+        slug: v.slug ?? null,
+        name: v.name,
+        locality: formatVendorLocality(v),
+        reconCount: counts.get(id) ?? 0,
+        photos: photos.slice(0, CARD_PHOTO_CAP),
+        // Override keys win; extracted keys survive where not set.
+        filters: overridesById.has(id)
+          ? { ...(v.filters ?? {}), ...overridesById.get(id) }
+          : (v.filters ?? null),
+        verified: verifiedIds.has(id),
+      },
+    ];
+  });
+}
+
+export interface VendorPreviewsState {
+  /**
+   * The built previews in the *given id order* (ids whose vendor row is gone
+   * are dropped), or null while there is nothing to show yet.
+   */
+  items: VendorPreview[] | null;
+  /**
+   * The latest fetch for ids not yet on screen gave up after its retries.
+   * With `items` null that is the whole list; otherwise just the newest page.
+   */
+  failed: boolean;
+  /** Ask again for whatever is missing. */
+  retry: () => void;
+}
+
+/**
+ * Fetch preview data for a set of vendor ids: the vendor rows and their active
+ * recon entries with media (tallied for the count + a fallback thumbnail),
+ * plus the verification RPCs. Each attempt has a deadline and a failed one is
+ * retried; after the last retry `failed` goes true and the caller offers
+ * `retry` (see PREVIEW_ATTEMPT_TIMEOUT_MS for why).
  *
  * It no longer reads the viewer's identity. It did, to sort the viewer's own
  * recon first; that key left `sortReconEntries` when the vendor page became a
  * cached render that cannot know the viewer (lib/recon-sort.ts), and the card
  * follows the page so it leads with the same entry.
  */
-/** Ceiling on the per-session preview cache before it is dropped wholesale. */
-const PREVIEW_CACHE_MAX = 600;
-
-export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
+export function useVendorPreviewsState(ids: string[]): VendorPreviewsState {
   // Previews already fetched this session, keyed by vendor id.
   //
   // This used to be plain state that the effect reset to null on every change
@@ -125,12 +302,18 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
     () => new Map(),
   );
   const fetchedRef = React.useRef(new Set<string>());
+  // The id list whose fetch gave up, and a counter `retry` bumps to re-run the
+  // effect. Keyed by the list so a new list starts out not failed.
+  const [failedKey, setFailedKey] = React.useState<string | null>(null);
+  const [retryTick, setRetryTick] = React.useState(0);
 
   // Stable key so the fetch effect doesn't re-run on array identity changes.
   const idsKey = ids.join(",");
 
   React.useEffect(() => {
     let cancelled = false;
+    let attempt: AbortController | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const wanted = idsKey ? idsKey.split(",") : [];
     // Only the ids we have never fetched. This is what keeps a "load 20 more"
     // request proportional to the page rather than to the whole list.
@@ -139,164 +322,66 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
     // so there is no state to set here (and setting it synchronously in an
     // effect would be a cascading render).
     if (idList.length === 0) return;
-    (async () => {
-      const supabase = createClient();
-      const [vendorsRes, reconRes, verifiedRes, overridesRes] = await Promise.all([
-        supabase
-          .from("vendors")
-          // city/region/address_text feed the "City, ST" subtitle — three small
-          // text columns on rows already being fetched, so no extra round trip.
-          .select(
-            "id, slug, name, google_photos, google_place_id, city, region, address_text, filters",
-          )
-          .in("id", idList),
-        supabase
-          .from("recon_entries")
-          .select(
-            "vendor_id, price_text, price_details, recon_collected_month, recon_collected_year, created_at, media:recon_media(thumb_path, storage_path)",
-          )
-          .eq("status", "active")
-          .in("vendor_id", idList)
-          .order("created_at", { ascending: false }),
-        // Which of these ids are verified vendors. A SECURITY DEFINER set
-        // function (migration 0044), because the perks rule reads the deny-all
-        // subscriptions table a plain select cannot touch. An error here (the
-        // RPC not yet applied) is treated as "nobody verified" so the card is
-        // exactly what it is today — same never-throw stance as searchVendors.
-        supabase.rpc("verified_vendor_ids", { p_ids: idList }),
-        // A verified vendor's own published details (migration 0044), merged
-        // over the extracted filters below exactly as the map route and the
-        // vendor page merge them. Without this a card could say "A la carte"
-        // for a florist the matcher, reading the vendor's own "full service
-        // only", had just ranked as a full-service match. Same never-throw
-        // stance: an error leaves the extracted filters as they are.
-        supabase.rpc("verified_listing_overrides", { p_ids: idList }),
-      ]);
-      if (cancelled) return;
 
-      const vendors = (vendorsRes.data ?? []) as unknown as VendorLite[];
-      const recons = (reconRes.data ?? []) as unknown as ReconRow[];
-      const verifiedIds = new Set<string>(
-        ((verifiedRes.data ?? []) as { vendor_id: string }[]).map(
-          (r) => r.vendor_id,
-        ),
-      );
-
-      const overridesById = new Map<string, Record<string, unknown>>();
-      for (const r of (overridesRes.data ?? []) as {
-        vendor_id: string;
-        filter_overrides: Record<string, unknown> | null;
-      }[]) {
-        if (r.filter_overrides && Object.keys(r.filter_overrides).length) {
-          overridesById.set(r.vendor_id, r.filter_overrides);
-        }
-      }
-      // A verified vendor's own first photo leads its card (Kiara, 2026-11-04):
-      // the portal tells them their photos lead their listing, and the card is
-      // where most couples first see it. Only verified ids are asked, so this
-      // is zero calls on most batches. verified_listing_public (0046) because
-      // vendor_listings has no anon select (drafts must never leak); it takes
-      // one id, hence one call per verified vendor. An error simply leaves the
-      // card on its recon / Google candidates.
-      const vendorPhotos = new Map<string, string[]>();
-      await Promise.all(
-        [...verifiedIds].map(async (vid) => {
-          const { data } = await supabase.rpc("verified_listing_public", {
-            p_vendor_id: vid,
-          });
-          const photos =
-            (data as { photos: { thumb_path?: string; storage_path?: string }[] | null }[] | null)?.[0]
-              ?.photos ?? [];
-          const urls = photos.flatMap((ph) => {
-            const path = ph.thumb_path ?? ph.storage_path;
-            return path ? [supabase.storage.from("vendor-media").getPublicUrl(path).data.publicUrl] : [];
-          });
-          if (urls.length) vendorPhotos.set(vid, urls);
-        }),
-      );
-      if (cancelled) return;
-
-      const vendorById = new Map<string, VendorLite>();
-      for (const v of vendors) vendorById.set(v.id, v);
-
-      // Sorted ONCE over the flat result, before anything is grouped, so the
-      // count, the fallback thumbnail and the slides all follow one order — and
-      // it is the same order the vendor page uses. Bucketing by vendor_id below
-      // preserves the relative order inside each vendor's rows, which is the
-      // only ordering that matters here.
-      const ordered = sortReconEntries(recons);
-
-      // Tally active recon counts and collect every recon photo per vendor.
-      const counts = new Map<string, number>();
-      const reconPhotos = new Map<string, string[]>();
-      for (const row of ordered) {
-        counts.set(row.vendor_id, (counts.get(row.vendor_id) ?? 0) + 1);
-        for (const m of row.media ?? []) {
-          const path = m.thumb_path ?? m.storage_path;
-          if (!path) continue;
-          const list = reconPhotos.get(row.vendor_id) ?? [];
-          list.push(supabase.storage.from("recon-media").getPublicUrl(path).data.publicUrl);
-          reconPhotos.set(row.vendor_id, list);
-        }
-      }
-
-      // Preserve the caller's id order; drop ids whose vendor row is gone.
-      const built: VendorPreview[] = idList.flatMap((id) => {
-        const v = vendorById.get(id);
-        if (!v) return [];
-        // The vendor's own photos, then recon photos (2026-08: free Supabase
-        // reads, and the vendor page strip also leads with recon), then Google.
-        const photos = [...(vendorPhotos.get(id) ?? []), ...(reconPhotos.get(id) ?? [])];
-        // Google: as many as the row has cached (up to the cap), or just the
-        // first when it has a place but no cached list yet, exactly the one
-        // photo cards asked for before. w=600 is the vendor page strip width,
-        // so the two share one billed fetch and CDN entry per photo.
-        const googleCount = v.google_photos?.length
-          ? Math.min(v.google_photos.length, GOOGLE_PHOTO_CAP)
-          : v.google_place_id
-            ? 1
-            : 0;
-        for (let i = 0; i < googleCount; i++) photos.push(`/api/vendor-photo/${id}?i=${i}&w=600`);
-        return [
-          {
-            id,
-            slug: v.slug ?? null,
-            name: v.name,
-            locality: formatVendorLocality(v),
-            reconCount: counts.get(id) ?? 0,
-            photos: photos.slice(0, CARD_PHOTO_CAP),
-            // Override keys win; extracted keys survive where not set.
-            filters: overridesById.has(id)
-              ? { ...(v.filters ?? {}), ...overridesById.get(id) }
-              : (v.filters ?? null),
-            verified: verifiedIds.has(id),
-          },
-        ];
+    const pause = (ms: number) =>
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, ms);
       });
 
+    (async () => {
+      let built: VendorPreview[] | null = null;
+      for (let i = 0; i <= PREVIEW_RETRY_DELAYS_MS.length && !cancelled; i++) {
+        if (i > 0) await pause(PREVIEW_RETRY_DELAYS_MS[i - 1]);
+        if (cancelled) return;
+        // A plain controller plus a timer rather than AbortSignal.timeout /
+        // AbortSignal.any, which older iOS Safari lacks. The cleanup aborts
+        // the same controller, so a superseded attempt stops at once.
+        attempt = new AbortController();
+        const ctrl = attempt;
+        timer = setTimeout(() => ctrl.abort(), PREVIEW_ATTEMPT_TIMEOUT_MS);
+        try {
+          built = await fetchPreviews(idList, ctrl.signal);
+          break;
+        } catch (err) {
+          if (cancelled) return;
+          console.warn("vendor previews: attempt failed", i + 1, err);
+        } finally {
+          clearTimeout(timer);
+        }
+      }
       if (cancelled) return;
+      if (!built) {
+        // Nothing is marked fetched, so a retry (or the list changing)
+        // asks for these ids again.
+        setFailedKey(idsKey);
+        return;
+      }
+      const result = built;
       // Mark every id we ASKED for, not just the ones that came back: a vendor
       // row that is gone must not be re-requested on every subsequent render.
       for (const id of idList) fetchedRef.current.add(id);
+      setFailedKey(null);
       setCache((prev) => {
         // Bound the session cache. Panning a map for a while would otherwise
         // accumulate every vendor ever previewed; dropping it wholesale is fine
         // because the next render simply refetches the ids on screen.
-        const overflowing = prev.size + built.length > PREVIEW_CACHE_MAX;
+        const overflowing = prev.size + result.length > PREVIEW_CACHE_MAX;
         if (overflowing) fetchedRef.current = new Set(idList);
         const next = overflowing
           ? new Map<string, VendorPreview>()
           : new Map(prev);
-        for (const item of built) next.set(item.id, item);
+        for (const item of result) next.set(item.id, item);
         return next;
       });
     })();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
+      attempt?.abort();
     };
-  }, [idsKey]);
+  }, [idsKey, retryTick]);
 
-  return React.useMemo(() => {
+  const items = React.useMemo(() => {
     const wanted = idsKey ? idsKey.split(",") : [];
     const built = wanted.flatMap((id) => cache.get(id) ?? []);
     // Null (the caller's spinner) only while we have NOTHING to show. Once any
@@ -307,6 +392,55 @@ export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
     if (built.length === 0 && wanted.length > 0) return null;
     return built;
   }, [idsKey, cache]);
+
+  const retry = React.useCallback(() => {
+    setFailedKey(null);
+    setRetryTick((n) => n + 1);
+  }, []);
+
+  return { items, failed: failedKey === idsKey && idsKey !== "", retry };
+}
+
+/** The previews alone, for surfaces with no failed state of their own. */
+export function useVendorPreviews(ids: string[]): VendorPreview[] | null {
+  return useVendorPreviewsState(ids).items;
+}
+
+/**
+ * Shown in place of a preview list whose fetch gave up: the words and the
+ * button every surface uses, so they all read alike.
+ */
+export function PreviewLoadError({
+  onRetry,
+  compact = false,
+  className,
+}: {
+  onRetry: () => void;
+  /** One line, for under a list that already has cards in it. */
+  compact?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      role="alert"
+      className={cn(
+        "flex flex-col items-center justify-center gap-2 text-center text-muted-foreground",
+        compact ? "py-4" : "h-40",
+        className,
+      )}
+    >
+      <span className="text-sm font-medium">
+        {compact ? "Couldn't load more vendors." : "Couldn't load vendors."}
+      </span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="rounded-full border bg-background px-4 py-1.5 text-sm font-medium text-foreground"
+      >
+        Try again
+      </button>
+    </div>
+  );
 }
 
 /**
