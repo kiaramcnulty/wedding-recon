@@ -6,8 +6,9 @@ import { SaveButton } from "@/components/vendor/save-button";
 import { type VendorType } from "@/lib/constants/categories";
 import type { FilterSelection } from "@/lib/filters/match";
 import {
+  PreviewLoadError,
   VendorPreviewCard,
-  useVendorPreviews,
+  useVendorPreviewsState,
 } from "@/components/map/vendor-preview-card";
 import { vendorPath } from "@/lib/vendors/slug";
 import {
@@ -45,7 +46,7 @@ export function VendorPinPreview({
   returnTo = "/explore?restore=1",
   surface,
 }: VendorPinPreviewProps) {
-  const items = useVendorPreviews([vendorId]);
+  const { items, failed, retry } = useVendorPreviewsState([vendorId]);
   const item = items?.[0] ?? null;
   const cardRef = React.useRef<HTMLDivElement>(null);
 
@@ -158,7 +159,12 @@ export function VendorPinPreview({
         <X className="size-4" />
       </button>
 
-      {item === null ? (
+      {item === null && failed ? (
+        <PreviewLoadError
+          onRetry={retry}
+          className="h-[213px] rounded-xl border bg-card shadow-xl"
+        />
+      ) : item === null ? (
         <div className="flex h-[213px] items-center justify-center rounded-xl border bg-card shadow-xl">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>

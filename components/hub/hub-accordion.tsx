@@ -13,8 +13,9 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { SaveButton } from "@/components/vendor/save-button";
 import {
+  PreviewLoadError,
   VendorPreviewCard,
-  useVendorPreviews,
+  useVendorPreviewsState,
 } from "@/components/map/vendor-preview-card";
 import { CATEGORIES, VENDOR_TYPES, type VendorType } from "@/lib/constants/categories";
 import { formatVendorLocality } from "@/lib/vendor-locality";
@@ -82,7 +83,7 @@ export function HubAccordion({ vendors: allVendors }: HubAccordionProps) {
   // collapsed sections are already populated when opened rather than each
   // section firing its own query.
   const ids = React.useMemo(() => vendors.map((v) => v.id), [vendors]);
-  const items = useVendorPreviews(ids);
+  const { items, failed, retry } = useVendorPreviewsState(ids);
   const itemById = React.useMemo(
     () => new Map((items ?? []).map((i) => [i.id, i])),
     [items],
@@ -94,6 +95,9 @@ export function HubAccordion({ vendors: allVendors }: HubAccordionProps) {
       multiple
       className="divide-y divide-border"
     >
+      {/* The skeletons below keep their names either way; this says the
+          photos and counts are not coming unless asked for again. */}
+      {failed && <PreviewLoadError compact onRetry={retry} />}
       {activeSections.map((type) => {
         const category = CATEGORIES[type];
         const Icon = category.icon;
