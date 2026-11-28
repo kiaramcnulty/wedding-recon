@@ -13,7 +13,13 @@ import { toast } from "sonner";
  */
 
 export type PhotoItem =
-  | { kind: "existing"; storagePath: string; thumbPath: string; url: string }
+  | {
+      kind: "existing";
+      storagePath: string;
+      thumbPath: string;
+      mediumPath?: string;
+      url: string;
+    }
   | { kind: "new"; file: File; url: string };
 
 const MAX = 4;

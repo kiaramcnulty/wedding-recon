@@ -23,6 +23,8 @@ export interface PricingRowInput {
 export interface PhotoInput {
   storage_path: string;
   thumb_path: string;
+  /** ~600px variant for the vendor page strip; absent on photos saved before it. */
+  medium_path?: string;
 }
 
 export interface SaveListingInput {
@@ -55,7 +57,14 @@ function sanitizePhotos(vendorId: string, raw: PhotoInput[]): PhotoInput[] {
         p.thumb_path.startsWith(prefix),
     )
     .slice(0, MAX_PHOTOS)
-    .map((p) => ({ storage_path: p.storage_path, thumb_path: p.thumb_path }));
+    .map((p) => ({
+      storage_path: p.storage_path,
+      thumb_path: p.thumb_path,
+      // Optional, and held to the same folder as the other two.
+      ...(typeof p.medium_path === "string" && p.medium_path.startsWith(prefix)
+        ? { medium_path: p.medium_path }
+        : {}),
+    }));
 }
 
 /**

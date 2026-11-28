@@ -20,7 +20,14 @@ import { PhotoLightbox, type LightboxPhoto } from "@/components/vendor/photo-lig
  *
  * One strip also means one lightbox sequence: opening any photo now pages
  * through all of them instead of stopping at the row boundary.
+ *
+ * Photos are large and whole (Kiara, 2026-11-28, after the preview cards got
+ * the same treatment): each tile is TILE_HEIGHT tall and as wide as its photo
+ * at that height, so nothing is cropped. With more than one photo a tile is
+ * capped short of the strip width so the next one always peeks, which is the
+ * only hint that the strip scrolls.
  */
+const TILE_HEIGHT = 240;
 interface VendorPhotosProps {
   vendorId: string;
   /** How many Google photos were resolved server-side. */
@@ -40,9 +47,10 @@ export function VendorPhotos({
   reconPhotos,
   vendorPhotos = [],
 }: VendorPhotosProps) {
-  // Tiles are 150x112 CSS, so w=600 still covers a 3x screen (450px); the 1200px
-  // variant is fetched only when a photo is opened. Both are CDN-cached
-  // separately, and the full size is never on the page's baseline.
+  // w=600 is the same key the preview cards fetch, so the strip costs no Google
+  // fetch a card has not already paid for. At 240px tall a 4:3 photo is 320
+  // CSS px wide, so 600 is ~1.9x density, the same as an uploaded photo at its
+  // medium size. The 1200px variant is fetched only when a photo is opened.
   const googlePhotos: LightboxPhoto[] = Array.from(
     { length: googleCount },
     (_, i) => ({
@@ -56,7 +64,14 @@ export function VendorPhotos({
   // uploads, then Google. Recon stays first on purpose — the page's job is to
   // get the reader to the recon, and community content should not read as the
   // vendor's marketing.
-  const photos = [...reconPhotos, ...vendorPhotos, ...googlePhotos];
+  //
+  // Uploaded photos show their ~600px medium where one exists (migration
+  // 0053): the 400px thumb is soft at 240px tall on a 3x screen, and the
+  // 1600px full is ten times the bytes. Rows from before it fall back to the
+  // thumb until the backfill reaches them.
+  const photos = [...reconPhotos, ...vendorPhotos, ...googlePhotos].map((p) =>
+    p.medium ? { ...p, thumb: p.medium } : p,
+  );
   if (photos.length === 0) return null;
 
   return (
@@ -68,9 +83,15 @@ export function VendorPhotos({
         // the first tile to the container edge and scrolls the padding away, so
         // the strip bleeds to the screen edge while the rest of the page keeps
         // its 16px margin. (Same reason the map preview card uses scroll-pl-2.)
-        containerClassName="flex gap-2 overflow-x-auto snap-x snap-mandatory px-4 scroll-px-4 pb-2 scroll-smooth"
+        // items-center: a panorama shrunk to the width cap is shorter than its
+        // neighbours, and sits level with them rather than at the top.
+        containerClassName="flex items-center gap-2 overflow-x-auto snap-x snap-mandatory px-4 scroll-px-4 pb-2 scroll-smooth"
         containerStyle={{ scrollbarWidth: "none" }}
-        tileClassName="snap-start w-[150px] h-[112px] rounded-xl ring-1 ring-foreground/10"
+        tileClassName="snap-start rounded-xl ring-1 ring-foreground/10"
+        tileHeight={TILE_HEIGHT}
+        // 90% of a 390px phone's strip is 322px: a 4:3 photo (320px) still
+        // fits at full height, and the next tile peeks ~45px.
+        maxTileWidth={photos.length > 1 ? "90%" : "100%"}
       />
       {googleCount > 0 && (
         // Google's terms require showing the attributions returned with a photo.

@@ -2,14 +2,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { compressImage } from "@/lib/image-compress";
 
-/** Storage paths for one uploaded photo: full-size + thumbnail. */
+/** Storage paths for one uploaded photo: full-size, medium and thumbnail. */
 export interface ReconMediaUpload {
   path: string;
   thumbPath: string;
+  mediumPath: string;
 }
 
-// Full-size: enough for the vendor-page carousel without storing originals.
+// Full-size: the lightbox, opened on tap, without storing originals.
 const FULL = { maxDim: 1600, quality: 0.8 };
+// Medium: the vendor-page photo strip (240px tall tiles). About twice the
+// thumbnail's bytes, a tenth of the full (migration 0053).
+export const MEDIUM = { maxDim: 600, quality: 0.72 };
 // Thumbnail: list/card previews; tiny so they barely touch egress.
 const THUMB = { maxDim: 400, quality: 0.7 };
 
@@ -34,12 +38,14 @@ export async function uploadReconImages(
 
   return Promise.all(
     files.map(async (file, i): Promise<ReconMediaUpload> => {
-      const [full, thumb] = await Promise.all([
+      const [full, medium, thumb] = await Promise.all([
         compressImage(file, FULL),
+        compressImage(file, MEDIUM),
         compressImage(file, THUMB),
       ]);
 
       const path = `${userId}/${submissionId}/${i}-full.jpg`;
+      const mediumPath = `${userId}/${submissionId}/${i}-medium.jpg`;
       const thumbPath = `${userId}/${submissionId}/${i}-thumb.jpg`;
 
       const put = (p: string, body: Blob) =>
@@ -47,14 +53,16 @@ export async function uploadReconImages(
           .from(BUCKET)
           .upload(p, body, { contentType: "image/jpeg", upsert: false });
 
-      const [{ error: fullErr }, { error: thumbErr }] = await Promise.all([
+      const results = await Promise.all([
         put(path, full),
+        put(mediumPath, medium),
         put(thumbPath, thumb),
       ]);
-      if (fullErr) throw new Error(`Photo upload failed: ${fullErr.message}`);
-      if (thumbErr) throw new Error(`Photo upload failed: ${thumbErr.message}`);
+      for (const { error } of results) {
+        if (error) throw new Error(`Photo upload failed: ${error.message}`);
+      }
 
-      return { path, thumbPath };
+      return { path, thumbPath, mediumPath };
     }),
   );
 }

@@ -46,7 +46,7 @@ interface VerifiedListingRow {
   website: string | null;
   instagram: string | null;
   pricing: PricingRow[] | null;
-  photos: { storage_path: string; thumb_path: string }[] | null;
+  photos: { storage_path: string; thumb_path: string; medium_path?: string }[] | null;
 }
 
 /** Instagram glyph — lucide v1 dropped brand icons, so this is drawn inline to lucide's stroke conventions. */
@@ -294,6 +294,10 @@ export default async function VendorPage({ params }: VendorPageProps) {
         thumb: supabase.storage
           .from("recon-media")
           .getPublicUrl(m.thumb_path ?? m.storage_path).data.publicUrl,
+        // The photo strip's 240px tiles; the entry card keeps the thumb.
+        medium: m.medium_path
+          ? supabase.storage.from("recon-media").getPublicUrl(m.medium_path).data.publicUrl
+          : undefined,
         full: supabase.storage
           .from("recon-media")
           .getPublicUrl(m.storage_path).data.publicUrl,
@@ -307,11 +311,14 @@ export default async function VendorPage({ params }: VendorPageProps) {
   // resolved here server-side with no network call.
   const vendorPhotos =
     (isVerified &&
-      (listing?.photos as { storage_path: string; thumb_path: string }[] | null)?.map(
+      (listing?.photos as VerifiedListingRow["photos"])?.map(
         (p) => ({
           thumb: supabase.storage
             .from("vendor-media")
             .getPublicUrl(p.thumb_path).data.publicUrl,
+          medium: p.medium_path
+            ? supabase.storage.from("vendor-media").getPublicUrl(p.medium_path).data.publicUrl
+            : undefined,
           full: supabase.storage
             .from("vendor-media")
             .getPublicUrl(p.storage_path).data.publicUrl,

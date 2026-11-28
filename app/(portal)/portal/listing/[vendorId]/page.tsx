@@ -14,7 +14,7 @@ interface ListingRow {
   website: string | null;
   instagram: string | null;
   pricing: PricingRow[] | null;
-  photos: { storage_path: string; thumb_path: string }[] | null;
+  photos: { storage_path: string; thumb_path: string; medium_path?: string }[] | null;
   filter_overrides: Record<string, unknown> | null;
   published: boolean;
 }
@@ -70,6 +70,7 @@ export default async function ListingEditorPage({
     photos: (l?.photos ?? []).map((p) => ({
       storagePath: p.storage_path,
       thumbPath: p.thumb_path,
+      mediumPath: p.medium_path,
       // Thumbnail public URL for the picker preview (public bucket).
       url: supabase.storage.from("vendor-media").getPublicUrl(p.thumb_path).data.publicUrl,
     })),
