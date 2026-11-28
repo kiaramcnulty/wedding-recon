@@ -22,7 +22,7 @@ import { filtersForType } from "@/lib/constants/vendor-filters";
 import type { VendorType } from "@/lib/constants/categories";
 import { createClient } from "@/lib/supabase/client";
 import { uploadVendorImages } from "@/lib/vendor-media-upload";
-import { saveListing } from "@/app/(portal)/portal/listing/actions";
+import { saveListing, type PhotoInput } from "@/app/(portal)/portal/listing/actions";
 
 const CTA_LABELS = ["Book a tour", "Check availability", "Contact us", "Get a quote"] as const;
 const MAX_INTRO = 600;
@@ -38,7 +38,7 @@ export interface ListingInitial {
   pricing: PricingRow[];
   filterOverrides: Record<string, unknown>;
   /** Already-uploaded photos, with their public URLs resolved server-side. */
-  photos: { storagePath: string; thumbPath: string; url: string }[];
+  photos: { storagePath: string; thumbPath: string; mediumPath?: string; url: string }[];
   published: boolean;
 }
 
@@ -70,6 +70,7 @@ export function ListingEditor({
       kind: "existing" as const,
       storagePath: p.storagePath,
       thumbPath: p.thumbPath,
+      mediumPath: p.mediumPath,
       url: p.url,
     })),
   );
@@ -90,7 +91,7 @@ export function ListingEditor({
       // Upload any newly-picked photos to vendor-media first (bytes never go
       // through the Server Action), then record paths in listing order: kept
       // existing photos keep their paths, new ones consume the uploads in turn.
-      let photos: { storage_path: string; thumb_path: string }[];
+      let photos: PhotoInput[];
       try {
         const supabase = createClient();
         const newFiles = photoItems.flatMap((it) => (it.kind === "new" ? [it.file] : []));
@@ -99,10 +100,20 @@ export function ListingEditor({
           : [];
         let u = 0;
         photos = photoItems.map((it) => {
+          // A kept photo keeps its medium if it has one (photos saved before
+          // the medium existed get one from the backfill, not from a re-save).
           if (it.kind === "existing")
-            return { storage_path: it.storagePath, thumb_path: it.thumbPath };
+            return {
+              storage_path: it.storagePath,
+              thumb_path: it.thumbPath,
+              ...(it.mediumPath ? { medium_path: it.mediumPath } : {}),
+            };
           const up = uploaded[u++];
-          return { storage_path: up.storagePath, thumb_path: up.thumbPath };
+          return {
+            storage_path: up.storagePath,
+            thumb_path: up.thumbPath,
+            medium_path: up.mediumPath,
+          };
         });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Photo upload failed.");

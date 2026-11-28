@@ -127,6 +127,11 @@ export interface ReconMedia {
   storage_path: string;
   /** Small (~400px) variant for list/card previews; null on pre-thumbnail rows. */
   thumb_path: string | null;
+  /**
+   * ~600px variant for the vendor-page photo strip (migration 0053). Null until
+   * backfilled, and absent before the migration is applied: fall back to thumb.
+   */
+  medium_path?: string | null;
   media_type: "image";
   created_at: string;
 }

@@ -1,0 +1,15 @@
+-- Recon media: a medium (~600px) variant between the thumbnail and the full.
+-- Idempotent, safe to re-run. NOT auto-applied: run by hand in the Supabase
+-- SQL editor, BEFORE the app change that writes it is deployed.
+--
+-- The vendor page photo strip shows each photo 240px tall, where the 400px
+-- thumbnail is soft on a high-density phone and the 1600px full costs about
+-- ten times the bytes. The medium is about twice the thumbnail (measured on
+-- 200 bot photos: 35.6 KB against 17.9 KB, full 183 KB) and matches the w=600
+-- Google tiles the same strip shows.
+--
+-- Nullable: existing rows stay null until scripts/backfill-medium-photos.mjs
+-- fills them, and every reader falls back to thumb_path when it is null.
+-- Listing photos (vendor_listings.photos) are jsonb and carry the same key,
+-- medium_path, with no schema change.
+alter table recon_media add column if not exists medium_path text;

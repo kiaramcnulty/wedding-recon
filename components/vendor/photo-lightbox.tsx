@@ -8,6 +8,11 @@ import { cn } from "@/lib/utils";
 export interface LightboxPhoto {
   /** Small variant shown inline in the strip. */
   thumb: string;
+  /**
+   * Optional ~600px variant. The vendor-page strip shows it in place of `thumb`
+   * (see VendorPhotos); smaller tiles ignore it.
+   */
+  medium?: string;
   /** Full-size variant, fetched only when the photo is opened. */
   full: string;
   /**
@@ -25,7 +30,20 @@ interface PhotoLightboxProps {
   containerClassName?: string;
   containerStyle?: React.CSSProperties;
   tileClassName?: string;
+  /**
+   * Show each photo whole, at its own aspect ratio and this many CSS px tall,
+   * instead of cropping it to the `tileClassName` box. A photo wider than
+   * `maxTileWidth` at that height is shrunk to fit, never cut. Until a photo
+   * loads, its tile holds a grey 4:3 placeholder. The container needs
+   * `items-center` so a shrunk panorama sits level with its neighbours.
+   */
+  tileHeight?: number;
+  /** Width cap for a `tileHeight` tile, as CSS against the strip. Default 100%. */
+  maxTileWidth?: string;
 }
+
+/** Placeholder shape for a `tileHeight` tile whose photo has not loaded yet. */
+const PLACEHOLDER_RATIO = 4 / 3;
 
 // A horizontal drag past this many pixels counts as a swipe to the next/previous
 // photo rather than a tap. Kept comfortably above a tap's jitter so a stationary
@@ -53,8 +71,17 @@ export function PhotoLightbox({
   containerClassName,
   containerStyle,
   tileClassName,
+  tileHeight,
+  maxTileWidth = "100%",
 }: PhotoLightboxProps) {
   const [openIdx, setOpenIdx] = React.useState<number | null>(null);
+  // Width / height of each loaded photo, by index, for `tileHeight` tiles.
+  const [ratios, setRatios] = React.useState<ReadonlyMap<number, number>>(new Map());
+  const recordRatio = (i: number, img: HTMLImageElement) => {
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    const r = img.naturalWidth / img.naturalHeight;
+    setRatios((prev) => (prev.get(i) === r ? prev : new Map(prev).set(i, r)));
+  };
   const [mounted, setMounted] = React.useState(false);
   // A tile whose image fails to load (e.g. a proxied Google photo that 404s) is
   // dropped rather than shown as a broken icon. Indices stay stable so the
@@ -139,8 +166,19 @@ export function PhotoLightbox({
   return (
     <>
       <div className={containerClassName} style={containerStyle}>
-        {photos.map((p, i) =>
-          failed.has(i) ? null : (
+        {photos.map((p, i) => {
+          if (failed.has(i)) return null;
+          // A `tileHeight` tile takes its photo's own shape: as wide as the
+          // photo at that height, capped at `maxTileWidth` (past which the
+          // aspect-ratio shrinks the height instead of cutting the photo).
+          const ratio = ratios.get(i);
+          const natural = tileHeight
+            ? {
+                width: `min(${Math.round(tileHeight * (ratio ?? PLACEHOLDER_RATIO))}px, ${maxTileWidth})`,
+                aspectRatio: ratio ?? PLACEHOLDER_RATIO,
+              }
+            : undefined;
+          return (
             <button
               key={p.full + i}
               type="button"
@@ -149,7 +187,9 @@ export function PhotoLightbox({
               className={cn(
                 "relative block shrink-0 cursor-zoom-in overflow-hidden",
                 tileClassName,
+                natural && !ratio && "bg-muted",
               )}
+              style={natural}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -162,6 +202,16 @@ export function PhotoLightbox({
                 // usually off-screen on load and cost nothing until reached.
                 loading="lazy"
                 decoding="async"
+                // The ref catches a photo that finished loading before
+                // hydration, whose load event React never sees.
+                ref={
+                  tileHeight
+                    ? (img) => {
+                        if (img?.complete) recordRatio(i, img);
+                      }
+                    : undefined
+                }
+                onLoad={tileHeight ? (e) => recordRatio(i, e.currentTarget) : undefined}
                 onError={() =>
                   setFailed((prev) => {
                     const next = new Set(prev);
@@ -169,7 +219,10 @@ export function PhotoLightbox({
                     return next;
                   })
                 }
-                className="h-full w-full object-cover"
+                // Once the tile has the photo's shape, contain and cover draw
+                // the same thing; contain is what keeps the placeholder from
+                // cropping before it does.
+                className={cn("h-full w-full", natural ? "object-contain" : "object-cover")}
               />
               {p.badge && (
                 // Names the source per-tile, which is what lets photos of
@@ -180,8 +233,8 @@ export function PhotoLightbox({
                 </span>
               )}
             </button>
-          ),
-        )}
+          );
+        })}
       </div>
 
       {mounted &&

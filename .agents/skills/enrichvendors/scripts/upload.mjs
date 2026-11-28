@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import { parseCSV, argValue, selectAll } from '../../launchvendors/scripts/lib.mjs';
 import { etype } from './etype.mjs';
@@ -394,14 +395,20 @@ for (const r of toInsert) {
   const sub = crypto.randomUUID();
   for (const [i, p] of photos.entries()) {
     const base = `${bot.user_id}/${sub}/photo-${i + 1}`;
-    for (const [suffix, local] of [['', p], ['_thumb', p.replace(/\.jpg$/, '_thumb.jpg')]]) {
+    // The medium (vendor-page strip, migration 0053) is made here from the local
+    // full rather than by photos.mjs, so workdirs harvested before it existed
+    // upload one too. Same size and quality as scripts/backfill-medium-photos.mjs.
+    const fullBuf = fs.readFileSync(path.join(workdir, p));
+    const mediumBuf = await sharp(fullBuf).resize({ width: 600, height: 600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 72 }).toBuffer();
+    for (const [suffix, body] of [['', fullBuf], ['_medium', mediumBuf], ['_thumb', fs.readFileSync(path.join(workdir, p.replace(/\.jpg$/, '_thumb.jpg')))]]) {
       const { error: sErr } = await supabase.storage.from('recon-media')
-        .upload(`${base}${suffix}.jpg`, fs.readFileSync(path.join(workdir, local)), { contentType: 'image/jpeg', upsert: true });
+        .upload(`${base}${suffix}.jpg`, body, { contentType: 'image/jpeg', upsert: true });
       if (sErr) { console.error(`STORAGE FAILED ${base}${suffix}.jpg: ${sErr.message}`); process.exit(1); }
     }
     const { error: mErr } = await supabase.from('recon_media').insert({
       recon_entry_id: entry.id,
       storage_path: `${base}.jpg`,
+      medium_path: `${base}_medium.jpg`,
       thumb_path: `${base}_thumb.jpg`,
       media_type: 'image',
     });

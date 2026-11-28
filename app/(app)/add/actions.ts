@@ -54,7 +54,7 @@ export interface CreateReconInput {
    * lib/recon-upload.ts); we only record their paths here. Image bytes never
    * pass through this action.
    */
-  media?: { path: string; thumbPath: string | null }[];
+  media?: { path: string; thumbPath: string | null; mediumPath?: string | null }[];
 }
 
 /**
@@ -198,13 +198,29 @@ export async function createRecon(input: CreateReconInput) {
       recon_entry_id: reconId,
       storage_path: m.path,
       thumb_path: m.thumbPath,
+      medium_path: m.mediumPath ?? null,
       media_type: "image",
     }));
 
   if (mediaRows.length > 0) {
-    const { error: mediaError } = await supabase
+    let { error: mediaError } = await supabase
       .from("recon_media")
       .insert(mediaRows);
+    // Before migration 0053 is applied the column does not exist, and PostgREST
+    // rejects the whole insert (PGRST204), which would drop the photos. Retry
+    // without it; the medium file is in storage and the backfill can link it.
+    if (mediaError?.code === "PGRST204" && mediaError.message.includes("medium_path")) {
+      ({ error: mediaError } = await supabase
+        .from("recon_media")
+        .insert(
+          mediaRows.map((r) => ({
+            recon_entry_id: r.recon_entry_id,
+            storage_path: r.storage_path,
+            thumb_path: r.thumb_path,
+            media_type: r.media_type,
+          })),
+        ));
+    }
     if (mediaError) {
       // Non-fatal: the recon still publishes even if media rows fail.
       console.error(`[createRecon] recon_media insert failed:`, mediaError.message);

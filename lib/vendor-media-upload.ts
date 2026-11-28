@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { compressImage } from "@/lib/image-compress";
+import { MEDIUM } from "@/lib/recon-upload";
 
-/** Storage paths for one uploaded vendor photo: full-size + thumbnail. */
+/** Storage paths for one uploaded vendor photo: full-size, medium and thumbnail. */
 export interface VendorMediaUpload {
   storagePath: string;
   thumbPath: string;
+  mediumPath: string;
 }
 
 const FULL = { maxDim: 1600, quality: 0.8 };
@@ -30,12 +32,14 @@ export async function uploadVendorImages(
 
   return Promise.all(
     files.map(async (file, i): Promise<VendorMediaUpload> => {
-      const [full, thumb] = await Promise.all([
+      const [full, medium, thumb] = await Promise.all([
         compressImage(file, FULL),
+        compressImage(file, MEDIUM),
         compressImage(file, THUMB),
       ]);
 
       const storagePath = `${vendorId}/${userId}/${submissionId}/${i}-full.jpg`;
+      const mediumPath = `${vendorId}/${userId}/${submissionId}/${i}-medium.jpg`;
       const thumbPath = `${vendorId}/${userId}/${submissionId}/${i}-thumb.jpg`;
 
       const put = (p: string, body: Blob) =>
@@ -43,14 +47,16 @@ export async function uploadVendorImages(
           .from(BUCKET)
           .upload(p, body, { contentType: "image/jpeg", upsert: false });
 
-      const [{ error: fullErr }, { error: thumbErr }] = await Promise.all([
+      const results = await Promise.all([
         put(storagePath, full),
+        put(mediumPath, medium),
         put(thumbPath, thumb),
       ]);
-      if (fullErr) throw new Error(`Photo upload failed: ${fullErr.message}`);
-      if (thumbErr) throw new Error(`Photo upload failed: ${thumbErr.message}`);
+      for (const { error } of results) {
+        if (error) throw new Error(`Photo upload failed: ${error.message}`);
+      }
 
-      return { storagePath, thumbPath };
+      return { storagePath, thumbPath, mediumPath };
     }),
   );
 }
