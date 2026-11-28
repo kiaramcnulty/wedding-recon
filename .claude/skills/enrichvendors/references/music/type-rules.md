@@ -25,6 +25,15 @@ Music vendors are stored under **two** `vendor_type`s — `dj` and `band` ("Live
 - What they cover: ceremony, cocktail hour, reception, late-night sets/EDM, dinner music.
 - Music style: genres (Motown, bluegrass, top-40), instruments, whether they take
   requests or learn a first-dance song.
+- **DJ `specialty` tag** = what the DJ itself sells: `open_format` when they market
+  "open format" / "all genres" / "every era" / "read the room", plus every genre they
+  NAME (site genre list, bio, promoted mixes, reviews praising a genre). Open format
+  never hides a DJ; every other value is a closed list (a DJ tagged only `edm_house`
+  is hidden from a Latin search), so tag every genre they name, not just the first,
+  and add `open_format` whenever they say it. Merges: rave/festival/bass music ->
+  `edm_house`; funk, soul, Motown, disco, decades -> `throwback`; a Spanish-speaking
+  MC or Spanish-language weddings -> `latin`; Bollywood/sangeet/baraat ->
+  `south_asian`; hora/simcha -> `jewish`. A business name alone is never a tag.
 - **"See them live":** free showcases, public gigs, venue residencies where a couple can
   check them out before booking — capture specifics when sourced (this is gold for this
   type).

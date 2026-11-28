@@ -230,6 +230,27 @@ console.log("every vendor type");
   eq("DJ: emcee required excludes a DJ who says no", verdict("dj", noMc, guidedSelection("dj", { flags: { includes_mc: true } })), -1);
   eq("DJ: emcee required, DJ silent is partial",
     verdict("dj", vendor("dj", DENVER, {}), guidedSelection("dj", { flags: { includes_mc: true } })), 0);
+  // DJ specialty: open format is a specialty that never hides a DJ; every
+  // other specialty hides a DJ whose list misses the pick (Kiara, 2026-11-28).
+  const latinPick = guidedSelection("dj", { picks: { specialty: ["latin"] } });
+  const openPick = guidedSelection("dj", { picks: { specialty: ["open_format"] } });
+  eq("DJ specialty: a named match is confirmed",
+    verdict("dj", vendor("dj", DENVER, { specialty: ["latin", "throwback"] }), latinPick), 1);
+  eq("DJ specialty: no specialty is partial",
+    verdict("dj", vendor("dj", DENVER, {}), latinPick), 0);
+  eq("DJ specialty: a different specialty is hidden",
+    verdict("dj", vendor("dj", DENVER, { specialty: ["edm_house"] }), latinPick), -1);
+  eq("DJ specialty: open format only is partial under a genre pick",
+    verdict("dj", vendor("dj", DENVER, { specialty: ["open_format"] }), latinPick), 0);
+  eq("DJ specialty: open format + another genre is still partial, not hidden",
+    verdict("dj", vendor("dj", DENVER, { specialty: ["edm_house", "open_format"] }), latinPick), 0);
+  eq("DJ specialty: picking Open format matches an open-format DJ",
+    verdict("dj", vendor("dj", DENVER, { specialty: ["open_format", "country"] }), openPick), 1);
+  eq("DJ specialty: picking Open format hides a genre-only DJ",
+    verdict("dj", vendor("dj", DENVER, { specialty: ["edm_house"] }), openPick), -1);
+  eq("DJ specialty: any one picked genre is enough",
+    verdict("dj", vendor("dj", DENVER, { specialty: ["country"] }),
+      guidedSelection("dj", { picks: { specialty: ["latin", "country"] } })), 1);
   eq("DJ hourly quote is partial on a package budget",
     verdict("dj", vendor("dj", DENVER, { price_min: 200, price_basis: "per_hour" }), guidedSelection("dj", { budget: 1500 })), 0);
 

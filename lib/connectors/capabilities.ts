@@ -34,6 +34,7 @@ export function connectorCapabilities() {
           label: definition.label,
           kind: definition.kind,
           ...(definition.options && { options: definition.options }),
+          ...(definition.nonExcluding?.length && { non_excluding: definition.nonExcluding }),
           ...(definition.mode && { mode: definition.mode }),
           ...(definition.unit && { unit: definition.unit }),
           ...(definition.basis && { basis: definition.basis }),
@@ -64,6 +65,7 @@ export function connectorCapabilities() {
       rules: [
         "Known contradictions are excluded.",
         "Missing attribute information remains as a visibly labeled partial match.",
+        "A vendor holding a filter's non_excluding value (DJ open format) is never excluded by that filter; when it lacks the requested values it is a partial match.",
         "Full matches always precede partial matches.",
         "Paid verification can affect order only within the same match tier and is not a quality certification.",
         "Vendor ID is the final deterministic tie-breaker.",

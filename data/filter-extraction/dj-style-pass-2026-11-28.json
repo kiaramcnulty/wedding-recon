@@ -1,0 +1,2596 @@
+[
+ {
+  "id": "06015532-7b26-4e06-bf17-5b7d64c4c9ab",
+  "name": "Rolling DJ",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "customized playlists for weddings and events",
+    "source": "packet:recon"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Describes itself as focused on customized playlists and non-traditional music (WeddingWire, via search summary).",
+  "coverage": "third_party",
+  "checked": [
+   "facebook page (skipped, Meta)",
+   "WebSearch Rolling DJ Littleton: WeddingWire/MapQuest snippets only, no site"
+  ],
+  "notes": "No website; thin listing."
+ },
+ {
+  "id": "216b6498-d3c4-462c-9d99-5889d1508d13",
+  "name": "KayBay Entertainment",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "we aren't music snobs",
+    "source": "https://www.kaybayentertainment.com/"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Calls its style \"high-energy, club-style DJing\" with \"tasteful, inclusive MCing\"; no genres named.",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.kaybayentertainment.com/ (no genres; Meet Our DJs truncated)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "3cb0d775-afec-49ae-81b8-24e0c1304fe3",
+  "name": "DJ Laserfrog",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "festival_bass",
+    "strength": "specialty",
+    "evidence": "specializes in bass-music weddings specifically, not just a generic wedding dj",
+    "source": "packet:recon"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Own site says only \"a wide variety of musical styles\" played to client taste; bass-music specialty comes from a recon entry and Denver EDM subreddit vouches.",
+  "coverage": "recon_only",
+  "checked": [
+   "https://www.mydenverweddingdj.com/ (generic: wide variety of styles; no bass/EDM mention)"
+  ],
+  "notes": "Site text contradicts/omits the bass specialty; recon and reddit (r/DenverEDM) support it."
+ },
+ {
+  "id": "47919bdf-e648-4716-ac01-29f27d8aa2b7",
+  "name": "Stage 1 Events LLC",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "We are versed in multiple genres!",
+    "source": "https://stageonecolorado.com/music"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "The 90's and early 2000's have held in popularity.",
+    "source": "https://stageonecolorado.com/music"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Music page says versed in multiple genres and mentions 90s/early 2000s popularity plus new artists.",
+  "coverage": "live_site",
+  "checked": [
+   "https://stageonecolorado.com/ (no genres)",
+   "https://stageonecolorado.com/music (genre text)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "632ec277-3b3e-4491-9cf7-1454a03298eb",
+  "name": "Rocky Mountain Fun Machine",
+  "is_dj": "hybrid",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Says couples are \"Tired of hearing the same songs played at every wedding\"; no genres named.",
+  "coverage": "none",
+  "checked": [
+   "WebSearch name+photo booth: found rmfunmachine.com",
+   "https://www.rmfunmachine.com/wedding-dj-services (nav only, truncated)",
+   "https://www.rmfunmachine.com/ (no music info)"
+  ],
+  "notes": "DJ + photo booth company."
+ },
+ {
+  "id": "74c0b750-9af8-4f3f-be29-9dd5452a2230",
+  "name": "Synaptic Beatz",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [
+   {
+    "slug": "edm_house",
+    "strength": "inferred",
+    "evidence": "Synaptic Beatz (SoundCloud link). Above is the mix from my recent show at Lost Lake. I've done weddings, and I've thrown basement ragers.",
+    "source": "packet:reddit"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Self-promo post in r/DenverEDM; mentions weddings and basement ragers; no genre stated. Search suggests Lost Lake club shows.",
+  "coverage": "recon_only",
+  "checked": [
+   "WebSearch Synaptic Beatz DJ Denver: Lost Lake listings, Beatport 'Synaptic' tech house (unconfirmed same act); no site"
+  ],
+  "notes": "Club/EDM DJ who has done weddings; EDM is inferred only from venue/subreddit context."
+ },
+ {
+  "id": "95a577f0-1e59-452e-acc4-535b4564815e",
+  "name": "DJ Aeryk",
+  "is_dj": "hybrid",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "live saxophone mixed to the best music of today",
+    "source": "https://www.djaeryk.com"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "Hybrid dj & saxophonIST",
+    "source": "https://www.djaeryk.com"
+   }
+  ],
+  "raw_claims": "Hybrid DJ and saxophonist playing \"the best music of today\" with live sax and \"feel-good vibes\".",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.djaeryk.com (sax; no genres)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "c476875d-9f8e-48fb-94c6-839a5390638f",
+  "name": "Pure Sounds Productions",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "specializes in R&B, jazz, country, and electronic",
+    "source": "https://www.weddingwire.com/biz/pure-sounds-productions-loveland/55726bc9acc9b851.html"
+   },
+   {
+    "slug": "jazz_lounge",
+    "strength": "listed",
+    "evidence": "specializes in R&B, jazz, country, and electronic",
+    "source": "https://www.weddingwire.com/biz/pure-sounds-productions-loveland/55726bc9acc9b851.html"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "specializes in R&B, jazz, country, and electronic",
+    "source": "https://www.weddingwire.com/biz/pure-sounds-productions-loveland/55726bc9acc9b851.html"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "listed",
+    "evidence": "specializes in R&B, jazz, country, and electronic",
+    "source": "https://www.weddingwire.com/biz/pure-sounds-productions-loveland/55726bc9acc9b851.html"
+   },
+   {
+    "slug": "rock_indie",
+    "strength": "listed",
+    "evidence": "from older rock to current pop",
+    "source": "https://www.theknot.com/marketplace/pure-sounds-productions-loveland-co-331054"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Own site: extensive, regularly updated library, plays what you want; WeddingWire/Knot list R&B, jazz, country, electronic, older rock to current pop.",
+  "coverage": "third_party",
+  "checked": [
+   "https://pspdj.com/ (no genres)",
+   "WebSearch Pure Sound Productions Michael: WeddingWire/Knot snippets (via search summary, quotes are the summary wording)"
+  ],
+  "notes": "Genre quotes come from a search-tool summary of WeddingWire/Knot, not fetched directly."
+ },
+ {
+  "id": "dd8960a5-fc63-4b7c-9643-b1a4b553dcf0",
+  "name": "DJ Spyke",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Pitches \"A Wedding DJ Who Can Actually Mix\" and \"the BEST DANCE PARTY OF THEIR LIVES\"; no genres; also adult proms.",
+  "coverage": "none",
+  "checked": [
+   "https://www.djspyke.com/ (no genres)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "fdd0bab8-24ae-4eff-b4e0-a9d6bad2aca5",
+  "name": "Boogie on Down Productions LLC",
+  "is_dj": "hybrid",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "No music style stated; reviewers praise Ken's \"music taste\" and custom playlists.",
+  "coverage": "none",
+  "checked": [
+   "http://www.boogie-on-down.com/ (HTTP 403)",
+   "WebSearch: pages found, no style info"
+  ],
+  "notes": "Photography + DJ husband/wife business."
+ },
+ {
+  "id": "1389b6c7-c9bc-4248-b948-7d88a9fb3cac",
+  "name": "Sound Junction Professional DJ",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "Top 200 Most Requested Pop Songs",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "Top 100 Most Requested Songs of the 1980's",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Music page just links DJ Intelligence most-requested charts (pop, decades 1950s-2010s) and a client Play / Do-Not-Play list; no genre positioning.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site home/music/packages"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "1efcffbd-3cb2-42bc-b0b2-4e723eda3e80",
+  "name": "Griz Entertainment",
+  "is_dj": "agency",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "Their massive setlist encompasses decades of music from the 50's to the latest hit\u2026country, funk, pop, dance\u2026you name it, they've got it.",
+    "source": "packet:site"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "country, funk, pop, dance\u2026you name it",
+    "source": "packet:site"
+   },
+   {
+    "slug": "funk_soul",
+    "strength": "listed",
+    "evidence": "country, funk, pop, dance\u2026you name it",
+    "source": "packet:site"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "country, funk, pop, dance\u2026you name it",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "Get the best of both worlds by adding a live musician and DJ combo.",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Multi-DJ team with dedicated live musicians page; setlist spans decades and genres; songs organized by genre.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site home/live-musicians/services"
+  ],
+  "notes": "Agency of DJs plus live musicians."
+ },
+ {
+  "id": "26d9f913-cb1a-4297-928b-63dc572bdafa",
+  "name": "Ron Michaels Weddings",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [
+   {
+    "slug": "new:bluegrass_folk",
+    "strength": "listed",
+    "evidence": "played music exactly to our bluegrass/folk liking during happy hour",
+    "source": "packet:recon"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Site text on file has no music copy; a Google review praises bluegrass/folk happy hour plus conga-line dance set; also 2025 Top Wedding Songs PDF.",
+  "coverage": "recon_only",
+  "checked": [
+   "packet:site (forms only, no music info)"
+  ],
+  "notes": "Style evidence is one review."
+ },
+ {
+  "id": "489e6987-330d-4042-9186-e26e3049df8c",
+  "name": "Mountain Event Services",
+  "is_dj": "agency",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "build a playlist that matches your energy, from chill ceremony moments to full-on dance floor bangers",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "silent_disco",
+    "evidence": "interactive silent discos",
+    "source": "packet:site"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "Interactive MC",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Reads the room and builds playlists to client energy; also karaoke, silent disco, magicians, photo booths.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site home/denver/fort-collins pages"
+  ],
+  "notes": "DJ/AV/photo-booth entertainment company with multiple DJs."
+ },
+ {
+  "id": "72429071-9781-4fe2-bf09-426e9cff8091",
+  "name": "Springs Sounds Entertainment",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "One of the key strengths of Springs Sounds Entertainment is the ability to play a wide range of music genres.",
+    "source": "packet:site"
+   },
+   {
+    "slug": "rock_indie",
+    "strength": "listed",
+    "evidence": "From classic rock to modern pop",
+    "source": "packet:site"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "From classic rock to modern pop",
+    "source": "packet:site"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "including Top 200, hip-hop, EDM, country, and more",
+    "source": "packet:site"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "listed",
+    "evidence": "including Top 200, hip-hop, EDM, country, and more",
+    "source": "packet:site"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "including Top 200, hip-hop, EDM, country, and more",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "DJ, MC, dance instructor, dance and party hosts all-in-one.",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Wide range of genres, 20,000+ songs; DJ/MC/dance instructor/party host, dance and aerial performances.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "8286bff0-8239-4707-8a17-c7b6ee94e43e",
+  "name": "A Music Plus Entertainment",
+  "is_dj": "agency",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "It is your event and we are happy to play any music that you want.",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "DJ & Live Music for Weddings and Events!",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "DJs plus booking of live soloists, ensembles and bands in \"most any style\"; \"modern to vintage\" mood.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site home/faq"
+  ],
+  "notes": "Agency: DJs and live music booking."
+ },
+ {
+  "id": "c51f7a8c-b89f-4344-8d27-c74420d047b7",
+  "name": "Tidal Wave Dave Productions",
+  "is_dj": "hybrid",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "90's remixes, current hits, dance music, and more it was a great spread.",
+    "source": "packet:site"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "90's remixes, current hits, dance music, and more",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Luxury mountain-wedding DJ/MC; own site names no genres; DJ is also a producer with original releases.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site",
+   "https://djdave.pro/ (no genres)"
+  ],
+  "notes": "Producer with original music; genre of releases not stated."
+ },
+ {
+  "id": "d3a27724-9184-4cd3-80c9-17062ce27644",
+  "name": "DJ Guy Disc Jockeys",
+  "is_dj": "agency",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "Our music library is updated weekly and has every genre of music including Rock, Hip Hop, Dance, Country, Classic Oldies and many more.",
+    "source": "packet:site"
+   },
+   {
+    "slug": "rock_indie",
+    "strength": "listed",
+    "evidence": "every genre of music including Rock, Hip Hop, Dance, Country, Classic Oldies",
+    "source": "packet:site"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "Rock, Hip Hop, Dance, Country, Classic Oldies",
+    "source": "packet:site"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "Rock, Hip Hop, Dance, Country, Classic Oldies",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "Classic Oldies",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "can handle requests, announcements, line dancing instruction",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Every genre; multi-DJ family-run company; LED dance floor rental; \"NO CHICKEN DANCE\".",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site"
+  ],
+  "notes": "Multi-DJ company."
+ },
+ {
+  "id": "ec707811-46f9-4845-9a76-c217df22bd53",
+  "name": "Encore Events and Entertainment",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "He had a great selection of oldies, Sinatra and the like during dinner",
+    "source": "packet:site"
+   },
+   {
+    "slug": "jazz_lounge",
+    "strength": "listed",
+    "evidence": "oldies, Sinatra and the like during dinner",
+    "source": "packet:site"
+   },
+   {
+    "slug": "jewish",
+    "strength": "listed",
+    "evidence": "BAR-BAT MITZVAH",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "Interactive MC's that will teach various audience participation dances",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Customized music requests; interactive emcees; weddings plus bar/bat mitzvah page; no genre positioning.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site"
+  ],
+  "notes": "Jewish/mitzvah signal is only a nav page."
+ },
+ {
+  "id": "07d8270d-d4b1-43ca-a7a2-26d7a9ff3ec8",
+  "name": "DJ Sant\u00e9 da Silva",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "He's an open format DJ (hip-hop, R&B, soul and dance music)",
+    "source": "packet:recon"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "open format DJ (hip-hop, R&B, soul and dance music)",
+    "source": "packet:recon"
+   },
+   {
+    "slug": "funk_soul",
+    "strength": "listed",
+    "evidence": "a love of R&B, soul, funk, Latin, pop, rock, and more to every celebration",
+    "source": "https://djsantedasilva.com/"
+   },
+   {
+    "slug": "latin",
+    "strength": "listed",
+    "evidence": "a love of R&B, soul, funk, Latin, pop, rock, and more to every celebration",
+    "source": "https://djsantedasilva.com/"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "a love of R&B, soul, funk, Latin, pop, rock, and more to every celebration",
+    "source": "https://djsantedasilva.com/"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "DJ/MC service",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "Open-format DJ rooted in hip-hop/block-party culture bringing R&B, soul, funk, Latin, pop, rock; also markets multicultural, LGBTQ+ weddings and quincea\u00f1eras.",
+  "coverage": "live_site",
+  "checked": [
+   "https://djsantedasilva.com/ (fetched)"
+  ],
+  "notes": "Site also lists multicultural/intercultural weddings and quincea\u00f1eras (not counted as styles); karaoke offered."
+ },
+ {
+  "id": "32d1eebd-cbe0-494f-a590-03cec302b034",
+  "name": "PLURTHLINGS",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "festival_bass",
+    "strength": "specialty",
+    "evidence": "their press kit lists rave weddings starting at $2,000 plus per diem, travel and accommodations",
+    "source": "packet:recon"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "specialty",
+    "evidence": "a denver dj duo (Monsoon and Kahu) doing open-format rave and edm sets, not a live band",
+    "source": "packet:recon"
+   },
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "doing open-format rave and edm sets",
+    "source": "packet:recon"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Denver DJ duo selling open-format rave/EDM sets and rave weddings; part of PLURTH Music Festival Resort brand.",
+  "coverage": "recon_only",
+  "checked": [
+   "https://www.plurth.com/press (dead: ENOTFOUND)",
+   "https://www.plurth.com/rave-weddings (dead: ENOTFOUND)",
+   "WebSearch Plurthlings Denver DJ duo (search snippets only; consistent with recon)"
+  ],
+  "notes": "Site not fetchable from here but search results show a Rave Weddings page and press kit; evidence quoted from packet recon."
+ },
+ {
+  "id": "3f1751fc-8e3a-459d-ab98-5d486dde67fe",
+  "name": "James Brown DJ Service",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Only says he provides 'an ideal selection of music' and has over 20,000 songs; no genres named.",
+  "coverage": "none",
+  "checked": [
+   "https://jamesbrowndjservice.com/ (fetched, no genre info)"
+  ],
+  "notes": "Library claim: more than 20,000 songs."
+ },
+ {
+  "id": "4d30cd65-6bb2-4e26-a509-41342268e188",
+  "name": "Firefly Entertainment LLC",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "Nathan builds your set around them, then fills in for the room you'll actually have.",
+    "source": "https://fireflyentertainmentgj.com/"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Builds each set from the couple's must-play songs, then fills in for the actual crowd; no genres named.",
+  "coverage": "live_site",
+  "checked": [
+   "WebSearch Firefly Entertainment Grand Junction DJ wedding",
+   "https://fireflyentertainmentgj.com/ (fetched)"
+  ],
+  "notes": "Packet had no website; found fireflyentertainmentgj.com via search. Also photo booth. Not an agency per their site."
+ },
+ {
+  "id": "6d8d2fd4-2c03-471e-943a-26ce8ae73257",
+  "name": "Basschicken",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "No own-words description found; only a Reddit commenter vouching for a new Denver DJ.",
+  "coverage": "none",
+  "checked": [
+   "WebSearch Basschicken DJ Denver (no results for this name)"
+  ],
+  "notes": "Surfaced in r/DenverEDM thread but no style claim from or about him; name hints at bass music only, not counted. Bookability unconfirmed."
+ },
+ {
+  "id": "7c1cb132-b45c-44a0-a9ed-c271cd667098",
+  "name": "DJ Bertie",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "edm_house",
+    "strength": "listed",
+    "evidence": "a heavy focus on house, hip hop, throwbacks, remixes, and edits",
+    "source": "https://djbertie.com/djs-for-clubs/"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "a heavy focus on house, hip hop, throwbacks, remixes, and edits",
+    "source": "https://djbertie.com/djs-for-clubs/"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "a heavy focus on house, hip hop, throwbacks, remixes, and edits",
+    "source": "https://djbertie.com/djs-for-clubs/"
+   },
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "It's not about the playlist. It's about reading the room.",
+    "source": "https://djbertie.com"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Club/festival DJ who also does weddings; sets 'custom-built in real time', 'deep house to throwback hip hop to fresh edits' (club page).",
+  "coverage": "live_site",
+  "checked": [
+   "https://djbertie.com (fetched)",
+   "WebSearch DJ Bertie Frisco wedding music genres",
+   "https://djbertie.com/djs-for-clubs/ (fetched)"
+  ],
+  "notes": "Genre quotes come from the club-DJ page FAQ, not the wedding page; ski/mountain wedding positioning is geographic."
+ },
+ {
+  "id": "973f5a97-1027-45d5-93cc-c507a229afe9",
+  "name": "Out The Box Entertainment LLC",
+  "is_dj": "agency",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Says 'Multiple DJ's to choose from, but not corporate'; no genres on site or in listings.",
+  "coverage": "none",
+  "checked": [
+   "http://outtheboxentertainment.com/ (fetched, no music info)",
+   "WebSearch Out The Box Entertainment Pueblo genres (no genre info)"
+  ],
+  "notes": "Multi-DJ company that also sells photography and photo booths."
+ },
+ {
+  "id": "c4f90855-ca31-421f-b92b-91a3d7aad9a0",
+  "name": "The Colorado Wedding DJ",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "mix nostalgic \u201980s, \u201990s, and 2000s throwbacks with today\u2019s Top 40 hits",
+    "source": "https://www.thecoloradoweddingdj.com/"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "mix nostalgic \u201980s, \u201990s, and 2000s throwbacks with today\u2019s Top 40 hits",
+    "source": "https://www.thecoloradoweddingdj.com/"
+   },
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "create a dynamic flow that keeps every generation on the dance floor",
+    "source": "https://www.thecoloradoweddingdj.com/"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Solo DJ/MC Kevin; tailors each set, blending 80s/90s/2000s throwbacks with Top 40 for every generation.",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.thecoloradoweddingdj.com/ (fetch returned title only)",
+   "WebSearch The Colorado Wedding DJ Lakewood Kevin (returned the site's own wording as snippet)"
+  ],
+  "notes": "Quotes obtained via search snippet of the site text, not the fetch."
+ },
+ {
+  "id": "ea146251-2236-48dc-a4e4-a834827b804f",
+  "name": "Greatime DJ",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "top 40 hits, oldies, pop, rock, jazz, country, and many more",
+    "source": "https://www.weddingwire.com/biz/greatime-dj-avon/3760f8fa88678bcd.html"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "top 40 hits, oldies, pop, rock, jazz, country, and many more",
+    "source": "https://www.weddingwire.com/biz/greatime-dj-avon/3760f8fa88678bcd.html"
+   },
+   {
+    "slug": "rock_indie",
+    "strength": "listed",
+    "evidence": "top 40 hits, oldies, pop, rock, jazz, country, and many more",
+    "source": "https://www.weddingwire.com/biz/greatime-dj-avon/3760f8fa88678bcd.html"
+   },
+   {
+    "slug": "jazz_lounge",
+    "strength": "listed",
+    "evidence": "top 40 hits, oldies, pop, rock, jazz, country, and many more",
+    "source": "https://www.weddingwire.com/biz/greatime-dj-avon/3760f8fa88678bcd.html"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "top 40 hits, oldies, pop, rock, jazz, country, and many more",
+    "source": "https://www.weddingwire.com/biz/greatime-dj-avon/3760f8fa88678bcd.html"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "Country, Electronic, Hip Hop, International, Jazz, Oldies, Pop, R&B/Soul, Rock, and Top 40",
+    "source": "https://www.weddingwire.com/biz/greatime-dj-avon/3760f8fa88678bcd.html"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "listed",
+    "evidence": "Country, Electronic, Hip Hop, International, Jazz, Oldies, Pop, R&B/Soul, Rock, and Top 40",
+    "source": "https://www.weddingwire.com/biz/greatime-dj-avon/3760f8fa88678bcd.html"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "WeddingWire profile lists a broad genre menu (top 40, oldies, pop, rock, jazz, country, hip hop, electronic, international); no own website.",
+  "coverage": "third_party",
+  "checked": [
+   "WebSearch Greatime DJ Avon Colorado",
+   "https://www.weddingwire.com/biz/greatime-dj-avon/3760f8fa88678bcd.html (fetched)"
+  ],
+  "notes": "FAQ list is quoted by the fetch tool's summary; 'International' not mapped to a slug. Multiple DJs on staff (Fred, Erik, Bob)."
+ },
+ {
+  "id": "164313e9-26d6-4043-b174-3db6d4ed8b6e",
+  "name": "Too Much Fun! DJ Service",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "Choice of crowd favorite games and interactive moments",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "'RIDICULOUSLY. FUN. PARTIES.' with 1 DJ + 1 MC teams; says only 'personalized playlists and special requests', no genres.",
+  "coverage": "none",
+  "checked": [
+   "packet:site crawl (no music-style content)"
+  ],
+  "notes": "Reviews mix in an officiant (Neil); crawl had no genre info."
+ },
+ {
+  "id": "200b047b-1149-4b17-b37f-282cb9bf5829",
+  "name": "Suit & Tie DJ Professionals",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [
+   {
+    "slug": "latin",
+    "strength": "listed",
+    "evidence": "Fluent in spanish, he is able to provide his services for spanish weddings and cultural ceremonies such as quincea\u00f1eras.",
+    "source": "packet:site"
+   },
+   {
+    "slug": "south_asian",
+    "strength": "listed",
+    "evidence": "two separate ceremonies for our Hindu-fusion wedding; Brandon was there all day to ensure both ceremonies went off without an issue",
+    "source": "packet:dossier"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "bilingual_mc",
+    "evidence": "Fluent in spanish, he is able to provide his services for spanish weddings",
+    "source": "packet:site"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "We even include interactive games throughout but more importantly, emcee the event",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "MC/coordination-led DJ crew known for dance-award buttons and interactive games; no genres named.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site crawl (6 pages)"
+  ],
+  "notes": "Also runs photo booths. South Asian entry is a review of a Hindu-fusion couple, not a marketed specialty."
+ },
+ {
+  "id": "3050b76b-0b64-4a80-9ab6-7d414bb5aca2",
+  "name": "Ignight Entertainment",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "edm_house",
+    "strength": "specialty",
+    "evidence": "If EDM, festivals, rave culture, lighting, and dance floor energy are important to your vision, you should hire a DJ team that understands both weddings and dance music performance. Hint: it\u2019s us.",
+    "source": "packet:site"
+   },
+   {
+    "slug": "festival_bass",
+    "strength": "specialty",
+    "evidence": "Rave Receptions",
+    "source": "packet:site"
+   },
+   {
+    "slug": "south_asian",
+    "strength": "specialty",
+    "evidence": "We specialize in multi-day destination weddings, and are known for our exciting performances at the Sangeet, Baraat, Reception",
+    "source": "packet:site"
+   },
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "Open Format - Expert Mixing - Top 40 - Funk - Hip Hop - Dance Music",
+    "source": "packet:dossier"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "Open Format - Expert Mixing - Top 40 - Funk - Hip Hop - Dance Music",
+    "source": "packet:dossier"
+   },
+   {
+    "slug": "funk_soul",
+    "strength": "listed",
+    "evidence": "Open Format - Expert Mixing - Top 40 - Funk - Hip Hop - Dance Music",
+    "source": "packet:dossier"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "Open Format - Expert Mixing - Top 40 - Funk - Hip Hop - Dance Music",
+    "source": "packet:dossier"
+   },
+   {
+    "slug": "latin",
+    "strength": "listed",
+    "evidence": "he was able to mix together Hindi, Latin, and old school hits for a Lit reception!",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "Musicians for all sections of your wedding, including ceremony!",
+    "source": "packet:site"
+   },
+   {
+    "slug": "silent_disco",
+    "evidence": "Photo Booths - Videography - Bespoke Entertainment - Special FX - Artists and DJ Bands - Silent Disco",
+    "source": "packet:dossier"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "DJ Ignight : Live mashup master, expert MC & founder of Ignight Entertainment",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "'Guiding Music Lovers to Lit Experiences'; EDM/rave wedding DJ with synced lighting, lasers, plus multi-day Indian weddings (sangeet, baraat, Bollywood/bhangra) and mashups.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site crawl (home, Indian wedding DJs page)"
+  ],
+  "notes": "Production-heavy: LED floors, lasers, drone shows, dhol drummers, Baraat truck. Also 'Electric Heart DJ Band'."
+ },
+ {
+  "id": "49a915b9-3e34-498f-bf7a-8b6faefdb6c5",
+  "name": "Changing Times Music Services",
+  "is_dj": "hybrid",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "From DJing and drumming to composition and live performance",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "One-stop 'rhythmic needs' shop: full-service DJ, professional drummer, lessons; no DJ genres named.",
+  "coverage": "none",
+  "checked": [
+   "packet:site crawl (4 pages)"
+  ],
+  "notes": "Drummer says 'Experienced in all musical styles' but that applies to drumming, not DJ sets. Also taps/memorial services and lessons."
+ },
+ {
+  "id": "72881d95-2def-4952-a389-4ef04f0b9eb0",
+  "name": "Denver DJ Services",
+  "is_dj": "hybrid",
+  "positioning": "unknown",
+  "styles": [
+   {
+    "slug": "latin",
+    "strength": "listed",
+    "evidence": "offering bilingual (English/Spanish) MC services",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "bilingual_mc",
+    "evidence": "offering bilingual (English/Spanish) MC services",
+    "source": "packet:site"
+   },
+   {
+    "slug": "live_instrument",
+    "evidence": "sax or violin $600/hr",
+    "source": "packet:recon"
+   },
+   {
+    "slug": "silent_disco",
+    "evidence": "Silent Disco Headphones",
+    "source": "packet:site"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "Our team of entertainers specialize in excitement and high energy receptions.",
+    "source": "packet:dossier"
+   }
+  ],
+  "raw_claims": "Luxury DJ & event-production/AV rental company; 'Your music preferences, event schedule, and guests guide our approach'; no genres named.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site crawl",
+   "https://denverdjservice.com/ (fetched, no genres)"
+  ],
+  "notes": "Mostly an AV/production company (stages, LED walls, rentals, photo booths) with a DJ arm; also serves Arizona. Latin entry is language-based only."
+ },
+ {
+  "id": "8deb5afa-c6ab-440f-aad7-a334b32bd93b",
+  "name": "Mile High Vibes Entertainment, LLC",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "We are adaptable, flexible and highly versatile. We know how to choose the right tracks, throughout the cocktail, dinner and reception.",
+    "source": "packet:site"
+   },
+   {
+    "slug": "latin",
+    "strength": "listed",
+    "evidence": "Mexican Wedding",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "vinyl_turntablist",
+    "evidence": "Jesse has over 20 years of DJ experience, beginning his practice on Technics 1200 turntables and vinyl.",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Husband-and-wife DJ team: 'we will play a variety of music that will keep everyone entertained'; guest requests woven into playlists.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site crawl"
+  ],
+  "notes": "'Mexican Wedding' appears only as a service-nav item on a lorem-ipsum services page; weak. Vinyl is Jesse's origin, not a marketed format."
+ },
+ {
+  "id": "c51fd2d1-9335-4fd8-b144-63ecc1a47f29",
+  "name": "Trebled Entertainment",
+  "is_dj": "agency",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Premier event entertainment (DJs, photographers, videographers, photo booths); no genres named in site text we saw.",
+  "coverage": "none",
+  "checked": [
+   "packet:site crawl (blog RSS only)",
+   "https://www.trebledentertainment.com/weddings (fetched, title only)"
+  ],
+  "notes": "Multi-DJ company (Mic, Hunter); reviews praise blending couple and guest tastes but name no genre."
+ },
+ {
+  "id": "d819588e-ecac-40b7-a451-da766f1ecd7f",
+  "name": "Moonshine Music, LLC",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "Every Decade, Every Genre for this Grand Junction DJ",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "Disk Jockey. Emcee. Entertainer.",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "'plays everything and is excellent at fulfilling requests from any decade, and any genre'; also MCs LGBTQ weddings, quincea\u00f1eras, bar mitzvahs.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site crawl (home, about)"
+  ],
+  "notes": "Dave also sings karaoke and played in bands."
+ },
+ {
+  "id": "fac95e4d-e446-4c62-9c00-2dbb1ffcb782",
+  "name": "Exclusive Events DJ",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "We creatively blend your favorite tracks with engaging MC work, guaranteeing a packed dance floor",
+    "source": "packet:site"
+   },
+   {
+    "slug": "south_asian",
+    "strength": "listed",
+    "evidence": "even seamlessly mixed in Bollywood music as requested",
+    "source": "packet:dossier"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "DJ | COORDINATION | LIVE MUSIC | PHOTO BOOTH",
+    "source": "packet:dossier"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "Are you able to provide professional MC services for announcements and introductions?",
+    "source": "packet:dossier"
+   }
+  ],
+  "raw_claims": "'Zero-cringe wedding entertainers... masters of the mix'; creative mixing, pro MC, club-style lighting; no genre list.",
+  "coverage": "crawl",
+  "checked": [
+   "packet:site crawl"
+  ],
+  "notes": "Also day-of coordination and photo booths; live musicians as an add-on. Bollywood is a single review praise."
+ },
+ {
+  "id": "0fe414f5-8fe0-4605-b0a8-ef210b89a588",
+  "name": "The Master Piece DJ",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "He blending everything we wanted from 80s to country to current music",
+    "source": "https://themasterpiecedj.com/"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "from 80s to country to current music",
+    "source": "https://themasterpiecedj.com/"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "from 80s to country to current music",
+    "source": "https://themasterpiecedj.com/"
+   },
+   {
+    "slug": "latin",
+    "strength": "listed",
+    "evidence": "we asked Perry to mix in some Latin music",
+    "source": "https://themasterpiecedj.com/"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Site names no genres; only client testimonials describing a blend of eras plus Latin on request.",
+  "coverage": "live_site",
+  "checked": [
+   "https://themasterpiecedj.com/ (testimonials only, no genre page)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "36c87356-405c-4cdd-b5be-e5edd6e030da",
+  "name": "Wander Beats",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "He has a wide range of music with one of the best arsenals I've ever had the chance to listen too!",
+    "source": "https://www.hellowanderbeats.com/"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Own words: \"flawlessly mixing the unique sound track to the event of your dreams\"; no genres named.",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.hellowanderbeats.com/ (no genres)"
+  ],
+  "notes": "Reddit thread was r/DenverEDM but gave no style for them."
+ },
+ {
+  "id": "4218ed9b-f4ed-40c7-b74c-ba1c2f349fec",
+  "name": "D-Jaden Sound and Events",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "endless selection of original tracks, mashups, remixes, and party favorites from every genre",
+    "source": "https://www.d-jaden.com/ (via web search summary)"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Plays across the board, every genre; also nightlife/production company in CO, ND, Las Vegas.",
+  "coverage": "live_site",
+  "checked": [
+   "WebSearch D-Jaden Sound and Events Colorado Springs DJ music genres",
+   "d-jaden.com not fetched directly (dossier crawl failed)"
+  ],
+  "notes": "Website listed as None in packet but d-jaden.com exists."
+ },
+ {
+  "id": "5021cf47-aee5-4e24-aed4-3360b9a5137f",
+  "name": "DJ Sparkafya | Colorado",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "edm_house",
+    "strength": "specialty",
+    "evidence": "His blend of tech house, house music, and dance tracks kept the energy up all night",
+    "source": "packet:dossier"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Reviews describe tech house / house / dance sets at bars; no wedding reviews; site returned 403.",
+  "coverage": "recon_only",
+  "checked": [
+   "https://sparkafya.com/ (HTTP 403)"
+  ],
+  "notes": "Evidence is Google reviews of bar gigs, not wedding work."
+ },
+ {
+  "id": "6efe336e-87bf-4673-8f4e-1b090324b182",
+  "name": "Friss Photography & Entertainment",
+  "is_dj": "hybrid",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Plays songs couple requests; no genres named.",
+  "coverage": "none",
+  "checked": [
+   "https://www.frisspe.com/ (no genres)",
+   "WebSearch Friss Jake music genres (no genres)"
+  ],
+  "notes": "Photography + DJ hybrid."
+ },
+ {
+  "id": "8b7ad3d4-65fa-4d2c-9647-34c625209cd8",
+  "name": "Travel Kit Music",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "edm_house",
+    "strength": "specialty",
+    "evidence": "record scratching, and deep house rhythms",
+    "source": "https://www.travel-kit-music.com/"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "vinyl_turntablist",
+    "evidence": "They playfully experiment and execute live looping, sequencing, and turntablism.",
+    "source": "https://www.travel-kit-music.com/"
+   }
+  ],
+  "raw_claims": "Deep house duo with analog synths, piano, sample manipulation and scratching; hosts an Open DJ Decks night.",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.travel-kit-music.com/"
+  ],
+  "notes": "Site does not mention weddings; wedding DJ status relies on IG per packet."
+ },
+ {
+  "id": "9c5fe224-8b86-434a-82e1-2c70d10846c6",
+  "name": "Gunnison Valley Entertainment",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "you can provide your own playlist and we will be happy to mix in your favorite songs",
+    "source": "https://www.gventertain.com/"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "silent_disco",
+    "evidence": "silent disco keeps the party going past quiet hours",
+    "source": "https://www.gventertain.com/"
+   }
+  ],
+  "raw_claims": "Custom playlist, plays to room energy; no genres named.",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.gventertain.com/"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "cab12e89-9370-41a8-9e56-7d50a6d5f878",
+  "name": "Dancin' Shoes DJ & Lighting",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "an open-format, high-energy approach to every event",
+    "source": "https://www.dancinshoesdj.com/"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "Jeff Miguel plays live saxophone and flute",
+    "source": "https://www.dancinshoesdj.com/"
+   },
+   {
+    "slug": "live_instrument",
+    "evidence": "Tanner Palmer plays live piano",
+    "source": "https://www.dancinshoesdj.com/"
+   },
+   {
+    "slug": "bilingual_mc",
+    "evidence": "Antonio is a bilingual MC (language not stated)",
+    "source": "https://www.dancinshoesdj.com/"
+   }
+  ],
+  "raw_claims": "Roster agency of DJs; open format, live sax/piano + DJ combo; The Beatles to Beyonce.",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.dancinshoesdj.com/"
+  ],
+  "notes": "Multi-DJ company."
+ },
+ {
+  "id": "ed69eaee-1aac-41b7-b3d5-a04089615351",
+  "name": "Amore' Entertainment",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Positioned as dance floor specialists; no genres found.",
+  "coverage": "recon_only",
+  "checked": [
+   "https://amoredjentertainment.com/ (HTTP 403)"
+  ],
+  "notes": "Site blocked; no search done."
+ },
+ {
+  "id": "0315db23-3136-4802-8490-230a0ea4994b",
+  "name": "Mirage Entertainment & Events",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "broad open format music knowledge",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "popular throwbacks",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "vinyl_turntablist",
+    "evidence": "bring the Technics out for a spin... scratch tricks added to the mix",
+    "source": "packet:site"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "Professional DJ & MC Services",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Roots in open format club scratch DJing; largest library in Colorado, 100k titles, any genre.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site crawl"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "168a7f50-2732-4581-b36a-21d7315780b9",
+  "name": "Wingman Entertainment",
+  "is_dj": "hybrid",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "a very large music library with every type of music",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "You choose the music you want; solo operator, DJ + photo booth + karaoke + arcade.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site crawl"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "204c55c2-230c-493d-8750-5ffb4a710125",
+  "name": "Vail-Djs",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Extensive catalog of music perfect for any wedding; no genres named.",
+  "coverage": "none",
+  "checked": [
+   "packet site crawl (no genres)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "32e59a2c-c0d5-47cb-a7c1-81a7b96d73be",
+  "name": "JAMMIN' DJs",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "jewish",
+    "strength": "specialty",
+    "evidence": "WE ARE YOUR #1 SIMCHA ENTERTAINMENT COMPANY",
+    "source": "packet:site"
+   },
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "the dance music was a good mix of songs to appeal to a diverse group",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "interactive hosts, music, games, dancers, special effects",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Large multi-DJ company: weddings, corporate, schools, bar/bat mitzvahs; no genre list.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site crawl"
+  ],
+  "notes": "Agency-style crew; Jewish positioning is simcha/mitzvah branding."
+ },
+ {
+  "id": "53b642d2-29f9-46f9-bb2f-fddde2110a14",
+  "name": "Nufusion Productions",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "latin",
+    "strength": "listed",
+    "evidence": "played awesome latin tunes that had me dancing the night away",
+    "source": "packet:site"
+   },
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "he also provided a variety of music selection for all our students music tastes",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Weddings, quinceaneras, nightclub, school dances; no genres named in own copy.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site crawl"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "7b212d60-e3b3-4da8-932f-69e1f842425d",
+  "name": "Colorado Mobile Music Inc.",
+  "is_dj": "hybrid",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "With a diverse range of music genres and a keen sense of crowd engagement",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "there was old school that brought back memories and of course the current hits",
+    "source": "packet:recon"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "silent_disco",
+    "evidence": "Silent Disco Headphones $8 each",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "DJ plus audio rental, party bus, photo/video; every genre claim only.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site crawl"
+  ],
+  "notes": "Rental/party-bus company; 2.8 star reliability concerns."
+ },
+ {
+  "id": "a451508a-b98f-4c22-966d-77ecee3c1945",
+  "name": "Standing Room Only DJ, Jay Kacik",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Site is educational; reviews: asked Jay to go with the vibe and lead the party.",
+  "coverage": "none",
+  "checked": [
+   "packet site crawl (no music info)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "cf5f7919-3c63-439f-a0ce-2b2436006ad4",
+  "name": "DJ CHANNELL LLC",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "renowned for his versatility as an open-format DJ",
+    "source": "packet:site"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "inferred",
+    "evidence": "Global Dance Festival at Red Rocks",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Open-format DJ blending genres; festival/artist-opener credits (Krewella, CandyLand, SnakeHips).",
+  "coverage": "crawl",
+  "checked": [
+   "packet site crawl"
+  ],
+  "notes": "Sells photo booths too; EDM only inferred from credits."
+ },
+ {
+  "id": "d84a21dc-482a-428b-98ac-7e13fbd65adc",
+  "name": "Lucas Media Productions",
+  "is_dj": "hybrid",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "music library contains over 25,000 hit songs ... only play music you want to hear",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Custom playlist from library of 25,000 hit songs.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site crawl"
+  ],
+  "notes": "Primarily videography/photography with DJ side."
+ },
+ {
+  "id": "13702a46-593a-4544-94ea-ec5ea89b9010",
+  "name": "DJ BLNCE",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "open format denver dj, meaning they'll mix genres instead of sticking to one lane",
+    "source": "packet:recon"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "DJ BLNCE Wedding Mix 2026 - Country, 2000's/10's Pop, 2000's/10's Hip Hop, Alternative Rock, Top 40 House Remixes",
+    "source": "https://soundcloud.com/tmcblnce/dj-blnce-wedding-mix-2026-country-2000s10s-pop-2000s10s-hip-hop-alternative-rock-top-40-house-remixes"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "2000's/10's Pop ... Top 40 House Remixes",
+    "source": "https://soundcloud.com/tmcblnce/dj-blnce-wedding-mix-2026-country-2000s10s-pop-2000s10s-hip-hop-alternative-rock-top-40-house-remixes"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "2000's/10's Hip Hop",
+    "source": "https://soundcloud.com/tmcblnce/dj-blnce-wedding-mix-2026-country-2000s10s-pop-2000s10s-hip-hop-alternative-rock-top-40-house-remixes"
+   },
+   {
+    "slug": "rock_indie",
+    "strength": "listed",
+    "evidence": "Alternative Rock",
+    "source": "https://soundcloud.com/tmcblnce/dj-blnce-wedding-mix-2026-country-2000s10s-pop-2000s10s-hip-hop-alternative-rock-top-40-house-remixes"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "listed",
+    "evidence": "Bash Beats calls him an EDM and open-format DJ (search summary); mix title: Top 40 House Remixes",
+    "source": "https://www.bashbeats.com/trentmcfadden"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "unlimited mcing and dance floor lighting",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "Open-format DJ who mixes genres; own 2026 wedding mix spans country, 2000s/10s pop and hip hop, alt rock, house remixes.",
+  "coverage": "third_party",
+  "checked": [
+   "https://www.djblnce.com/ (no music info; Live DJ & Performer, Opus Quad controllers)",
+   "WebSearch DJ BLNCE (WeddingWire/Knot/SoundCloud/Bash Beats snippets)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "38ccdd02-9341-4a0a-8c5a-bada53e79713",
+  "name": "Seamless Entertainment",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "MCs without being over the top; DJing plus emceeing from the ceremony to the last song",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "No music style stated; pitch is full-service gear and emceeing, planner praises him for keeping the floor packed.",
+  "coverage": "none",
+  "checked": [
+   "https://www.seamlessentertainment.com/ (no music info)",
+   "https://www.seamlessentertainment.com/whats-included (404)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "445c29bf-fd6d-4efc-8a02-f3480933423b",
+  "name": "Rickochet Entertainment",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "a wide range of musical styles (search summary of site/testimonial); reviews: DJs mixed all different genres",
+    "source": "http://rickochetentertainment.com/testimonials/"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "one hour of country followed by four hours of EDM (couple review)",
+    "source": "http://rickochetentertainment.com/testimonials/"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "listed",
+    "evidence": "one hour of country followed by four hours of EDM (couple review)",
+    "source": "http://rickochetentertainment.com/testimonials/"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Claims knowledge of a wide range of musical styles and reading the crowd; also photo booth/lasers add-ons.",
+  "coverage": "third_party",
+  "checked": [
+   "WebSearch Rickochet DJ wedding genres",
+   "http://rickochetentertainment.com/ (SSL cert error)"
+  ],
+  "notes": "Styles are via search-result summary, not directly fetched; also photo booth offering."
+ },
+ {
+  "id": "522e0065-9993-4993-9be5-4e3a1afb9474",
+  "name": "Colt Price Music",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "edm_house",
+    "strength": "listed",
+    "evidence": "he nailed the Avicii-style house music they asked for, he leans EDM but plays across genres",
+    "source": "packet:recon"
+   },
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "he leans EDM but plays across genres",
+    "source": "packet:recon"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Site names no genres (just DJ services for weddings, parties, schools); WeddingWire review says leans EDM but plays across genres.",
+  "coverage": "recon_only",
+  "checked": [
+   "https://coltpricemusic.com/ (no genres)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "708006bc-8cd9-46f0-bc7a-b98e4e24a0f5",
+  "name": "ElectriFly Events",
+  "is_dj": "hybrid",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "Beat-matched, read-the-room and creative mixing across every era and genre",
+    "source": "https://www.electrifly.love/"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "live drums, horns and other instruments",
+    "source": "https://www.electrifly.love/"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "DJ performs live throughout the night (search summary)",
+    "source": "https://www.electrifly.love/"
+   }
+  ],
+  "raw_claims": "High-energy fusion of DJing and live drums/horns, mixing across every era and genre.",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.electrifly.love/",
+   "WebSearch ElectriFly"
+  ],
+  "notes": "Founder DJs while playing drums; queer and women owned."
+ },
+ {
+  "id": "9058ae85-afff-417a-ab58-afe85a9faad7",
+  "name": "Oro y Plata Events",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "festival_bass",
+    "strength": "specialty",
+    "evidence": "I DJ bass music most of my time when I play out in town and I also started an events business last year and I DJ weddings in that as well",
+    "source": "packet:reddit"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Owner Zach self-describes as a bass-music DJ who also DJs weddings; SoundCloud has wedding showcases (not fetched).",
+  "coverage": "third_party",
+  "checked": [
+   "WebSearch Oro y Plata Events (nothing found)"
+  ],
+  "notes": "Maps to bass music; could also be edm_house. No own site found."
+ },
+ {
+  "id": "b2a6299b-913c-415c-a80f-3b01e2225178",
+  "name": "Raphael Batista Violinist & DJ",
+  "is_dj": "hybrid",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "rock_indie",
+    "strength": "listed",
+    "evidence": "A REPERTORY THAT RANGES FROM CLASSIC TO ROCK'N ROLL",
+    "source": "https://www.raphaelbatistaviolinist.com/"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "Violinist DJ ... Live Show Performer Artist",
+    "source": "https://www.raphaelbatistaviolinist.com/"
+   }
+  ],
+  "raw_claims": "Violinist-DJ with repertoire ranging from classic to rock n roll, tailored per event; composes own soundtracks.",
+  "coverage": "live_site",
+  "checked": [
+   "https://www.raphaelbatistaviolinist.com/"
+  ],
+  "notes": "Primarily a violinist/live performer who also DJs."
+ },
+ {
+  "id": "d1f5e548-29f8-4d99-8c76-e815009e5fa5",
+  "name": "D-Jay's Sound Wave Entertainment LLC.",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "Professional MC services to guide the flow of the evening",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "Describes service/gear only; no genres named; site says 'blending global and local sounds' and 'hits, throwbacks, dance floor anthems' (generic).",
+  "coverage": "none",
+  "checked": [
+   "https://www.jthedj.com (generic: global and local sounds, hits, throwbacks)"
+  ],
+  "notes": "Weak generic site wording not counted as a style."
+ },
+ {
+  "id": "edc258a6-be9d-4a72-bb20-f36bfa5f5aaf",
+  "name": "Paul Andre",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "festival_bass",
+    "strength": "specialty",
+    "evidence": "He plays clubs / raves at least two times a week ... has equipment to throw a rave",
+    "source": "packet:reddit"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "inferred",
+    "evidence": "plays clubs / raves (friend recommendation, genre unstated)",
+    "source": "packet:reddit"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Only a friend's Reddit recommendation: club and rave DJ; no wedding bookings confirmed.",
+  "coverage": "recon_only",
+  "checked": [
+   "WebSearch Paul Andre DJ Denver (nothing specific)"
+  ],
+  "notes": "Possibly not an active wedding DJ."
+ },
+ {
+  "id": "044955f0-370c-4738-a463-46797e318581",
+  "name": "HOWE EVENTFUL | Entertainment & Event Solutions",
+  "is_dj": "agency",
+  "positioning": "generalist",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "Combining a DJ with live musicians like saxophone, violin, guitar or percussion",
+    "source": "packet:site"
+   },
+   {
+    "slug": "silent_disco",
+    "evidence": "SILENT DISCO ENTERTAINMENT",
+    "source": "packet:site"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "Mobile DJ/EmCee Entertainment",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Multi-DJ company; no genres named, offers DJ+live musician combo 'VIBE', silent disco, photo booth.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": "Review: pre-ceremony jams to dance party, read the room (not a style)."
+ },
+ {
+  "id": "1c5304f9-d63d-4bf3-aea2-820186c643b0",
+  "name": "Reel Life Events Colorado LLC",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "take your suggestions and blend all genres and decades to create a party for everyone to enjoy",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "our DJs ... interact with the guests and organize games",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Blends all genres and decades; customized to the couple; also photo booths (Salsa Photo Booth is just a name).",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "239167ba-b916-4dbe-9831-5c6864dc2c94",
+  "name": "Elite Entertainment",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "Our talented saxophonist, drummer, and violinist bring an energetic, dynamic touch",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "No genres named; Elite Fusion blends live sax/drums/violin with DJ set.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "36752ec0-da01-4ef2-b7b7-10de819aef37",
+  "name": "Tri-City Mobile Music",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "music library of over 100,000 titles in a wide variety of genres for couples to choose from",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Large library across many genres, custom setlists and do-not-play lists.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "5f7e0fe0-d345-462e-a4df-b5aa82bf3274",
+  "name": "HEPS DJ & Photo Booth",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "No genres on site; one review mentions multicultural (Mexican and Hindu) ceremony with specific musical requests delivered.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": "Review-only multicultural mention not classified (single couple request)."
+ },
+ {
+  "id": "7babab8b-84d5-4d18-bb66-603109f917fe",
+  "name": "Tono Productions",
+  "is_dj": "agency",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "can entertain for any age, type of event, or musical taste. You are hiring someone with an extensive knowledge of many musical genres!",
+    "source": "packet:site"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "A passionate lover of country music and classic rock, but can mix any style you want",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "passionate lover of country music and classic rock",
+    "source": "packet:site"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "listed",
+    "evidence": "Jim loves his house and dance music",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Roster of several DJs, each with own tastes; overall any musical taste; serves LGBT weddings.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": "Agency with DJ roster."
+ },
+ {
+  "id": "a551b76a-f64e-4d2a-ade2-b490e47feed3",
+  "name": "DJ Manos",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "open format music by Manos",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "From the '70s, 80s, '90s, and 2000s ... funk, disco, Motown, classic rock",
+    "source": "packet:site"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "modern pop ... today's top hits",
+    "source": "packet:site"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "specialty",
+    "evidence": "blends the euphoria of organic house, the depth of deep house, and the mesmerizing rhythms of Afro and tribal sounds",
+    "source": "packet:site"
+   },
+   {
+    "slug": "latin",
+    "strength": "listed",
+    "evidence": "salsa, cumbia, reggeaton, merengue",
+    "source": "packet:site"
+   },
+   {
+    "slug": "funk_soul",
+    "strength": "listed",
+    "evidence": "funk, disco, Motown",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Wide range from 70s to today incl. house, EDM, salsa, cumbia, reggaeton; bio rooted in Denver electronic scene (organic/deep house, Afro).",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": "Electronic bio is DJ's club identity; wedding pitch is open format."
+ },
+ {
+  "id": "d1d6cfc4-f9c7-4228-a1e4-95b5d4cf5539",
+  "name": "The Music Man DJ, Chris Haug",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "Play all styles of music, from the 1940's to the top 40 of today",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Plays all styles from the 1940s to today's top 40.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "e209f7f6-01d6-46cd-9c59-7657b5356254",
+  "name": "Altitude Beats - Silent Disco, Wedding DJ & Events",
+  "is_dj": "yes",
+  "positioning": "specialist",
+  "styles": [
+   {
+    "slug": "latin",
+    "strength": "specialty",
+    "evidence": "blending Latin favorites, crossover hits, and wedding essentials",
+    "source": "packet:site"
+   },
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "Some want Latin, throwbacks, open format, hip-hop, disco, or a full cross-cultural blend",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "Latin, throwbacks, open format, hip-hop, disco",
+    "source": "packet:site"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "Latin, throwbacks, open format, hip-hop, disco",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "bilingual_mc",
+    "evidence": "Elegant English + Spanish MC + music experiences",
+    "source": "packet:site"
+   },
+   {
+    "slug": "silent_disco",
+    "evidence": "Ask about silent disco wedding options for after-parties",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Bilingual English/Spanish MC and DJ; Latin favorites mixed with crossover hits; silent disco.",
+  "coverage": "crawl",
+  "checked": [
+   "packet site text"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "19df3450-56ca-4978-a8ee-a5817b124df0",
+  "name": "Vibe Driven DJ Productions",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "DJ, MC, officiant, and co-owner (search summary of WeddingWire/Knot listing)",
+    "source": "web search"
+   }
+  ],
+  "raw_claims": "Markets mountain-wedding specialty (ceremony audio) and live mixing; no genres named.",
+  "coverage": "none",
+  "checked": [
+   "WebSearch vendor name Estes Park (WeddingWire/Knot/vibedrivendj.com events page; no genre info)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "3b3125e0-2a36-4649-a3f8-1c61eccebb5d",
+  "name": "Unique Sounds (DJ Halapeno Productions)",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "very versatile any music you want he will play",
+    "source": "packet:dossier"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "No own site; reviews call him versatile; one review hints at genre-expectation mismatch (hip hop crowd).",
+  "coverage": "recon_only",
+  "checked": [
+   "WebSearch: no own site, directory listings only, no music info"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "47831fe7-8c30-4b25-b24b-a8237f8eebd4",
+  "name": "Bad Boyz DJ Services",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Reviews say played all requested songs; Yelp says weddings/parties; The Bash mentions wide music selection; no genres.",
+  "coverage": "none",
+  "checked": [
+   "site 404 in crawl",
+   "WebSearch: Yelp/Birdeye/Bash, no genres"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "5e67d5c0-d9f4-4e55-a283-76e9d562ff99",
+  "name": "No Distractions Music",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Only evidence is an Instagram handle dropped in a r/DenverEDM thread; no own site or music description. Style evidence is by thread context only, not counted.",
+  "coverage": "none",
+  "checked": [
+   "WebSearch: could not identify; YouTube channel and unrelated events"
+  ],
+  "notes": "Possibly EDM/club-oriented but only via subreddit context; not counted."
+ },
+ {
+  "id": "73193196-6b37-4412-829a-7541c5d312e9",
+  "name": "Denver Wedding DJ",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "a wide variety of musical styles",
+    "source": "https://www.mydenverweddingdj.com"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "reception packages include MC services such as announcements, grand entrances, and introductions",
+    "source": "https://www.mydenverweddingdj.com"
+   }
+  ],
+  "raw_claims": "Wide variety of styles tailored to the client; genre matters less than execution.",
+  "coverage": "live_site",
+  "checked": [
+   "WebFetch mydenverweddingdj.com"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "90bd80e1-ea00-449e-8774-37e452242723",
+  "name": "MegaMind Entertainment",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "DJ/MC plus photography; full MC in every tier",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "Customized playlists tailored to your music style; concert-grade audio; also karaoke and photo booth.",
+  "coverage": "none",
+  "checked": [
+   "WebFetch megamindentertainment.com (no genres)"
+  ],
+  "notes": "DJ + photography hybrid offering."
+ },
+ {
+  "id": "c26801fc-3d04-4dc1-b101-9b0497ecc96a",
+  "name": "Digital DJ",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "High-energy, packed dance floor, expert mixing; no genres named.",
+  "coverage": "none",
+  "checked": [
+   "WebFetch digitaldjcolorado.com (no genres; blog titles only: EDM, pop-punk, country, 2000s throwback song lists)"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "db6f0ea7-9cbc-4ee8-bae9-e25de6a7fea1",
+  "name": "Denver Sound & Color",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "bilingual_mc",
+    "evidence": "bilingual DJ/MC service (language not stated)",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "Bilingual DJ/MC plus production/lighting; language not specified; no genres on site.",
+  "coverage": "recon_only",
+  "checked": [
+   "WebFetch densoundandcolor.com (no genre/bilingual info on fetched page)"
+  ],
+  "notes": "Bilingual language unspecified, so latin not claimed."
+ },
+ {
+  "id": "f79fe556-69ed-4bdf-92d0-d5716fe673ec",
+  "name": "Snappy Little Numbers Entertainment",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [
+   {
+    "slug": "rock_indie",
+    "strength": "listed",
+    "evidence": "owner is a big vinyl fan and plays 45 rpm singles at Denver's best rock n' roll bars",
+    "source": "http://snappylittlenumbersdj.blogspot.com/"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "vinyl_turntablist",
+    "evidence": "a big vinyl fan and plays 45 rpm singles",
+    "source": "http://snappylittlenumbersdj.blogspot.com/"
+   },
+   {
+    "slug": "mc_heavy",
+    "evidence": "does MC and officiant work too",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "Blends client inspiration lists with crowd favorites; thousands of tunes; played sock hops.",
+  "coverage": "live_site",
+  "checked": [
+   "WebFetch blogspot site"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "0a577489-fc66-4b1b-95ed-8746c11ff9d7",
+  "name": "Sound Master Entertainment",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "Top 100 of the 2010's ... 2000's ... 1990's ... 1980's ... 1970's ... 1960's ... 1950's",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "Karaoke & Trivia (Available by Request); Music Video Bingo",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Personalized playlist across decades of top-100 song lists; karaoke and music video bingo.",
+  "coverage": "crawl",
+  "checked": [
+   "crawled site"
+  ],
+  "notes": "Decade charts imply breadth; no named genre."
+ },
+ {
+  "id": "1d9af178-51a6-401d-9621-bec688076418",
+  "name": "Performance Entertainment",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "a fun and engaging MC, making announcements and guiding the evening's flow",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "Expertly mixed music, luxury-level DJ/MC; no genres named.",
+  "coverage": "none",
+  "checked": [
+   "crawled site"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "240fc8aa-eb20-4692-9184-032fd66454d2",
+  "name": "DJ Connection",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "combine your personal requests with crowd favorites and smooth transitions",
+    "source": "https://djconnection.com/denver"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Requests plus crowd favorites, follows the energy; no genres.",
+  "coverage": "live_site",
+  "checked": [
+   "crawl no styles",
+   "WebFetch djconnection.com/denver"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "3a3ce01d-288d-4fa5-817e-06a07e86a80f",
+  "name": "Rooster Entertainment",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "We collaborate directly with you to curate a playlist that caters to everyone's enjoyment!",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "mc_heavy",
+    "evidence": "strong MC who reads the crowd well and keeps the timeline on track",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "Curated playlist per couple via app; also karaoke nights.",
+  "coverage": "crawl",
+  "checked": [
+   "crawled site"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "6b0aadc3-750d-47ca-9c12-b9678e35e73d",
+  "name": "DJ/Guitarist/Bagpiper- Michael Lancaster",
+  "is_dj": "hybrid",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "Michael possesses ... mash up styles and genre's to elevate the dance floor",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "live_instrument",
+    "evidence": "plays classical guitar for ceremony then flips to full dj mode for reception",
+    "source": "packet:recon"
+   },
+   {
+    "slug": "live_instrument",
+    "evidence": "guitarist and bagpiper; elegant sound of the guitar ... bagpipe",
+    "source": "packet:site"
+   }
+  ],
+  "raw_claims": "DJ who also plays live guitar and bagpipes; mashes up styles and genres.",
+  "coverage": "crawl",
+  "checked": [
+   "crawled site"
+  ],
+  "notes": "Guitar styles pop, jazz, rock, blues, classical, spanish, celtic are for guitar, not DJ sets."
+ },
+ {
+  "id": "81eaaf32-32a8-4a71-953e-518abe547192",
+  "name": "Stag Entertainment",
+  "is_dj": "yes",
+  "positioning": "unknown",
+  "styles": [],
+  "formats": [],
+  "raw_claims": "Craft a musical journey; read the room; plays requests; no genres.",
+  "coverage": "none",
+  "checked": [
+   "crawled site"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "ba0cfdf8-3d4f-453f-bce9-4b1447e5f833",
+  "name": "Discosapien",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "specialty",
+    "evidence": "open-format",
+    "source": "packet:dossier"
+   },
+   {
+    "slug": "edm_house",
+    "strength": "specialty",
+    "evidence": "We specialize in electronic dance music and have a killer collection",
+    "source": "packet:site"
+   },
+   {
+    "slug": "top40_pop",
+    "strength": "listed",
+    "evidence": "best dance music, including Top 40, Retro Dance, EDM, Hip Hop, R&B, 80s, Old School, Funk, Soul, Disco, Motown",
+    "source": "packet:site"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "Top 40, Retro Dance, EDM, Hip Hop, R&B, 80s, Old School, Funk, Soul",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "80s, Old School, Funk, Soul, Disco, Motown",
+    "source": "packet:site"
+   },
+   {
+    "slug": "funk_soul",
+    "strength": "listed",
+    "evidence": "Funk, Soul, Disco, Motown",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [
+   {
+    "slug": "silent_disco",
+    "evidence": "We also provide silent headphone disco",
+    "source": "packet:site"
+   },
+   {
+    "slug": "bilingual_mc",
+    "evidence": "bilingual MC offered (language not stated)",
+    "source": "packet:recon"
+   }
+  ],
+  "raw_claims": "Open-format with nightclub-quality live mixing; EDM label and DJ academy; EDM wedding page.",
+  "coverage": "crawl",
+  "checked": [
+   "crawled site"
+  ],
+  "notes": "EDM label and DJ academy; also photo booth."
+ },
+ {
+  "id": "d3158d7d-48b0-4057-b5b7-8f6b4c9a9815",
+  "name": "Sounds Entertainment llc",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "We have music ranging from the oldies to disco, 70's, 80's, 90's, 2000's, country, and even today's newest hits!",
+    "source": "packet:site"
+   },
+   {
+    "slug": "throwback",
+    "strength": "listed",
+    "evidence": "oldies to disco, 70's, 80's, 90's, 2000's",
+    "source": "packet:site"
+   },
+   {
+    "slug": "country",
+    "strength": "listed",
+    "evidence": "country, and even today's newest hits",
+    "source": "packet:site"
+   },
+   {
+    "slug": "hiphop_rnb",
+    "strength": "listed",
+    "evidence": "from the Top-40s, to Hip-Hop and even fun oldies",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Vast music library across eras; also bar/bat mitzvah and teen parties.",
+  "coverage": "crawl",
+  "checked": [
+   "crawled site"
+  ],
+  "notes": ""
+ },
+ {
+  "id": "e94c17b6-84fc-41ce-930b-558c9c22bdeb",
+  "name": "Laser Sound",
+  "is_dj": "yes",
+  "positioning": "generalist",
+  "styles": [
+   {
+    "slug": "open_format",
+    "strength": "listed",
+    "evidence": "over 250,000 musical selections (Colorado's Largest Mobile Music Collection)",
+    "source": "packet:site"
+   }
+  ],
+  "formats": [],
+  "raw_claims": "Huge music library; lighting design is the differentiator; no genres.",
+  "coverage": "crawl",
+  "checked": [
+   "crawled site"
+  ],
+  "notes": ""
+ }
+]

@@ -45,6 +45,23 @@ eq("present and matching -> full",
 eq("present and contradicting -> excluded",
   filterRank({ setting: ["garden"] }, { setting: { kind: "multi", values: ["mountain"] } }), -1);
 
+// A `nonExcluding` value turns a would-be contradiction into a silence for the
+// vendor holding it (DJ open format, Kiara 2026-11-28); everyone else keeps
+// the closed-set rule, and picking the value itself still matches.
+const djSpec = (values) => ({ specialty: { kind: "multi", values, nonExcluding: ["open_format"] } });
+eq("non-excluding value held, pick missed -> partial",
+  filterMatch({ specialty: ["open_format", "edm_house"] }, djSpec(["latin"])), { rank: 0, unknown: 1, active: 1 });
+eq("non-excluding value NOT held, pick missed -> still excluded",
+  filterRank({ specialty: ["edm_house"] }, djSpec(["latin"])), -1);
+eq("non-excluding value picked -> full match for its holder",
+  filterRank({ specialty: ["open_format"] }, djSpec(["open_format"])), 1);
+eq("buildSelection carries nonExcluding from the def onto the spec",
+  buildSelection(VENDOR_FILTERS.dj, { specialty: ["latin"] }).specialty,
+  { kind: "multi", values: ["latin"], nonExcluding: ["open_format"] });
+eq("a def without nonExcluding builds the plain spec",
+  buildSelection(VENDOR_FILTERS.venue, { setting: ["mountain"] }).setting,
+  { kind: "multi", values: ["mountain"] });
+
 // A low-coverage ("rare") attribute is no longer an exception: silence demotes
 // there too, so the vendor stays visible in the partial tier. `rare` is a UI
 // badge only now, and the matcher does not read it at all.

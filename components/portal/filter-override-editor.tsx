@@ -177,6 +177,20 @@ export function FilterOverrideEditor({
             </div>
           )}
 
+          {/* A list is a closed set for the matcher: ticking only one genre
+              hides the vendor from every other genre search. Say so, and name
+              the value that never hides them (DJ: Open format). */}
+          {def.kind === "multi" && def.nonExcluding?.length ? (
+            <p className="text-xs text-muted-foreground">
+              Pick every one you offer.{" "}
+              {(def.options ?? [])
+                .filter((o) => def.nonExcluding?.includes(o.value))
+                .map((o) => o.label)
+                .join(", ")}{" "}
+              keeps you in every search.
+            </p>
+          ) : null}
+
           {/* def.hint is written for a couple filtering ("venues that seat your
               party"), which reads as nonsense to a vendor declaring their own
               attributes — so it is deliberately not shown here. */}

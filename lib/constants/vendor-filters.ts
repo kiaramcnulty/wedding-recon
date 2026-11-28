@@ -26,6 +26,15 @@ export interface FilterDef {
   /** `multi` only. Order here is the order rendered. */
   options?: FilterOption[];
   /**
+   * `multi` only. Values that never get a vendor HIDDEN. A vendor's list is
+   * otherwise a closed set (a DJ tagged only `edm_house` is hidden from a Latin
+   * search); one that holds a value listed here and misses the pick reads as
+   * silent instead, so it lands in the partial tier. Picking the value itself
+   * still matches normally. DJ `open_format` is the one use (Kiara,
+   * 2026-11-28): an open-format DJ plays what the couple asks for.
+   */
+  nonExcluding?: string[];
+  /**
    * `range` only.
    * - `point`   — the vendor holds ONE number that must land inside the
    *               selected range (venue capacity: big enough for my party,
@@ -379,6 +388,37 @@ export const VENDOR_FILTERS: Partial<Record<VendorType, FilterDef[]>> = {
   ],
 
   dj: [
+    /**
+     * What a DJ sells: open format and/or the genres it names (Kiara,
+     * 2026-11-28). Open format is a specialty that never hides a DJ
+     * (`nonExcluding`): an open-format DJ is a match when Open format is
+     * picked and partial under any genre it does not name. Every other value
+     * keeps the ordinary rule, so a DJ that names only genres the pick misses
+     * is hidden, and a DJ with no specialty is partial. Measured over all 91
+     * CO DJs (recon, crawled sites, live sites, listing profiles): 64 carry a
+     * specialty, 27 say nothing. Dataset:
+     * data/filter-extraction/dj-style-pass-2026-11-28.json; coverage and merge
+     * rules: docs/vendor-filter-coverage.md.
+     */
+    {
+      key: "specialty",
+      label: "Specialty",
+      kind: "multi",
+      nonExcluding: ["open_format"],
+      options: opt({
+        open_format: "Open format",
+        throwback: "Throwbacks",
+        edm_house: "EDM & house",
+        pop_top40: "Pop & Top 40",
+        hiphop_rnb: "Hip-hop & R&B",
+        country: "Country",
+        latin: "Latin",
+        rock: "Rock",
+        jazz_lounge: "Jazz & lounge",
+        south_asian: "South Asian",
+        jewish: "Jewish",
+      }),
+    },
     { key: "includes_mc", label: "Emcee included", kind: "bool" },
     {
       key: "price",
