@@ -9,7 +9,7 @@
  */
 import "./ts-alias.mjs";
 
-const { syncDecision, parseJourney } = await import("../lib/search/journey-state.ts");
+const { syncDecision, parseJourney, journeyProgress } = await import("../lib/search/journey-state.ts");
 
 let pass = 0, fail = 0;
 function eq(label, got, want) {
@@ -106,6 +106,20 @@ eq("Advanced answers survive the trip",
   parseJourney({ ...journey, byType: { beauty: { budget: 300, flags: { airbrush: true }, limits: { party_price: 150 } }, venue: { day: "friday" } } })?.byType,
   { beauty: { budget: 300, flags: { airbrush: true }, limits: { party_price: 150 } }, venue: { day: "friday" } });
 eq("a corrupt account copy is rejected, not applied", parseJourney({ version: 2 }), null);
+
+console.log("progress tracker");
+const prog = (step, hasVenue, status = "in_progress") => journeyProgress({ step, hasVenue, status });
+eq("welcome, venue answer unknown: step 1 of the longer path", prog("welcome", null), { step: 1, total: 4 });
+eq("booked venue: venue search is step 2 of 4", prog("venue", true), { step: 2, total: 4 });
+eq("booked venue, picked a town instead: still step 2 of 4", prog("city", true), { step: 2, total: 4 });
+eq("booked venue: vendor type is step 3 of 4", prog("category", true), { step: 3, total: 4 });
+eq("booked venue: preferences are the last step", prog("prefs", true), { step: 4, total: 4 });
+eq("no venue: town is step 2 of 3", prog("city", false), { step: 2, total: 3 });
+eq("no venue: preferences are step 3 of 3", prog("prefs", false), { step: 3, total: 3 });
+eq("results show no tracker", prog("results", true), null);
+eq("next vendor: the type grid is step 1 of 2", prog("category", true, "completed"), { step: 1, total: 2 });
+eq("next vendor: preferences are step 2 of 2", prog("prefs", false, "completed"), { step: 2, total: 2 });
+eq("editing the place of a finished search shows no tracker", prog("venue", true, "completed"), null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

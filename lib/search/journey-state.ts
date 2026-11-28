@@ -199,6 +199,45 @@ export function journeyStarted(s: JourneyState | null): boolean {
   return !!s && (s.hasVenue !== null || !!s.location);
 }
 
+/**
+ * Where a journey screen sits for the progress tracker (StepProgress), or null
+ * where none shows: results, and editing the place of a finished search.
+ *
+ * - First search, booked venue: welcome, venue (or town), vendor type, prefs.
+ * - First search, no venue: welcome, town, prefs (the type is Venue).
+ * - Finished search, next vendor ("which vendor are you looking for today?"):
+ *   vendor type, prefs.
+ *
+ * Welcome counts as step 1, so arriving at /start from the popup already
+ * shows a step done. While the venue answer is unknown the total is the
+ * longer path's 4: a total may shrink as the couple answers, never grow. A
+ * type with no questions (hotel blocks, Other) skips prefs and ends a step
+ * early, which reads as a pleasant surprise rather than a broken count.
+ */
+export function journeyProgress(
+  s: Pick<JourneyState, "step" | "status" | "hasVenue">,
+): { step: number; total: number } | null {
+  if (s.status === "completed") {
+    if (s.step === "category") return { step: 1, total: 2 };
+    if (s.step === "prefs") return { step: 2, total: 2 };
+    return null;
+  }
+  const total = s.hasVenue === false ? 3 : 4;
+  switch (s.step) {
+    case "welcome":
+      return { step: 1, total };
+    case "venue":
+    case "city":
+      return { step: 2, total };
+    case "category":
+      return total === 4 ? { step: 3, total } : null;
+    case "prefs":
+      return { step: total, total };
+    default:
+      return null;
+  }
+}
+
 export function loadJourney(): JourneyState | null {
   try {
     const raw = localStorage.getItem(JOURNEY_STORAGE_KEY);
