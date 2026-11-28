@@ -54,6 +54,7 @@ research intel, and Reddit passages matched to that vendor. 191 batch calls, zer
 | | | breakfast_included | 61% ±6 |
 | | | parking | 37% ±6 |
 | | | has_shuttle | 14% ±4 |
+| dj | 91 | specialty (2026-11-28 pass, below) | **70%** ±9 |
 | dj | 77 | includes_mc | **58%** ±11 |
 | | | production | 49% ±11 |
 | | | has_photobooth | 38% ±11 |
@@ -119,3 +120,54 @@ the rule self-enforcing and every number auditable after the fact. See
   `region`. Hotel `block_type` in particular leans on chain-level Reddit reports about
   Marriott/Hilton attrition norms, so most values are `basis: chain` — true and useful, but
   not property-confirmed.
+
+## DJ specialty (pass of 2026-11-28)
+
+Separate from the August extraction: a per-DJ judgement over all **91** live DJs, reading our
+recon, the enrich dossiers, vendor-level Reddit, the August site crawl (45 DJs), and, for the
+46 never crawled, the live site or one listing profile (WeddingWire, The Knot, SoundCloud).
+Meta properties were not fetched. Every tag carries a verbatim quote and its source URL:
+`data/filter-extraction/dj-style-pass-2026-11-28.json`.
+
+**DJs do not sell by genre.** 48 of 91 explicitly market "open format"; nobody specializes in
+pop or country; only 11 put any genre front and centre (9 of them EDM/house/rave, plus one
+each Latin, South Asian, Jewish). Most genre evidence is a list on the site.
+
+**Rules (Kiara, 2026-11-28).** `specialty` holds open format and every genre the DJ names,
+from a list or a headline alike. **Open format is a specialty that never hides a DJ**
+(`nonExcluding` on the filter def): an open-format DJ matches an Open format pick and is
+partial under any genre it does not name. Every other value keeps the ordinary `multi` rule,
+so a DJ whose named genres all miss the pick is hidden, and a DJ with no specialty is partial.
+
+Merges into the 11 values: rave/festival/bass -> `edm_house`; funk/soul/Motown/disco/decades
+-> `throwback`; bluegrass/folk -> `country`; a Spanish-speaking MC or Spanish-language
+weddings -> `latin`. A name-only hint ("Basschicken") is never a tag. **64 of 91 DJs (70%)
+carry a specialty.**
+
+| pick | match | partial | hidden |
+|---|---|---|---|
+| Open format | 48 | 27 | 16 |
+| Throwbacks | 19 | 60 | 12 |
+| EDM & house | 17 | 65 | 9 |
+| Pop & Top 40 | 12 | 67 | 12 |
+| Hip-hop & R&B | 11 | 66 | 14 |
+| Country | 11 | 67 | 13 |
+| Latin | 9 | 68 | 14 |
+| Rock | 7 | 72 | 12 |
+| Jazz & lounge | 3 | 75 | 13 |
+| South Asian | 3 | 73 | 15 |
+| Jewish | 2 | 74 | 15 |
+
+Partial = the 27 with no music evidence anywhere (sites that name no genre, three sites
+blocked or down, two Facebook-only, five with no site) plus the open-format DJs that do not
+name the pick. Seven DJs the research judged generalists name genres without ever saying
+"open format" (Greatime, Pure Sounds, Encore, Sound Junction, Tidal Wave Dave, DJ Aeryk,
+Raphael Batista), so they are hidden from genres they do not list. Six tags rest on a
+search engine summary of a listing rather than a fetched page, and four EDM tags on one Reddit
+comment or bot recon alone (DJ Laserfrog, Oro y Plata, Paul Andre, DJ Sparkafya); the dataset
+marks the source of each.
+
+Written by `scripts/backfill-dj-specialty.mjs` with `filters_meta.specialty.source =
+'extraction'` plus the quote and URL. Most of these genres are not in any recon entry; the
+reconciler does not retract a tag for silence (`daily-build-calls.mjs`, RETRACT), so they
+survive it. Future regions get the tag from enrich (`references/music/type-rules.md`).

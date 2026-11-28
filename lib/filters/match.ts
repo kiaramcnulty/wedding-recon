@@ -24,7 +24,12 @@ import { offerFor, type PriceOffer } from "@/lib/filters/price-offers";
 
 /** One selected filter, built from the UI state by `buildSelection`. */
 export type FilterSpec =
-  | { kind: "multi"; values: string[] }
+  | {
+      kind: "multi";
+      values: string[];
+      /** Values that never get a vendor hidden. See `FilterDef.nonExcluding`. */
+      nonExcluding?: string[];
+    }
   | { kind: "bool"; value: boolean }
   | {
       kind: "range";
@@ -172,7 +177,10 @@ export function filterMatch(
       if (!Array.isArray(v) || v.length === 0) {
         unknown++;
       } else if (!v.some((x) => spec.values.includes(String(x)))) {
-        return { rank: -1, unknown, active };
+        // A vendor holding a non-excluding value (an open-format DJ) is not
+        // contradicting a pick it does not name: it reads as silent, partial.
+        if (spec.nonExcluding?.some((n) => v.map(String).includes(n))) unknown++;
+        else return { rank: -1, unknown, active };
       }
       continue;
     }
@@ -379,7 +387,11 @@ export function buildSelection(
     if (v == null) continue;
 
     if (d.kind === "multi" && Array.isArray(v) && v.length) {
-      out[d.key] = { kind: "multi", values: v as string[] };
+      out[d.key] = {
+        kind: "multi",
+        values: v as string[],
+        ...(d.nonExcluding?.length && { nonExcluding: d.nonExcluding }),
+      };
     } else if (d.kind === "bool" && v === true) {
       out[d.key] = { kind: "bool", value: true };
     } else if (d.kind === "range" && typeof v === "object") {

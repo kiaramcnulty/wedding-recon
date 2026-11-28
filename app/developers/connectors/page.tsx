@@ -60,6 +60,7 @@ export default function ConnectorDocsPage() {
         <h2 className="text-xl font-medium">Interpretation rules</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
           <li>Known contradictions are excluded. Missing facts remain as partial matches after every full match.</li>
+          <li>A filter&apos;s <code>non_excluding</code> values never exclude a vendor. An open-format DJ is a partial match for a genre it does not name.</li>
           <li>A starting price is a floor, and range overlap can still mean part of the reported range exceeds the budget.</li>
           <li>A nearby vendor is not confirmed to serve that city. Distance is straight-line from recorded coordinates, not travel time.</li>
           <li>Paid verification can affect ordering only within the same match tier. It is not an independent quality certification.</li>

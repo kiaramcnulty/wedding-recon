@@ -86,7 +86,7 @@ export const GUIDED_CONTROLS: Record<GuidedType, GuidedControls> = {
   },
   dj: {
     budget: { key: "price", label: "DJ budget", placeholder: "1,500", pill: upTo },
-    picks: [],
+    picks: [{ key: "specialty" }],
     flags: [{ key: "includes_mc" }],
   },
   band: {

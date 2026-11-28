@@ -69,7 +69,7 @@ Every field below already exists in `lib/constants/vendor-filters.ts`; no new ta
 | --- | --- | --- | --- |
 | Venue | Budget, guest count, setting | `price`, `capacity_max`, `setting` | Budget is the event/venue total; see the open question on all-inclusive pricing |
 | Caterer | Per-person budget, cuisine, service style | `price`, `cuisine`, `service_style` | No guest-count field (requirement 6) |
-| DJ | Budget, emcee included (off) | `price`, `includes_mc` | |
+| DJ | Budget, specialty, emcee included (off) | `price`, `specialty`, `includes_mc` | Specialty added 2026-11-28; Open format is a specialty that never hides a DJ (`nonExcluding`) |
 | Live music | Price, genre | `price`, `genre` | |
 | Florist | Budget, style, structure | `price` + `minimum_spend`, `style`, `engagement_model` | Selecting both Full service and À la carte means either; replaces the earlier three-way question |
 | Dress shop | Budget, in-house alterations (off) | `price`, `in_house_alterations` | Per gown |
